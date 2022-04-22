@@ -1,0 +1,18 @@
+[
+  {
+    "modid": "kaliastyle",
+    "name": "KaliaStyle",
+    "description": "卡利亚王室后代流传已久的附魔",
+    "version": "1.0.0",
+    "mcversion": "1.12.2",
+    "url": "",
+    "updateUrl": "",
+    "authorList": [
+      "Roinflam"
+    ],
+    "credits": "Old Man Ring!",
+    "logoFile": "",
+    "screenshots": [],
+    "dependencies": []
+  }
+]
