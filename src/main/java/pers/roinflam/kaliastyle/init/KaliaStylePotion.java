@@ -5,6 +5,7 @@ import pers.roinflam.kaliastyle.potion.PotionBadOmen;
 import pers.roinflam.kaliastyle.potion.PotionFrostbite;
 import pers.roinflam.kaliastyle.potion.PotionScarletCorruption;
 import pers.roinflam.kaliastyle.potion.PotionSleeping;
+import pers.roinflam.kaliastyle.potion.hide.PotionDoomedDeath;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,5 +17,7 @@ public class KaliaStylePotion {
     public static final PotionBadOmen BAD_OMEN = new PotionBadOmen(true, 0x74581f);
     public static final PotionSleeping SLEEPING = new PotionSleeping(true, 0x7038a1);
     public static final PotionFrostbite FROSTBITE = new PotionFrostbite(true, 0x2a76a9);
+
+    public static final PotionDoomedDeath DOOMED_DEATH = new PotionDoomedDeath(true, 0x380000);
 
 }

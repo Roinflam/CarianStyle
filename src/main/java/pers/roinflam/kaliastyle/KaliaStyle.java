@@ -5,11 +5,11 @@ import net.minecraftforge.fml.common.SidedProxy;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
-import pers.roinflam.kaliastyle.enchantment.config.ConfigLoader;
+import pers.roinflam.kaliastyle.config.ConfigLoader;
 import pers.roinflam.kaliastyle.proxy.CommonProxy;
 import pers.roinflam.kaliastyle.utils.Reference;
 
-@Mod(modid = Reference.MOD_ID, version = Reference.VERSION, useMetadata = true)
+@Mod(modid = Reference.MOD_ID, useMetadata = true)
 public class KaliaStyle {
     @Mod.Instance
     public static KaliaStyle instance;

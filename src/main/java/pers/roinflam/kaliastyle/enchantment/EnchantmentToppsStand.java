@@ -8,7 +8,9 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
+import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.kaliastyle.init.KaliaStyleEnchantments;
@@ -31,29 +33,33 @@ public class EnchantmentToppsStand extends Enchantment {
         return KaliaStyleEnchantments.TOPPS_STAND;
     }
 
-    @SubscribeEvent
-    public static void onPlayerTick(TickEvent.PlayerTickEvent evt) {
-        if (!evt.player.world.isRemote) {
-            if (evt.phase.equals(TickEvent.Phase.END)) {
-                if (RandomUtil.percentageChance(5)) {
-                    EntityPlayer entityPlayer = evt.player;
-                    if (entityPlayer.isEntityAlive()) {
-                        int bonusLevel = 0;
-                        for (ItemStack itemStack : entityPlayer.getArmorInventoryList()) {
-                            if (itemStack != null) {
-                                bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
-                            }
-                        }
-                        if (bonusLevel > 0) {
-                            List<Entity> entities = EntityUtil.getNearbyEntities(
-                                    entityPlayer,
-                                    bonusLevel * 2,
-                                    bonusLevel * 2,
-                                    entity -> entity instanceof EntityLivingBase && ((EntityLivingBase) entity).getActivePotionEffects().size() > 0
-                            );
-                            for (Entity entity : entities) {
-                                EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
-                                entityLivingBase.clearActivePotions();
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onLivingAttack(LivingAttackEvent evt) {
+        if (!evt.getEntity().world.isRemote) {
+            if (evt.getSource().isMagicDamage()) {
+                EntityLivingBase hurter = evt.getEntityLiving();
+                List<Entity> entities = EntityUtil.getNearbyEntities(
+                        hurter,
+                        6,
+                        6,
+                        entity -> entity instanceof EntityLivingBase
+                );
+                if(evt.getSource().getTrueSource() instanceof EntityLivingBase){
+                    EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
+                    entities.addAll(EntityUtil.getNearbyEntities(
+                            attacker,
+                            6,
+                            6,
+                            entity -> entity instanceof EntityLivingBase
+                    ));
+                }
+                for (Entity entity : entities) {
+                    EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
+                    for (ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
+                        if (itemStack != null) {
+                            if (EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack) > 0) {
+                                evt.setCanceled(true);
+                                return;
                             }
                         }
                     }
@@ -69,7 +75,7 @@ public class EnchantmentToppsStand extends Enchantment {
 
     @Override
     public int getMaxLevel() {
-        return 3;
+        return 1;
     }
 
     @Override
@@ -86,4 +92,5 @@ public class EnchantmentToppsStand extends Enchantment {
     public boolean isTreasureEnchantment() {
         return true;
     }
+
 }

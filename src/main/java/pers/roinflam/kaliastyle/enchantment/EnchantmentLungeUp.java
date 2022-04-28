@@ -55,7 +55,7 @@ public class EnchantmentLungeUp extends Enchantment {
                                 }
 
                             }.start();
-                            evt.setAmount((float) (evt.getAmount() + evt.getAmount() * bonusLevel * 0.2));
+                            evt.setAmount((float) (evt.getAmount() + evt.getAmount() * bonusLevel * 0.15));
                         }
                     }
                 }

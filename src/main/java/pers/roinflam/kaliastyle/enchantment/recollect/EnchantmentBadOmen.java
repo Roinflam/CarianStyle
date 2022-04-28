@@ -74,4 +74,8 @@ public class EnchantmentBadOmen extends Enchantment {
         return getMinEnchantability(enchantmentLevel) * 2;
     }
 
+    @Override
+    public boolean canApplyTogether(Enchantment ench) {
+        return !KaliaStyleEnchantments.RECOLLECT.contains(ench);
+    }
 }

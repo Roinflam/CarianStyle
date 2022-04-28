@@ -51,7 +51,8 @@ public class EnchantmentHealingByFire extends Enchantment {
                                 List<PotionEffect> potionEffects = new ArrayList<>(hurter.getActivePotionEffects());
                                 potionEffects.removeIf(potionEffect ->
                                         !potionEffect.getPotion().isBadEffect() ||
-                                                potionEffect.getPotion().isInstant()
+                                                potionEffect.getPotion().isInstant() ||
+                                                !potionEffect.getPotion().shouldRender(potionEffect)
                                 );
                                 if (potionEffects.size() > 0) {
                                     PotionEffect potionEffect = potionEffects.get(RandomUtil.getInt(0, potionEffects.size() - 1));

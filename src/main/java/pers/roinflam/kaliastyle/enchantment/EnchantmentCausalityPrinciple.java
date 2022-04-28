@@ -61,13 +61,13 @@ public class EnchantmentCausalityPrinciple extends Enchantment {
                             CAUSALITY_PRINCIPLE.remove(hurter.getUniqueID());
                             List<Entity> entities = EntityUtil.getNearbyEntities(
                                     hurter,
-                                    bonusLevel * 2,
-                                    bonusLevel * 2,
+                                    bonusLevel * 3,
+                                    bonusLevel * 3,
                                     entity -> entity instanceof EntityLivingBase && !entity.equals(hurter)
                             );
                             for (Entity entity : entities) {
                                 EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
-                                entityLivingBase.attackEntityFrom(DamageSource.causeMobDamage(hurter), (float) (evt.getAmount() * bonusLevel * 0.5));
+                                entityLivingBase.attackEntityFrom(DamageSource.causeMobDamage(hurter), (float) (evt.getAmount() * bonusLevel * 0.75));
                             }
                         } else {
                             CAUSALITY_PRINCIPLE.put(hurter.getUniqueID(), CAUSALITY_PRINCIPLE.getOrDefault(hurter.getUniqueID(), 0) + 1);

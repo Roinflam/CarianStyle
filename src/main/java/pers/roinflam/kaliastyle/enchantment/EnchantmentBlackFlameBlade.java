@@ -1,13 +1,16 @@
-package pers.roinflam.kaliastyle.enchantment.recollect;
+package pers.roinflam.kaliastyle.enchantment;
 
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.projectile.EntityArrow;
+import net.minecraft.init.MobEffects;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemArmor;
+import net.minecraft.item.ItemStack;
 import net.minecraft.potion.PotionEffect;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.event.entity.living.LivingHealEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -16,21 +19,17 @@ import pers.roinflam.kaliastyle.init.KaliaStylePotion;
 import pers.roinflam.kaliastyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.kaliastyle.utils.util.EnchantmentUtil;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-
 @Mod.EventBusSubscriber
-public class EnchantmentDoomedDeath extends Enchantment {
+public class EnchantmentBlackFlameBlade extends Enchantment {
 
-    public EnchantmentDoomedDeath(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+    public EnchantmentBlackFlameBlade(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
         super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "doomed_death");
+        EnchantmentUtil.registerEnchantment(this, "black_flame_blade");
         KaliaStyleEnchantments.ENCHANTMENTS.add(this);
     }
 
     public static Enchantment getEnchantment() {
-        return KaliaStyleEnchantments.DOOMED_DEATH;
+        return KaliaStyleEnchantments.BLACK_FLAME_BLADE;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -42,8 +41,7 @@ public class EnchantmentDoomedDeath extends Enchantment {
                 if (attacker.getHeldItemMainhand() != null) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
                     if (bonusLevel > 0) {
-                        hurter.addPotionEffect(new PotionEffect(KaliaStylePotion.DOOMED_DEATH, 10 * 20, 0));
-                        float hurtDamage = evt.getAmount();
+                        float damage = (float) (evt.getAmount() * bonusLevel * 0.15 / 100);
                         new SynchronizationTask(5, 1) {
                             private int tick = 0;
 
@@ -53,8 +51,6 @@ public class EnchantmentDoomedDeath extends Enchantment {
                                     this.cancel();
                                     return;
                                 }
-                                float damage = (float) ((hurtDamage * 0.5 + hurter.getHealth() * 0.05) / 100);
-                                damage = (float) (damage * 0.3 + damage * tick / 50 * 0.7);
                                 if (hurter.getHealth() - damage * 1.1 > 0) {
                                     hurter.setHealth(hurter.getHealth() - damage);
                                 } else {
@@ -78,12 +74,12 @@ public class EnchantmentDoomedDeath extends Enchantment {
 
     @Override
     public int getMaxLevel() {
-        return 1;
+        return 3;
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return KaliaStyleEnchantments.RECOLLECT_ENCHANTABILITY;
+        return 25 + (enchantmentLevel - 1) * 15;
     }
 
     @Override
@@ -92,7 +88,18 @@ public class EnchantmentDoomedDeath extends Enchantment {
     }
 
     @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return !KaliaStyleEnchantments.RECOLLECT.contains(ench);
+    public boolean canApplyAtEnchantingTable(ItemStack itemStack) {
+        return super.canApplyAtEnchantingTable(itemStack) && !(itemStack.getItem() instanceof ItemArmor);
     }
+
+    @Override
+    public boolean isTreasureEnchantment() {
+        return true;
+    }
+
+    @Override
+    public boolean canApplyTogether(Enchantment ench) {
+        return super.canApplyTogether(ench) && !ench.equals(KaliaStyleEnchantments.INVISIBLE_WEAPON);
+    }
+
 }

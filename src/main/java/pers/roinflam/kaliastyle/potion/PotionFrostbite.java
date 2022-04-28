@@ -43,11 +43,6 @@ public class PotionFrostbite extends Potion {
         return duration % 20 == 0;
     }
 
-    @Override
-    public boolean hasStatusIcon() {
-        return true;
-    }
-
     @SideOnly(Side.CLIENT)
     @Override
     public void renderInventoryEffect(int x, int y, PotionEffect effect, Minecraft mc) {

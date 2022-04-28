@@ -69,6 +69,7 @@ public class EnchantmentBloodCollection extends Enchantment {
         return super.canApplyTogether(ench) &&
                 !ench.equals(KaliaStyleEnchantments.SCARLET_CORRUPTION) &&
                 !ench.equals(KaliaStyleEnchantments.FIRE_GIVES_POWER) &&
+                !ench.equals(KaliaStyleEnchantments.FIRE_DEVOURED) &&
                 !ench.equals(KaliaStyleEnchantments.VIC_DRAGON_THUNDER) &&
                 !ench.equals(KaliaStyleEnchantments.DARK_MOON);
     }

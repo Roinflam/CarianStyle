@@ -1,4 +1,4 @@
-package pers.roinflam.kaliastyle.enchantment.config;
+package pers.roinflam.kaliastyle.config;
 
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;

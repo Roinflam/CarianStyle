@@ -316,6 +316,16 @@ public class KaliaStyleEnchantments {
             EnumEnchantmentType.ARMOR_LEGS,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.LEGS}
     );
+    public static final EnchantmentRegressivePrinciple REGRESSIVE_PRINCIPLE = new EnchantmentRegressivePrinciple(
+            Enchantment.Rarity.RARE,
+            EnumEnchantmentType.ARMOR_HEAD,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.HEAD}
+    );
+    public static final EnchantmentBlackFlameBlade BLACK_FLAME_BLADE = new EnchantmentBlackFlameBlade(
+            Enchantment.Rarity.RARE,
+            EnumEnchantmentType.WEAPON,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
+    );
 
     public static final Set<Enchantment> RECOLLECT = new HashSet<>(ImmutableList.of(BROKEN_STAR, BLASPHEMY, DOOMED_DEATH, FULL_MOON, LIVING_CORPSE, MIKAELA_BLADE, BAD_OMEN, GIANT_FLAME, BLOOD, TIME_REVERSAL, WARRIOR, GOLDEN_LAW, ANCESTRAL_SPIRITS, DARK_ABANDONED_CHILD));
 }

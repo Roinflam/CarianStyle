@@ -79,7 +79,6 @@ public class EnchantmentHypnoticSmoke extends Enchantment {
     public boolean canApplyTogether(Enchantment ench) {
         return super.canApplyTogether(ench) &&
                 !ench.equals(KaliaStyleEnchantments.EPILEPSY_FIRE) &&
-                !ench.equals(KaliaStyleEnchantments.EPILEPSY_FIRE) &&
                 !ench.equals(KaliaStyleEnchantments.EAT_SHIT);
     }
 

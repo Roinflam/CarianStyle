@@ -141,6 +141,7 @@ public class EnchantmentStarsLaw extends Enchantment {
                 (ench.equals(KaliaStyleEnchantments.DARK_ABANDONED_CHILD) || !KaliaStyleEnchantments.RECOLLECT.contains(ench)) &&
                 !ench.equals(KaliaStyleEnchantments.SCARLET_CORRUPTION) &&
                 !ench.equals(KaliaStyleEnchantments.FIRE_GIVES_POWER) &&
+                !ench.equals(KaliaStyleEnchantments.FIRE_DEVOURED) &&
                 !ench.equals(KaliaStyleEnchantments.VIC_DRAGON_THUNDER);
     }
 
