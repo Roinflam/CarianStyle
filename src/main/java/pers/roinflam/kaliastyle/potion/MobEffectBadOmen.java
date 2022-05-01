@@ -7,30 +7,38 @@ import net.minecraft.potion.Potion;
 import net.minecraft.potion.PotionEffect;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
+import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import pers.roinflam.kaliastyle.init.KaliaStylePotion;
-import pers.roinflam.kaliastyle.source.NewDamageSource;
 import pers.roinflam.kaliastyle.utils.Reference;
-import pers.roinflam.kaliastyle.utils.java.random.RandomUtil;
-import pers.roinflam.kaliastyle.utils.util.EntityUtil;
 import pers.roinflam.kaliastyle.utils.util.PotionUtil;
 
 @Mod.EventBusSubscriber
-public class PotionScarletCorruption extends Potion {
-    private final static ResourceLocation RESOURCE_LOCATION = new ResourceLocation(Reference.MOD_ID, "textures/effect/scarlet_corruption.png");
+public class MobEffectBadOmen extends Potion {
+    private final static ResourceLocation RESOURCE_LOCATION = new ResourceLocation(Reference.MOD_ID, "textures/effect/bad_omen.png");
 
-    public PotionScarletCorruption(boolean isBadEffectIn, int liquidColorIn) {
+    public MobEffectBadOmen(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn, liquidColorIn);
-        PotionUtil.registerPotion(this, "scarlet_corruption");
+        PotionUtil.registerPotion(this, "bad_omen");
         KaliaStylePotion.POTIONS.add(this);
     }
 
     public static Potion getPotion() {
-        return KaliaStylePotion.SCARLET_CORRUPTION;
+        return KaliaStylePotion.BAD_OMEN;
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public static void onLivingHurt(LivingHurtEvent evt) {
+        if (!evt.getEntity().world.isRemote) {
+            EntityLivingBase hurter = evt.getEntityLiving();
+            if (hurter.isPotionActive(getPotion())) {
+                evt.setAmount((float) (evt.getAmount() * 1.25));
+            }
+        }
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -38,17 +46,8 @@ public class PotionScarletCorruption extends Potion {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase healer = evt.getEntityLiving();
             if (healer.isPotionActive(getPotion())) {
-                evt.setAmount((float) (evt.getAmount() * 0.75));
+                evt.setAmount((float) (evt.getAmount() * 0.5));
             }
-        }
-    }
-
-    @Override
-    public void performEffect(EntityLivingBase entityLivingBaseIn, int amplifier) {
-        if (EntityUtil.getFire(entityLivingBaseIn) <= 0 || RandomUtil.percentageChance(25)) {
-            float damage = (float) (entityLivingBaseIn.getHealth() * 0.02 + entityLivingBaseIn.getMaxHealth() * 0.0005);
-            damage += damage * amplifier * 0.25;
-            entityLivingBaseIn.attackEntityFrom(NewDamageSource.SCARLET_CORRUPTION, damage);
         }
     }
 

@@ -7,7 +7,6 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.potion.PotionEffect;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.event.entity.living.LivingHealEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -15,10 +14,6 @@ import pers.roinflam.kaliastyle.init.KaliaStyleEnchantments;
 import pers.roinflam.kaliastyle.init.KaliaStylePotion;
 import pers.roinflam.kaliastyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.kaliastyle.utils.util.EnchantmentUtil;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
 
 @Mod.EventBusSubscriber
 public class EnchantmentDoomedDeath extends Enchantment {
@@ -42,6 +37,7 @@ public class EnchantmentDoomedDeath extends Enchantment {
                 if (attacker.getHeldItemMainhand() != null) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
                     if (bonusLevel > 0) {
+                        hurter.addPotionEffect(new PotionEffect(KaliaStylePotion.DOOMED_DEATH_BURNING, 5 * 20 + 5, 0));
                         hurter.addPotionEffect(new PotionEffect(KaliaStylePotion.DOOMED_DEATH, 10 * 20, 0));
                         float hurtDamage = evt.getAmount();
                         new SynchronizationTask(5, 1) {

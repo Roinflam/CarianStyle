@@ -19,9 +19,9 @@ import pers.roinflam.kaliastyle.utils.Reference;
 import pers.roinflam.kaliastyle.utils.util.PotionUtil;
 
 @Mod.EventBusSubscriber
-public class PotionDoomedDeath extends Potion {
+public class MobEffectDoomedDeath extends Potion {
 
-    public PotionDoomedDeath(boolean isBadEffectIn, int liquidColorIn) {
+    public MobEffectDoomedDeath(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn, liquidColorIn);
         PotionUtil.registerPotion(this, "doomed_death");
         KaliaStylePotion.POTIONS.add(this);

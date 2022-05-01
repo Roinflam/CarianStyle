@@ -37,7 +37,6 @@ public class EnchantmentLorettaBigBow extends Enchantment {
                 int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
                 if (bonusLevel > 0) {
                     entityArrow.setDamage(entityArrow.getDamage() + entityArrow.getDamage() * 0.5);
-                    System.out.println(EntityUtil.getFire(entityArrow));
                     Explosion explosion = attacker.world.createExplosion(attacker, entityArrow.posX, entityArrow.posY, entityArrow.posZ, (float) EntityUtil.getFire(entityArrow) > 0 ? 3 : 2, false);
                 }
             }

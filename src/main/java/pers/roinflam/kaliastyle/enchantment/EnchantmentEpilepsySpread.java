@@ -17,6 +17,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.kaliastyle.init.KaliaStyleEnchantments;
+import pers.roinflam.kaliastyle.init.KaliaStylePotion;
 import pers.roinflam.kaliastyle.source.NewDamageSource;
 import pers.roinflam.kaliastyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.kaliastyle.utils.util.EnchantmentUtil;
@@ -89,6 +90,7 @@ public class EnchantmentEpilepsySpread extends Enchantment {
                                         for (Entity entity : entities) {
                                             EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
                                             entityLivingBase.playSound(SoundEvents.ENTITY_GHAST_HURT, 1, 1);
+                                            entityLivingBase.addPotionEffect(new PotionEffect(KaliaStylePotion.EPILEPSY_FIRE_BURNING, 3 * 20 + 5, 0));
                                             new SynchronizationTask(5, 1) {
                                                 private int tick = 0;
 

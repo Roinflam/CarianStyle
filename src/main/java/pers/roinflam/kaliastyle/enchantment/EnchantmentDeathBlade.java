@@ -5,12 +5,14 @@ import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.potion.PotionEffect;
 import net.minecraft.util.DamageSource;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.kaliastyle.init.KaliaStyleEnchantments;
+import pers.roinflam.kaliastyle.init.KaliaStylePotion;
 import pers.roinflam.kaliastyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.kaliastyle.utils.util.EnchantmentUtil;
 
@@ -38,15 +40,17 @@ public class EnchantmentDeathBlade extends Enchantment {
                     if (bonusLevel > 0) {
                         DamageSource damageSource = evt.getSource();
                         if (!damageSource.damageType.equals("deathBlade") && !damageSource.canHarmInCreative()) {
-                            evt.setCanceled(true);
-                            float damage = evt.getAmount() / 60;
+                            float damage = (float) (evt.getAmount() * 0.5 / 100);
+                            evt.setAmount((float) (evt.getAmount() * 0.5));
                             damageSource.damageType = "deathBlade";
+                            hurter.addPotionEffect(new PotionEffect(KaliaStylePotion.DOOMED_DEATH_BURNING, 5 * 20 + 5, 0));
+                            hurter.addPotionEffect(new PotionEffect(KaliaStylePotion.DOOMED_DEATH, 10 * 20, 0));
                             new SynchronizationTask(1, 1) {
                                 private int tick = 0;
 
                                 @Override
                                 public void run() {
-                                    if (++tick > 60 || !hurter.isEntityAlive()) {
+                                    if (++tick > 100 || !hurter.isEntityAlive()) {
                                         this.cancel();
                                         return;
                                     }

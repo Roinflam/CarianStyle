@@ -6,11 +6,13 @@ import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.potion.PotionEffect;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.kaliastyle.init.KaliaStyleEnchantments;
+import pers.roinflam.kaliastyle.init.KaliaStylePotion;
 import pers.roinflam.kaliastyle.source.NewDamageSource;
 import pers.roinflam.kaliastyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.kaliastyle.utils.util.EnchantmentUtil;
@@ -39,6 +41,7 @@ public class EnchantmentEpilepsyFire extends Enchantment {
                     if (bonusLevel > 0) {
                         float hurtDamage = evt.getAmount();
                         if (!(attacker instanceof EntityPlayer) || !((EntityPlayer) attacker).isCreative()) {
+                            attacker.addPotionEffect(new PotionEffect(KaliaStylePotion.EPILEPSY_FIRE_BURNING, 3 * 20 + 5, 0));
                             new SynchronizationTask(5, 1) {
                                 private int tick = 0;
 
@@ -61,6 +64,7 @@ public class EnchantmentEpilepsyFire extends Enchantment {
 
                             }.start();
                         }
+                        hurter.addPotionEffect(new PotionEffect(KaliaStylePotion.EPILEPSY_FIRE_BURNING, 3 * 20 + 5, 0));
                         new SynchronizationTask(5, 1) {
                             private int tick = 0;
 

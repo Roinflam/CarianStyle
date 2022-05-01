@@ -177,22 +177,22 @@ public class KaliaStyleEnchantments {
             new EntityEquipmentSlot[]{EntityEquipmentSlot.FEET}
     );
     public static final EnchantmentLorettaBigBow LORETTA_BIG_BOW = new EnchantmentLorettaBigBow(
-            Enchantment.Rarity.VERY_RARE,
+            Enchantment.Rarity.RARE,
             EnumEnchantmentType.BOW,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
     );
     public static final EnchantmentLorettaTrick LORETTA_TRICK = new EnchantmentLorettaTrick(
-            Enchantment.Rarity.VERY_RARE,
+            Enchantment.Rarity.RARE,
             EnumEnchantmentType.BOW,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
     );
     public static final EnchantmentEmptyEpilepsyFire EMPTY_EPILEPSY_FIRE = new EnchantmentEmptyEpilepsyFire(
-            Enchantment.Rarity.VERY_RARE,
+            Enchantment.Rarity.RARE,
             EnumEnchantmentType.BOW,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
     );
     public static final EnchantmentCallStar CALL_STAR = new EnchantmentCallStar(
-            Enchantment.Rarity.VERY_RARE,
+            Enchantment.Rarity.RARE,
             EnumEnchantmentType.BOW,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
     );
@@ -326,6 +326,22 @@ public class KaliaStyleEnchantments {
             EnumEnchantmentType.WEAPON,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
     );
+    public static final EnchantmentContinuousShooting CONTINUOUS_SHOOTING = new EnchantmentContinuousShooting(
+            Enchantment.Rarity.VERY_RARE,
+            EnumEnchantmentType.BOW,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
+    );
+    public static final EnchantmentLongTailCat LONG_TAIL_CAT = new EnchantmentLongTailCat(
+            Enchantment.Rarity.RARE,
+            EnumEnchantmentType.ARMOR,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.FEET}
+    );
+    public static final EnchantmentGodskinSwaddling GODSKIN_SWADDLING = new EnchantmentGodskinSwaddling(
+            Enchantment.Rarity.RARE,
+            EnumEnchantmentType.WEAPON,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
+    );
 
     public static final Set<Enchantment> RECOLLECT = new HashSet<>(ImmutableList.of(BROKEN_STAR, BLASPHEMY, DOOMED_DEATH, FULL_MOON, LIVING_CORPSE, MIKAELA_BLADE, BAD_OMEN, GIANT_FLAME, BLOOD, TIME_REVERSAL, WARRIOR, GOLDEN_LAW, ANCESTRAL_SPIRITS, DARK_ABANDONED_CHILD));
+    public static final Set<Enchantment> LAW = new HashSet<>(ImmutableList.of(GOLDEN_LAW, STARS_LAW));
 }

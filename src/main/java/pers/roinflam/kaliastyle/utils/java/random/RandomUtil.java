@@ -21,6 +21,7 @@ public class RandomUtil {
      * 返回百分比几率的结果
      *
      * @param probability 百分比几率
+     *
      * @return 结果
      */
     public static boolean percentageChance(double probability) {

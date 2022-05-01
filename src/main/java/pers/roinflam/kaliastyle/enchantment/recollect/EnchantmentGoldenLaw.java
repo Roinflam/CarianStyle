@@ -108,6 +108,6 @@ public class EnchantmentGoldenLaw extends Enchantment {
 
     @Override
     public boolean canApplyTogether(Enchantment ench) {
-        return !KaliaStyleEnchantments.RECOLLECT.contains(ench);
+        return !KaliaStyleEnchantments.RECOLLECT.contains(ench) && !KaliaStyleEnchantments.LAW.contains(ench);
     }
 }

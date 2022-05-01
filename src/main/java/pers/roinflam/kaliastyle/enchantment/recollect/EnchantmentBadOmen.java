@@ -12,7 +12,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.kaliastyle.init.KaliaStyleEnchantments;
-import pers.roinflam.kaliastyle.potion.PotionBadOmen;
+import pers.roinflam.kaliastyle.potion.MobEffectBadOmen;
 import pers.roinflam.kaliastyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
@@ -37,7 +37,7 @@ public class EnchantmentBadOmen extends Enchantment {
                 if (attacker.getHeldItemMainhand() != null) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
                     if (bonusLevel > 0) {
-                        if (hurter.isPotionActive(PotionBadOmen.getPotion())) {
+                        if (hurter.isPotionActive(MobEffectBadOmen.getPotion())) {
                             double damage = evt.getAmount();
                             if (damage * 0.5 >= hurter.getHealth()) {
                                 hurter.setHealth(0);
@@ -47,7 +47,7 @@ public class EnchantmentBadOmen extends Enchantment {
                                 evt.setAmount((float) (damage * 0.5));
                             }
                         }
-                        hurter.addPotionEffect(new PotionEffect(PotionBadOmen.getPotion(), 200, 0));
+                        hurter.addPotionEffect(new PotionEffect(MobEffectBadOmen.getPotion(), 200, 0));
                     }
                 }
             }

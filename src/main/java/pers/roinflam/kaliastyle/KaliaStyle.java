@@ -6,6 +6,7 @@ import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import pers.roinflam.kaliastyle.config.ConfigLoader;
+import pers.roinflam.kaliastyle.network.NetworkRegistryHandler;
 import pers.roinflam.kaliastyle.proxy.CommonProxy;
 import pers.roinflam.kaliastyle.utils.Reference;
 
@@ -20,6 +21,7 @@ public class KaliaStyle {
     @Mod.EventHandler
     public static void preInit(FMLPreInitializationEvent evt) {
         new ConfigLoader(evt);
+        NetworkRegistryHandler.register();
     }
 
     @Mod.EventHandler

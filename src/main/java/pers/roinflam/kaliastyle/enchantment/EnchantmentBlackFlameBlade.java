@@ -42,6 +42,7 @@ public class EnchantmentBlackFlameBlade extends Enchantment {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
                     if (bonusLevel > 0) {
                         float damage = (float) (evt.getAmount() * bonusLevel * 0.15 / 100);
+                        hurter.addPotionEffect(new PotionEffect(KaliaStylePotion.DESTRUCTION_FIRE_BURNING, 5 * 20 + 5, 0));
                         new SynchronizationTask(5, 1) {
                             private int tick = 0;
 

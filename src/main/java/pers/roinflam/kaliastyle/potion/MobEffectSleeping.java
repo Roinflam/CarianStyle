@@ -24,10 +24,10 @@ import pers.roinflam.kaliastyle.utils.util.EntityLivingUtil;
 import pers.roinflam.kaliastyle.utils.util.PotionUtil;
 
 @Mod.EventBusSubscriber
-public class PotionSleeping extends Potion {
+public class MobEffectSleeping extends Potion {
     private final static ResourceLocation RESOURCE_LOCATION = new ResourceLocation(Reference.MOD_ID, "textures/effect/sleeping.png");
 
-    public PotionSleeping(boolean isBadEffectIn, int liquidColorIn) {
+    public MobEffectSleeping(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn, liquidColorIn);
         PotionUtil.registerPotion(this, "sleeping");
         KaliaStylePotion.POTIONS.add(this);

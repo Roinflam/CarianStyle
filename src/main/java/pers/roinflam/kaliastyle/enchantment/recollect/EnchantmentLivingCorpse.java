@@ -49,7 +49,6 @@ public class EnchantmentLivingCorpse extends Enchantment {
                 if (!DEAD.contains(hurter.getUniqueID())) {
                     if (!hurter.isDead) {
                         evt.setCanceled(true);
-                        System.out.println(hurter.getMaxHealth() - hurter.getHealth());
                         hurter.setHealth(hurter.getMaxHealth());
                         DEAD.add(hurter.getUniqueID());
                         LOSE_BLOOD.add(hurter.getUniqueID());

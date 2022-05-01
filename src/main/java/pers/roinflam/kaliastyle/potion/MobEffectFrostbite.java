@@ -3,52 +3,39 @@ package pers.roinflam.kaliastyle.potion;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.potion.Potion;
 import net.minecraft.potion.PotionEffect;
 import net.minecraft.util.ResourceLocation;
-import net.minecraftforge.event.entity.living.LivingHealEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import pers.roinflam.kaliastyle.init.KaliaStylePotion;
+import pers.roinflam.kaliastyle.source.NewDamageSource;
 import pers.roinflam.kaliastyle.utils.Reference;
 import pers.roinflam.kaliastyle.utils.util.PotionUtil;
 
 @Mod.EventBusSubscriber
-public class PotionBadOmen extends Potion {
-    private final static ResourceLocation RESOURCE_LOCATION = new ResourceLocation(Reference.MOD_ID, "textures/effect/bad_omen.png");
+public class MobEffectFrostbite extends Potion {
+    private final static ResourceLocation RESOURCE_LOCATION = new ResourceLocation(Reference.MOD_ID, "textures/effect/frostbite.png");
 
-    public PotionBadOmen(boolean isBadEffectIn, int liquidColorIn) {
+    public MobEffectFrostbite(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn, liquidColorIn);
-        PotionUtil.registerPotion(this, "bad_omen");
+        PotionUtil.registerPotion(this, "frostbite");
         KaliaStylePotion.POTIONS.add(this);
+
+        this.registerPotionAttributeModifier(SharedMonsterAttributes.MOVEMENT_SPEED, "5d59080b-eda9-f5b7-1b3c-51568e5b6682", -0.075, 2);
     }
 
     public static Potion getPotion() {
-        return KaliaStylePotion.BAD_OMEN;
+        return KaliaStylePotion.FROSTBITE;
     }
 
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHurt(LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            EntityLivingBase hurter = evt.getEntityLiving();
-            if (hurter.isPotionActive(getPotion())) {
-                evt.setAmount((float) (evt.getAmount() * 1.25));
-            }
-        }
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingHeal(LivingHealEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            EntityLivingBase healer = evt.getEntityLiving();
-            if (healer.isPotionActive(getPotion())) {
-                evt.setAmount((float) (evt.getAmount() * 0.5));
-            }
-        }
+    @Override
+    public void performEffect(EntityLivingBase entityLivingBaseIn, int amplifier) {
+        float damage = (float) (entityLivingBaseIn.getMaxHealth() * 0.005);
+        damage += damage * amplifier;
+        entityLivingBaseIn.attackEntityFrom(NewDamageSource.FROSTBITE, damage);
     }
 
     @Override

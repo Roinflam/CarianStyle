@@ -138,6 +138,7 @@ public class EnchantmentStarsLaw extends Enchantment {
     @Override
     public boolean canApplyTogether(Enchantment ench) {
         return super.canApplyTogether(ench) &&
+                !KaliaStyleEnchantments.LAW.contains(ench) &&
                 (ench.equals(KaliaStyleEnchantments.DARK_ABANDONED_CHILD) || !KaliaStyleEnchantments.RECOLLECT.contains(ench)) &&
                 !ench.equals(KaliaStyleEnchantments.SCARLET_CORRUPTION) &&
                 !ench.equals(KaliaStyleEnchantments.FIRE_GIVES_POWER) &&
