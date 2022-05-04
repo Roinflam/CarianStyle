@@ -1,7 +1,0 @@
-{
-    "parent": "kaliastyle:block/white_flame_side_alt",
-    "textures": {
-        "particle": "kaliastyle:blocks/white_flame_layer_1",
-        "fire": "kaliastyle:blocks/white_flame_layer_1"
-    }
-}

@@ -1,7 +1,0 @@
-{
-    "parent": "kaliastyle:block/crimson_flame_side",
-    "textures": {
-        "particle": "kaliastyle:blocks/crimson_flame_layer_1",
-        "fire": "kaliastyle:blocks/crimson_flame_layer_1"
-    }
-}

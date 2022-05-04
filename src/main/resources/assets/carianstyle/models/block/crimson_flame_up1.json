@@ -1,0 +1,7 @@
+{
+    "parent": "carianstyle:block/crimson_flame_up",
+    "textures": {
+        "particle": "carianstyle:blocks/crimson_flame_layer_1",
+        "fire": "carianstyle:blocks/crimson_flame_layer_1"
+    }
+}

@@ -1,7 +1,0 @@
-{
-    "parent": "kaliastyle:block/yellow_flame_up",
-    "textures": {
-        "particle": "kaliastyle:blocks/yellow_flame_layer_0",
-        "fire": "kaliastyle:blocks/yellow_flame_layer_0"
-    }
-}

@@ -1,0 +1,7 @@
+{
+    "parent": "carianstyle:block/yellow_flame_up",
+    "textures": {
+        "particle": "carianstyle:blocks/yellow_flame_layer_1",
+        "fire": "carianstyle:blocks/yellow_flame_layer_1"
+    }
+}
