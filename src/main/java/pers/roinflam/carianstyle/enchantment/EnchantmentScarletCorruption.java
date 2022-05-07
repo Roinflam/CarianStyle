@@ -20,16 +20,16 @@ import java.util.UUID;
 
 @Mod.EventBusSubscriber
 public class EnchantmentScarletCorruption extends Enchantment {
-    public static Set<UUID> SCARLET_CORRUPTION = new HashSet<>();
+    public static Set<UUID> SCARLET_ROT = new HashSet<>();
 
     public EnchantmentScarletCorruption(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
         super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "scarlet_corruption");
+        EnchantmentUtil.registerEnchantment(this, "SCARLET_ROT");
         CarianStyleEnchantments.ENCHANTMENTS.add(this);
     }
 
     public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.SCARLET_CORRUPTION;
+        return CarianStyleEnchantments.SCARLET_ROT;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -41,7 +41,7 @@ public class EnchantmentScarletCorruption extends Enchantment {
                 if (attacker.getHeldItemMainhand() != null) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
                     if (bonusLevel > 0) {
-                        hurter.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_CORRUPTION, bonusLevel * 20 * 20, 0));
+                        hurter.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_ROT, bonusLevel * 20 * 20, 0));
                     }
                 }
             }

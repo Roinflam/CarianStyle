@@ -49,7 +49,7 @@ public class EnchantmentDragonBreathCorruption extends Enchantment {
                         );
                         for (Entity entity : entities) {
                             EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
-                            entityLivingBase.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_CORRUPTION, bonusLevel * 5 * 20, bonusLevel - 1));
+                            entityLivingBase.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_ROT, bonusLevel * 5 * 20, bonusLevel - 1));
                         }
                     }
                 }

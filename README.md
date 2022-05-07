@@ -1,5 +1,7 @@
-# 卡利亚式附魔
+# CarianStyle
 
-Minecraft 1.12.2Forge Mod
+Minecraft Forge Mod
 
-根据艾尔登法环游戏内容所制作的附魔类型Mod
+An enchantment type mod based on the game content of the Elden Ring.
+
+### [Download](https://www.curseforge.com/minecraft/mc-mods/carianstyle)	[Chinese WIKI](https://www.mcmod.cn/class/6247.html)

@@ -20,17 +20,17 @@ import pers.roinflam.carianstyle.utils.util.EntityUtil;
 import pers.roinflam.carianstyle.utils.util.PotionUtil;
 
 @Mod.EventBusSubscriber
-public class MobEffectScarletCorruption extends Potion {
-    private final static ResourceLocation RESOURCE_LOCATION = new ResourceLocation(Reference.MOD_ID, "textures/effect/scarlet_corruption.png");
+public class MobEffectScarletRot extends Potion {
+    private final static ResourceLocation RESOURCE_LOCATION = new ResourceLocation(Reference.MOD_ID, "textures/effect/scarlet_rot.png");
 
-    public MobEffectScarletCorruption(boolean isBadEffectIn, int liquidColorIn) {
+    public MobEffectScarletRot(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn, liquidColorIn);
-        PotionUtil.registerPotion(this, "scarlet_corruption");
+        PotionUtil.registerPotion(this, "scarlet_rot");
         CarianStylePotion.POTIONS.add(this);
     }
 
     public static Potion getPotion() {
-        return CarianStylePotion.SCARLET_CORRUPTION;
+        return CarianStylePotion.SCARLET_ROT;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -48,7 +48,7 @@ public class MobEffectScarletCorruption extends Potion {
         if (EntityUtil.getFire(entityLivingBaseIn) <= 0 || RandomUtil.percentageChance(25)) {
             float damage = (float) (entityLivingBaseIn.getHealth() * 0.02 + entityLivingBaseIn.getMaxHealth() * 0.0005);
             damage += damage * amplifier * 0.25;
-            entityLivingBaseIn.attackEntityFrom(NewDamageSource.SCARLET_CORRUPTION, damage);
+            entityLivingBaseIn.attackEntityFrom(NewDamageSource.SCARLET_ROT, damage);
         }
     }
 

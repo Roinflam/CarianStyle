@@ -91,7 +91,7 @@ public class CarianStyleEnchantments {
             EnumEnchantmentType.WEAPON,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
     );
-    public static final EnchantmentScarletCorruption SCARLET_CORRUPTION = new EnchantmentScarletCorruption(
+    public static final EnchantmentScarletCorruption SCARLET_ROT = new EnchantmentScarletCorruption(
             Enchantment.Rarity.RARE,
             EnumEnchantmentType.WEAPON,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
@@ -350,6 +350,31 @@ public class CarianStyleEnchantments {
             Enchantment.Rarity.VERY_RARE,
             EnumEnchantmentType.ARMOR_LEGS,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.LEGS}
+    );
+    public static final EnchantmentGoldenVow GOLDEN_VOW = new EnchantmentGoldenVow(
+            Enchantment.Rarity.RARE,
+            EnumEnchantmentType.ARMOR_CHEST,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST}
+    );
+    public static final EnchantmentBlessingOfTheErdtree BLESSING_OF_THE_ERDTREE = new EnchantmentBlessingOfTheErdtree(
+            Enchantment.Rarity.RARE,
+            EnumEnchantmentType.ARMOR_CHEST,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST}
+    );
+    public static final EnchantmentProtectionOfTheErdtree PROTECTION_OF_THE_ERDTREE = new EnchantmentProtectionOfTheErdtree(
+            Enchantment.Rarity.RARE,
+            EnumEnchantmentType.ARMOR_CHEST,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST}
+    );
+    public static final EnchantmentRedFeatheredBranchsword RED_FEATHERED_BRANCHSWORD = new EnchantmentRedFeatheredBranchsword(
+            Enchantment.Rarity.UNCOMMON,
+            EnumEnchantmentType.WEAPON,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
+    );
+    public static final EnchantmentBlueFeatheredBranchsword BLUE_FEATHERED_BRANCHSWORD = new EnchantmentBlueFeatheredBranchsword(
+            Enchantment.Rarity.UNCOMMON,
+            EnumEnchantmentType.WEAPON,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
     );
 
     public static final Set<Enchantment> RECOLLECT = new HashSet<>(ImmutableList.of(BROKEN_STAR, BLASPHEMY, DOOMED_DEATH, FULL_MOON, LIVING_CORPSE, MIKAELA_BLADE, BAD_OMEN, GIANT_FLAME, BLOOD, TIME_REVERSAL, WARRIOR, GOLDEN_LAW, ANCESTRAL_SPIRITS, DARK_ABANDONED_CHILD));

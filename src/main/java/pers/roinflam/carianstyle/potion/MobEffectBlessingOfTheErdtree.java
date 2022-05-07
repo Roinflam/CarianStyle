@@ -11,36 +11,33 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
-import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.PotionUtil;
 
 @Mod.EventBusSubscriber
-public class MobEffectFrostbite extends Potion {
-    private final static ResourceLocation RESOURCE_LOCATION = new ResourceLocation(Reference.MOD_ID, "textures/effect/frostbite.png");
+public class MobEffectBlessingOfTheErdtree extends Potion {
+    private final static ResourceLocation RESOURCE_LOCATION = new ResourceLocation(Reference.MOD_ID, "textures/effect/blessing_of_the_erdtree.png");
 
-    public MobEffectFrostbite(boolean isBadEffectIn, int liquidColorIn) {
+    public MobEffectBlessingOfTheErdtree(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn, liquidColorIn);
-        PotionUtil.registerPotion(this, "frostbite");
+        PotionUtil.registerPotion(this, "blessing_of_the_erdtree");
         CarianStylePotion.POTIONS.add(this);
 
-        this.registerPotionAttributeModifier(SharedMonsterAttributes.MOVEMENT_SPEED, "5d59080b-eda9-f5b7-1b3c-51568e5b6682", -0.075, 2);
+        this.registerPotionAttributeModifier(SharedMonsterAttributes.MAX_HEALTH, "c407bffa-97df-adf8-51db-5681fdef4b8c", 0.15, 2);
     }
 
     public static Potion getPotion() {
-        return CarianStylePotion.FROSTBITE;
-    }
-
-    @Override
-    public void performEffect(EntityLivingBase entityLivingBaseIn, int amplifier) {
-        float damage = (float) (entityLivingBaseIn.getMaxHealth() * 0.0025);
-        damage += damage * amplifier;
-        entityLivingBaseIn.attackEntityFrom(NewDamageSource.FROSTBITE, damage);
+        return CarianStylePotion.BLESSING_OF_THE_ERDTREE;
     }
 
     @Override
     public boolean isReady(int duration, int amplifier) {
-        return duration % 10 == 0;
+        return duration % 60 == 0;
+    }
+
+    @Override
+    public void performEffect(EntityLivingBase entityLivingBaseIn, int amplifier) {
+        entityLivingBaseIn.heal((float) (entityLivingBaseIn.getMaxHealth() * (amplifier + 1) * 0.04));
     }
 
     @SideOnly(Side.CLIENT)

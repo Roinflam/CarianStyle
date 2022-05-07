@@ -91,7 +91,7 @@ public class EnchantmentScarletLonia extends Enchantment {
                                     for (Entity entity : entities) {
                                         EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
                                         entityLivingBase.setHealth((float) (entityLivingBase.getHealth() - entityLivingBase.getHealth() * finalBonusLevel * 0.05));
-                                        entityLivingBase.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_CORRUPTION, finalBonusLevel * 10 * 20, finalBonusLevel - 1));
+                                        entityLivingBase.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_ROT, finalBonusLevel * 10 * 20, finalBonusLevel - 1));
                                         double x = hurter.posX - entityLivingBase.posX;
                                         double z = hurter.posZ - entityLivingBase.posZ;
                                         entityLivingBase.knockBack(hurter, (float) (finalBonusLevel * 0.75), x, z);
@@ -100,7 +100,7 @@ public class EnchantmentScarletLonia extends Enchantment {
                                 SCARLET_LONIA.remove(hurter.getUniqueID());
 
                                 hurter.setHealth(0);
-                                hurter.onDeath(NewDamageSource.SCARLET_CORRUPTION);
+                                hurter.onDeath(NewDamageSource.SCARLET_ROT);
                             }
 
                         }.start();

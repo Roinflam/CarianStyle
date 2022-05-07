@@ -159,7 +159,7 @@ public class EnchantmentDarkMoon extends Enchantment {
     @Override
     public boolean canApplyTogether(Enchantment ench) {
         return super.canApplyTogether(ench) &&
-                !ench.equals(CarianStyleEnchantments.SCARLET_CORRUPTION) &&
+                !ench.equals(CarianStyleEnchantments.SCARLET_ROT) &&
                 !ench.equals(CarianStyleEnchantments.FIRE_GIVES_POWER) &&
                 !ench.equals(CarianStyleEnchantments.FIRE_DEVOURED) &&
                 !ench.equals(CarianStyleEnchantments.VIC_DRAGON_THUNDER);

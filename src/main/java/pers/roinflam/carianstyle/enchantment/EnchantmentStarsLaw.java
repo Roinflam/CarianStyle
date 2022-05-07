@@ -140,7 +140,7 @@ public class EnchantmentStarsLaw extends Enchantment {
         return super.canApplyTogether(ench) &&
                 !CarianStyleEnchantments.LAW.contains(ench) &&
                 (ench.equals(CarianStyleEnchantments.DARK_ABANDONED_CHILD) || !CarianStyleEnchantments.RECOLLECT.contains(ench)) &&
-                !ench.equals(CarianStyleEnchantments.SCARLET_CORRUPTION) &&
+                !ench.equals(CarianStyleEnchantments.SCARLET_ROT) &&
                 !ench.equals(CarianStyleEnchantments.FIRE_GIVES_POWER) &&
                 !ench.equals(CarianStyleEnchantments.FIRE_DEVOURED) &&
                 !ench.equals(CarianStyleEnchantments.VIC_DRAGON_THUNDER);

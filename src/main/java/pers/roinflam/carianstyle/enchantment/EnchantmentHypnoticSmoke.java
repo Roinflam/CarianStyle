@@ -43,7 +43,7 @@ public class EnchantmentHypnoticSmoke extends Enchantment {
 
                                 @Override
                                 public void run() {
-                                    hurter.addPotionEffect(new PotionEffect(CarianStylePotion.SLEEPING, bonusLevel * 3 * 20, bonusLevel - 1));
+                                    hurter.addPotionEffect(new PotionEffect(CarianStylePotion.SLEEP, bonusLevel * 3 * 20, bonusLevel - 1));
                                 }
 
                             }.start();

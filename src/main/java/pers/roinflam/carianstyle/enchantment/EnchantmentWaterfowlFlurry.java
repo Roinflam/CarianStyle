@@ -37,11 +37,11 @@ public class EnchantmentWaterfowlFlurry extends Enchantment {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
                     if (bonusLevel > 0) {
                         DamageSource damageSource = evt.getSource();
-                        if (!damageSource.damageType.equals("waterfowlFlurry") && !damageSource.damageType.equals("noDeathBlade")) {
+                        if (!damageSource.damageType.equals("waterfowlDance") && !damageSource.damageType.equals("noDeathBlade")) {
                             float damage = (float) ((evt.getAmount() / (bonusLevel + 1)) * (1 - bonusLevel * 0.3));
                             evt.setAmount(damage);
 
-                            damageSource.damageType = "waterfowlFlurry";
+                            damageSource.damageType = "waterfowlDance";
 
                             new SynchronizationTask(1, 2) {
                                 private int time = 0;

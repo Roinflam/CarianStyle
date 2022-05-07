@@ -48,6 +48,7 @@ public class EnchantmentTimeReversal extends Enchantment {
             if (bonusLevel > 0) {
                 if (!REVERSAL_COOLDING.contains(hurter.getUniqueID())) {
                     if (!hurter.isDead) {
+                        evt.setCanceled(true);
                         hurter.setHealth(1);
 
                         REVERSAL_COOLDING.add(hurter.getUniqueID());
@@ -64,7 +65,7 @@ public class EnchantmentTimeReversal extends Enchantment {
                             }
 
                         }.start();
-                        new SynchronizationTask(150) {
+                        new SynchronizationTask(6000) {
 
                             @Override
                             public void run() {

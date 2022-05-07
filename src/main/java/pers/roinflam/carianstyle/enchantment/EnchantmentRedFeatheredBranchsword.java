@@ -9,24 +9,19 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
-import java.util.HashMap;
-import java.util.UUID;
-
 @Mod.EventBusSubscriber
-public class EnchantmentCorruptedWingSword extends Enchantment {
-    private static final HashMap<UUID, Integer> COMMB = new HashMap<>();
+public class EnchantmentRedFeatheredBranchsword extends Enchantment {
 
-    public EnchantmentCorruptedWingSword(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+    public EnchantmentRedFeatheredBranchsword(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
         super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "corrupted_wing_sword");
+        EnchantmentUtil.registerEnchantment(this, "red_feathered_branchsword");
         CarianStyleEnchantments.ENCHANTMENTS.add(this);
     }
 
     public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.CORRUPTED_WING_SWORD;
+        return CarianStyleEnchantments.RED_FEATHERED_BRANCHSWORD;
     }
 
     @SubscribeEvent
@@ -37,23 +32,8 @@ public class EnchantmentCorruptedWingSword extends Enchantment {
                 if (attacker.getHeldItemMainhand() != null) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
                     if (bonusLevel > 0) {
-                        if (COMMB.getOrDefault(attacker.getUniqueID(), 0) < 20) {
-                            COMMB.put(attacker.getUniqueID(), COMMB.getOrDefault(attacker.getUniqueID(), 0) + 1);
-                            new SynchronizationTask(200) {
-
-                                @Override
-                                public void run() {
-                                    if (COMMB.get(attacker.getUniqueID()) > 1) {
-                                        COMMB.put(attacker.getUniqueID(), COMMB.get(attacker.getUniqueID()) - 1);
-                                    } else {
-                                        COMMB.remove(attacker.getUniqueID());
-                                    }
-                                }
-
-                            }.start();
-                            if (COMMB.get(attacker.getUniqueID()) % 4 == 0) {
-                                evt.setAmount((float) (evt.getAmount() + evt.getAmount() * COMMB.get(attacker.getUniqueID()) / 4 * 0.03 * bonusLevel));
-                            }
+                        if (attacker.getHealth() <= attacker.getMaxHealth() * 0.2) {
+                            evt.setAmount(evt.getAmount() + (float) (evt.getAmount() * bonusLevel * 0.2));
                         }
                     }
                 }
@@ -68,17 +48,22 @@ public class EnchantmentCorruptedWingSword extends Enchantment {
 
     @Override
     public int getMaxLevel() {
-        return 3;
+        return 5;
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 15 + (enchantmentLevel - 1) * 5;
+        return 15 + (enchantmentLevel - 1) * 10;
     }
 
     @Override
     public int getMaxEnchantability(int enchantmentLevel) {
         return getMinEnchantability(enchantmentLevel) * 2;
+    }
+
+    @Override
+    public boolean canApplyTogether(Enchantment ench) {
+        return super.canApplyTogether(ench) && !ench.equals(CarianStyleEnchantments.CORRUPTED_WING_SWORD);
     }
 
 }

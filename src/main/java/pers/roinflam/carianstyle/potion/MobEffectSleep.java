@@ -24,19 +24,19 @@ import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import pers.roinflam.carianstyle.utils.util.PotionUtil;
 
 @Mod.EventBusSubscriber
-public class MobEffectSleeping extends Potion {
-    private final static ResourceLocation RESOURCE_LOCATION = new ResourceLocation(Reference.MOD_ID, "textures/effect/sleeping.png");
+public class MobEffectSleep extends Potion {
+    private final static ResourceLocation RESOURCE_LOCATION = new ResourceLocation(Reference.MOD_ID, "textures/effect/sleep.png");
 
-    public MobEffectSleeping(boolean isBadEffectIn, int liquidColorIn) {
+    public MobEffectSleep(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn, liquidColorIn);
-        PotionUtil.registerPotion(this, "sleeping");
+        PotionUtil.registerPotion(this, "sleep");
         CarianStylePotion.POTIONS.add(this);
 
         this.registerPotionAttributeModifier(SharedMonsterAttributes.MOVEMENT_SPEED, "5d59080b-eda9-f5b7-1b3c-51568e5b6682", -1, 2);
     }
 
     public static Potion getPotion() {
-        return CarianStylePotion.SLEEPING;
+        return CarianStylePotion.SLEEP;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)

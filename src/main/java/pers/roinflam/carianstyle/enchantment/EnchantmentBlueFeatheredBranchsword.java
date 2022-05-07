@@ -1,4 +1,4 @@
-package pers.roinflam.carianstyle.enchantment.recollect;
+package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
@@ -12,39 +12,28 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentBrokenStar extends Enchantment {
+public class EnchantmentBlueFeatheredBranchsword extends Enchantment {
 
-    public EnchantmentBrokenStar(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+    public EnchantmentBlueFeatheredBranchsword(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
         super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "broken_star");
+        EnchantmentUtil.registerEnchantment(this, "blue_feathered_branchsword");
         CarianStyleEnchantments.ENCHANTMENTS.add(this);
     }
 
     public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.BROKEN_STAR;
+        return CarianStyleEnchantments.BLUE_FEATHERED_BRANCHSWORD;
     }
 
     @SubscribeEvent
     public static void onLivingHurt(LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (attacker.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
-                    if (bonusLevel > 0) {
-                        if (attacker.getHealth() >= attacker.getMaxHealth() / 2) {
-                            evt.setAmount((float) (evt.getAmount() * 1.5));
-                        }
-                    }
-                }
-            }
-            if (!evt.getSource().canHarmInCreative()) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 if (hurter.getHeldItemMainhand() != null) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItemMainhand());
                     if (bonusLevel > 0) {
-                        if (hurter.getHealth() <= hurter.getMaxHealth() / 2) {
-                            evt.setAmount((float) (evt.getAmount() * 0.75));
+                        if (hurter.getHealth() <= hurter.getMaxHealth() * 0.2) {
+                            evt.setAmount(evt.getAmount() - (float) (evt.getAmount() * bonusLevel * 0.1));
                         }
                     }
                 }
@@ -59,12 +48,12 @@ public class EnchantmentBrokenStar extends Enchantment {
 
     @Override
     public int getMaxLevel() {
-        return 1;
+        return 5;
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return CarianStyleEnchantments.RECOLLECT_ENCHANTABILITY;
+        return 15 + (enchantmentLevel - 1) * 10;
     }
 
     @Override
@@ -74,6 +63,7 @@ public class EnchantmentBrokenStar extends Enchantment {
 
     @Override
     public boolean canApplyTogether(Enchantment ench) {
-        return !CarianStyleEnchantments.RECOLLECT.contains(ench);
+        return super.canApplyTogether(ench) && !ench.equals(CarianStyleEnchantments.CORRUPTED_WING_SWORD);
     }
+
 }
