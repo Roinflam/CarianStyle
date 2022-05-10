@@ -1,4 +1,4 @@
-package pers.roinflam.carianstyle.enchantment;
+package pers.roinflam.carianstyle.enchantment.dead;
 
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
@@ -43,7 +43,7 @@ public class EnchantmentScarletLonia extends Enchantment {
         return CarianStyleEnchantments.SCARLET_LONIA;
     }
 
-    @SubscribeEvent(priority = EventPriority.LOW)
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingDeath(LivingDeathEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (!evt.getSource().canHarmInCreative()) {
@@ -164,10 +164,6 @@ public class EnchantmentScarletLonia extends Enchantment {
 
     @Override
     public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) &&
-                !ench.equals(CarianStyleEnchantments.FULL_MOON) &&
-                !ench.equals(CarianStyleEnchantments.LIVING_CORPSE) &&
-                !ench.equals(CarianStyleEnchantments.TIME_REVERSAL) &&
-                !ench.equals(CarianStyleEnchantments.ANCIENT_DRAGON_LIGHTNING);
+        return !CarianStyleEnchantments.DEAD.contains(ench);
     }
 }

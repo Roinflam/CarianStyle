@@ -1,14 +1,21 @@
 package pers.roinflam.carianstyle;
 
+import net.minecraft.creativetab.CreativeTabs;
+import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.SidedProxy;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.network.NetworkRegistryHandler;
 import pers.roinflam.carianstyle.proxy.CommonProxy;
 import pers.roinflam.carianstyle.utils.Reference;
+import scala.actors.threadpool.Arrays;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Mod(modid = Reference.MOD_ID, useMetadata = true)
 public class CarianStyle {
@@ -22,6 +29,11 @@ public class CarianStyle {
     public static void preInit(FMLPreInitializationEvent evt) {
         new ConfigLoader(evt);
         NetworkRegistryHandler.register();
+        List<EnumEnchantmentType> typeList = new ArrayList<>(Arrays.asList(CreativeTabs.COMBAT.getRelevantEnchantmentTypes()));
+        typeList.add(CarianStyleEnchantments.ARMS);
+        typeList.add(CarianStyleEnchantments.SHIELD);
+        CreativeTabs.COMBAT.setRelevantEnchantmentTypes(typeList.toArray(new EnumEnchantmentType[0]));
+
     }
 
     @Mod.EventHandler

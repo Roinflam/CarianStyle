@@ -1,4 +1,4 @@
-package pers.roinflam.carianstyle.enchantment;
+package pers.roinflam.carianstyle.enchantment.law;
 
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;

@@ -35,7 +35,7 @@ public class EnchantmentTimeReversal extends Enchantment {
         return CarianStyleEnchantments.TIME_REVERSAL;
     }
 
-    @SubscribeEvent(priority = EventPriority.LOW)
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingDeath(LivingDeathEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
@@ -126,6 +126,7 @@ public class EnchantmentTimeReversal extends Enchantment {
 
     @Override
     public boolean canApplyTogether(Enchantment ench) {
-        return !CarianStyleEnchantments.RECOLLECT.contains(ench);
+        return !CarianStyleEnchantments.RECOLLECT.contains(ench) &&
+                !CarianStyleEnchantments.DEAD.contains(ench);
     }
 }

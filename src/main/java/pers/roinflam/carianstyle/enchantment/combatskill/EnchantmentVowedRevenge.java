@@ -1,4 +1,4 @@
-package pers.roinflam.carianstyle.enchantment;
+package pers.roinflam.carianstyle.enchantment.combatskill;
 
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
@@ -76,9 +76,7 @@ public class EnchantmentVowedRevenge extends Enchantment {
 
     @Override
     public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) &&
-                !ench.equals(CarianStyleEnchantments.OFFER_SWORD) &&
-                !ench.equals(CarianStyleEnchantments.LUNGE_UP);
+        return !CarianStyleEnchantments.COMBAT_SKILL.contains(ench);
     }
 
 }

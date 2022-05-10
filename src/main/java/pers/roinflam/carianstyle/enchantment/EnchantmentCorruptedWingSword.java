@@ -5,6 +5,9 @@ import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemShield;
+import net.minecraftforge.event.entity.living.LivingAttackEvent;
+import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -39,7 +42,7 @@ public class EnchantmentCorruptedWingSword extends Enchantment {
                     if (bonusLevel > 0) {
                         if (COMMB.getOrDefault(attacker.getUniqueID(), 0) < 20) {
                             COMMB.put(attacker.getUniqueID(), COMMB.getOrDefault(attacker.getUniqueID(), 0) + 1);
-                            new SynchronizationTask(200) {
+                            new SynchronizationTask(300) {
 
                                 @Override
                                 public void run() {
@@ -51,9 +54,7 @@ public class EnchantmentCorruptedWingSword extends Enchantment {
                                 }
 
                             }.start();
-                            if (COMMB.get(attacker.getUniqueID()) % 4 == 0) {
-                                evt.setAmount((float) (evt.getAmount() + evt.getAmount() * COMMB.get(attacker.getUniqueID()) / 4 * 0.03 * bonusLevel));
-                            }
+                            evt.setAmount((float) (evt.getAmount() + evt.getAmount() * (COMMB.get(attacker.getUniqueID()) / 4) * 0.03 * bonusLevel));
                         }
                     }
                 }

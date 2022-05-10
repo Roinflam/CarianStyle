@@ -144,6 +144,7 @@ public class EnchantmentLivingCorpse extends Enchantment {
 
     @Override
     public boolean canApplyTogether(Enchantment ench) {
-        return !CarianStyleEnchantments.RECOLLECT.contains(ench);
+        return !CarianStyleEnchantments.RECOLLECT.contains(ench) &&
+                !CarianStyleEnchantments.DEAD.contains(ench);
     }
 }

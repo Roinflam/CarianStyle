@@ -70,11 +70,6 @@ public class EnchantmentInvisibleWeapon extends Enchantment {
     }
 
     @Override
-    public boolean canApplyAtEnchantingTable(ItemStack itemStack) {
-        return super.canApplyAtEnchantingTable(itemStack) && !(itemStack.getItem() instanceof ItemArmor);
-    }
-
-    @Override
     public boolean isTreasureEnchantment() {
         return true;
     }

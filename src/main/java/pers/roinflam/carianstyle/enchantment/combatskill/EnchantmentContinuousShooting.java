@@ -1,4 +1,4 @@
-package pers.roinflam.carianstyle.enchantment;
+package pers.roinflam.carianstyle.enchantment.combatskill;
 
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
@@ -80,6 +80,6 @@ public class EnchantmentContinuousShooting extends Enchantment {
 
     @Override
     public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) && !ench.equals(Enchantments.INFINITY);
+        return !CarianStyleEnchantments.COMBAT_SKILL.contains(ench) && !ench.equals(Enchantments.INFINITY);
     }
 }

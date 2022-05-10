@@ -36,7 +36,7 @@ public class EnchantmentFullMoon extends Enchantment {
         return CarianStyleEnchantments.FULL_MOON;
     }
 
-    @SubscribeEvent(priority = EventPriority.LOW)
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingDeath(LivingDeathEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (!evt.getSource().canHarmInCreative()) {
@@ -163,9 +163,8 @@ public class EnchantmentFullMoon extends Enchantment {
     @Override
     public boolean canApplyTogether(Enchantment ench) {
         return !CarianStyleEnchantments.RECOLLECT.contains(ench) &&
+                !CarianStyleEnchantments.DEAD.contains(ench) &&
                 !ench.equals(CarianStyleEnchantments.HEALING_BY_FIRE) &&
-                !ench.equals(CarianStyleEnchantments.SHELTER_OF_FIRE) &&
-                !ench.equals(CarianStyleEnchantments.PRECISE_LIGHTNING) &&
-                !ench.equals(CarianStyleEnchantments.ANCIENT_DRAGON_LIGHTNING);
+                !ench.equals(CarianStyleEnchantments.SHELTER_OF_FIRE);
     }
 }

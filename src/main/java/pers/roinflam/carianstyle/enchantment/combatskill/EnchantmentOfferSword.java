@@ -1,53 +1,45 @@
-package pers.roinflam.carianstyle.enchantment;
+package pers.roinflam.carianstyle.enchantment.combatskill;
 
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.potion.PotionEffect;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
-
 @Mod.EventBusSubscriber
-public class EnchantmentScarletCorruption extends Enchantment {
-    public static Set<UUID> SCARLET_ROT = new HashSet<>();
+public class EnchantmentOfferSword extends Enchantment {
 
-    public EnchantmentScarletCorruption(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+    public EnchantmentOfferSword(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
         super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "scarlet_rot");
+        EnchantmentUtil.registerEnchantment(this, "offer_sword");
         CarianStyleEnchantments.ENCHANTMENTS.add(this);
     }
 
     public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.SCARLET_ROT;
+        return CarianStyleEnchantments.OFFER_SWORD;
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(LivingDamageEvent evt) {
+    @SubscribeEvent
+    public static void onLivingHurt(LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase hurter = evt.getEntityLiving();
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (attacker.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
-                    if (bonusLevel > 0) {
-                        hurter.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_ROT, bonusLevel * 20 * 20, 0));
+                    if (attacker.getHealth() >= attacker.getMaxHealth()) {
+                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                        if (bonusLevel > 0) {
+                            evt.setAmount((float) (evt.getAmount() + evt.getAmount() * bonusLevel * 0.1));
+                        }
                     }
                 }
             }
         }
     }
-
 
     @Override
     public int getMinLevel() {
@@ -56,12 +48,12 @@ public class EnchantmentScarletCorruption extends Enchantment {
 
     @Override
     public int getMaxLevel() {
-        return 3;
+        return 5;
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 36 + (enchantmentLevel - 1) * 20;
+        return 5 + (enchantmentLevel - 1) * 10;
     }
 
     @Override
@@ -71,9 +63,6 @@ public class EnchantmentScarletCorruption extends Enchantment {
 
     @Override
     public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) &&
-                !ench.equals(CarianStyleEnchantments.FIRE_GIVES_POWER) &&
-                !ench.equals(CarianStyleEnchantments.FIRE_DEVOURED);
+        return !CarianStyleEnchantments.COMBAT_SKILL.contains(ench);
     }
-
 }

@@ -4,7 +4,16 @@ import com.google.common.collect.ImmutableList;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemBow;
+import net.minecraft.item.ItemShield;
+import net.minecraft.item.ItemSword;
+import net.minecraftforge.common.util.EnumHelper;
 import pers.roinflam.carianstyle.enchantment.*;
+import pers.roinflam.carianstyle.enchantment.combatskill.*;
+import pers.roinflam.carianstyle.enchantment.dead.EnchantmentAncientDragonLightning;
+import pers.roinflam.carianstyle.enchantment.dead.EnchantmentEpilepsySpread;
+import pers.roinflam.carianstyle.enchantment.dead.EnchantmentScarletLonia;
+import pers.roinflam.carianstyle.enchantment.law.EnchantmentStarsLaw;
 import pers.roinflam.carianstyle.enchantment.recollect.*;
 
 import java.util.ArrayList;
@@ -13,6 +22,8 @@ import java.util.List;
 import java.util.Set;
 
 public class CarianStyleEnchantments {
+    public static final EnumEnchantmentType SHIELD = EnumHelper.addEnchantmentType("cs_shield", item -> item instanceof ItemShield);
+    public static final EnumEnchantmentType ARMS = EnumHelper.addEnchantmentType("cs_arms", item -> item instanceof ItemSword || item instanceof ItemBow);
     public static final int RECOLLECT_ENCHANTABILITY = 38;
     public static final List<Enchantment> ENCHANTMENTS = new ArrayList<Enchantment>();
 
@@ -198,7 +209,7 @@ public class CarianStyleEnchantments {
     );
     public static final EnchantmentInvisibleWeapon INVISIBLE_WEAPON = new EnchantmentInvisibleWeapon(
             Enchantment.Rarity.RARE,
-            EnumEnchantmentType.ALL,
+            ARMS,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
     );
     public static final EnchantmentHardArrow HARD_ARROW = new EnchantmentHardArrow(
@@ -376,7 +387,29 @@ public class CarianStyleEnchantments {
             EnumEnchantmentType.WEAPON,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
     );
+    public static final EnchantmentDaedicarWoe DAEDICAR_WOE = new EnchantmentDaedicarWoe(
+            Enchantment.Rarity.VERY_RARE,
+            EnumEnchantmentType.ARMOR,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET}
+    );
+    public static final EnchantmentScholarShield SCHOLAR_SHIELD = new EnchantmentScholarShield(
+            Enchantment.Rarity.RARE,
+            SHIELD,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND, EntityEquipmentSlot.OFFHAND}
+    );
+    public static final EnchantmentShieldBash SHIELD_BASH = new EnchantmentShieldBash(
+            Enchantment.Rarity.RARE,
+            SHIELD,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND, EntityEquipmentSlot.OFFHAND}
+    );
+    public static final EnchantmentImmutableShield IMMUTABLE_SHIELD = new EnchantmentImmutableShield(
+            Enchantment.Rarity.RARE,
+            SHIELD,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND, EntityEquipmentSlot.OFFHAND}
+    );
 
     public static final Set<Enchantment> RECOLLECT = new HashSet<>(ImmutableList.of(BROKEN_STAR, BLASPHEMY, DOOMED_DEATH, FULL_MOON, LIVING_CORPSE, MIKAELA_BLADE, BAD_OMEN, GIANT_FLAME, BLOOD, TIME_REVERSAL, WARRIOR, GOLDEN_LAW, ANCESTRAL_SPIRITS, DARK_ABANDONED_CHILD));
     public static final Set<Enchantment> LAW = new HashSet<>(ImmutableList.of(GOLDEN_LAW, STARS_LAW));
+    public static final Set<Enchantment> COMBAT_SKILL = new HashSet<>(ImmutableList.of(OFFER_SWORD, LUNGE_UP, VOWED_REVENGE, PATIENCE, CONTINUOUS_SHOOTING));
+    public static final Set<Enchantment> DEAD = new HashSet<>(ImmutableList.of(FULL_MOON, LIVING_CORPSE, TIME_REVERSAL, ANCIENT_DRAGON_LIGHTNING, SCARLET_LONIA, EPILEPSY_SPREAD));
 }

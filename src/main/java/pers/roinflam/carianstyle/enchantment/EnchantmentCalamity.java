@@ -45,7 +45,7 @@ public class EnchantmentCalamity extends Enchantment {
                 }
             }
             if (bonusLevel > 0) {
-                evt.setAmount((float) (evt.getAmount() * 2.5));
+                evt.setAmount(evt.getAmount() * 2);
             }
         }
     }

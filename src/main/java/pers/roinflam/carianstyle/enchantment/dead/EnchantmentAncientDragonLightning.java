@@ -1,4 +1,4 @@
-package pers.roinflam.carianstyle.enchantment;
+package pers.roinflam.carianstyle.enchantment.dead;
 
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
@@ -142,9 +142,6 @@ public class EnchantmentAncientDragonLightning extends Enchantment {
 
     @Override
     public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) &&
-                !ench.equals(CarianStyleEnchantments.FULL_MOON) &&
-                !ench.equals(CarianStyleEnchantments.LIVING_CORPSE) &&
-                !ench.equals(CarianStyleEnchantments.TIME_REVERSAL);
+        return !CarianStyleEnchantments.DEAD.contains(ench);
     }
 }
