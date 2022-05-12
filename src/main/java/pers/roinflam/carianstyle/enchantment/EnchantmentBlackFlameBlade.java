@@ -86,10 +86,7 @@ public class EnchantmentBlackFlameBlade extends Enchantment {
         return getMinEnchantability(enchantmentLevel) * 2;
     }
 
-    @Override
-    public boolean canApplyAtEnchantingTable(ItemStack itemStack) {
-        return super.canApplyAtEnchantingTable(itemStack) && !(itemStack.getItem() instanceof ItemArmor);
-    }
+
 
     @Override
     public boolean isTreasureEnchantment() {

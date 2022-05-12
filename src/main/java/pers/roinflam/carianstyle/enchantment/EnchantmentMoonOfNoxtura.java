@@ -4,6 +4,7 @@ import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.monster.EntityMob;
 import net.minecraft.inventory.EntityEquipmentSlot;
@@ -34,9 +35,9 @@ public class EnchantmentMoonOfNoxtura extends Enchantment {
     @SubscribeEvent
     public static void onLivingSetAttackTarget(LivingSetAttackTargetEvent evt) {
         if (!evt.getEntity().world.isRemote && !evt.getEntity().world.isDaytime()) {
-            if (evt.getEntityLiving() instanceof EntityMob && evt.getTarget() != null) {
+            if (evt.getEntityLiving() instanceof EntityLiving && evt.getTarget() != null) {
                 EntityLivingBase target = evt.getTarget();
-                EntityMob entityLivingBase = (EntityMob) evt.getEntityLiving();
+                EntityLiving entityLiving = (EntityLiving) evt.getEntityLiving();
                 int bonusLevel = 0;
                 for (ItemStack itemStack : target.getArmorInventoryList()) {
                     if (itemStack != null) {
@@ -45,15 +46,15 @@ public class EnchantmentMoonOfNoxtura extends Enchantment {
                 }
                 if (bonusLevel > 0) {
                     if (RandomUtil.percentageChance(2.5)) {
-                        double distance = entityLivingBase.getDistance(target);
+                        double distance = entityLiving.getDistance(target);
                         List<Entity> entities = EntityUtil.getNearbyEntities(
-                                entityLivingBase,
+                                entityLiving,
                                 distance,
                                 distance,
-                                entity -> entity instanceof EntityMob && entity.getClass() != (entityLivingBase.getClass()) && entityLivingBase.canEntityBeSeen(entity) && !entity.equals(entityLivingBase) && !entity.equals(target)
+                                entity -> entity instanceof EntityMob && entity.getClass() != (entityLiving.getClass()) && entityLiving.canEntityBeSeen(entity) && !entity.equals(entityLiving) && !entity.equals(target)
                         );
                         if (!entities.isEmpty()) {
-                            entityLivingBase.setAttackTarget((EntityLivingBase) entities.get(RandomUtil.getInt(0, entities.size() - 1)));
+                            entityLiving.setAttackTarget((EntityLivingBase) entities.get(RandomUtil.getInt(0, entities.size() - 1)));
                         }
                     }
                 }

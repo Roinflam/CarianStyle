@@ -36,7 +36,7 @@ public class EnchantmentImmutableShield extends Enchantment {
                 if (itemStack != null && itemStack.getItem() instanceof ItemShield) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     if (bonusLevel > 0) {
-                        if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
+                        if (evt.getAmount() <= 0 && evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                             EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                             attacker.clearActivePotions();
                             hurter.heal((float) (hurter.getMaxHealth() * bonusLevel * 0.01));

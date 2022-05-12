@@ -12,6 +12,7 @@ import pers.roinflam.carianstyle.enchantment.*;
 import pers.roinflam.carianstyle.enchantment.combatskill.*;
 import pers.roinflam.carianstyle.enchantment.dead.EnchantmentAncientDragonLightning;
 import pers.roinflam.carianstyle.enchantment.dead.EnchantmentEpilepsySpread;
+import pers.roinflam.carianstyle.enchantment.dead.EnchantmentGreatbladePhalanx;
 import pers.roinflam.carianstyle.enchantment.dead.EnchantmentScarletLonia;
 import pers.roinflam.carianstyle.enchantment.law.EnchantmentStarsLaw;
 import pers.roinflam.carianstyle.enchantment.recollect.*;
@@ -393,23 +394,43 @@ public class CarianStyleEnchantments {
             new EntityEquipmentSlot[]{EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET}
     );
     public static final EnchantmentScholarShield SCHOLAR_SHIELD = new EnchantmentScholarShield(
-            Enchantment.Rarity.RARE,
+            Enchantment.Rarity.UNCOMMON,
             SHIELD,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND, EntityEquipmentSlot.OFFHAND}
     );
     public static final EnchantmentShieldBash SHIELD_BASH = new EnchantmentShieldBash(
-            Enchantment.Rarity.RARE,
+            Enchantment.Rarity.UNCOMMON,
             SHIELD,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND, EntityEquipmentSlot.OFFHAND}
     );
     public static final EnchantmentImmutableShield IMMUTABLE_SHIELD = new EnchantmentImmutableShield(
+            Enchantment.Rarity.UNCOMMON,
+            SHIELD,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND, EntityEquipmentSlot.OFFHAND}
+    );
+    public static final EnchantmentParry PARRY = new EnchantmentParry(
+            Enchantment.Rarity.UNCOMMON,
+            SHIELD,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND, EntityEquipmentSlot.OFFHAND}
+    );
+    public static final EnchantmentCarianRetaliation CARIAN_RETALIATION = new EnchantmentCarianRetaliation(
             Enchantment.Rarity.RARE,
             SHIELD,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND, EntityEquipmentSlot.OFFHAND}
+    );
+    public static final EnchantmentCarianPhalanx CARIAN_PHALANX = new EnchantmentCarianPhalanx(
+            Enchantment.Rarity.UNCOMMON,
+            EnumEnchantmentType.BOW,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
+    );
+    public static final EnchantmentGreatbladePhalanx GREATBLADE_PHALANX = new EnchantmentGreatbladePhalanx(
+            Enchantment.Rarity.RARE,
+            EnumEnchantmentType.ARMOR_CHEST,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST}
     );
 
     public static final Set<Enchantment> RECOLLECT = new HashSet<>(ImmutableList.of(BROKEN_STAR, BLASPHEMY, DOOMED_DEATH, FULL_MOON, LIVING_CORPSE, MIKAELA_BLADE, BAD_OMEN, GIANT_FLAME, BLOOD, TIME_REVERSAL, WARRIOR, GOLDEN_LAW, ANCESTRAL_SPIRITS, DARK_ABANDONED_CHILD));
     public static final Set<Enchantment> LAW = new HashSet<>(ImmutableList.of(GOLDEN_LAW, STARS_LAW));
     public static final Set<Enchantment> COMBAT_SKILL = new HashSet<>(ImmutableList.of(OFFER_SWORD, LUNGE_UP, VOWED_REVENGE, PATIENCE, CONTINUOUS_SHOOTING));
-    public static final Set<Enchantment> DEAD = new HashSet<>(ImmutableList.of(FULL_MOON, LIVING_CORPSE, TIME_REVERSAL, ANCIENT_DRAGON_LIGHTNING, SCARLET_LONIA, EPILEPSY_SPREAD));
+    public static final Set<Enchantment> DEAD = new HashSet<>(ImmutableList.of(FULL_MOON, LIVING_CORPSE, TIME_REVERSAL, ANCIENT_DRAGON_LIGHTNING, SCARLET_LONIA, EPILEPSY_SPREAD, GREATBLADE_PHALANX));
 }

@@ -151,6 +151,14 @@ enchantment.shield_bash=Shield Bash
 enchantment.carianstyle.shield_bash.desc=After the shield is attacked, it will repel the attacker with [Enchantment Level]*0.2
 enchantment.immutable_shield=Immutable Shield
 enchantment.carianstyle.immutable_shield.desc=Increase your [Enchantment Level]*10%% non-biological damage resistance when raising a shield, restore your [Enchantment Level]*1%% of your maximum health after being attacked, and clear all effects of the attacker's buffs
+enchantment.parry=Parry
+enchantment.carianstyle.parry.desc=Counterattack within 0.5 second after the shield is hit, it will cause additional [Enchantment Level]*25%% damage, this effect has a 2 second cooldown
+enchantment.carian_retaliation=Carian Retaliation
+enchantment.carianstyle.carian_retaliation.desc=When you receive magic damage or long-range damage while raising the shield, three Glintblades will be generated, and then the Glintblades will automatically track and shoot at the attacker, each Glintblades causing [enchantment level]*20% magic damage
+enchantment.carian_phalanx=Carian Phalanx
+enchantment.carianstyle.carian_phalanx.desc=After the arrow damages the target, there is a probability of [Enchantment Level]*2%% to generate nine Glintblades, and then the Glintblades will automatically track and shoot towards the target, each of Glintblades will cause [Enchantment Level]*5%% magic damage
+enchantment.greatblade_phalanx=Greatblade Phalanx
+enchantment.carianstyle.greatblade_phalanx.desc=When receiving fatal damage, nine huge Glintblades will automatically track and shoot at the attacker, each Glintblades will cause [Enchantment Level] * 10%% of the attacker's lost health magic damage, and generate super Huge explosion, this effect has a 300 second cooldown
 
 effect.bad_omen=Bad Omen
 effect.scarlet_rot=Scarlet Rot
@@ -170,3 +178,7 @@ death.attack.frostbite=%1$s died of Frostbite
 death.attack.frostbite.player=%1$s died of Frostbite in battle with %2$s
 death.attack.wave_stone_magic=%1$s by the wizard wave stone to death
 death.attack.wave_stone_magic.player=During the battle between %1$s and %2$s, %2$s was immoral and used wave stone magic to kill %1$s
+
+entity.glintblades=Glintblades
+
+item.glintblades.name=Glintblades

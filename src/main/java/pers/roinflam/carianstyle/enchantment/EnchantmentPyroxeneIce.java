@@ -70,11 +70,6 @@ public class EnchantmentPyroxeneIce extends Enchantment {
     }
 
     @Override
-    public boolean canApplyAtEnchantingTable(ItemStack itemStack) {
-        return super.canApplyAtEnchantingTable(itemStack) && !(itemStack.getItem() instanceof ItemArmor);
-    }
-
-    @Override
     public boolean canApplyTogether(Enchantment ench) {
         return super.canApplyTogether(ench) && !ench.equals(Enchantments.FLAME);
     }

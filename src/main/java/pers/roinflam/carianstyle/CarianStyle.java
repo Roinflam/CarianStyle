@@ -12,9 +12,9 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.network.NetworkRegistryHandler;
 import pers.roinflam.carianstyle.proxy.CommonProxy;
 import pers.roinflam.carianstyle.utils.Reference;
-import scala.actors.threadpool.Arrays;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 @Mod(modid = Reference.MOD_ID, useMetadata = true)
@@ -29,11 +29,12 @@ public class CarianStyle {
     public static void preInit(FMLPreInitializationEvent evt) {
         new ConfigLoader(evt);
         NetworkRegistryHandler.register();
+        proxy.registerEntityRenderer();
+
         List<EnumEnchantmentType> typeList = new ArrayList<>(Arrays.asList(CreativeTabs.COMBAT.getRelevantEnchantmentTypes()));
         typeList.add(CarianStyleEnchantments.ARMS);
         typeList.add(CarianStyleEnchantments.SHIELD);
         CreativeTabs.COMBAT.setRelevantEnchantmentTypes(typeList.toArray(new EnumEnchantmentType[0]));
-
     }
 
     @Mod.EventHandler
