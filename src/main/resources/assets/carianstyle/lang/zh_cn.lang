@@ -155,10 +155,10 @@ enchantment.parry=格挡
 enchantment.carianstyle.parry.desc=盾牌受击后的0.5秒内反击，将会额外造成[附魔等级]*25%%伤害，此效果拥有2秒冷却时间
 enchantment.carian_retaliation=卡利亚式奉还
 enchantment.carianstyle.carian_retaliation.desc=举盾时受到魔法伤害或远程伤害时，产生三道魔法辉剑，随后魔法辉剑会自动追踪并射向攻击者，每道辉剑造成[附魔等级]*20%魔法伤害
-enchantment.carian_phalanx=卡利亚式圆阵
+enchantment.carian_phalanx=卡利亚圆阵
 enchantment.carianstyle.carian_phalanx.desc=箭矢伤害目标后，有[附魔等级]*2%%的概率产生九道魔法辉剑，随后魔法辉剑会自动追踪并射向目标，每道辉剑造成[附魔等级]*5%%魔法伤害
 enchantment.greatblade_phalanx=巨剑阵
-enchantment.carianstyle.greatblade_phalanx.desc=受到致命伤害时，产生九道巨大魔法辉剑，随后魔法辉剑会自动追踪并射向攻击者，每道辉剑造成[附魔等级]*10%%攻击者已损失生命值魔法伤害，并产生超巨大爆炸，此效果拥有300秒冷却时间
+enchantment.carianstyle.greatblade_phalanx.desc=受到致命伤害时，产生三道巨大魔法辉剑，随后魔法辉剑会自动追踪并射向攻击者，每道辉剑造成[附魔等级]*10%%攻击者已损失生命值魔法伤害，并产生超巨大爆炸，此效果拥有300秒冷却时间
 
 effect.bad_omen=噩兆
 effect.scarlet_rot=猩红腐败

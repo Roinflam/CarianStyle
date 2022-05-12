@@ -158,7 +158,7 @@ enchantment.carianstyle.carian_retaliation.desc=When you receive magic damage or
 enchantment.carian_phalanx=Carian Phalanx
 enchantment.carianstyle.carian_phalanx.desc=After the arrow damages the target, there is a probability of [Enchantment Level]*2%% to generate nine Glintblades, and then the Glintblades will automatically track and shoot towards the target, each of Glintblades will cause [Enchantment Level]*5%% magic damage
 enchantment.greatblade_phalanx=Greatblade Phalanx
-enchantment.carianstyle.greatblade_phalanx.desc=When receiving fatal damage, nine huge Glintblades will automatically track and shoot at the attacker, each Glintblades will cause [Enchantment Level] * 10%% of the attacker's lost health magic damage, and generate super Huge explosion, this effect has a 300 second cooldown
+enchantment.carianstyle.greatblade_phalanx.desc=When receiving fatal damage, three huge Glintblades will automatically track and shoot at the attacker, each Glintblades will cause [Enchantment Level] * 10%% of the attacker's lost health magic damage, and generate super Huge explosion, this effect has a 300 second cooldown
 
 effect.bad_omen=Bad Omen
 effect.scarlet_rot=Scarlet Rot
