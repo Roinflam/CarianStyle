@@ -3,31 +3,28 @@ package pers.roinflam.carianstyle.enchantment;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.monster.EntityMob;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
-import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
 
 @Mod.EventBusSubscriber
-public class EnchantmentCalamity extends Enchantment {
+public class EnchantmentCalamity extends VeryRaryBase {
 
-    public EnchantmentCalamity(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "calamity");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentCalamity(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "calamity");
     }
 
     public static Enchantment getEnchantment() {
@@ -40,7 +37,7 @@ public class EnchantmentCalamity extends Enchantment {
             EntityLivingBase hurter = evt.getEntityLiving();
             int bonusLevel = 0;
             for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                if (itemStack != null) {
+                if (!itemStack.isEmpty()) {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
             }
@@ -58,23 +55,20 @@ public class EnchantmentCalamity extends Enchantment {
                     EntityPlayer entityPlayer = evt.player;
                     if (entityPlayer.isEntityAlive()) {
                         int bonusLevel = 0;
-                        if (entityPlayer.getHeldItemMainhand() != null) {
-                            bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityPlayer.getHeldItemMainhand());
+                        if (!entityPlayer.getHeldItem(entityPlayer.getActiveHand()).isEmpty()) {
+                            bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityPlayer.getHeldItem(entityPlayer.getActiveHand()));
                         }
                         for (ItemStack itemStack : entityPlayer.getArmorInventoryList()) {
-                            if (itemStack != null) {
+                            if (!itemStack.isEmpty()) {
                                 bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                             }
                         }
                         if (bonusLevel > 0) {
-                            List<Entity> entities = EntityUtil.getNearbyEntities(
-                                    entityPlayer,
-                                    32,
-                                    32,
-                                    entity -> entity instanceof EntityMob
+                            List<EntityMob> entities = entityPlayer.world.getEntitiesWithinAABB(
+                                    EntityMob.class,
+                                    new AxisAlignedBB(entityPlayer.getPosition()).expand(32, 32, 32)
                             );
-                            for (Entity entity : entities) {
-                                EntityMob entityMob = (EntityMob) entity;
+                            for (EntityMob entityMob : entities) {
                                 EntityLivingBase attackTarget = entityMob.getAttackTarget();
                                 if (attackTarget == null || !entityMob.getAttackTarget().isEntityAlive()) {
                                     if (RandomUtil.percentageChance(25)) {
@@ -96,23 +90,8 @@ public class EnchantmentCalamity extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 1;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 35;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

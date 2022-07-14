@@ -12,6 +12,7 @@ import net.minecraftforge.event.entity.living.LivingHealEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
@@ -21,13 +22,11 @@ import java.util.Set;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
-public class EnchantmentEatShit extends Enchantment {
+public class EnchantmentEatShit extends UncommonBase {
     private final static Set<UUID> EAT_SHIT = new HashSet<>();
 
-    public EnchantmentEatShit(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "eat_shit");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentEatShit(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "eat_shit");
     }
 
     public static Enchantment getEnchantment() {
@@ -40,8 +39,8 @@ public class EnchantmentEatShit extends Enchantment {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (attacker.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         hurter.addPotionEffect(new PotionEffect(MobEffects.NAUSEA, bonusLevel * 80));
                         attacker.addPotionEffect(new PotionEffect(MobEffects.NAUSEA, bonusLevel * 30));
@@ -69,25 +68,9 @@ public class EnchantmentEatShit extends Enchantment {
         }
     }
 
-
-    @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 5;
-    }
-
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 35 + (enchantmentLevel - 1) * 1;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
 }

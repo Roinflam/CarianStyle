@@ -3,32 +3,29 @@ package pers.roinflam.carianstyle.enchantment;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.DamageSource;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
-import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
-public class EnchantmentCausalityPrinciple extends Enchantment {
+public class EnchantmentCausalityPrinciple extends RaryBase {
     private static final HashMap<UUID, Integer> CAUSALITY_PRINCIPLE = new HashMap<>();
 
-    public EnchantmentCausalityPrinciple(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "causality_principle");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentCausalityPrinciple(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "causality_principle");
 
         new SynchronizationTask(6000, 6000) {
 
@@ -52,21 +49,19 @@ public class EnchantmentCausalityPrinciple extends Enchantment {
                     EntityLivingBase hurter = evt.getEntityLiving();
                     int bonusLevel = 0;
                     for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                        if (itemStack != null) {
+                        if (!itemStack.isEmpty()) {
                             bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                         }
                     }
                     if (bonusLevel > 0) {
                         if (CAUSALITY_PRINCIPLE.getOrDefault(hurter.getUniqueID(), 0) >= 5) {
                             CAUSALITY_PRINCIPLE.remove(hurter.getUniqueID());
-                            List<Entity> entities = EntityUtil.getNearbyEntities(
-                                    hurter,
-                                    bonusLevel * 3,
-                                    bonusLevel * 3,
-                                    entity -> entity instanceof EntityLivingBase && !entity.equals(hurter)
+                            List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                                    EntityLivingBase.class,
+                                    new AxisAlignedBB(hurter.getPosition()).expand(bonusLevel * 3, bonusLevel * 3, bonusLevel * 3),
+                                    entityLivingBase -> !entityLivingBase.equals(hurter)
                             );
-                            for (Entity entity : entities) {
-                                EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
+                            for (EntityLivingBase entityLivingBase : entities) {
                                 entityLivingBase.attackEntityFrom(DamageSource.causeMobDamage(hurter), (float) (evt.getAmount() * bonusLevel * 0.75));
                             }
                         } else {
@@ -79,23 +74,8 @@ public class EnchantmentCausalityPrinciple extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 10 + (enchantmentLevel - 1) * 10;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
 }

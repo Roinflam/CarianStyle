@@ -11,6 +11,7 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
@@ -19,13 +20,11 @@ import java.util.HashMap;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
-public class EnchantmentPatience extends Enchantment {
+public class EnchantmentPatience extends RaryBase {
     private static final HashMap<UUID, Float> PATIENCE = new HashMap<>();
 
-    public EnchantmentPatience(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "patience");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentPatience(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "patience");
 
         new SynchronizationTask(6000, 6000) {
 
@@ -46,8 +45,8 @@ public class EnchantmentPatience extends Enchantment {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (attacker.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         evt.setAmount(evt.getAmount() + PATIENCE.getOrDefault(attacker.getUniqueID(), 0f));
                         PATIENCE.remove(attacker.getUniqueID());
@@ -62,8 +61,8 @@ public class EnchantmentPatience extends Enchantment {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                if (hurter.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItemMainhand());
+                if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                     if (bonusLevel > 0) {
                         float damage = PATIENCE.getOrDefault(hurter.getUniqueID(), 0f);
                         damage = (float) Math.min(damage + evt.getAmount() * bonusLevel * 0.1, hurter.getMaxHealth() * bonusLevel * 0.4);
@@ -82,23 +81,8 @@ public class EnchantmentPatience extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 5;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 10 + (enchantmentLevel - 1) * 5;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

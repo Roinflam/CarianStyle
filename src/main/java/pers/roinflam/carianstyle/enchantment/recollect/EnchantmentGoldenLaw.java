@@ -10,22 +10,20 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
-public class EnchantmentGoldenLaw extends Enchantment {
+public class EnchantmentGoldenLaw extends VeryRaryBase {
     private static final Set<UUID> GOLDEN_LAW = new HashSet<>();
 
-    public EnchantmentGoldenLaw(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "golden_law");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentGoldenLaw(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "golden_law");
     }
 
     public static Enchantment getEnchantment() {
@@ -38,8 +36,8 @@ public class EnchantmentGoldenLaw extends Enchantment {
             if (!evt.getSource().canHarmInCreative()) {
                 if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                     EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                    if (attacker.getHeldItemMainhand() != null) {
-                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                    if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                         if (bonusLevel > 0) {
                             evt.setAmount((float) (evt.getAmount() + evt.getAmount() * 0.15));
                         }
@@ -47,8 +45,8 @@ public class EnchantmentGoldenLaw extends Enchantment {
                 }
                 if (!evt.getSource().canHarmInCreative()) {
                     EntityLivingBase hurter = evt.getEntityLiving();
-                    if (hurter.getHeldItemMainhand() != null) {
-                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItemMainhand());
+                    if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
+                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                         if (bonusLevel > 0) {
                             evt.setAmount((float) (evt.getAmount() - evt.getAmount() * 0.15));
                         }
@@ -63,8 +61,8 @@ public class EnchantmentGoldenLaw extends Enchantment {
         if (!evt.getEntity().world.isRemote) {
             if (!evt.getSource().canHarmInCreative()) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                if (hurter.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItemMainhand());
+                if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                     if (bonusLevel > 0) {
                         if (evt.getAmount() <= hurter.getHealth() * 0.15) {
                             evt.setCanceled(true);
@@ -87,23 +85,8 @@ public class EnchantmentGoldenLaw extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 1;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return CarianStyleEnchantments.RECOLLECT_ENCHANTABILITY;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

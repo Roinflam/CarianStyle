@@ -1,7 +1,5 @@
 package pers.roinflam.carianstyle.potion;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Gui;
 import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.SharedMonsterAttributes;
@@ -16,21 +14,16 @@ import net.minecraftforge.event.entity.living.LivingSetAttackTargetEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
+import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
-import pers.roinflam.carianstyle.utils.util.PotionUtil;
 
 @Mod.EventBusSubscriber
-public class MobEffectSleep extends Potion {
-    private final static ResourceLocation RESOURCE_LOCATION = new ResourceLocation(Reference.MOD_ID, "textures/effect/sleep.png");
+public class MobEffectSleep extends IconBase {
 
     public MobEffectSleep(boolean isBadEffectIn, int liquidColorIn) {
-        super(isBadEffectIn, liquidColorIn);
-        PotionUtil.registerPotion(this, "sleep");
-        CarianStylePotion.POTIONS.add(this);
+        super(isBadEffectIn, liquidColorIn, "sleep");
 
         this.registerPotionAttributeModifier(SharedMonsterAttributes.MOVEMENT_SPEED, "5d59080b-eda9-f5b7-1b3c-51568e5b6682", -1, 2);
     }
@@ -102,17 +95,8 @@ public class MobEffectSleep extends Potion {
         return true;
     }
 
-    @SideOnly(Side.CLIENT)
     @Override
-    public void renderInventoryEffect(int x, int y, PotionEffect effect, Minecraft mc) {
-        mc.getTextureManager().bindTexture(RESOURCE_LOCATION);
-        Gui.drawModalRectWithCustomSizedTexture(x + 6, y + 7, 0, 0, 18, 18, 18, 18);
-    }
-
-    @SideOnly(Side.CLIENT)
-    @Override
-    public void renderHUDEffect(int x, int y, PotionEffect effect, Minecraft mc, float alpha) {
-        mc.getTextureManager().bindTexture(RESOURCE_LOCATION);
-        Gui.drawModalRectWithCustomSizedTexture(x + 3, y + 3, 0, 0, 18, 18, 18, 18);
+    protected ResourceLocation getResourceLocation() {
+        return new ResourceLocation(Reference.MOD_ID, "textures/effect/sleep.png");
     }
 }

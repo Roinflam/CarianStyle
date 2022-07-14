@@ -8,16 +8,15 @@ import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraftforge.event.entity.living.LivingExperienceDropEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentGoldenDungTurtle extends Enchantment {
+public class EnchantmentGoldenDungTurtle extends UncommonBase {
 
-    public EnchantmentGoldenDungTurtle(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "golden_dung_turtle");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentGoldenDungTurtle(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "golden_dung_turtle");
     }
 
     public static Enchantment getEnchantment() {
@@ -29,8 +28,8 @@ public class EnchantmentGoldenDungTurtle extends Enchantment {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getAttackingPlayer() != null) {
                 EntityPlayer player = evt.getAttackingPlayer();
-                if (player.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), player.getHeldItemMainhand());
+                if (!player.getHeldItem(player.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), player.getHeldItem(player.getActiveHand()));
                     if (bonusLevel > 0) {
                         evt.setDroppedExperience((int) (evt.getDroppedExperience() + evt.getDroppedExperience() * bonusLevel * 0.3));
                     }
@@ -39,25 +38,9 @@ public class EnchantmentGoldenDungTurtle extends Enchantment {
         }
     }
 
-
-    @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 5;
-    }
-
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 5 + (enchantmentLevel - 1) * 10;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
 }

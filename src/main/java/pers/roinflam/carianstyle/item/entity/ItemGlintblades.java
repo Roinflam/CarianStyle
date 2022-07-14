@@ -4,16 +4,14 @@ import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.item.ItemSword;
 import pers.roinflam.carianstyle.init.CarianStyleItem;
 import pers.roinflam.carianstyle.utils.IHasModel;
+import pers.roinflam.carianstyle.utils.util.ItemUtil;
 
 public class ItemGlintblades extends ItemSword implements IHasModel {
 
     public ItemGlintblades(String name, CreativeTabs creativeTabs, ToolMaterial material) {
         super(material);
 
-        setUnlocalizedName(name);
-        setRegistryName(name);
-        setCreativeTab(creativeTabs);
-
+        ItemUtil.registerItem(this, name, creativeTabs);
         CarianStyleItem.ITEMS.add(this);
     }
 

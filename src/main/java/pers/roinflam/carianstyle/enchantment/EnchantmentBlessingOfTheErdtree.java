@@ -13,17 +13,16 @@ import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentBlessingOfTheErdtree extends Enchantment {
+public class EnchantmentBlessingOfTheErdtree extends RaryBase {
 
-    public EnchantmentBlessingOfTheErdtree(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "blessing_of_the_erdtree");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentBlessingOfTheErdtree(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "blessing_of_the_erdtree");
     }
 
     public static Enchantment getEnchantment() {
@@ -39,7 +38,7 @@ public class EnchantmentBlessingOfTheErdtree extends Enchantment {
                 EntityLivingBase attacker = (EntityLivingBase) damageSource.getTrueSource();
                 int bonusLevel = 0;
                 for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                    if (itemStack != null) {
+                    if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
@@ -48,7 +47,7 @@ public class EnchantmentBlessingOfTheErdtree extends Enchantment {
                 }
                 bonusLevel = 0;
                 for (ItemStack itemStack : attacker.getArmorInventoryList()) {
-                    if (itemStack != null) {
+                    if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
@@ -60,23 +59,8 @@ public class EnchantmentBlessingOfTheErdtree extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 35 + (enchantmentLevel - 1) * 25;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

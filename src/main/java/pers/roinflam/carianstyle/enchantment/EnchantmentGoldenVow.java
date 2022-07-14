@@ -13,17 +13,16 @@ import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentGoldenVow extends Enchantment {
+public class EnchantmentGoldenVow extends RaryBase {
 
-    public EnchantmentGoldenVow(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "golden_vow");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentGoldenVow(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "golden_vow");
     }
 
     public static Enchantment getEnchantment() {
@@ -39,7 +38,7 @@ public class EnchantmentGoldenVow extends Enchantment {
                 EntityLivingBase attacker = (EntityLivingBase) damageSource.getTrueSource();
                 int bonusLevel = 0;
                 for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                    if (itemStack != null) {
+                    if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
@@ -48,7 +47,7 @@ public class EnchantmentGoldenVow extends Enchantment {
                 }
                 bonusLevel = 0;
                 for (ItemStack itemStack : attacker.getArmorInventoryList()) {
-                    if (itemStack != null) {
+                    if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
@@ -60,23 +59,8 @@ public class EnchantmentGoldenVow extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 35 + (enchantmentLevel - 1) * 25;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

@@ -11,19 +11,17 @@ import net.minecraft.potion.PotionEffect;
 import net.minecraftforge.event.entity.ProjectileImpactEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentEmptyEpilepsyFire extends Enchantment {
+public class EnchantmentEmptyEpilepsyFire extends RaryBase {
 
-    public EnchantmentEmptyEpilepsyFire(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "empty_epilepsy_fire");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentEmptyEpilepsyFire(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "empty_epilepsy_fire");
     }
 
     public static Enchantment getEnchantment() {
@@ -37,7 +35,7 @@ public class EnchantmentEmptyEpilepsyFire extends Enchantment {
                 EntityArrow entityArrow = evt.getArrow();
                 EntityLivingBase attacker = (EntityLivingBase) evt.getArrow().shootingEntity;
                 EntityLivingBase hurter = (EntityLivingBase) evt.getRayTraceResult().entityHit;
-                int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                 if (bonusLevel > 0) {
                     if (!(attacker instanceof EntityPlayer) || !((EntityPlayer) attacker).isCreative()) {
                         attacker.addPotionEffect(new PotionEffect(CarianStylePotion.EPILEPSY_FIRE_BURNING, 3 * 20 + 5, 0));
@@ -54,9 +52,8 @@ public class EnchantmentEmptyEpilepsyFire extends Enchantment {
                                 if (attacker.getHealth() - damage * 1.1 > 0) {
                                     attacker.setHealth(attacker.getHealth() - damage);
                                 } else {
-                                    if (attacker.isEntityAlive()) {
-                                        attacker.attackEntityFrom(NewDamageSource.EPILEPSY_FIRE, (float) (damage * 1.1));
-                                    }
+                                    attacker.onDeath(NewDamageSource.EPILEPSY_FIRE);
+                                    attacker.setDead();
                                     this.cancel();
                                 }
                             }
@@ -77,10 +74,8 @@ public class EnchantmentEmptyEpilepsyFire extends Enchantment {
                             if (hurter.getHealth() - damage * 1.1 > 0) {
                                 hurter.setHealth(hurter.getHealth() - damage);
                             } else {
-                                if (hurter.isEntityAlive()) {
-                                    hurter.hurtResistantTime = 0;
-                                    hurter.attackEntityFrom(NewDamageSource.EPILEPSY_FIRE, (float) (damage * 1.1));
-                                }
+                                hurter.onDeath(NewDamageSource.EPILEPSY_FIRE);
+                                hurter.setDead();
                                 this.cancel();
                             }
                         }
@@ -93,23 +88,8 @@ public class EnchantmentEmptyEpilepsyFire extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 10 * 10;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
 }

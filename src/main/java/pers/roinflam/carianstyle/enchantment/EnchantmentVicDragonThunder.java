@@ -12,6 +12,7 @@ import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
@@ -21,13 +22,11 @@ import java.util.Set;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
-public class EnchantmentVicDragonThunder extends Enchantment {
+public class EnchantmentVicDragonThunder extends RaryBase {
     private static final Set<UUID> VIC_DRAGON_THUNDER = new HashSet<>();
 
-    public EnchantmentVicDragonThunder(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "vic_dragon_thunder");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentVicDragonThunder(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "vic_dragon_thunder");
     }
 
     public static Enchantment getEnchantment() {
@@ -39,8 +38,8 @@ public class EnchantmentVicDragonThunder extends Enchantment {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
             if (!evt.getSource().canHarmInCreative() && evt.getSource().damageType.equals("lightningBolt")) {
-                if (hurter.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItemMainhand());
+                if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                     if (bonusLevel > 0) {
                         if (bonusLevel * 0.15 >= 1) {
                             evt.setCanceled(true);
@@ -52,8 +51,8 @@ public class EnchantmentVicDragonThunder extends Enchantment {
             }
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (attacker.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         if (RandomUtil.percentageChance(attacker.world.isThundering() ? 100 : bonusLevel * 5 * (attacker.world.isRaining() ? 2 : 1))) {
                             World world = hurter.world;
@@ -81,25 +80,9 @@ public class EnchantmentVicDragonThunder extends Enchantment {
         }
     }
 
-
-    @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 30 + (enchantmentLevel - 1) * 15;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

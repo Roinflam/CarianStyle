@@ -12,16 +12,15 @@ import net.minecraftforge.event.entity.living.PotionEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentBeastVitality extends Enchantment {
+public class EnchantmentBeastVitality extends UncommonBase {
 
-    public EnchantmentBeastVitality(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "beast_vitality");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentBeastVitality(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "beast_vitality");
     }
 
     public static Enchantment getEnchantment() {
@@ -34,7 +33,7 @@ public class EnchantmentBeastVitality extends Enchantment {
             EntityLivingBase entityLivingBase = evt.getEntityLiving();
             int bonusLevel = 0;
             for (ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
-                if (itemStack != null) {
+                if (!itemStack.isEmpty()) {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
             }
@@ -49,23 +48,8 @@ public class EnchantmentBeastVitality extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 5;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 5 + (enchantmentLevel - 1) * 25;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

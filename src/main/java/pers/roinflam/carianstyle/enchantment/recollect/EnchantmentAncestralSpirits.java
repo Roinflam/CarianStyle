@@ -10,23 +10,21 @@ import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentAncestralSpirits extends Enchantment {
+public class EnchantmentAncestralSpirits extends VeryRaryBase {
 
-    public EnchantmentAncestralSpirits(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "ancestral_spirits");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentAncestralSpirits(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "ancestral_spirits");
     }
 
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.ANCESTRAL_SPIRITS;
     }
-
 
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onLivingDamage(LivingDamageEvent evt) {
@@ -35,7 +33,7 @@ public class EnchantmentAncestralSpirits extends Enchantment {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 int bonusLevel = 0;
                 for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                    if (itemStack != null) {
+                    if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
@@ -66,23 +64,8 @@ public class EnchantmentAncestralSpirits extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 1;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return CarianStyleEnchantments.RECOLLECT_ENCHANTABILITY;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

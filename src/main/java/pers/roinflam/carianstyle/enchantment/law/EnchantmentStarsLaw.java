@@ -14,17 +14,16 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentStarsLaw extends Enchantment {
+public class EnchantmentStarsLaw extends VeryRaryBase {
 
-    public EnchantmentStarsLaw(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "stars_law");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentStarsLaw(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "stars_law");
     }
 
     public static Enchantment getEnchantment() {
@@ -38,8 +37,8 @@ public class EnchantmentStarsLaw extends Enchantment {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!evt.getSource().isMagicDamage()) {
-                    if (hurter.getHeldItemMainhand() != null) {
-                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItemMainhand());
+                    if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
+                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                         if (bonusLevel > 0) {
                             if (attacker.isPotionActive(CarianStylePotion.FROSTBITE)) {
                                 int level = Math.min(attacker.getActivePotionEffect(CarianStylePotion.FROSTBITE).getAmplifier() + 1, 5);
@@ -50,8 +49,8 @@ public class EnchantmentStarsLaw extends Enchantment {
                         }
                     }
                 }
-                if (attacker.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         if (hurter.isPotionActive(CarianStylePotion.FROSTBITE)) {
                             if (evt.getSource().isMagicDamage()) {
@@ -67,8 +66,8 @@ public class EnchantmentStarsLaw extends Enchantment {
             } else if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
-                if (hurter.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItemMainhand());
+                if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                     if (bonusLevel > 0) {
                         if (!evt.getSource().isMagicDamage()) {
                             if (attacker.isPotionActive(CarianStylePotion.FROSTBITE)) {
@@ -88,8 +87,8 @@ public class EnchantmentStarsLaw extends Enchantment {
     public static void onLivingHeal(LivingHealEvent evt) {
         if (!evt.getEntity().world.isRemote && !evt.getEntity().world.isDaytime()) {
             EntityLivingBase healer = evt.getEntityLiving();
-            if (healer.getHeldItemMainhand() != null) {
-                int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), healer.getHeldItemMainhand());
+            if (!healer.getHeldItem(healer.getActiveHand()).isEmpty()) {
+                int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), healer.getHeldItem(healer.getActiveHand()));
                 if (bonusLevel > 0) {
                     evt.setAmount((float) (evt.getAmount() + evt.getAmount() * 0.5));
                 }
@@ -103,8 +102,8 @@ public class EnchantmentStarsLaw extends Enchantment {
             if (evt.phase.equals(TickEvent.Phase.END)) {
                 EntityPlayer entityPlayer = evt.player;
                 if (entityPlayer.isEntityAlive()) {
-                    if (entityPlayer.getHeldItemMainhand() != null) {
-                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityPlayer.getHeldItemMainhand());
+                    if (!entityPlayer.getHeldItem(entityPlayer.getActiveHand()).isEmpty()) {
+                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityPlayer.getHeldItem(entityPlayer.getActiveHand()));
                         if (bonusLevel > 0) {
                             entityPlayer.addPotionEffect(new PotionEffect(MobEffects.SPEED, 50));
                             entityPlayer.addPotionEffect(new PotionEffect(MobEffects.JUMP_BOOST, 50));
@@ -116,23 +115,8 @@ public class EnchantmentStarsLaw extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 1;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return CarianStyleEnchantments.RECOLLECT_ENCHANTABILITY;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

@@ -10,6 +10,7 @@ import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
@@ -19,13 +20,11 @@ import java.util.Set;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
-public class EnchantmentScarletCorruption extends Enchantment {
+public class EnchantmentScarletCorruption extends RaryBase {
     public static Set<UUID> SCARLET_ROT = new HashSet<>();
 
-    public EnchantmentScarletCorruption(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "scarlet_rot");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentScarletCorruption(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "scarlet_rot");
     }
 
     public static Enchantment getEnchantment() {
@@ -38,8 +37,8 @@ public class EnchantmentScarletCorruption extends Enchantment {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (attacker.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         hurter.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_ROT, bonusLevel * 20 * 20, 0));
                     }
@@ -48,25 +47,9 @@ public class EnchantmentScarletCorruption extends Enchantment {
         }
     }
 
-
-    @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 36 + (enchantmentLevel - 1) * 20;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

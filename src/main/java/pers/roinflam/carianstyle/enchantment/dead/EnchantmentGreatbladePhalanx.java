@@ -11,6 +11,7 @@ import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
@@ -21,13 +22,11 @@ import java.util.Set;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
-public class EnchantmentGreatbladePhalanx extends Enchantment {
+public class EnchantmentGreatbladePhalanx extends RaryBase {
     private static final Set<UUID> DEAD = new HashSet<>();
 
-    public EnchantmentGreatbladePhalanx(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "greatblade_phalanx");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentGreatbladePhalanx(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "greatblade_phalanx");
     }
 
     public static Enchantment getEnchantment() {
@@ -42,7 +41,7 @@ public class EnchantmentGreatbladePhalanx extends Enchantment {
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
                 int bonusLevel = 0;
                 for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                    if (itemStack != null) {
+                    if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
@@ -101,23 +100,8 @@ public class EnchantmentGreatbladePhalanx extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 30 + (enchantmentLevel - 1) * 15;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

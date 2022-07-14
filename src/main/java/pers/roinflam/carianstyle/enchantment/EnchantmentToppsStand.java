@@ -7,53 +7,47 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
-import net.minecraftforge.event.entity.living.LivingAttackEvent;
+import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
-import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
 
 @Mod.EventBusSubscriber
-public class EnchantmentToppsStand extends Enchantment {
+public class EnchantmentToppsStand extends VeryRaryBase {
 
-    public EnchantmentToppsStand(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "topps_stand");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentToppsStand(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "topps_stand");
     }
 
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.TOPPS_STAND;
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingAttack(LivingAttackEvent evt) {
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingDamage(LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().isMagicDamage()) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                List<Entity> entities = EntityUtil.getNearbyEntities(
-                        hurter,
-                        6,
-                        6,
-                        entity -> entity instanceof EntityLivingBase
+                List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                        EntityLivingBase.class,
+                        new AxisAlignedBB(hurter.getPosition()).expand(6, 6, 6)
                 );
-                if(evt.getSource().getTrueSource() instanceof EntityLivingBase){
+                if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
                     EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
-                    entities.addAll(EntityUtil.getNearbyEntities(
-                            attacker,
-                            6,
-                            6,
-                            entity -> entity instanceof EntityLivingBase
+                    entities.addAll(attacker.world.getEntitiesWithinAABB(
+                            EntityLivingBase.class,
+                            new AxisAlignedBB(attacker.getPosition()).expand(6, 6, 6)
                     ));
                 }
                 for (Entity entity : entities) {
                     EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
                     for (ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
-                        if (itemStack != null) {
+                        if (!itemStack.isEmpty()) {
                             if (EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack) > 0) {
                                 evt.setCanceled(true);
                                 return;
@@ -66,23 +60,8 @@ public class EnchantmentToppsStand extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 1;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 5 + (enchantmentLevel - 1) * 10;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

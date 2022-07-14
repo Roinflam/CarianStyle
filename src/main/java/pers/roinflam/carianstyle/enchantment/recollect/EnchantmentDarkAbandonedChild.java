@@ -13,6 +13,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
@@ -21,12 +22,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Mod.EventBusSubscriber
-public class EnchantmentDarkAbandonedChild extends Enchantment {
+public class EnchantmentDarkAbandonedChild extends VeryRaryBase {
 
-    public EnchantmentDarkAbandonedChild(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "dark_abandoned_child");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentDarkAbandonedChild(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "dark_abandoned_child");
     }
 
     public static Enchantment getEnchantment() {
@@ -40,8 +39,8 @@ public class EnchantmentDarkAbandonedChild extends Enchantment {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (attacker.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         evt.getSource().setMagicDamage().setDamageBypassesArmor();
                         if (hurter.getActivePotionEffects().size() > 0) {
@@ -68,8 +67,8 @@ public class EnchantmentDarkAbandonedChild extends Enchantment {
         if (!evt.getEntity().world.isRemote) {
             if (!evt.getSource().canHarmInCreative()) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                if (hurter.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItemMainhand());
+                if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                     if (bonusLevel > 0) {
                         if (!hurter.world.isDaytime()) {
                             evt.setAmount((float) (evt.getAmount() * 0.9));
@@ -86,8 +85,8 @@ public class EnchantmentDarkAbandonedChild extends Enchantment {
             if (evt.phase.equals(TickEvent.Phase.END)) {
                 EntityPlayer entityPlayer = evt.player;
                 if (entityPlayer.isEntityAlive()) {
-                    if (entityPlayer.getHeldItemMainhand() != null) {
-                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityPlayer.getHeldItemMainhand());
+                    if (!entityPlayer.getHeldItem(entityPlayer.getActiveHand()).isEmpty()) {
+                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityPlayer.getHeldItem(entityPlayer.getActiveHand()));
                         if (bonusLevel > 0) {
                             entityPlayer.heal((float) (entityPlayer.getMaxHealth() * 0.015 / 20));
                         }
@@ -98,23 +97,8 @@ public class EnchantmentDarkAbandonedChild extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 1;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return CarianStyleEnchantments.RECOLLECT_ENCHANTABILITY;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

@@ -12,23 +12,21 @@ import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
-public class EnchantmentLivingCorpse extends Enchantment {
+public class EnchantmentLivingCorpse extends VeryRaryBase {
     private static final Set<UUID> DEAD = new HashSet<>();
     private static final Set<UUID> LOSE_BLOOD = new HashSet<>();
 
-    public EnchantmentLivingCorpse(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "living_corpse");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentLivingCorpse(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "living_corpse");
     }
 
     public static Enchantment getEnchantment() {
@@ -41,7 +39,7 @@ public class EnchantmentLivingCorpse extends Enchantment {
             EntityLivingBase hurter = evt.getEntityLiving();
             int bonusLevel = 0;
             for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                if (itemStack != null) {
+                if (!itemStack.isEmpty()) {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
             }
@@ -66,8 +64,8 @@ public class EnchantmentLivingCorpse extends Enchantment {
                                 if (hurter.getHealth() - damage * 1.1 > 0) {
                                     hurter.setHealth(hurter.getHealth() - damage);
                                 } else {
-                                    hurter.hurtResistantTime = 0;
-                                    hurter.attackEntityFrom(evt.getSource().setDamageBypassesArmor().setDamageAllowedInCreativeMode(), (float) (damage * 1.1));
+                                    hurter.onDeath(evt.getSource().setDamageBypassesArmor());
+                                    hurter.setDead();
                                     LOSE_BLOOD.remove(hurter.getUniqueID());
                                     this.cancel();
                                 }
@@ -109,8 +107,8 @@ public class EnchantmentLivingCorpse extends Enchantment {
                             if (hurter.getHealth() - damage * 1.1 > 0) {
                                 hurter.setHealth(hurter.getHealth() - damage);
                             } else {
-                                hurter.hurtResistantTime = 0;
-                                hurter.attackEntityFrom(DamageSource.causeMobDamage(hurter).setDamageBypassesArmor().setDamageAllowedInCreativeMode(), (float) (damage * 1.1));
+                                hurter.onDeath(DamageSource.causeMobDamage(hurter).setDamageBypassesArmor());
+                                hurter.setDead();
                                 LOSE_BLOOD.remove(hurter.getUniqueID());
                                 this.cancel();
                             }
@@ -123,23 +121,8 @@ public class EnchantmentLivingCorpse extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 1;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return CarianStyleEnchantments.RECOLLECT_ENCHANTABILITY;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

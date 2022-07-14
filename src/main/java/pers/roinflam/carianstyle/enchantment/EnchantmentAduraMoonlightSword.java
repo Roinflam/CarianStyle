@@ -7,24 +7,22 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.potion.PotionEffect;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
-import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
 
 @Mod.EventBusSubscriber
-public class EnchantmentAduraMoonlightSword extends Enchantment {
+public class EnchantmentAduraMoonlightSword extends RaryBase {
 
-    public EnchantmentAduraMoonlightSword(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "adura_moonlight_sword");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentAduraMoonlightSword(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "adura_moonlight_sword");
     }
 
     public static Enchantment getEnchantment() {
@@ -37,19 +35,17 @@ public class EnchantmentAduraMoonlightSword extends Enchantment {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (attacker.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         evt.getSource().setMagicDamage();
-                        List<Entity> entities = EntityUtil.getNearbyEntities(
-                                hurter,
-                                bonusLevel,
-                                bonusLevel,
-                                entity -> entity instanceof EntityLivingBase && !entity.equals(attacker)
+                        List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                                EntityLivingBase.class,
+                                new AxisAlignedBB(hurter.getPosition()).expand(bonusLevel, bonusLevel, bonusLevel),
+                                entityLivingBase -> !entityLivingBase.equals(attacker)
                         );
                         if (attacker.world.isDaytime()) {
-                            for (Entity entity : entities) {
-                                EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
+                            for (EntityLivingBase entityLivingBase : entities) {
                                 if (entityLivingBase.isPotionActive(CarianStylePotion.FROSTBITE)) {
                                     int level = Math.min(entityLivingBase.getActivePotionEffect(CarianStylePotion.FROSTBITE).getAmplifier() + 1, 9);
                                     entityLivingBase.addPotionEffect(new PotionEffect(CarianStylePotion.FROSTBITE, 200, level));
@@ -74,25 +70,9 @@ public class EnchantmentAduraMoonlightSword extends Enchantment {
         }
     }
 
-
-    @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 30 + (enchantmentLevel - 1) * 10;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

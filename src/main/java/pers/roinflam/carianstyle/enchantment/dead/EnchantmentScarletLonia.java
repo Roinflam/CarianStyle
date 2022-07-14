@@ -9,17 +9,18 @@ import net.minecraft.init.MobEffects;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.potion.PotionEffect;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
@@ -29,14 +30,12 @@ import java.util.Set;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
-public class EnchantmentScarletLonia extends Enchantment {
+public class EnchantmentScarletLonia extends RaryBase {
     private static final Set<UUID> SCARLET_LONIA = new HashSet<>();
     private static final Set<UUID> SCARLET_LONIA_COOLDING = new HashSet<>();
 
-    public EnchantmentScarletLonia(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "scarlet_lonia");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentScarletLonia(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "scarlet_lonia");
     }
 
     public static Enchantment getEnchantment() {
@@ -50,7 +49,7 @@ public class EnchantmentScarletLonia extends Enchantment {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 int bonusLevel = 0;
                 for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                    if (itemStack != null) {
+                    if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
@@ -63,14 +62,12 @@ public class EnchantmentScarletLonia extends Enchantment {
                         hurter.setHealth(1);
                         hurter.addPotionEffect(new PotionEffect(MobEffects.SLOWNESS, 30, 6));
 
-                        List<Entity> entities = EntityUtil.getNearbyEntities(
-                                hurter,
-                                bonusLevel * 4,
-                                bonusLevel * 4,
-                                entity -> entity instanceof EntityLivingBase && !entity.equals(hurter)
+                        List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                                EntityLivingBase.class,
+                                new AxisAlignedBB(hurter.getPosition()).expand(bonusLevel * 4, bonusLevel * 4, bonusLevel * 4),
+                                entityLivingBase -> !entityLivingBase.equals(hurter)
                         );
-                        for (Entity entity : entities) {
-                            EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
+                        for (EntityLivingBase entityLivingBase : entities) {
                             double x = entityLivingBase.posX - hurter.posX;
                             double z = entityLivingBase.posZ - hurter.posZ;
                             float stronge = (float) (bonusLevel * 0.7 * Math.max(Math.abs(x), Math.abs(z)) / 14);
@@ -81,11 +78,10 @@ public class EnchantmentScarletLonia extends Enchantment {
 
                             @Override
                             public void run() {
-                                List<Entity> entities = EntityUtil.getNearbyEntities(
-                                        hurter,
-                                        finalBonusLevel * 2,
-                                        finalBonusLevel * 2,
-                                        entity -> entity instanceof EntityLivingBase && !entity.equals(hurter)
+                                List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                                        EntityLivingBase.class,
+                                        new AxisAlignedBB(hurter.getPosition()).expand(finalBonusLevel * 2, finalBonusLevel * 2, finalBonusLevel * 2),
+                                        entityLivingBase -> !entityLivingBase.equals(hurter)
                                 );
                                 if (!entities.isEmpty()) {
                                     for (Entity entity : entities) {
@@ -99,8 +95,8 @@ public class EnchantmentScarletLonia extends Enchantment {
                                 }
                                 SCARLET_LONIA.remove(hurter.getUniqueID());
 
-                                hurter.setHealth(0);
                                 hurter.onDeath(NewDamageSource.SCARLET_ROT);
+                                hurter.setDead();
                             }
 
                         }.start();
@@ -143,23 +139,8 @@ public class EnchantmentScarletLonia extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 36 + (enchantmentLevel - 1) * 20;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

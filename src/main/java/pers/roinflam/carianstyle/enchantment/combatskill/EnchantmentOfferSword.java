@@ -8,16 +8,15 @@ import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentOfferSword extends Enchantment {
+public class EnchantmentOfferSword extends UncommonBase {
 
-    public EnchantmentOfferSword(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "offer_sword");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentOfferSword(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "offer_sword");
     }
 
     public static Enchantment getEnchantment() {
@@ -29,9 +28,9 @@ public class EnchantmentOfferSword extends Enchantment {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (attacker.getHeldItemMainhand() != null) {
+                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     if (attacker.getHealth() >= attacker.getMaxHealth()) {
-                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                         if (bonusLevel > 0) {
                             evt.setAmount((float) (evt.getAmount() + evt.getAmount() * bonusLevel * 0.1));
                         }
@@ -42,23 +41,8 @@ public class EnchantmentOfferSword extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 5;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 5 + (enchantmentLevel - 1) * 10;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

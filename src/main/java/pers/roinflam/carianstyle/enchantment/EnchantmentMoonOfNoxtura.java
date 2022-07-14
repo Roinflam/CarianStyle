@@ -3,29 +3,29 @@ package pers.roinflam.carianstyle.enchantment;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.monster.EntityMob;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraftforge.client.event.EntityViewRenderEvent;
+import net.minecraftforge.client.event.RenderLivingEvent;
+import net.minecraftforge.client.event.RenderPlayerEvent;
 import net.minecraftforge.event.entity.living.LivingSetAttackTargetEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
-import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
 
 @Mod.EventBusSubscriber
-public class EnchantmentMoonOfNoxtura extends Enchantment {
+public class EnchantmentMoonOfNoxtura extends VeryRaryBase {
 
-    public EnchantmentMoonOfNoxtura(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "moon_of_noxtura");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentMoonOfNoxtura(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "moon_of_noxtura");
     }
 
     public static Enchantment getEnchantment() {
@@ -40,21 +40,20 @@ public class EnchantmentMoonOfNoxtura extends Enchantment {
                 EntityLiving entityLiving = (EntityLiving) evt.getEntityLiving();
                 int bonusLevel = 0;
                 for (ItemStack itemStack : target.getArmorInventoryList()) {
-                    if (itemStack != null) {
+                    if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
                 if (bonusLevel > 0) {
                     if (RandomUtil.percentageChance(2.5)) {
                         double distance = entityLiving.getDistance(target);
-                        List<Entity> entities = EntityUtil.getNearbyEntities(
-                                entityLiving,
-                                distance,
-                                distance,
-                                entity -> entity instanceof EntityMob && entity.getClass() != (entityLiving.getClass()) && entityLiving.canEntityBeSeen(entity) && !entity.equals(entityLiving) && !entity.equals(target)
+                        List<EntityLivingBase> entities = entityLiving.world.getEntitiesWithinAABB(
+                                EntityLivingBase.class,
+                                new AxisAlignedBB(entityLiving.getPosition()).expand(distance, distance, distance),
+                                entityLivingBase -> entityLivingBase.getClass() != (entityLiving.getClass()) && entityLiving.canEntityBeSeen(entityLivingBase) && !entityLivingBase.equals(entityLiving) && !entityLivingBase.equals(target)
                         );
                         if (!entities.isEmpty()) {
-                            entityLiving.setAttackTarget((EntityLivingBase) entities.get(RandomUtil.getInt(0, entities.size() - 1)));
+                            entityLiving.setAttackTarget(entities.get(RandomUtil.getInt(0, entities.size() - 1)));
                         }
                     }
                 }
@@ -63,23 +62,8 @@ public class EnchantmentMoonOfNoxtura extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 1;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 35;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

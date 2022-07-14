@@ -11,17 +11,16 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.potion.MobEffectBadOmen;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentBadOmen extends Enchantment {
+public class EnchantmentBadOmen extends VeryRaryBase {
 
-    public EnchantmentBadOmen(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "bad_omen");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentBadOmen(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "bad_omen");
     }
 
     public static Enchantment getEnchantment() {
@@ -34,14 +33,14 @@ public class EnchantmentBadOmen extends Enchantment {
             EntityLivingBase hurter = evt.getEntityLiving();
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (attacker.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         if (hurter.isPotionActive(MobEffectBadOmen.getPotion())) {
                             double damage = evt.getAmount();
                             if (damage * 0.5 >= hurter.getHealth()) {
-                                hurter.setHealth(0);
                                 hurter.onDeath(DamageSource.causeMobDamage(attacker).setDamageBypassesArmor());
+                                hurter.setDead();
                             } else {
                                 hurter.setHealth((float) (hurter.getHealth() - damage * 0.5));
                                 evt.setAmount((float) (damage * 0.5));
@@ -55,23 +54,8 @@ public class EnchantmentBadOmen extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 1;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return CarianStyleEnchantments.RECOLLECT_ENCHANTABILITY;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

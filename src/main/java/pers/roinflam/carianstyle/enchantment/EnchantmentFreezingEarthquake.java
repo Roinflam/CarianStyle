@@ -3,31 +3,28 @@ package pers.roinflam.carianstyle.enchantment;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.potion.PotionEffect;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.common.ForgeHooks;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingKnockBackEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
-import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
 
 @Mod.EventBusSubscriber
-public class EnchantmentFreezingEarthquake extends Enchantment {
+public class EnchantmentFreezingEarthquake extends RaryBase {
 
-    public EnchantmentFreezingEarthquake(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "freezing_earthquake");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentFreezingEarthquake(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "freezing_earthquake");
     }
 
     public static Enchantment getEnchantment() {
@@ -42,19 +39,17 @@ public class EnchantmentFreezingEarthquake extends Enchantment {
                     EntityLivingBase hurter = evt.getEntityLiving();
                     int bonusLevel = 0;
                     for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                        if (itemStack != null) {
+                        if (!itemStack.isEmpty()) {
                             bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                         }
                     }
                     if (bonusLevel > 0) {
-                        List<Entity> entities = EntityUtil.getNearbyEntities(
-                                hurter,
-                                3 + (bonusLevel - 1) * 2,
-                                3 + (bonusLevel - 1) * 2,
-                                entity -> entity.onGround && entity instanceof EntityLivingBase && !entity.equals(hurter)
+                        List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                                EntityLivingBase.class,
+                                new AxisAlignedBB(hurter.getPosition()).expand(3 + (bonusLevel - 1) * 2, 3 + (bonusLevel - 1) * 2, 3 + (bonusLevel - 1) * 2),
+                                entityLivingBase -> entityLivingBase.onGround && !entityLivingBase.equals(hurter)
                         );
-                        for (Entity entity : entities) {
-                            EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
+                        for (EntityLivingBase entityLivingBase : entities) {
                             if (entityLivingBase.onGround) {
                                 LivingKnockBackEvent livingKnockBackEvent = ForgeHooks.onLivingKnockBack(entityLivingBase, hurter, bonusLevel * 0.35f, 0, 0);
                                 if (!livingKnockBackEvent.isCanceled()) {
@@ -71,23 +66,8 @@ public class EnchantmentFreezingEarthquake extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 15 + (enchantmentLevel - 1) * 15;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
 }

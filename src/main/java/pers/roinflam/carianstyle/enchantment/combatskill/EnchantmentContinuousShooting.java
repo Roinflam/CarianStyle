@@ -12,17 +12,15 @@ import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentContinuousShooting extends Enchantment {
+public class EnchantmentContinuousShooting extends VeryRaryBase {
 
-    public EnchantmentContinuousShooting(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "continuous_shooting");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentContinuousShooting(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "continuous_shooting");
     }
 
     public static Enchantment getEnchantment() {
@@ -35,7 +33,7 @@ public class EnchantmentContinuousShooting extends Enchantment {
             if (evt.getArrow().shootingEntity != null && evt.getRayTraceResult().entityHit != null) {
                 EntityArrow entityArrow = evt.getArrow();
                 EntityLivingBase attacker = (EntityLivingBase) evt.getArrow().shootingEntity;
-                int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                 if (bonusLevel > 0) {
                     entityArrow.setDamage(entityArrow.getDamage() - entityArrow.getDamage() * 0.5);
                 }
@@ -47,8 +45,8 @@ public class EnchantmentContinuousShooting extends Enchantment {
     public static void onLivingUpdate(LivingEvent.LivingUpdateEvent evt) {
         EntityLivingBase entityLivingBase = evt.getEntityLiving();
         if (entityLivingBase.isHandActive()) {
-            if (entityLivingBase.getHeldItemMainhand() != null) {
-                int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityLivingBase.getHeldItemMainhand());
+            if (!entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()).isEmpty()) {
+                int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()));
                 if (bonusLevel > 0) {
                     for (int i = 0; i < 4; i++) {
                         EntityLivingUtil.updateHeld(entityLivingBase);
@@ -59,23 +57,8 @@ public class EnchantmentContinuousShooting extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 1;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 35;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

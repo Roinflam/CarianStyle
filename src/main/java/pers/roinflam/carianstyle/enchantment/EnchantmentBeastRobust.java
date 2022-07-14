@@ -12,16 +12,15 @@ import net.minecraftforge.event.entity.living.PotionEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentBeastRobust extends Enchantment {
+public class EnchantmentBeastRobust extends VeryRaryBase {
 
-    public EnchantmentBeastRobust(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "beast_robust");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentBeastRobust(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "beast_robust");
     }
 
     public static Enchantment getEnchantment() {
@@ -34,7 +33,7 @@ public class EnchantmentBeastRobust extends Enchantment {
             EntityLivingBase entityLivingBase = evt.getEntityLiving();
             int bonusLevel = 0;
             for (ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
-                if (itemStack != null) {
+                if (!itemStack.isEmpty()) {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
             }
@@ -49,23 +48,8 @@ public class EnchantmentBeastRobust extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 1;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 35;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

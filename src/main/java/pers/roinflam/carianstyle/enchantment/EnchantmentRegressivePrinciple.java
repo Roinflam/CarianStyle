@@ -3,28 +3,23 @@ package pers.roinflam.carianstyle.enchantment;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
-import pers.roinflam.carianstyle.utils.util.EntityUtil;
-
-import java.util.List;
 
 @Mod.EventBusSubscriber
-public class EnchantmentRegressivePrinciple extends Enchantment {
+public class EnchantmentRegressivePrinciple extends RaryBase {
 
-    public EnchantmentRegressivePrinciple(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "regressive_principle");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentRegressivePrinciple(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "regressive_principle");
     }
 
     public static Enchantment getEnchantment() {
@@ -40,21 +35,18 @@ public class EnchantmentRegressivePrinciple extends Enchantment {
                     if (entityPlayer.isEntityAlive()) {
                         int bonusLevel = 0;
                         for (ItemStack itemStack : entityPlayer.getArmorInventoryList()) {
-                            if (itemStack != null) {
+                            if (!itemStack.isEmpty()) {
                                 bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                             }
                         }
                         if (bonusLevel > 0) {
-                            List<Entity> entities = EntityUtil.getNearbyEntities(
-                                    entityPlayer,
-                                    bonusLevel * 2,
-                                    bonusLevel * 2,
-                                    entity -> entity instanceof EntityLivingBase && ((EntityLivingBase) entity).getActivePotionEffects().size() > 0
-                            );
-                            for (Entity entity : entities) {
-                                EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
-                                entityLivingBase.clearActivePotions();
-                            }
+                            entityPlayer.world.getEntitiesWithinAABB(
+                                    EntityLivingBase.class,
+                                    new AxisAlignedBB(entityPlayer.getPosition()).expand(bonusLevel * 3, bonusLevel * 3, bonusLevel * 3),
+                                    entityLivingBase -> entityLivingBase.getActivePotionEffects().size() > 0)
+                                    .forEach((entityLivingBase) -> {
+                                        entityLivingBase.clearActivePotions();
+                                    });
                         }
                     }
                 }
@@ -63,23 +55,8 @@ public class EnchantmentRegressivePrinciple extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 5 + (enchantmentLevel - 1) * 10;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
+        return 15 + (enchantmentLevel - 1) * 15;
     }
 
     @Override

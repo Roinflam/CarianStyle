@@ -3,12 +3,12 @@ package pers.roinflam.carianstyle.enchantment.dead;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.effect.EntityLightningBolt;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.DamageSource;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.World;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
@@ -16,11 +16,10 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import org.apache.commons.lang3.RandomUtils;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
-import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.HashSet;
 import java.util.List;
@@ -28,13 +27,11 @@ import java.util.Set;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
-public class EnchantmentAncientDragonLightning extends Enchantment {
+public class EnchantmentAncientDragonLightning extends RaryBase {
     private static final Set<UUID> THUNDER = new HashSet<>();
 
-    public EnchantmentAncientDragonLightning(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "ancient_dragon_lightning");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentAncientDragonLightning(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "ancient_dragon_lightning");
     }
 
     public static Enchantment getEnchantment() {
@@ -47,7 +44,7 @@ public class EnchantmentAncientDragonLightning extends Enchantment {
             EntityLivingBase hurter = evt.getEntityLiving();
             int bonusLevel = 0;
             for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                if (itemStack != null) {
+                if (!itemStack.isEmpty()) {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
             }
@@ -55,15 +52,13 @@ public class EnchantmentAncientDragonLightning extends Enchantment {
                 if (!THUNDER.contains(hurter.getUniqueID())) {
                     if (!hurter.isDead) {
                         THUNDER.add(hurter.getUniqueID());
-                        List<Entity> entities = EntityUtil.getNearbyEntities(
-                                hurter,
-                                60,
-                                15,
-                                entity -> entity instanceof EntityLivingBase && !entity.equals(hurter)
-                        );
+                        List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                                EntityLivingBase.class,
+                                new AxisAlignedBB(hurter.getPosition()).expand(60, 15, 60),
+                                entityLivingBase -> !entityLivingBase.equals(hurter));
                         List<Integer> list = RandomUtil.randomList(bonusLevel * 100, entities.size());
                         for (int i = 0; i < list.size(); i++) {
-                            EntityLivingBase entityLivingBase = (EntityLivingBase) entities.get(i);
+                            EntityLivingBase entityLivingBase = entities.get(i);
                             int timeLightning = Math.min(list.get(i), bonusLevel * 15);
                             new SynchronizationTask(40, 5) {
                                 private int time = 0;
@@ -121,23 +116,8 @@ public class EnchantmentAncientDragonLightning extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 36 + (enchantmentLevel - 1) * 20;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

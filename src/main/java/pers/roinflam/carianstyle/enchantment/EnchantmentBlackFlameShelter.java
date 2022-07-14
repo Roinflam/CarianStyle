@@ -13,16 +13,15 @@ import net.minecraftforge.event.entity.living.LivingHealEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentBlackFlameShelter extends Enchantment {
+public class EnchantmentBlackFlameShelter extends RaryBase {
 
-    public EnchantmentBlackFlameShelter(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "black_flame_shelter");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentBlackFlameShelter(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "black_flame_shelter");
     }
 
     public static Enchantment getEnchantment() {
@@ -37,7 +36,7 @@ public class EnchantmentBlackFlameShelter extends Enchantment {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 int bonusLevel = 0;
                 for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                    if (itemStack != null) {
+                    if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
@@ -54,7 +53,7 @@ public class EnchantmentBlackFlameShelter extends Enchantment {
             EntityLivingBase entityLivingBase = evt.getEntityLiving();
             int bonusLevel = 0;
             for (ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
-                if (itemStack != null) {
+                if (!itemStack.isEmpty()) {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
             }
@@ -65,23 +64,8 @@ public class EnchantmentBlackFlameShelter extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 20 + (enchantmentLevel - 1) * 15;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

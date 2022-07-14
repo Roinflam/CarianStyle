@@ -11,16 +11,14 @@ import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentBlasphemy extends Enchantment {
+public class EnchantmentBlasphemy extends VeryRaryBase {
 
-    public EnchantmentBlasphemy(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "blasphemy");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentBlasphemy(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "blasphemy");
     }
 
     public static Enchantment getEnchantment() {
@@ -34,8 +32,8 @@ public class EnchantmentBlasphemy extends Enchantment {
                 EntityLivingBase killer = (EntityLivingBase) evt.getSource().getImmediateSource();
                 EntityLivingBase deader = evt.getEntityLiving();
                 if (killer.isEntityAlive() && !evt.getEntityLiving().equals(killer)) {
-                    if (killer.getHeldItemMainhand() != null) {
-                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), killer.getHeldItemMainhand());
+                    if (!killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
+                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), killer.getHeldItem(killer.getActiveHand()));
                         if (bonusLevel > 0) {
                             killer.heal((float) (deader.getMaxHealth() * 0.1));
                             if (killer instanceof EntityPlayer) {
@@ -51,23 +49,8 @@ public class EnchantmentBlasphemy extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 1;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return CarianStyleEnchantments.RECOLLECT_ENCHANTABILITY;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

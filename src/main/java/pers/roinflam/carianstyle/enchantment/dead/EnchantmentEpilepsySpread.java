@@ -10,19 +10,19 @@ import net.minecraft.init.SoundEvents;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.potion.PotionEffect;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
-import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.HashSet;
 import java.util.List;
@@ -30,14 +30,12 @@ import java.util.Set;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
-public class EnchantmentEpilepsySpread extends Enchantment {
+public class EnchantmentEpilepsySpread extends RaryBase {
     private static final Set<UUID> EPILEPSY_SPREAD = new HashSet<>();
     private static final Set<UUID> EPILEPSY_SPREAD_COOLDING = new HashSet<>();
 
-    public EnchantmentEpilepsySpread(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "epilepsy_spread");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentEpilepsySpread(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "epilepsy_spread");
     }
 
     public static Enchantment getEnchantment() {
@@ -51,7 +49,7 @@ public class EnchantmentEpilepsySpread extends Enchantment {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 int bonusLevel = 0;
                 for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                    if (itemStack != null) {
+                    if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
@@ -65,14 +63,11 @@ public class EnchantmentEpilepsySpread extends Enchantment {
                             hurter.setHealth((float) (hurter.getMaxHealth() * 0.3));
                             hurter.addPotionEffect(new PotionEffect(MobEffects.SLOWNESS, 100, 6));
 
-                            List<Entity> entities = EntityUtil.getNearbyEntities(
-                                    hurter,
-                                    bonusLevel * 4,
-                                    bonusLevel * 4,
-                                    entity -> entity instanceof EntityLivingBase
+                            List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                                    EntityLivingBase.class,
+                                    new AxisAlignedBB(hurter.getPosition()).expand(bonusLevel * 4, bonusLevel * 4, bonusLevel * 4)
                             );
-                            for (Entity entity : entities) {
-                                EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
+                            for (EntityLivingBase entityLivingBase : entities) {
                                 entityLivingBase.playSound(SoundEvents.ENTITY_GHAST_HURT, 1, 1);
                                 if (!entityLivingBase.equals(hurter)) {
                                     double x = entityLivingBase.posX - hurter.posX;
@@ -106,9 +101,8 @@ public class EnchantmentEpilepsySpread extends Enchantment {
                                                             hurter.setHealth(hurter.getHealth() - damage);
                                                         } else {
                                                             EPILEPSY_SPREAD.remove(hurter.getUniqueID());
-                                                            if (hurter.isEntityAlive()) {
-                                                                hurter.attackEntityFrom(NewDamageSource.EPILEPSY_FIRE, (float) (damage * 1.1));
-                                                            }
+                                                            hurter.onDeath(NewDamageSource.EPILEPSY_FIRE);
+                                                            hurter.setDead();
                                                             this.cancel();
                                                         }
                                                     } else {
@@ -116,9 +110,8 @@ public class EnchantmentEpilepsySpread extends Enchantment {
                                                         if (entityLivingBase.getHealth() - damage * 1.1 > 0) {
                                                             entityLivingBase.setHealth(entityLivingBase.getHealth() - damage);
                                                         } else {
-                                                            if (entityLivingBase.isEntityAlive()) {
-                                                                entityLivingBase.attackEntityFrom(NewDamageSource.EPILEPSY_FIRE, (float) (damage * 1.1));
-                                                            }
+                                                            entityLivingBase.onDeath(NewDamageSource.EPILEPSY_FIRE);
+                                                            entityLivingBase.setDead();
                                                             this.cancel();
                                                         }
                                                     }
@@ -133,8 +126,8 @@ public class EnchantmentEpilepsySpread extends Enchantment {
                                         @Override
                                         public void run() {
                                             if (hurter.isEntityAlive()) {
-                                                hurter.setHealth(0);
                                                 hurter.onDeath(NewDamageSource.EPILEPSY_FIRE);
+                                                hurter.setDead();
                                             }
                                             EPILEPSY_SPREAD.remove(hurter.getUniqueID());
                                         }
@@ -180,23 +173,8 @@ public class EnchantmentEpilepsySpread extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 36 + (enchantmentLevel - 1) * 20;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

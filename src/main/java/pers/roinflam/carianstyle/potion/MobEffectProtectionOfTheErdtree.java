@@ -13,18 +13,16 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
+import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.PotionUtil;
 
 @Mod.EventBusSubscriber
-public class MobEffectProtectionOfTheErdtree extends Potion {
-    private final static ResourceLocation RESOURCE_LOCATION = new ResourceLocation(Reference.MOD_ID, "textures/effect/protection_of_the_erdtree.png");
+public class MobEffectProtectionOfTheErdtree extends IconBase {
 
     public MobEffectProtectionOfTheErdtree(boolean isBadEffectIn, int liquidColorIn) {
-        super(isBadEffectIn, liquidColorIn);
-        PotionUtil.registerPotion(this, "protection_of_the_erdtree");
-        CarianStylePotion.POTIONS.add(this);
+        super(isBadEffectIn, liquidColorIn, "protection_of_the_erdtree");
     }
 
     public static Potion getPotion() {
@@ -52,17 +50,8 @@ public class MobEffectProtectionOfTheErdtree extends Potion {
         return true;
     }
 
-    @SideOnly(Side.CLIENT)
     @Override
-    public void renderInventoryEffect(int x, int y, PotionEffect effect, Minecraft mc) {
-        mc.getTextureManager().bindTexture(RESOURCE_LOCATION);
-        Gui.drawModalRectWithCustomSizedTexture(x + 6, y + 7, 0, 0, 18, 18, 18, 18);
-    }
-
-    @SideOnly(Side.CLIENT)
-    @Override
-    public void renderHUDEffect(int x, int y, PotionEffect effect, Minecraft mc, float alpha) {
-        mc.getTextureManager().bindTexture(RESOURCE_LOCATION);
-        Gui.drawModalRectWithCustomSizedTexture(x + 3, y + 3, 0, 0, 18, 18, 18, 18);
+    protected ResourceLocation getResourceLocation() {
+        return new ResourceLocation(Reference.MOD_ID, "textures/effect/protection_of_the_erdtree.png");
     }
 }

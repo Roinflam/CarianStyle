@@ -20,6 +20,7 @@ public class CarianStylePotion {
 
 
     public static final MobEffectDoomedDeath DOOMED_DEATH = new MobEffectDoomedDeath(true, 0x380000);
+    public static final MobEffectStealth STEALTH = new MobEffectStealth(false, 0);
 
     public static final MobEffectDoomedDeathBurning DOOMED_DEATH_BURNING = new MobEffectDoomedDeathBurning(true, 0);
     public static final MobEffectDestructionFireBurning DESTRUCTION_FIRE_BURNING = new MobEffectDestructionFireBurning(true, 0);

@@ -11,6 +11,7 @@ import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
@@ -19,13 +20,11 @@ import java.util.HashMap;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
-public class EnchantmentCorruptedWingSword extends Enchantment {
+public class EnchantmentCorruptedWingSword extends UncommonBase {
     private static final HashMap<UUID, Integer> COMMB = new HashMap<>();
 
-    public EnchantmentCorruptedWingSword(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "corrupted_wing_sword");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentCorruptedWingSword(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "corrupted_wing_sword");
     }
 
     public static Enchantment getEnchantment() {
@@ -37,8 +36,8 @@ public class EnchantmentCorruptedWingSword extends Enchantment {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (attacker.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         if (COMMB.getOrDefault(attacker.getUniqueID(), 0) < 20) {
                             COMMB.put(attacker.getUniqueID(), COMMB.getOrDefault(attacker.getUniqueID(), 0) + 1);
@@ -63,23 +62,8 @@ public class EnchantmentCorruptedWingSword extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 15 + (enchantmentLevel - 1) * 5;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
 }

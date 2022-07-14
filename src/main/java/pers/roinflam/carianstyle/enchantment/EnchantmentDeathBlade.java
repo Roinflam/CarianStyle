@@ -11,18 +11,16 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentDeathBlade extends Enchantment {
+public class EnchantmentDeathBlade extends VeryRaryBase {
 
-    public EnchantmentDeathBlade(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "death_blade");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentDeathBlade(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "death_blade");
     }
 
     public static Enchantment getEnchantment() {
@@ -35,8 +33,8 @@ public class EnchantmentDeathBlade extends Enchantment {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (attacker.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         DamageSource damageSource = evt.getSource();
                         if (!damageSource.damageType.equals("deathBlade") && !damageSource.canHarmInCreative()) {
@@ -57,8 +55,8 @@ public class EnchantmentDeathBlade extends Enchantment {
                                     if (hurter.getHealth() - damage * 1.1 > 0) {
                                         hurter.setHealth(hurter.getHealth() - damage);
                                     } else {
-                                        hurter.hurtResistantTime = 0;
-                                        hurter.attackEntityFrom(damageSource.setDamageBypassesArmor(), (float) (damage * 1.1));
+                                        hurter.onDeath(damageSource.setDamageBypassesArmor());
+                                        hurter.setDead();
                                         this.cancel();
                                     }
                                 }
@@ -72,23 +70,8 @@ public class EnchantmentDeathBlade extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 1;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 50;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

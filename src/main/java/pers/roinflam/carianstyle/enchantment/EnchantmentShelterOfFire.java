@@ -13,17 +13,16 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentShelterOfFire extends Enchantment {
+public class EnchantmentShelterOfFire extends UncommonBase {
 
-    public EnchantmentShelterOfFire(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "shelter_of_fire");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentShelterOfFire(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "shelter_of_fire");
     }
 
     public static Enchantment getEnchantment() {
@@ -37,7 +36,7 @@ public class EnchantmentShelterOfFire extends Enchantment {
             if (EntityUtil.getFire(hurter) > 0) {
                 int bonusLevel = 0;
                 for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                    if (itemStack != null) {
+                    if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
@@ -61,7 +60,7 @@ public class EnchantmentShelterOfFire extends Enchantment {
                     if (entityPlayer.isEntityAlive()) {
                         int bonusLevel = 0;
                         for (ItemStack itemStack : entityPlayer.getArmorInventoryList()) {
-                            if (itemStack != null) {
+                            if (!itemStack.isEmpty()) {
                                 bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                             }
                         }
@@ -75,23 +74,8 @@ public class EnchantmentShelterOfFire extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 5;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 25 + (enchantmentLevel - 1) * 5;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

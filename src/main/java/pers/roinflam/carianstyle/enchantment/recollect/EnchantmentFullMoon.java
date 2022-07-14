@@ -12,6 +12,7 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.enchantment.EnchantmentDarkMoon;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
@@ -22,14 +23,12 @@ import java.util.Set;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
-public class EnchantmentFullMoon extends Enchantment {
+public class EnchantmentFullMoon extends VeryRaryBase {
     private static final Set<UUID> FULL_MOON = new HashSet<>();
     private static final Set<UUID> FULL_MOON_COOLDING = new HashSet<>();
 
-    public EnchantmentFullMoon(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "full_moon");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentFullMoon(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "full_moon");
     }
 
     public static Enchantment getEnchantment() {
@@ -43,7 +42,7 @@ public class EnchantmentFullMoon extends Enchantment {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 int bonusLevel = 0;
                 for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                    if (itemStack != null) {
+                    if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
@@ -56,8 +55,8 @@ public class EnchantmentFullMoon extends Enchantment {
                             FULL_MOON_COOLDING.add(hurter.getUniqueID());
                             FULL_MOON.add(hurter.getUniqueID());
 
-                            if (hurter.getHeldItemMainhand() != null) {
-                                if (EnchantmentHelper.getEnchantmentLevel(EnchantmentDarkMoon.getEnchantment(), hurter.getHeldItemMainhand()) > 0) {
+                            if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
+                                if (EnchantmentHelper.getEnchantmentLevel(EnchantmentDarkMoon.getEnchantment(), hurter.getHeldItem(hurter.getActiveHand())) > 0) {
                                     new SynchronizationTask(1, 1) {
                                         private int tick = 1;
 
@@ -111,7 +110,7 @@ public class EnchantmentFullMoon extends Enchantment {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 int bonusLevel = 0;
                 for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                    if (itemStack != null) {
+                    if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
@@ -130,7 +129,7 @@ public class EnchantmentFullMoon extends Enchantment {
             EntityLivingBase healer = evt.getEntityLiving();
             int bonusLevel = 0;
             for (ItemStack itemStack : healer.getArmorInventoryList()) {
-                if (itemStack != null) {
+                if (!itemStack.isEmpty()) {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
             }
@@ -141,23 +140,8 @@ public class EnchantmentFullMoon extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 1;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return CarianStyleEnchantments.RECOLLECT_ENCHANTABILITY;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

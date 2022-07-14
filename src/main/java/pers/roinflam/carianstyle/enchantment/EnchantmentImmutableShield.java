@@ -11,16 +11,15 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentImmutableShield extends Enchantment {
+public class EnchantmentImmutableShield extends RaryBase {
 
-    public EnchantmentImmutableShield(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "immutable_shield");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentImmutableShield(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "immutable_shield");
     }
 
     public static Enchantment getEnchantment() {
@@ -33,7 +32,7 @@ public class EnchantmentImmutableShield extends Enchantment {
             EntityLivingBase hurter = evt.getEntityLiving();
             if (hurter.isHandActive()) {
                 ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
-                if (itemStack != null && itemStack.getItem() instanceof ItemShield) {
+                if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     if (bonusLevel > 0) {
                         if (evt.getAmount() <= 0 && evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
@@ -50,23 +49,8 @@ public class EnchantmentImmutableShield extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 5;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 5 + (enchantmentLevel - 1) * 10;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

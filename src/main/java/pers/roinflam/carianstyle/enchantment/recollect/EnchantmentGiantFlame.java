@@ -13,9 +13,9 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.HashSet;
@@ -23,13 +23,11 @@ import java.util.Set;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
-public class EnchantmentGiantFlame extends Enchantment {
+public class EnchantmentGiantFlame extends VeryRaryBase {
     private static final Set<UUID> FLAME = new HashSet<>();
 
-    public EnchantmentGiantFlame(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "giant_flame");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentGiantFlame(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "giant_flame");
     }
 
     public static Enchantment getEnchantment() {
@@ -46,7 +44,7 @@ public class EnchantmentGiantFlame extends Enchantment {
                     if (EntityUtil.getFire(hurter) > 0) {
                         int bonusLevel = 0;
                         for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                            if (itemStack != null) {
+                            if (!itemStack.isEmpty()) {
                                 bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                             }
                         }
@@ -66,7 +64,7 @@ public class EnchantmentGiantFlame extends Enchantment {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 int bonusLevel = 0;
                 for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                    if (itemStack != null) {
+                    if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
@@ -85,7 +83,7 @@ public class EnchantmentGiantFlame extends Enchantment {
                 if (!evt.getSource().canHarmInCreative()) {
                     int bonusLevel = 0;
                     for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                        if (itemStack != null) {
+                        if (!itemStack.isEmpty()) {
                             bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                         }
                     }
@@ -113,23 +111,8 @@ public class EnchantmentGiantFlame extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 1;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return CarianStyleEnchantments.RECOLLECT_ENCHANTABILITY;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

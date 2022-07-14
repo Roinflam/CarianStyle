@@ -8,16 +8,15 @@ import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentBlueFeatheredBranchsword extends Enchantment {
+public class EnchantmentBlueFeatheredBranchsword extends UncommonBase {
 
-    public EnchantmentBlueFeatheredBranchsword(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "blue_feathered_branchsword");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentBlueFeatheredBranchsword(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "blue_feathered_branchsword");
     }
 
     public static Enchantment getEnchantment() {
@@ -29,8 +28,8 @@ public class EnchantmentBlueFeatheredBranchsword extends Enchantment {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                if (hurter.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItemMainhand());
+                if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                     if (bonusLevel > 0) {
                         if (hurter.getHealth() <= hurter.getMaxHealth() * 0.2) {
                             evt.setAmount(evt.getAmount() - (float) (evt.getAmount() * bonusLevel * 0.1));
@@ -42,23 +41,8 @@ public class EnchantmentBlueFeatheredBranchsword extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 5;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 15 + (enchantmentLevel - 1) * 10;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

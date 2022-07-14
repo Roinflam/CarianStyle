@@ -10,17 +10,16 @@ import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentFireGivesPower extends Enchantment {
+public class EnchantmentFireGivesPower extends UncommonBase {
 
-    public EnchantmentFireGivesPower(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "fire_gives_power");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentFireGivesPower(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "fire_gives_power");
     }
 
     public static Enchantment getEnchantment() {
@@ -32,8 +31,8 @@ public class EnchantmentFireGivesPower extends Enchantment {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (attacker.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         if (EntityUtil.getFire(attacker) > 0) {
                             if (EntityUtil.getFire(attacker) < 200) {
@@ -57,8 +56,8 @@ public class EnchantmentFireGivesPower extends Enchantment {
             EntityLivingBase hurter = evt.getEntityLiving();
             if (EntityUtil.getFire(hurter) > 0) {
                 if (!evt.getSource().canHarmInCreative() && !evt.getSource().isMagicDamage()) {
-                    if (hurter.getHeldItemMainhand() != null) {
-                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItemMainhand());
+                    if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
+                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                         if (bonusLevel > 0) {
                             evt.setAmount((float) (evt.getAmount() - evt.getAmount() * 0.0375 * bonusLevel));
                         }
@@ -69,23 +68,8 @@ public class EnchantmentFireGivesPower extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 5;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 5 + (enchantmentLevel - 1) * 10;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
 }

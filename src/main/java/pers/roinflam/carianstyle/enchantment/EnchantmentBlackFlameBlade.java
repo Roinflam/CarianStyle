@@ -5,25 +5,21 @@ import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemArmor;
-import net.minecraft.item.ItemStack;
 import net.minecraft.potion.PotionEffect;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentBlackFlameBlade extends Enchantment {
+public class EnchantmentBlackFlameBlade extends RaryBase {
 
-    public EnchantmentBlackFlameBlade(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "black_flame_blade");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentBlackFlameBlade(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "black_flame_blade");
     }
 
     public static Enchantment getEnchantment() {
@@ -36,8 +32,8 @@ public class EnchantmentBlackFlameBlade extends Enchantment {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (attacker.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         float damage = (float) (evt.getAmount() * bonusLevel * 0.15 / 100);
                         hurter.addPotionEffect(new PotionEffect(CarianStylePotion.DESTRUCTION_FIRE_BURNING, 5 * 20 + 5, 0));
@@ -53,8 +49,8 @@ public class EnchantmentBlackFlameBlade extends Enchantment {
                                 if (hurter.getHealth() - damage * 1.1 > 0) {
                                     hurter.setHealth(hurter.getHealth() - damage);
                                 } else {
-                                    hurter.hurtResistantTime = 0;
-                                    hurter.attackEntityFrom(evt.getSource().setDamageBypassesArmor().setDamageAllowedInCreativeMode(), (float) (damage * 1.1));
+                                    hurter.onDeath(evt.getSource().setDamageBypassesArmor());
+                                    hurter.setDead();
                                     this.cancel();
                                 }
                             }
@@ -67,25 +63,9 @@ public class EnchantmentBlackFlameBlade extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 25 + (enchantmentLevel - 1) * 15;
     }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
-    }
-
 
 
     @Override

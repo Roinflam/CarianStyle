@@ -6,27 +6,34 @@ import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.potion.PotionEffect;
+import net.minecraft.util.DamageSource;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentDoomedDeath extends Enchantment {
+public class EnchantmentDoomedDeath extends VeryRaryBase {
 
-    public EnchantmentDoomedDeath(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "doomed_death");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentDoomedDeath(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "doomed_death");
     }
 
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.DOOMED_DEATH;
     }
+
+//    @SubscribeEvent(priority = EventPriority.LOWEST)
+//    public static void onLivingDeath(LivingDeathEvent evt) {
+//        if (evt.getEntityLiving().getHealth() < 1) {
+//            evt.getEntityLiving().onDeath(DamageSource.OUT_OF_WORLD);
+//        }
+//    }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingDamage(LivingDamageEvent evt) {
@@ -34,8 +41,8 @@ public class EnchantmentDoomedDeath extends Enchantment {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (attacker.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         hurter.addPotionEffect(new PotionEffect(CarianStylePotion.DOOMED_DEATH_BURNING, 5 * 20 + 5, 0));
                         hurter.addPotionEffect(new PotionEffect(CarianStylePotion.DOOMED_DEATH, 10 * 20, 0));
@@ -45,7 +52,7 @@ public class EnchantmentDoomedDeath extends Enchantment {
 
                             @Override
                             public void run() {
-                                if (++tick > 100 || !hurter.isEntityAlive()) {
+                                if (++tick > 100 || hurter.isDead) {
                                     this.cancel();
                                     return;
                                 }
@@ -54,8 +61,8 @@ public class EnchantmentDoomedDeath extends Enchantment {
                                 if (hurter.getHealth() - damage * 1.1 > 0) {
                                     hurter.setHealth(hurter.getHealth() - damage);
                                 } else {
-                                    hurter.hurtResistantTime = 0;
-                                    hurter.attackEntityFrom(evt.getSource().setDamageBypassesArmor().setDamageAllowedInCreativeMode(), (float) (damage * 1.1));
+                                    hurter.onDeath(evt.getSource().setDamageBypassesArmor());
+                                    hurter.setDead();
                                     this.cancel();
                                 }
                             }
@@ -68,23 +75,8 @@ public class EnchantmentDoomedDeath extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 1;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return CarianStyleEnchantments.RECOLLECT_ENCHANTABILITY;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

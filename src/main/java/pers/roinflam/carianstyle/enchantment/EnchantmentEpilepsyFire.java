@@ -11,19 +11,17 @@ import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentEpilepsyFire extends Enchantment {
+public class EnchantmentEpilepsyFire extends RaryBase {
 
-    public EnchantmentEpilepsyFire(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "epilepsy_fire");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentEpilepsyFire(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "epilepsy_fire");
     }
 
     public static Enchantment getEnchantment() {
@@ -36,8 +34,8 @@ public class EnchantmentEpilepsyFire extends Enchantment {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (attacker.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         float hurtDamage = evt.getAmount();
                         if (!(attacker instanceof EntityPlayer) || !((EntityPlayer) attacker).isCreative()) {
@@ -55,9 +53,8 @@ public class EnchantmentEpilepsyFire extends Enchantment {
                                     if (attacker.getHealth() - damage * 1.1 > 0) {
                                         attacker.setHealth(attacker.getHealth() - damage);
                                     } else {
-                                        if (attacker.isEntityAlive()) {
-                                            attacker.attackEntityFrom(NewDamageSource.EPILEPSY_FIRE, (float) (damage * 1.1));
-                                        }
+                                        attacker.onDeath(NewDamageSource.EPILEPSY_FIRE);
+                                        attacker.setDead();
                                         this.cancel();
                                     }
                                 }
@@ -78,10 +75,8 @@ public class EnchantmentEpilepsyFire extends Enchantment {
                                 if (hurter.getHealth() - damage * 1.1 > 0) {
                                     hurter.setHealth(hurter.getHealth() - damage);
                                 } else {
-                                    if (hurter.isEntityAlive()) {
-                                        hurter.hurtResistantTime = 0;
-                                        hurter.attackEntityFrom(NewDamageSource.EPILEPSY_FIRE, (float) (damage * 1.1));
-                                    }
+                                    hurter.onDeath(NewDamageSource.EPILEPSY_FIRE);
+                                    hurter.setDead();
                                     this.cancel();
                                 }
                             }
@@ -94,23 +89,8 @@ public class EnchantmentEpilepsyFire extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 5 + (enchantmentLevel - 1) * 25;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
 }

@@ -11,6 +11,7 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
@@ -21,14 +22,12 @@ import java.util.Set;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
-public class EnchantmentParry extends Enchantment {
+public class EnchantmentParry extends UncommonBase {
     private static final HashMap<UUID, Integer> PARRY = new HashMap<>();
     private static final Set<UUID> COOLDING = new HashSet<>();
 
-    public EnchantmentParry(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "parry");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentParry(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "parry");
     }
 
     public static Enchantment getEnchantment() {
@@ -43,7 +42,7 @@ public class EnchantmentParry extends Enchantment {
                     EntityLivingBase hurter = evt.getEntityLiving();
                     if (hurter.isHandActive()) {
                         ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
-                        if (itemStack != null && itemStack.getItem() instanceof ItemShield) {
+                        if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                             int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                             if (bonusLevel > 0) {
                                 if (!COOLDING.contains(hurter.getUniqueID()) && !PARRY.containsKey(hurter.getUniqueID())) {
@@ -89,23 +88,8 @@ public class EnchantmentParry extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 5;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 10 + (enchantmentLevel - 1) * 10;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
     @Override

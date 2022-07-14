@@ -45,7 +45,7 @@ public class GlintbladesRender<T extends EntityGlintblades> extends Render<T> {
             GlStateManager.enableOutlineMode(this.getTeamColor(entity));
         }
 
-        this.itemRenderer.renderItem(this.getStackToRender(entity), ItemCameraTransforms.TransformType.THIRD_PERSON_RIGHT_HAND);
+        this.itemRenderer.renderItem(new ItemStack(item), ItemCameraTransforms.TransformType.THIRD_PERSON_RIGHT_HAND);
 
         if (this.renderOutlines) {
             GlStateManager.disableOutlineMode();
@@ -60,10 +60,6 @@ public class GlintbladesRender<T extends EntityGlintblades> extends Render<T> {
     @Override
     protected ResourceLocation getEntityTexture(T entity) {
         return TextureMap.LOCATION_BLOCKS_TEXTURE;
-    }
-
-    public ItemStack getStackToRender(T entityIn) {
-        return new ItemStack(this.item);
     }
 
 }

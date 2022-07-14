@@ -7,24 +7,22 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.MathHelper;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
-import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
 
 @Mod.EventBusSubscriber
-public class EnchantmentExclude extends Enchantment {
+public class EnchantmentExclude extends RaryBase {
 
-    public EnchantmentExclude(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "exclude");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentExclude(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "exclude");
     }
 
     public static Enchantment getEnchantment() {
@@ -38,16 +36,15 @@ public class EnchantmentExclude extends Enchantment {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 int bonusLevel = 0;
                 for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                    if (itemStack != null) {
+                    if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
                 if (bonusLevel > 0) {
-                    List<Entity> entities = EntityUtil.getNearbyEntities(
-                            hurter,
-                            5 + (bonusLevel - 1) * 0.75,
-                            5 + (bonusLevel - 1) * 0.75,
-                            entity -> entity instanceof EntityLivingBase && !entity.equals(hurter)
+                    List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                            EntityLivingBase.class,
+                            new AxisAlignedBB(hurter.getPosition()).expand(5 + (bonusLevel - 1) * 0.75, 5 + (bonusLevel - 1) * 0.75, 5 + (bonusLevel - 1) * 0.75),
+                            entityLivingBase -> !entityLivingBase.equals(hurter)
                     );
                     for (Entity entity : entities) {
                         EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
@@ -64,23 +61,8 @@ public class EnchantmentExclude extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 25 + (enchantmentLevel - 1) * 10;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
 }

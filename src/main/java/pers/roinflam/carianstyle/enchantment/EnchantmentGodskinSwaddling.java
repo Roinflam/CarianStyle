@@ -9,6 +9,7 @@ import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
@@ -17,13 +18,11 @@ import java.util.HashMap;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
-public class EnchantmentGodskinSwaddling extends Enchantment {
+public class EnchantmentGodskinSwaddling extends RaryBase {
     private static final HashMap<UUID, Integer> ATTACK = new HashMap<>();
 
-    public EnchantmentGodskinSwaddling(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(rarityIn, typeIn, slots);
-        EnchantmentUtil.registerEnchantment(this, "godskin_swaddling");
-        CarianStyleEnchantments.ENCHANTMENTS.add(this);
+    public EnchantmentGodskinSwaddling(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "godskin_swaddling");
 
         new SynchronizationTask(6000, 6000) {
 
@@ -44,8 +43,8 @@ public class EnchantmentGodskinSwaddling extends Enchantment {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (attacker.getHeldItemMainhand() != null) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItemMainhand());
+                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         if (ATTACK.getOrDefault(attacker.getUniqueID(), 0) == 3) {
                             ATTACK.remove(attacker.getUniqueID());
@@ -61,23 +60,8 @@ public class EnchantmentGodskinSwaddling extends Enchantment {
     }
 
     @Override
-    public int getMinLevel() {
-        return 1;
-    }
-
-    @Override
-    public int getMaxLevel() {
-        return 3;
-    }
-
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return 20 + (enchantmentLevel - 1) * 10;
-    }
-
-    @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
     }
 
 }
