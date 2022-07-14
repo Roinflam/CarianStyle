@@ -28,13 +28,6 @@ public class EnchantmentDoomedDeath extends VeryRaryBase {
         return CarianStyleEnchantments.DOOMED_DEATH;
     }
 
-//    @SubscribeEvent(priority = EventPriority.LOWEST)
-//    public static void onLivingDeath(LivingDeathEvent evt) {
-//        if (evt.getEntityLiving().getHealth() < 1) {
-//            evt.getEntityLiving().onDeath(DamageSource.OUT_OF_WORLD);
-//        }
-//    }
-
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingDamage(LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
