@@ -15,6 +15,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -61,11 +62,10 @@ public class EnchantmentLivingCorpse extends VeryRaryBase {
                                 }
                                 float damage = (float) (hurter.getMaxHealth() * 0.01 / 20);
                                 damage = damage * 5 + damage * ++tick / 75;
-                                if (hurter.getHealth() - damage * 1.1 > 0) {
+                                if (hurter.getHealth() - damage * 2 > 0) {
                                     hurter.setHealth(hurter.getHealth() - damage);
                                 } else {
-                                    hurter.onDeath(evt.getSource().setDamageBypassesArmor());
-                                    hurter.setDead();
+                                    EntityLivingUtil.kill(hurter, evt.getSource());
                                     LOSE_BLOOD.remove(hurter.getUniqueID());
                                     this.cancel();
                                 }
@@ -104,11 +104,10 @@ public class EnchantmentLivingCorpse extends VeryRaryBase {
                             }
                             float damage = (float) (hurter.getMaxHealth() * 0.01 / 20);
                             damage = damage * 6 + damage * ++tick / 30;
-                            if (hurter.getHealth() - damage * 1.1 > 0) {
+                            if (hurter.getHealth() - damage * 2 > 0) {
                                 hurter.setHealth(hurter.getHealth() - damage);
                             } else {
-                                hurter.onDeath(DamageSource.causeMobDamage(hurter).setDamageBypassesArmor());
-                                hurter.setDead();
+                                EntityLivingUtil.kill(hurter, DamageSource.OUT_OF_WORLD);
                                 LOSE_BLOOD.remove(hurter.getUniqueID());
                                 this.cancel();
                             }

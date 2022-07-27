@@ -95,8 +95,7 @@ public class EnchantmentScarletLonia extends RaryBase {
                                 }
                                 SCARLET_LONIA.remove(hurter.getUniqueID());
 
-                                hurter.onDeath(NewDamageSource.SCARLET_ROT);
-                                hurter.setDead();
+                                EntityLivingUtil.kill(hurter, NewDamageSource.SCARLET_ROT);
                             }
 
                         }.start();

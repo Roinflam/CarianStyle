@@ -5,6 +5,7 @@ import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemBow;
+import net.minecraft.item.ItemPickaxe;
 import net.minecraft.item.ItemShield;
 import net.minecraft.item.ItemSword;
 import net.minecraftforge.common.util.EnumHelper;
@@ -25,6 +26,7 @@ import java.util.Set;
 public class CarianStyleEnchantments {
     public static final EnumEnchantmentType SHIELD = EnumHelper.addEnchantmentType("cs_shield", item -> item instanceof ItemShield);
     public static final EnumEnchantmentType ARMS = EnumHelper.addEnchantmentType("cs_arms", item -> item instanceof ItemSword || item instanceof ItemBow);
+    public static final EnumEnchantmentType PICKAEX = EnumHelper.addEnchantmentType("cs_pickaxe", item -> item instanceof ItemPickaxe);
     public static final int RECOLLECT_ENCHANTABILITY = 38;
     public static final List<Enchantment> ENCHANTMENTS = new ArrayList<Enchantment>();
 
@@ -364,9 +366,17 @@ public class CarianStyleEnchantments {
             EnumEnchantmentType.ARMOR_LEGS,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.LEGS}
     );
+    public static final EnchantmentRockBlaster ROCK_BLASTER = new EnchantmentRockBlaster(
+            PICKAEX,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
+    );
+    public static final EnchantmentLionClaw LION_CLAW = new EnchantmentLionClaw(
+            EnumEnchantmentType.WEAPON,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
+    );
 
     public static final Set<Enchantment> RECOLLECT = new HashSet<>(ImmutableList.of(BROKEN_STAR, BLASPHEMY, DOOMED_DEATH, FULL_MOON, LIVING_CORPSE, MIKAELA_BLADE, BAD_OMEN, GIANT_FLAME, BLOOD, TIME_REVERSAL, WARRIOR, GOLDEN_LAW, ANCESTRAL_SPIRITS, DARK_ABANDONED_CHILD));
     public static final Set<Enchantment> LAW = new HashSet<>(ImmutableList.of(GOLDEN_LAW, STARS_LAW));
-    public static final Set<Enchantment> COMBAT_SKILL = new HashSet<>(ImmutableList.of(OFFER_SWORD, LUNGE_UP, VOWED_REVENGE, PATIENCE, CONTINUOUS_SHOOTING));
+    public static final Set<Enchantment> COMBAT_SKILL = new HashSet<>(ImmutableList.of(OFFER_SWORD, LUNGE_UP, VOWED_REVENGE, PATIENCE, CONTINUOUS_SHOOTING, LION_CLAW));
     public static final Set<Enchantment> DEAD = new HashSet<>(ImmutableList.of(FULL_MOON, LIVING_CORPSE, TIME_REVERSAL, ANCIENT_DRAGON_LIGHTNING, SCARLET_LONIA, EPILEPSY_SPREAD, GREATBLADE_PHALANX));
 }

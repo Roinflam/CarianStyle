@@ -5,6 +5,7 @@ import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.potion.PotionEffect;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
@@ -13,8 +14,8 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.enchantment.EnchantmentBloodCollection;
 import pers.roinflam.carianstyle.enchantment.EnchantmentBloodSlash;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 import java.util.HashMap;
 import java.util.UUID;
@@ -51,15 +52,15 @@ public class EnchantmentBlood extends VeryRaryBase {
                     if (bonusLevel > 0) {
                         if (INJURIES.getOrDefault(hurter.getUniqueID(), 0) == 2) {
                             INJURIES.remove(hurter.getUniqueID());
-                            float damage = (float) (hurter.getHealth() * 0.08);
+                            float damage = (float) (hurter.getHealth() * 0.12);
 
-                            attacker.heal((float) Math.min(damage, attacker.getMaxHealth() * 0.12));
+                            attacker.heal((float) Math.min(damage, attacker.getMaxHealth() * 0.18));
                             hurter.setHealth(hurter.getHealth() - damage);
 
                             if (EnchantmentHelper.getEnchantmentLevel(EnchantmentBloodSlash.getEnchantment(), attacker.getHeldItem(attacker.getActiveHand())) > 0 && EnchantmentHelper.getEnchantmentLevel(EnchantmentBloodCollection.getEnchantment(), attacker.getHeldItem(attacker.getActiveHand())) > 0) {
-                                evt.setAmount(evt.getAmount() + (attacker.getMaxHealth() - attacker.getHealth()));
+                                hurter.addPotionEffect(new PotionEffect(CarianStylePotion.HEMORRHAGE, 30, 7));
                             } else {
-                                evt.setAmount((float) (evt.getAmount() + (attacker.getMaxHealth() - attacker.getHealth()) * 0.2));
+                                hurter.addPotionEffect(new PotionEffect(CarianStylePotion.HEMORRHAGE, 30, 0));
                             }
                         } else {
                             INJURIES.put(hurter.getUniqueID(), INJURIES.getOrDefault(hurter.getUniqueID(), 0) + 1);

@@ -39,7 +39,7 @@ public abstract class SynchronizationTask implements Runnable {
         this.DELAY = delay;
     }
 
-    public static boolean cancel(int taskID) {
+    public synchronized static boolean cancel(int taskID) {
         if (TASK_LIST.containsKey(taskID)) {
             TASK_LIST.get(taskID).cancel();
             return true;
@@ -50,7 +50,7 @@ public abstract class SynchronizationTask implements Runnable {
 
     @SubscribeEvent
     public void onTick(TickEvent.ServerTickEvent evt) {
-        if (evt.phase.equals(TickEvent.Phase.END)) {
+        if (evt.phase.equals(TickEvent.Phase.START)) {
             tick++;
             if (first) {
                 if (tick >= INITIALDELAY) {
@@ -75,7 +75,7 @@ public abstract class SynchronizationTask implements Runnable {
         return TASKID;
     }
 
-    public void start() {
+    public synchronized void start() {
         if (!start) {
             start = true;
             TASK_LIST.put(getTaskID(), this);
@@ -83,7 +83,7 @@ public abstract class SynchronizationTask implements Runnable {
         }
     }
 
-    public void cancel() {
+    public synchronized void cancel() {
         start = false;
         TASK_LIST.remove(this.getTaskID());
         MinecraftForge.EVENT_BUS.unregister(this);

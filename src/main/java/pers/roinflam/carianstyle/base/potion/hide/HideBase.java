@@ -13,7 +13,7 @@ public abstract class HideBase extends PotionBase {
 
     @Override
     public boolean isReady(int duration, int amplifier) {
-        return false;
+        return true;
     }
 
     @Override

@@ -54,7 +54,7 @@ public class EnchantmentShelterOfFire extends UncommonBase {
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent evt) {
         if (!evt.player.world.isRemote) {
-            if (evt.phase.equals(TickEvent.Phase.END)) {
+            if (evt.phase.equals(TickEvent.Phase.START)) {
                 EntityPlayer entityPlayer = evt.player;
                 if (EntityUtil.getFire(entityPlayer) > 0) {
                     if (entityPlayer.isEntityAlive()) {

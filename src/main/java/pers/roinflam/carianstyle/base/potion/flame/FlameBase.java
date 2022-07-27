@@ -10,27 +10,23 @@ import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.potion.Potion;
 import net.minecraft.potion.PotionEffect;
-import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.client.event.RenderLivingEvent;
 import net.minecraftforge.client.event.RenderSpecificHandEvent;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.entity.living.PotionEvent;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
-import pers.roinflam.carianstyle.base.potion.PotionBase;
+import pers.roinflam.carianstyle.base.potion.NetworkBase;
 
-public abstract class FlameBase extends PotionBase {
+public abstract class FlameBase extends NetworkBase {
 
     protected FlameBase(boolean isBadEffectIn, int liquidColorIn, String name) {
         super(isBadEffectIn, liquidColorIn, name);
         MinecraftForge.EVENT_BUS.register(this);
     }
 
+    @SideOnly(Side.CLIENT)
     public void renderFireInFirstPerson(String iconName) {
         Minecraft minecraft = Minecraft.getMinecraft();
 
@@ -71,6 +67,7 @@ public abstract class FlameBase extends PotionBase {
         GlStateManager.enableAlpha();
     }
 
+    @SideOnly(Side.CLIENT)
     public void renderEntityOnFire(Entity entity, double posX, double posY, double posZ, String iconName_0, String iconName_1) {
         Minecraft minecraft = Minecraft.getMinecraft();
 
@@ -124,52 +121,11 @@ public abstract class FlameBase extends PotionBase {
         GlStateManager.enableLighting();
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public void onPotionRemove(PotionEvent.PotionRemoveEvent evt) {
-        if (evt.getPotion().equals(getPotion())) {
-            EntityLivingBase entityLivingBase = evt.getEntityLiving();
-            MinecraftServer minecraftServer = entityLivingBase.world.getMinecraftServer();
-            if (minecraftServer != null) {
-                for (EntityPlayer entityPlayer : entityLivingBase.world.getMinecraftServer().getPlayerList().getPlayers()) {
-                    sendClientCustomPacket(entityPlayer, entityLivingBase.getEntityId(), false);
-                }
-            }
-        }
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public void onPotionExpiry(PotionEvent.PotionExpiryEvent evt) {
-        if (evt.getPotionEffect().getPotion().equals(getPotion())) {
-            EntityLivingBase entityLivingBase = evt.getEntityLiving();
-            MinecraftServer minecraftServer = entityLivingBase.world.getMinecraftServer();
-            if (minecraftServer != null) {
-                for (EntityPlayer entityPlayer : entityLivingBase.world.getMinecraftServer().getPlayerList().getPlayers()) {
-                    sendClientCustomPacket(entityPlayer, entityLivingBase.getEntityId(), false);
-                }
-            }
-        }
-    }
-
-    @SubscribeEvent
-    public void onPlayerTick(TickEvent.PlayerTickEvent evt) {
-        if (!evt.player.world.isRemote && evt.phase.equals(TickEvent.Phase.END)) {
-            EntityLivingBase entityLivingBase = evt.player;
-            if (!entityLivingBase.isEntityAlive()) {
-                MinecraftServer minecraftServer = entityLivingBase.world.getMinecraftServer();
-                if (minecraftServer != null) {
-                    for (EntityPlayer entityPlayer : entityLivingBase.world.getMinecraftServer().getPlayerList().getPlayers()) {
-                        sendClientCustomPacket(entityPlayer, entityLivingBase.getEntityId(), false);
-                    }
-                }
-            }
-        }
-    }
-
     @SideOnly(Side.CLIENT)
     @SubscribeEvent
     public void onRenderLiving(RenderLivingEvent.Specials.Post evt) {
         EntityLivingBase entityLivingBase = evt.getEntity();
-        if (isAflame(entityLivingBase.getEntityId())) {
+        if (isAction(entityLivingBase.getEntityId())) {
             float partialTicks = evt.getPartialRenderTick();
             double posX = evt.getX() + (entityLivingBase.posX - entityLivingBase.lastTickPosX) * (double) partialTicks;
             double posY = evt.getY() + (entityLivingBase.posY - entityLivingBase.lastTickPosY + 1) * (double) partialTicks;
@@ -182,7 +138,7 @@ public abstract class FlameBase extends PotionBase {
     @SubscribeEvent
     public void onRenderSpecificHand(RenderSpecificHandEvent evt) {
         EntityPlayer player = Minecraft.getMinecraft().player;
-        if (isAflame(player.getEntityId())) {
+        if (isAction(player.getEntityId())) {
             renderFireInFirstPerson(getLevelTwoName());
         }
     }
@@ -190,22 +146,6 @@ public abstract class FlameBase extends PotionBase {
     protected abstract String getLevelOneName();
 
     protected abstract String getLevelTwoName();
-
-    public abstract Potion getPotion();
-
-    @Override
-    public void performEffect(EntityLivingBase entityLivingBaseIn, int amplifier) {
-        MinecraftServer minecraftServer = entityLivingBaseIn.world.getMinecraftServer();
-        if (minecraftServer != null) {
-            for (EntityPlayer entityPlayer : entityLivingBaseIn.world.getMinecraftServer().getPlayerList().getPlayers()) {
-                sendClientCustomPacket(entityPlayer, entityLivingBaseIn.getEntityId(), true);
-            }
-        }
-    }
-
-    public abstract void sendClientCustomPacket(EntityPlayer entityPlayer, int id, boolean add);
-
-    public abstract boolean isAflame(int id);
 
     @Override
     public boolean isReady(int duration, int amplifier) {
@@ -226,4 +166,5 @@ public abstract class FlameBase extends PotionBase {
     public boolean shouldRenderHUD(PotionEffect effect) {
         return false;
     }
+
 }

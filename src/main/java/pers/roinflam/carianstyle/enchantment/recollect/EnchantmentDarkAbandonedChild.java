@@ -82,7 +82,7 @@ public class EnchantmentDarkAbandonedChild extends VeryRaryBase {
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent evt) {
         if (!evt.player.world.isRemote && !evt.player.world.isDaytime()) {
-            if (evt.phase.equals(TickEvent.Phase.END)) {
+            if (evt.phase.equals(TickEvent.Phase.START)) {
                 EntityPlayer entityPlayer = evt.player;
                 if (entityPlayer.isEntityAlive()) {
                     if (!entityPlayer.getHeldItem(entityPlayer.getActiveHand()).isEmpty()) {

@@ -17,9 +17,9 @@ public class CarianStylePotion {
     public static final MobEffectGoldenVow GOLDEN_VOW = new MobEffectGoldenVow(false, 0xffd700);
     public static final MobEffectBlessingOfTheErdtree BLESSING_OF_THE_ERDTREE = new MobEffectBlessingOfTheErdtree(false, 0xffd700);
     public static final MobEffectProtectionOfTheErdtree PROTECTION_OF_THE_ERDTREE = new MobEffectProtectionOfTheErdtree(false, 0xffd700);
+    public static final MobEffectHemorrhage HEMORRHAGE = new MobEffectHemorrhage(true, 0xc70000);
 
-
-    public static final MobEffectDoomedDeath DOOMED_DEATH = new MobEffectDoomedDeath(true, 0x380000);
+    public static final MobEffectDoomedDeath DOOMED_DEATH = new MobEffectDoomedDeath(true, 0);
     public static final MobEffectStealth STEALTH = new MobEffectStealth(false, 0);
 
     public static final MobEffectDoomedDeathBurning DOOMED_DEATH_BURNING = new MobEffectDoomedDeathBurning(true, 0);

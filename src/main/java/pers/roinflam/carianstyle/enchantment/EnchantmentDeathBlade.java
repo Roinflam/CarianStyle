@@ -14,7 +14,9 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 @Mod.EventBusSubscriber
 public class EnchantmentDeathBlade extends VeryRaryBase {
@@ -42,7 +44,7 @@ public class EnchantmentDeathBlade extends VeryRaryBase {
                             evt.setAmount((float) (evt.getAmount() * 0.5));
                             damageSource.damageType = "deathBlade";
                             hurter.addPotionEffect(new PotionEffect(CarianStylePotion.DOOMED_DEATH_BURNING, 5 * 20 + 5, 0));
-                            hurter.addPotionEffect(new PotionEffect(CarianStylePotion.DOOMED_DEATH, 10 * 20, 0));
+                            hurter.addPotionEffect(new PotionEffect(CarianStylePotion.DOOMED_DEATH, 10 * 20 + 5, 0));
                             new SynchronizationTask(1, 1) {
                                 private int tick = 0;
 
@@ -52,11 +54,10 @@ public class EnchantmentDeathBlade extends VeryRaryBase {
                                         this.cancel();
                                         return;
                                     }
-                                    if (hurter.getHealth() - damage * 1.1 > 0) {
+                                    if (hurter.getHealth() - damage * 2 > 0) {
                                         hurter.setHealth(hurter.getHealth() - damage);
                                     } else {
-                                        hurter.onDeath(damageSource.setDamageBypassesArmor());
-                                        hurter.setDead();
+                                        EntityLivingUtil.kill(hurter, damageSource);
                                         this.cancel();
                                     }
                                 }

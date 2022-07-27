@@ -19,25 +19,21 @@ public class MobEffectBadOmen extends IconBase {
         super(isBadEffectIn, liquidColorIn, "bad_omen");
     }
 
-    public static Potion getPotion() {
-        return CarianStylePotion.BAD_OMEN;
-    }
-
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public void onLivingHurt(LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
-            if (hurter.isPotionActive(getPotion())) {
+            if (hurter.isPotionActive(this)) {
                 evt.setAmount((float) (evt.getAmount() * 1.25));
             }
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingHeal(LivingHealEvent evt) {
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public void onLivingHeal(LivingHealEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase healer = evt.getEntityLiving();
-            if (healer.isPotionActive(getPotion())) {
+            if (healer.isPotionActive(this)) {
                 evt.setAmount((float) (evt.getAmount() * 0.5));
             }
         }

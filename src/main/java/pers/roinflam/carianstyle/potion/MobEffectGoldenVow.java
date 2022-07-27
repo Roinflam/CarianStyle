@@ -18,24 +18,20 @@ public class MobEffectGoldenVow extends IconBase {
         super(isBadEffectIn, liquidColorIn, "golden_vow");
     }
 
-    public static Potion getPotion() {
-        return CarianStylePotion.GOLDEN_VOW;
-    }
-
     @SubscribeEvent
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public void onLivingHurt(LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             DamageSource damageSource = evt.getSource();
             if (!damageSource.canHarmInCreative()) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                if (hurter.isPotionActive(getPotion())) {
-                    int amplifier = hurter.getActivePotionEffect(getPotion()).getAmplifier();
+                if (hurter.isPotionActive(this)) {
+                    int amplifier = hurter.getActivePotionEffect(this).getAmplifier();
                     evt.setAmount((float) (evt.getAmount() - evt.getAmount() * (amplifier + 1) * 0.1));
                 }
                 if (damageSource.getTrueSource() instanceof EntityLivingBase) {
                     EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
-                    if (attacker.isPotionActive(getPotion())) {
-                        int amplifier = attacker.getActivePotionEffect(getPotion()).getAmplifier();
+                    if (attacker.isPotionActive(this)) {
+                        int amplifier = attacker.getActivePotionEffect(this).getAmplifier();
                         evt.setAmount((float) (evt.getAmount() + evt.getAmount() * (amplifier + 1) * 0.15));
                     }
                 }

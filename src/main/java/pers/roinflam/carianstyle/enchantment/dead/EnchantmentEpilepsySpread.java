@@ -97,21 +97,19 @@ public class EnchantmentEpilepsySpread extends RaryBase {
                                                     }
                                                     if (entityLivingBase.equals(hurter)) {
                                                         float damage = (float) (hurter.getMaxHealth() * 0.3 / 60);
-                                                        if (hurter.getHealth() - damage * 1.1 > 0) {
+                                                        if (hurter.getHealth() - damage * 2 > 0) {
                                                             hurter.setHealth(hurter.getHealth() - damage);
                                                         } else {
                                                             EPILEPSY_SPREAD.remove(hurter.getUniqueID());
-                                                            hurter.onDeath(NewDamageSource.EPILEPSY_FIRE);
-                                                            hurter.setDead();
+                                                            EntityLivingUtil.kill(hurter, NewDamageSource.EPILEPSY_FIRE);
                                                             this.cancel();
                                                         }
                                                     } else {
                                                         float damage = (float) (hurter.getMaxHealth() * finalBonusLevel * 0.3 * 2 / 60);
-                                                        if (entityLivingBase.getHealth() - damage * 1.1 > 0) {
+                                                        if (entityLivingBase.getHealth() - damage * 2 > 0) {
                                                             entityLivingBase.setHealth(entityLivingBase.getHealth() - damage);
                                                         } else {
-                                                            entityLivingBase.onDeath(NewDamageSource.EPILEPSY_FIRE);
-                                                            entityLivingBase.setDead();
+                                                            EntityLivingUtil.kill(entityLivingBase, NewDamageSource.EPILEPSY_FIRE);
                                                             this.cancel();
                                                         }
                                                     }
@@ -125,10 +123,7 @@ public class EnchantmentEpilepsySpread extends RaryBase {
 
                                         @Override
                                         public void run() {
-                                            if (hurter.isEntityAlive()) {
-                                                hurter.onDeath(NewDamageSource.EPILEPSY_FIRE);
-                                                hurter.setDead();
-                                            }
+                                            EntityLivingUtil.kill(hurter, NewDamageSource.EPILEPSY_FIRE);
                                             EPILEPSY_SPREAD.remove(hurter.getUniqueID());
                                         }
 

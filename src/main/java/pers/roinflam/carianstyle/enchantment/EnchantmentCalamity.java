@@ -50,7 +50,7 @@ public class EnchantmentCalamity extends VeryRaryBase {
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent evt) {
         if (!evt.player.world.isRemote) {
-            if (evt.phase.equals(TickEvent.Phase.END)) {
+            if (evt.phase.equals(TickEvent.Phase.START)) {
                 if (RandomUtil.percentageChance(2)) {
                     EntityPlayer entityPlayer = evt.player;
                     if (entityPlayer.isEntityAlive()) {

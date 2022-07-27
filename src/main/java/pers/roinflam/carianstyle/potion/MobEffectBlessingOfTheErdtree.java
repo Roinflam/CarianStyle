@@ -18,10 +18,6 @@ public class MobEffectBlessingOfTheErdtree extends IconBase {
         this.registerPotionAttributeModifier(SharedMonsterAttributes.MAX_HEALTH, "c407bffa-97df-adf8-51db-5681fdef4b8c", 0.15, 2);
     }
 
-    public static Potion getPotion() {
-        return CarianStylePotion.BLESSING_OF_THE_ERDTREE;
-    }
-
     @Override
     public boolean isReady(int duration, int amplifier) {
         return duration % 60 == 0;

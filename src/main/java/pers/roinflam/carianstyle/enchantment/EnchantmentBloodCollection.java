@@ -10,7 +10,6 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
 public class EnchantmentBloodCollection extends RaryBase {
@@ -31,11 +30,11 @@ public class EnchantmentBloodCollection extends RaryBase {
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
-                        evt.setAmount((float) (evt.getAmount() + evt.getAmount() * (attacker.getHealth() / attacker.getMaxHealth()) * bonusLevel * 0.1));
+                        evt.setAmount((float) (evt.getAmount() + evt.getAmount() * (1 - attacker.getHealth() / attacker.getMaxHealth()) * bonusLevel * 0.15));
                         if (EnchantmentHelper.getEnchantmentLevel(EnchantmentBloodSlash.getEnchantment(), attacker.getHeldItem(attacker.getActiveHand())) > 0) {
-                            attacker.heal((float) ((1 - attacker.getHealth() / attacker.getMaxHealth()) * bonusLevel * 0.5));
+                            attacker.heal((float) (attacker.getMaxHealth() * (1 - attacker.getHealth() / attacker.getMaxHealth()) * bonusLevel * 0.04));
                         } else {
-                            attacker.heal((float) ((1 - attacker.getHealth() / attacker.getMaxHealth()) * bonusLevel * 0.25));
+                            attacker.heal((float) (attacker.getMaxHealth() * (1 - attacker.getHealth() / attacker.getMaxHealth()) * bonusLevel * 0.02));
                         }
                     }
                 }

@@ -21,15 +21,11 @@ public class MobEffectScarletRot extends IconBase {
         super(isBadEffectIn, liquidColorIn, "scarlet_rot");
     }
 
-    public static Potion getPotion() {
-        return CarianStylePotion.SCARLET_ROT;
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingHeal(LivingHealEvent evt) {
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public void onLivingHeal(LivingHealEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase healer = evt.getEntityLiving();
-            if (healer.isPotionActive(getPotion())) {
+            if (healer.isPotionActive(this)) {
                 evt.setAmount((float) (evt.getAmount() * 0.75));
             }
         }

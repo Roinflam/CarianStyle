@@ -1,10 +1,6 @@
 package pers.roinflam.carianstyle.potion.hide;
 
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.potion.Potion;
 import pers.roinflam.carianstyle.base.potion.flame.FlameBase;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
-import pers.roinflam.carianstyle.network.NetworkRegistryHandler;
 import pers.roinflam.carianstyle.utils.Reference;
 
 public class MobEffectDestructionFireBurning extends FlameBase {
@@ -14,18 +10,8 @@ public class MobEffectDestructionFireBurning extends FlameBase {
     }
 
     @Override
-    public Potion getPotion() {
-        return CarianStylePotion.DESTRUCTION_FIRE_BURNING;
-    }
-
-    @Override
-    public void sendClientCustomPacket(EntityPlayer entityPlayer, int id, boolean add) {
-        NetworkRegistryHandler.DestructionFireBurning.sendClientCustomPacket(entityPlayer, id, add);
-    }
-
-    @Override
-    public boolean isAflame(int id) {
-        return NetworkRegistryHandler.DestructionFireBurning.getEntitiesID().contains(id);
+    public int getSerialNumber() {
+        return 2;
     }
 
     @Override

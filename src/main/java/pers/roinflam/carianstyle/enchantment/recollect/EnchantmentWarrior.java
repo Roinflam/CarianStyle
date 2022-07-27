@@ -12,7 +12,9 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 @Mod.EventBusSubscriber
 public class EnchantmentWarrior extends VeryRaryBase {
@@ -58,11 +60,10 @@ public class EnchantmentWarrior extends VeryRaryBase {
                                 this.cancel();
                                 return;
                             }
-                            if (hurter.getHealth() - damage * 1.1 > 0) {
+                            if (hurter.getHealth() - damage * 2 > 0) {
                                 hurter.setHealth(hurter.getHealth() - damage);
                             } else {
-                                hurter.onDeath(evt.getSource().setDamageBypassesArmor());
-                                hurter.setDead();
+                                EntityLivingUtil.kill(hurter, evt.getSource());
                                 this.cancel();
                             }
                         }

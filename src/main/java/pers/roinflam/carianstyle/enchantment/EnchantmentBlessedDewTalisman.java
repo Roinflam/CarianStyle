@@ -27,7 +27,7 @@ public class EnchantmentBlessedDewTalisman extends UncommonBase {
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent evt) {
         if (!evt.player.world.isRemote) {
-            if (evt.phase.equals(TickEvent.Phase.END)) {
+            if (evt.phase.equals(TickEvent.Phase.START)) {
                 EntityPlayer entityPlayer = evt.player;
                 if (!entityPlayer.getFoodStats().needFood()) {
                     int bonusLevel = 0;
@@ -37,7 +37,7 @@ public class EnchantmentBlessedDewTalisman extends UncommonBase {
                         }
                     }
                     if (bonusLevel > 0) {
-                        entityPlayer.heal((float) (entityPlayer.getMaxHealth() * bonusLevel * 0.0025 / 20));
+                        entityPlayer.heal((float) (entityPlayer.getMaxHealth() * bonusLevel * 0.002 / 20));
                     }
                 }
             }

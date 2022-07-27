@@ -15,7 +15,9 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 @Mod.EventBusSubscriber
 public class EnchantmentDoomedDeath extends VeryRaryBase {
@@ -38,7 +40,7 @@ public class EnchantmentDoomedDeath extends VeryRaryBase {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         hurter.addPotionEffect(new PotionEffect(CarianStylePotion.DOOMED_DEATH_BURNING, 5 * 20 + 5, 0));
-                        hurter.addPotionEffect(new PotionEffect(CarianStylePotion.DOOMED_DEATH, 10 * 20, 0));
+                        hurter.addPotionEffect(new PotionEffect(CarianStylePotion.DOOMED_DEATH, 10 * 20 + 5, 0));
                         float hurtDamage = evt.getAmount();
                         new SynchronizationTask(5, 1) {
                             private int tick = 0;
@@ -51,11 +53,10 @@ public class EnchantmentDoomedDeath extends VeryRaryBase {
                                 }
                                 float damage = (float) ((hurtDamage * 0.5 + hurter.getHealth() * 0.05) / 100);
                                 damage = (float) (damage * 0.3 + damage * tick / 50 * 0.7);
-                                if (hurter.getHealth() - damage * 1.1 > 0) {
+                                if (hurter.getHealth() - damage * 2 > 0) {
                                     hurter.setHealth(hurter.getHealth() - damage);
                                 } else {
-                                    hurter.onDeath(evt.getSource().setDamageBypassesArmor());
-                                    hurter.setDead();
+                                    EntityLivingUtil.kill(hurter, evt.getSource());
                                     this.cancel();
                                 }
                             }

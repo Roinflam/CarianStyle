@@ -25,19 +25,15 @@ public class MobEffectProtectionOfTheErdtree extends IconBase {
         super(isBadEffectIn, liquidColorIn, "protection_of_the_erdtree");
     }
 
-    public static Potion getPotion() {
-        return CarianStylePotion.PROTECTION_OF_THE_ERDTREE;
-    }
-
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage(LivingDamageEvent evt) {
+    public void onLivingDamage(LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             DamageSource damageSource = evt.getSource();
             if (!damageSource.canHarmInCreative() && !damageSource.isDamageAbsolute()) {
                 if (!(damageSource.getTrueSource() instanceof EntityLivingBase)) {
                     EntityLivingBase hurter = evt.getEntityLiving();
-                    if (hurter.isPotionActive(getPotion())) {
-                        int amplifier = hurter.getActivePotionEffect(getPotion()).getAmplifier();
+                    if (hurter.isPotionActive(this)) {
+                        int amplifier = hurter.getActivePotionEffect(this).getAmplifier();
                         evt.setAmount((float) (evt.getAmount() - evt.getAmount() * (amplifier + 1) * 0.2));
                     }
                 }

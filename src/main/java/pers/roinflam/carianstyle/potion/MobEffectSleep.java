@@ -4,7 +4,6 @@ import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.init.MobEffects;
-import net.minecraft.potion.Potion;
 import net.minecraft.potion.PotionEffect;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
@@ -15,7 +14,6 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
@@ -28,17 +26,13 @@ public class MobEffectSleep extends IconBase {
         this.registerPotionAttributeModifier(SharedMonsterAttributes.MOVEMENT_SPEED, "5d59080b-eda9-f5b7-1b3c-51568e5b6682", -1, 2);
     }
 
-    public static Potion getPotion() {
-        return CarianStylePotion.SLEEP;
-    }
-
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingSetAttackTarget(LivingSetAttackTargetEvent evt) {
+    public void onLivingSetAttackTarget(LivingSetAttackTargetEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getTarget() != null) {
                 if (evt.getEntityLiving() instanceof EntityLiving) {
                     EntityLiving entityLiving = (EntityLiving) evt.getEntityLiving();
-                    if (entityLiving.isPotionActive(getPotion())) {
+                    if (entityLiving.isPotionActive(this)) {
                         entityLiving.setAttackTarget(null);
                     }
                 }
@@ -47,11 +41,11 @@ public class MobEffectSleep extends IconBase {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingAttack(LivingAttackEvent evt) {
+    public void onLivingAttack(LivingAttackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
-                if (attacker.isPotionActive(getPotion())) {
+                if (attacker.isPotionActive(this)) {
                     evt.setCanceled(true);
                 }
             }
@@ -59,23 +53,23 @@ public class MobEffectSleep extends IconBase {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingDamage(LivingDamageEvent evt) {
+    public void onLivingDamage(LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                if (hurter.isPotionActive(getPotion())) {
-                    evt.setAmount((float) (evt.getAmount() * 2 + evt.getAmount() * hurter.getActivePotionEffect(getPotion()).getAmplifier() * 0.25));
-                    hurter.removePotionEffect(getPotion());
+                if (hurter.isPotionActive(this)) {
+                    evt.setAmount((float) (evt.getAmount() * 2 + evt.getAmount() * hurter.getActivePotionEffect(this).getAmplifier() * 0.25));
+                    hurter.removePotionEffect(this);
                 }
             }
         }
     }
 
     @SubscribeEvent
-    public static void onLivingUpdate(LivingEvent.LivingUpdateEvent evt) {
+    public void onLivingUpdate(LivingEvent.LivingUpdateEvent evt) {
         if (evt.getEntity().world.isRemote) {
             EntityLivingBase entityLiving = evt.getEntityLiving();
-            if (entityLiving.isPotionActive(getPotion())) {
+            if (entityLiving.isPotionActive(this)) {
                 EntityLivingUtil.setJumped(entityLiving);
             }
         }

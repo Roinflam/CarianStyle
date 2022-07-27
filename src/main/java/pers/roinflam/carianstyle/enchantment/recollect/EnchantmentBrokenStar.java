@@ -31,7 +31,11 @@ public class EnchantmentBrokenStar extends VeryRaryBase {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         if (attacker.getHealth() >= attacker.getMaxHealth() / 2) {
-                            evt.setAmount((float) (evt.getAmount() * 1.5));
+                            if (!attacker.world.isDaytime()) {
+                                evt.setAmount(evt.getAmount() * 2);
+                            } else {
+                                evt.setAmount((float) (evt.getAmount() * 1.5));
+                            }
                         }
                     }
                 }
@@ -42,7 +46,11 @@ public class EnchantmentBrokenStar extends VeryRaryBase {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                     if (bonusLevel > 0) {
                         if (hurter.getHealth() <= hurter.getMaxHealth() / 2) {
-                            evt.setAmount((float) (evt.getAmount() * 0.75));
+                            if (!hurter.world.isDaytime()) {
+                                evt.setAmount((float) (evt.getAmount() * 0.75));
+                            } else {
+                                evt.setAmount((float) (evt.getAmount() * 0.5));
+                            }
                         }
                     }
                 }

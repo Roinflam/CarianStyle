@@ -4,11 +4,9 @@ import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -30,14 +28,16 @@ public class EnchantmentCrucibleScaleTalisman extends RaryBase {
     public static void onLivingDamage(LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
-            int bonusLevel = 0;
-            for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                if (!itemStack.isEmpty()) {
-                    bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
+            if (evt.getAmount() >= hurter.getMaxHealth()) {
+                int bonusLevel = 0;
+                for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+                    if (!itemStack.isEmpty()) {
+                        bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
+                    }
                 }
-            }
-            if (bonusLevel > 0) {
-                evt.setAmount((float) (evt.getAmount() - evt.getAmount() * Math.min(bonusLevel, 6) * 0.15));
+                if (bonusLevel > 0) {
+                    evt.setAmount((float) (evt.getAmount() - evt.getAmount() * Math.min(bonusLevel, 6) * 0.15));
+                }
             }
         }
     }

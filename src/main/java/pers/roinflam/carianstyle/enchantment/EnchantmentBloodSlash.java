@@ -14,7 +14,8 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
+import pers.roinflam.carianstyle.source.NewDamageSource;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 @Mod.EventBusSubscriber
 public class EnchantmentBloodSlash extends RaryBase {
@@ -38,12 +39,10 @@ public class EnchantmentBloodSlash extends RaryBase {
                     if (bonusLevel > 0) {
                         evt.setAmount((float) (evt.getAmount() + hurter.getHealth() * bonusLevel * 0.05));
                         if (!(attacker instanceof EntityPlayer) || !((EntityPlayer) attacker).isCreative()) {
-                            if (attacker.getHealth() > attacker.getMaxHealth() * 0.075) {
-                                attacker.setHealth((float) (attacker.getHealth() - attacker.getMaxHealth() * 0.075));
+                            if (attacker.getHealth() > attacker.getMaxHealth() * 0.1) {
+                                attacker.setHealth((float) (attacker.getHealth() - attacker.getMaxHealth() * 0.1));
                             } else {
-                                attacker.setHealth(0);
-                                attacker.onDeath(DamageSource.causeMobDamage(attacker));
-                                attacker.setDead();
+                                EntityLivingUtil.kill(attacker, NewDamageSource.HEMORRHAGE);
                             }
                         }
                     }

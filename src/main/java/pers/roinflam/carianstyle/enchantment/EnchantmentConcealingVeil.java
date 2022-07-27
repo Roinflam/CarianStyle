@@ -3,7 +3,6 @@ package pers.roinflam.carianstyle.enchantment;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Enchantments;
 import net.minecraft.inventory.EntityEquipmentSlot;
@@ -47,20 +46,22 @@ public class EnchantmentConcealingVeil extends VeryRaryBase {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingAttack(LivingAttackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
-            EntityLivingBase hurter = evt.getEntityLiving();
-            BATTLE.add(hurter.getUniqueID());
-            new SynchronizationTask(100, 100) {
+            if (evt.getEntityLiving() instanceof EntityPlayer) {
+                EntityPlayer hurter = (EntityPlayer) evt.getEntityLiving();
+                BATTLE.add(hurter.getUniqueID());
+                new SynchronizationTask(60) {
 
-                @Override
-                public void run() {
-                    BATTLE.remove(hurter.getUniqueID());
-                }
+                    @Override
+                    public void run() {
+                        BATTLE.remove(hurter.getUniqueID());
+                    }
 
-            }.start();
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                }.start();
+            }
+            if (evt.getSource().getImmediateSource() instanceof EntityPlayer) {
+                EntityPlayer attacker = (EntityPlayer) evt.getSource().getImmediateSource();
                 BATTLE.add(attacker.getUniqueID());
-                new SynchronizationTask(100, 100) {
+                new SynchronizationTask(60) {
 
                     @Override
                     public void run() {
@@ -72,10 +73,10 @@ public class EnchantmentConcealingVeil extends VeryRaryBase {
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
+    @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent evt) {
         if (!evt.player.world.isRemote) {
-            if (evt.phase.equals(TickEvent.Phase.END)) {
+            if (evt.phase.equals(TickEvent.Phase.START)) {
                 EntityPlayer entityPlayer = evt.player;
                 if (entityPlayer.isSneaking() && !BATTLE.contains(entityPlayer.getUniqueID())) {
                     int bonusLevel = 0;
@@ -85,7 +86,7 @@ public class EnchantmentConcealingVeil extends VeryRaryBase {
                         }
                     }
                     if (bonusLevel > 0) {
-                        entityPlayer.addPotionEffect(new PotionEffect(CarianStylePotion.STEALTH, 1, 0));
+                        entityPlayer.addPotionEffect(new PotionEffect(CarianStylePotion.STEALTH, 2, 0));
                     }
                 }
             }

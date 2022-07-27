@@ -16,24 +16,23 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 public class NetworkRegistryHandler {
 
     public static void register() {
-        DoomeDeathBurning.CHANNEL.register(DoomeDeathBurning.class);
-        DestructionFireBurning.CHANNEL.register(DestructionFireBurning.class);
-        EpilepsyFireBurning.CHANNEL.register(EpilepsyFireBurning.class);
+        RenderingEffect.CHANNEL.register(RenderingEffect.class);
     }
 
-    public static class DoomeDeathBurning {
-        private static final String NAME = "DOOMED_DEATH";
+    public static class RenderingEffect {
+        private static final String NAME = "RENDERING_EFFECT";
         private static final FMLEventChannel CHANNEL = NetworkRegistry.INSTANCE.newEventDrivenChannel(NAME);
 
-        private static final List<Integer> ENTITIES_ID = new ArrayList<>();
+        private static final HashMap<Integer, List<Integer>> ENTITIES_ID = new HashMap<>();
 
         static {
-            new SynchronizationTask(10 * 12000, 10 * 1200) {
+            new SynchronizationTask(10 * 1200, 10 * 1200) {
 
                 @Override
                 public void run() {
@@ -50,144 +49,39 @@ public class NetworkRegistryHandler {
             Minecraft minecraft = Minecraft.getMinecraft();
             minecraft.addScheduledTask(() -> {
                 EntityPlayer player = minecraft.player;
+                int serialNumber = byteBuf.readInt();
                 int length = byteBuf.readInt();
-                ENTITIES_ID.clear();
+                List<Integer> entities = new ArrayList<>();
                 for (int i = 0; i < length; i++) {
-                    ENTITIES_ID.add(byteBuf.readInt());
+                    entities.add(byteBuf.readInt());
                 }
+                ENTITIES_ID.put(serialNumber, entities);
             });
         }
 
-        public static void sendClientCustomPacket(EntityPlayer entityPlayer, Integer id, boolean add) {
+        public static void sendClientCustomPacket(int serialNumber, EntityPlayer entityPlayer, Integer id, boolean add) {
+            List<Integer> entites_id = ENTITIES_ID.getOrDefault(serialNumber, new ArrayList<>());
             if (add) {
-                if (!ENTITIES_ID.contains(id)) {
-                    ENTITIES_ID.add(id);
+                if (!entites_id.contains(id)) {
+                    entites_id.add(id);
                 }
             } else {
-                ENTITIES_ID.remove(id);
+                entites_id.remove(id);
             }
 
             PacketBuffer packetBuffer = new PacketBuffer(Unpooled.buffer());
-            packetBuffer.writeInt(ENTITIES_ID.size());
-            for (Integer integer : ENTITIES_ID) {
+            packetBuffer.writeInt(serialNumber);
+            packetBuffer.writeInt(entites_id.size());
+            for (Integer integer : entites_id) {
                 packetBuffer.writeInt(integer);
             }
 
             CHANNEL.sendTo(new FMLProxyPacket(packetBuffer, NAME), (EntityPlayerMP) entityPlayer);
         }
 
-        public static List<Integer> getEntitiesID() {
-            return ENTITIES_ID;
+        public static List<Integer> getEntitiesID(int serialNumber) {
+            return ENTITIES_ID.getOrDefault(serialNumber, new ArrayList<>());
         }
     }
 
-    public static class DestructionFireBurning {
-        private static final String NAME = "DESTRUCTION_FIRE";
-        private static final FMLEventChannel CHANNEL = NetworkRegistry.INSTANCE.newEventDrivenChannel(NAME);
-
-        private static final List<Integer> ENTITIES_ID = new ArrayList<>();
-
-        static {
-            new SynchronizationTask(10 * 12000, 10 * 1200) {
-
-                @Override
-                public void run() {
-                    ENTITIES_ID.clear();
-                }
-
-            }.start();
-        }
-
-        @SubscribeEvent
-        @SideOnly(Side.CLIENT)
-        public static void onClientCustomPacket(FMLNetworkEvent.ClientCustomPacketEvent evt) {
-            ByteBuf byteBuf = evt.getPacket().payload();
-            Minecraft minecraft = Minecraft.getMinecraft();
-            minecraft.addScheduledTask(() -> {
-                EntityPlayer player = minecraft.player;
-                int length = byteBuf.readInt();
-                ENTITIES_ID.clear();
-                for (int i = 0; i < length; i++) {
-                    ENTITIES_ID.add(byteBuf.readInt());
-                }
-            });
-        }
-
-        public static void sendClientCustomPacket(EntityPlayer entityPlayer, Integer id, boolean add) {
-            if (add) {
-                if (!ENTITIES_ID.contains(id)) {
-                    ENTITIES_ID.add(id);
-                }
-            } else {
-                ENTITIES_ID.remove(id);
-            }
-
-            PacketBuffer packetBuffer = new PacketBuffer(Unpooled.buffer());
-            packetBuffer.writeInt(ENTITIES_ID.size());
-            for (Integer integer : ENTITIES_ID) {
-                packetBuffer.writeInt(integer);
-            }
-
-            CHANNEL.sendTo(new FMLProxyPacket(packetBuffer, NAME), (EntityPlayerMP) entityPlayer);
-        }
-
-        public static List<Integer> getEntitiesID() {
-            return ENTITIES_ID;
-        }
-    }
-
-    public static class EpilepsyFireBurning {
-        private static final String NAME = "EPILEPSY_FIRE";
-        private static final FMLEventChannel CHANNEL = NetworkRegistry.INSTANCE.newEventDrivenChannel(NAME);
-
-        private static final List<Integer> ENTITIES_ID = new ArrayList<>();
-
-        static {
-            new SynchronizationTask(10 * 12000, 10 * 1200) {
-
-                @Override
-                public void run() {
-                    ENTITIES_ID.clear();
-                }
-
-            }.start();
-        }
-
-        @SubscribeEvent
-        @SideOnly(Side.CLIENT)
-        public static void onClientCustomPacket(FMLNetworkEvent.ClientCustomPacketEvent evt) {
-            ByteBuf byteBuf = evt.getPacket().payload();
-            Minecraft minecraft = Minecraft.getMinecraft();
-            minecraft.addScheduledTask(() -> {
-                EntityPlayer player = minecraft.player;
-                int length = byteBuf.readInt();
-                ENTITIES_ID.clear();
-                for (int i = 0; i < length; i++) {
-                    ENTITIES_ID.add(byteBuf.readInt());
-                }
-            });
-        }
-
-        public static void sendClientCustomPacket(EntityPlayer entityPlayer, Integer id, boolean add) {
-            if (add) {
-                if (!ENTITIES_ID.contains(id)) {
-                    ENTITIES_ID.add(id);
-                }
-            } else {
-                ENTITIES_ID.remove(id);
-            }
-
-            PacketBuffer packetBuffer = new PacketBuffer(Unpooled.buffer());
-            packetBuffer.writeInt(ENTITIES_ID.size());
-            for (Integer integer : ENTITIES_ID) {
-                packetBuffer.writeInt(integer);
-            }
-
-            CHANNEL.sendTo(new FMLProxyPacket(packetBuffer, NAME), (EntityPlayerMP) entityPlayer);
-        }
-
-        public static List<Integer> getEntitiesID() {
-            return ENTITIES_ID;
-        }
-    }
 }

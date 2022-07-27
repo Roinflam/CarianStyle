@@ -25,10 +25,6 @@ public class MobEffectFrostbite extends IconBase {
         this.registerPotionAttributeModifier(SharedMonsterAttributes.MOVEMENT_SPEED, "5d59080b-eda9-f5b7-1b3c-51568e5b6682", -0.075, 2);
     }
 
-    public static Potion getPotion() {
-        return CarianStylePotion.FROSTBITE;
-    }
-
     @Override
     public void performEffect(EntityLivingBase entityLivingBaseIn, int amplifier) {
         float damage = (float) (entityLivingBaseIn.getMaxHealth() * 0.0025);

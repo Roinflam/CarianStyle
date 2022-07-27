@@ -9,6 +9,7 @@ import java.util.List;
 
 public class ConfigLoader {
     public static List<String> uninstall_enchantment;
+    public static int rockblaster_maxrange;
     private static Configuration config;
     private static Logger logger;
 
@@ -25,6 +26,10 @@ public class ConfigLoader {
         String comment = "Fill in the id of the enchantment you want to disable registration here, you can find the id of the relevant enchantment in en_us.lang.";
 
         uninstall_enchantment = Arrays.asList(config.get(Configuration.CATEGORY_GENERAL, "uninstall", new String[]{}, comment).getStringList());
+
+        comment = "The maximum mining radius of the Rock Blaster Enchantment.";
+        rockblaster_maxrange = config.get(Configuration.CATEGORY_GENERAL, "rockBlasterMaxRange", 10, comment).getInt();
+
 
         config.save();
         logger.info("Finished loading config.");

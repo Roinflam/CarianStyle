@@ -16,6 +16,7 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 @Mod.EventBusSubscriber
 public class EnchantmentEpilepsyFire extends RaryBase {
@@ -49,12 +50,11 @@ public class EnchantmentEpilepsyFire extends RaryBase {
                                         this.cancel();
                                         return;
                                     }
-                                    float damage = (float) (attacker.getMaxHealth() * 0.2 / 60);
-                                    if (attacker.getHealth() - damage * 1.1 > 0) {
+                                    float damage = (float) (attacker.getMaxHealth() * 0.3 / 60);
+                                    if (attacker.getHealth() - damage * 2 > 0) {
                                         attacker.setHealth(attacker.getHealth() - damage);
                                     } else {
-                                        attacker.onDeath(NewDamageSource.EPILEPSY_FIRE);
-                                        attacker.setDead();
+                                        EntityLivingUtil.kill(attacker, NewDamageSource.EPILEPSY_FIRE);
                                         this.cancel();
                                     }
                                 }
@@ -71,12 +71,11 @@ public class EnchantmentEpilepsyFire extends RaryBase {
                                     this.cancel();
                                     return;
                                 }
-                                float damage = (float) (attacker.getMaxHealth() * 0.2 * bonusLevel / 60);
-                                if (hurter.getHealth() - damage * 1.1 > 0) {
+                                float damage = (float) (attacker.getMaxHealth() * 0.3 * bonusLevel * 0.5 / 60);
+                                if (hurter.getHealth() - damage * 2 > 0) {
                                     hurter.setHealth(hurter.getHealth() - damage);
                                 } else {
-                                    hurter.onDeath(NewDamageSource.EPILEPSY_FIRE);
-                                    hurter.setDead();
+                                    EntityLivingUtil.kill(hurter, NewDamageSource.EPILEPSY_FIRE);
                                     this.cancel();
                                 }
                             }

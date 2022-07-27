@@ -3,7 +3,6 @@ package pers.roinflam.carianstyle.enchantment;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.effect.EntityLightningBolt;
 import net.minecraft.entity.projectile.EntityArrow;
@@ -20,7 +19,6 @@ import org.apache.commons.lang3.RandomUtils;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
 
@@ -77,10 +75,8 @@ public class EnchantmentCallStar extends RaryBase {
                                                 )
                                         );
                                         int magnification = 1;
-                                        if (entityLivingBase.world.isRaining()) {
-                                            magnification *= 2;
-                                        } else if (entityLivingBase.world.isThundering()) {
-                                            magnification *= 4;
+                                        if (!entityLivingBase.world.isDaytime()) {
+                                            magnification *= 3;
                                         }
                                         entityLivingBase.attackEntityFrom(DamageSource.LIGHTNING_BOLT, (float) (evt.getArrow().getDamage() * bonusLevel * 0.3 * magnification));
                                         if (entityLivingBase.onGround) {
