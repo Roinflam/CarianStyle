@@ -30,11 +30,11 @@ public class EnchantmentBloodCollection extends RaryBase {
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
-                        evt.setAmount((float) (evt.getAmount() + evt.getAmount() * (1 - attacker.getHealth() / attacker.getMaxHealth()) * bonusLevel * 0.15));
+                        evt.setAmount(evt.getAmount() + evt.getAmount() * (1 - attacker.getHealth() / attacker.getMaxHealth()) * bonusLevel * 0.15f);
                         if (EnchantmentHelper.getEnchantmentLevel(EnchantmentBloodSlash.getEnchantment(), attacker.getHeldItem(attacker.getActiveHand())) > 0) {
-                            attacker.heal((float) (attacker.getMaxHealth() * (1 - attacker.getHealth() / attacker.getMaxHealth()) * bonusLevel * 0.04));
+                            attacker.heal(attacker.getMaxHealth() * (1 - attacker.getHealth() / attacker.getMaxHealth()) * bonusLevel * 0.04f);
                         } else {
-                            attacker.heal((float) (attacker.getMaxHealth() * (1 - attacker.getHealth() / attacker.getMaxHealth()) * bonusLevel * 0.02));
+                            attacker.heal(attacker.getMaxHealth() * (1 - attacker.getHealth() / attacker.getMaxHealth()) * bonusLevel * 0.02f);
                         }
                     }
                 }

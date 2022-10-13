@@ -51,13 +51,13 @@ public class EnchantmentMikaelaBlade extends VeryRaryBase {
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
-                        evt.setAmount((float) (evt.getAmount() * 0.4 + evt.getAmount() * COMMB.getOrDefault(attacker.getUniqueID(), 0) * 0.2));
+                        evt.setAmount(evt.getAmount() * 0.4f + evt.getAmount() * COMMB.getOrDefault(attacker.getUniqueID(), 0) * 0.2f);
                         COMMB.put(attacker.getUniqueID(), COMMB.getOrDefault(attacker.getUniqueID(), 0) + 1);
                     }
                 }
             }
             EntityLivingBase hurter = evt.getEntityLiving();
-            evt.setAmount((float) (evt.getAmount() + evt.getAmount() * COMMB.getOrDefault(hurter.getUniqueID(), 0) * 0.1));
+            evt.setAmount(evt.getAmount() + evt.getAmount() * COMMB.getOrDefault(hurter.getUniqueID(), 0) * 0.1f);
         }
     }
 

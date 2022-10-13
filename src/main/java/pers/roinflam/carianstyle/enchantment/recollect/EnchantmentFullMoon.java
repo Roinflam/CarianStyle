@@ -16,7 +16,6 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.enchantment.EnchantmentDarkMoon;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -50,7 +49,7 @@ public class EnchantmentFullMoon extends VeryRaryBase {
                     if (!FULL_MOON_COOLDING.contains(hurter.getUniqueID())) {
                         if (!hurter.isDead) {
                             evt.setCanceled(true);
-                            hurter.setHealth((float) (hurter.getMaxHealth() * 0.0075));
+                            hurter.setHealth(hurter.getMaxHealth() * 0.0075f);
 
                             FULL_MOON_COOLDING.add(hurter.getUniqueID());
                             FULL_MOON.add(hurter.getUniqueID());
@@ -116,7 +115,7 @@ public class EnchantmentFullMoon extends VeryRaryBase {
                 }
                 if (bonusLevel > 0) {
                     if (FULL_MOON.contains(hurter.getUniqueID())) {
-                        evt.setAmount((float) (evt.getAmount() * 0.5));
+                        evt.setAmount(evt.getAmount() * 0.5f);
                     }
                 }
             }
@@ -134,7 +133,7 @@ public class EnchantmentFullMoon extends VeryRaryBase {
                 }
             }
             if (bonusLevel > 0) {
-                evt.setAmount((float) (evt.getAmount() + evt.getAmount() * 0.25));
+                evt.setAmount(evt.getAmount() + evt.getAmount() * 0.25f);
             }
         }
     }

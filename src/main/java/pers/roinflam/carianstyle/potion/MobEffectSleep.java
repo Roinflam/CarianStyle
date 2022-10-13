@@ -10,14 +10,12 @@ import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.living.LivingSetAttackTargetEvent;
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
-@Mod.EventBusSubscriber
 public class MobEffectSleep extends IconBase {
 
     public MobEffectSleep(boolean isBadEffectIn, int liquidColorIn) {
@@ -58,7 +56,7 @@ public class MobEffectSleep extends IconBase {
             if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 if (hurter.isPotionActive(this)) {
-                    evt.setAmount((float) (evt.getAmount() * 2 + evt.getAmount() * hurter.getActivePotionEffect(this).getAmplifier() * 0.25));
+                    evt.setAmount(evt.getAmount() * 2 + evt.getAmount() * hurter.getActivePotionEffect(this).getAmplifier() * 0.25f);
                     hurter.removePotionEffect(this);
                 }
             }
@@ -67,11 +65,9 @@ public class MobEffectSleep extends IconBase {
 
     @SubscribeEvent
     public void onLivingUpdate(LivingEvent.LivingUpdateEvent evt) {
-        if (evt.getEntity().world.isRemote) {
-            EntityLivingBase entityLiving = evt.getEntityLiving();
-            if (entityLiving.isPotionActive(this)) {
-                EntityLivingUtil.setJumped(entityLiving);
-            }
+        EntityLivingBase entityLiving = evt.getEntityLiving();
+        if (entityLiving.isPotionActive(this)) {
+            EntityLivingUtil.setJumped(entityLiving);
         }
     }
 

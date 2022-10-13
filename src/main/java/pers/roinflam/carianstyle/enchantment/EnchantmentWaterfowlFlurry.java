@@ -13,7 +13,6 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
 public class EnchantmentWaterfowlFlurry extends RaryBase {
@@ -37,7 +36,7 @@ public class EnchantmentWaterfowlFlurry extends RaryBase {
                     if (bonusLevel > 0) {
                         DamageSource damageSource = evt.getSource();
                         if (!damageSource.damageType.equals("waterfowlDance") && !damageSource.damageType.equals("noDeathBlade")) {
-                            float damage = (float) ((evt.getAmount() / (bonusLevel + 1)) * (1 - bonusLevel * 0.3));
+                            float damage = (evt.getAmount() / (bonusLevel + 1)) * (1 - bonusLevel * 0.3f);
                             evt.setAmount(damage);
 
                             damageSource.damageType = "waterfowlDance";

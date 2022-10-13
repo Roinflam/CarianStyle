@@ -49,7 +49,7 @@ public class EnchantmentGodskinSwaddling extends RaryBase {
                         if (ATTACK.getOrDefault(attacker.getUniqueID(), 0) == 3) {
                             ATTACK.remove(attacker.getUniqueID());
 
-                            attacker.heal((float) (attacker.getMaxHealth() * 0.03 + attacker.getMaxHealth() * (bonusLevel - 1) * 0.01));
+                            attacker.heal(attacker.getMaxHealth() * 0.03f + attacker.getMaxHealth() * (bonusLevel - 1) * 0.01f);
                         } else {
                             ATTACK.put(attacker.getUniqueID(), ATTACK.getOrDefault(attacker.getUniqueID(), 0) + 1);
                         }

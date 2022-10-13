@@ -7,7 +7,6 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.potion.PotionEffect;
-import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
@@ -15,6 +14,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
 
@@ -39,9 +39,10 @@ public class EnchantmentAduraMoonlightSword extends RaryBase {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         evt.getSource().setMagicDamage();
-                        List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
-                                new AxisAlignedBB(hurter.getPosition()).expand(bonusLevel, bonusLevel, bonusLevel),
+                                hurter,
+                                bonusLevel,
                                 entityLivingBase -> !entityLivingBase.equals(attacker)
                         );
                         if (attacker.world.isDaytime()) {

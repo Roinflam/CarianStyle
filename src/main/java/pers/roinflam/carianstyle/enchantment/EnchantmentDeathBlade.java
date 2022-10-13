@@ -40,8 +40,8 @@ public class EnchantmentDeathBlade extends VeryRaryBase {
                     if (bonusLevel > 0) {
                         DamageSource damageSource = evt.getSource();
                         if (!damageSource.damageType.equals("deathBlade") && !damageSource.canHarmInCreative()) {
-                            float damage = (float) (evt.getAmount() * 0.5 / 100);
-                            evt.setAmount((float) (evt.getAmount() * 0.5));
+                            float damage = evt.getAmount() * 0.5f / 100;
+                            evt.setAmount(evt.getAmount() * 0.5f);
                             damageSource.damageType = "deathBlade";
                             hurter.addPotionEffect(new PotionEffect(CarianStylePotion.DOOMED_DEATH_BURNING, 5 * 20 + 5, 0));
                             hurter.addPotionEffect(new PotionEffect(CarianStylePotion.DOOMED_DEATH, 10 * 20 + 5, 0));

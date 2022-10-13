@@ -41,7 +41,7 @@ public class EnchantmentAncestralSpiritHorn extends RaryBase {
                     }
                 }
                 if (bonusLevel > 0) {
-                    evt.setAmount((float) (evt.getAmount() * 0.5));
+                    evt.setAmount(evt.getAmount() * 0.5f);
                 }
             }
         }
@@ -60,7 +60,7 @@ public class EnchantmentAncestralSpiritHorn extends RaryBase {
                     }
                 }
                 if (bonusLevel > 0) {
-                    float heal = (float) (evt.getAmount() * bonusLevel * 0.1 / 20);
+                    float heal = evt.getAmount() * bonusLevel * 0.1f / 20;
                     new SynchronizationTask(10, 10) {
                         private int tick = 0;
 

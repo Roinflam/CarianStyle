@@ -38,9 +38,9 @@ public class EnchantmentImmutableShield extends RaryBase {
                         if (evt.getAmount() <= 0 && evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                             EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                             attacker.clearActivePotions();
-                            hurter.heal((float) (hurter.getMaxHealth() * bonusLevel * 0.01));
+                            hurter.heal(hurter.getMaxHealth() * bonusLevel * 0.01f);
                         } else {
-                            evt.setAmount((float) (evt.getAmount() - evt.getAmount() * bonusLevel * 0.1));
+                            evt.setAmount(evt.getAmount() - evt.getAmount() * bonusLevel * 0.1f);
                         }
                     }
                 }

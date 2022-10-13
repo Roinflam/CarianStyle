@@ -6,13 +6,13 @@ import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
 
@@ -33,16 +33,17 @@ public class EnchantmentRealmOfMagic extends VeryRaryBase {
             if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
                 if (evt.getSource().isMagicDamage()) {
                     EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
-                    List<EntityLivingBase> entities = attacker.world.getEntitiesWithinAABB(
+                    List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                             EntityLivingBase.class,
-                            new AxisAlignedBB(attacker.getPosition()).expand(6, 6, 6),
+                            attacker,
+                            6,
                             entityLivingBase -> entityLivingBase.getClass() == (attacker.getClass())
                     );
                     for (EntityLivingBase entityLivingBase : entities) {
                         for (ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
                             if (!itemStack.isEmpty()) {
                                 if (EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack) > 0) {
-                                    evt.setAmount((float) (evt.getAmount() + evt.getAmount() * 0.5));
+                                    evt.setAmount(evt.getAmount() + evt.getAmount() * 0.5f);
                                     break;
                                 }
                             }

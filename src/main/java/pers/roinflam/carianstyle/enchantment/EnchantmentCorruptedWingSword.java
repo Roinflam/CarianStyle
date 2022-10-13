@@ -5,16 +5,12 @@ import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemShield;
-import net.minecraftforge.event.entity.living.LivingAttackEvent;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 import java.util.HashMap;
 import java.util.UUID;
@@ -53,7 +49,7 @@ public class EnchantmentCorruptedWingSword extends UncommonBase {
                                 }
 
                             }.start();
-                            evt.setAmount((float) (evt.getAmount() + evt.getAmount() * (COMMB.get(attacker.getUniqueID()) / 4) * 0.03 * bonusLevel));
+                            evt.setAmount(evt.getAmount() + evt.getAmount() * (COMMB.get(attacker.getUniqueID()) / 4) * 0.03f * bonusLevel);
                         }
                     }
                 }

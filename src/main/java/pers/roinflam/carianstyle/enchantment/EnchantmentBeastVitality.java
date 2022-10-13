@@ -14,7 +14,6 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
 public class EnchantmentBeastVitality extends UncommonBase {

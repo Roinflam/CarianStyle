@@ -52,9 +52,9 @@ public class EnchantmentBlood extends VeryRaryBase {
                     if (bonusLevel > 0) {
                         if (INJURIES.getOrDefault(hurter.getUniqueID(), 0) == 2) {
                             INJURIES.remove(hurter.getUniqueID());
-                            float damage = (float) (hurter.getHealth() * 0.12);
+                            float damage = hurter.getHealth() * 0.12f;
 
-                            attacker.heal((float) Math.min(damage, attacker.getMaxHealth() * 0.18));
+                            attacker.heal(Math.min(damage, attacker.getMaxHealth() * 0.18f));
                             hurter.setHealth(hurter.getHealth() - damage);
 
                             if (EnchantmentHelper.getEnchantmentLevel(EnchantmentBloodSlash.getEnchantment(), attacker.getHeldItem(attacker.getActiveHand())) > 0 && EnchantmentHelper.getEnchantmentLevel(EnchantmentBloodCollection.getEnchantment(), attacker.getHeldItem(attacker.getActiveHand())) > 0) {

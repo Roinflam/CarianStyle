@@ -40,7 +40,7 @@ public class EnchantmentShieldBash extends UncommonBase {
                         if (bonusLevel > 0) {
                             double x = hurter.posX - attacker.posX;
                             double z = hurter.posZ - attacker.posZ;
-                            attacker.knockBack(hurter, (float) (bonusLevel * 0.25), x, z);
+                            attacker.knockBack(hurter, bonusLevel * 0.25f, x, z);
                         }
                     }
                 }

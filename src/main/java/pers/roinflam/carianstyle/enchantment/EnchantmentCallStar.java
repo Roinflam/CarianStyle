@@ -8,7 +8,6 @@ import net.minecraft.entity.effect.EntityLightningBolt;
 import net.minecraft.entity.projectile.EntityArrow;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.util.DamageSource;
-import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.World;
 import net.minecraftforge.event.entity.ProjectileImpactEvent;
@@ -19,6 +18,7 @@ import org.apache.commons.lang3.RandomUtils;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
 
@@ -42,24 +42,26 @@ public class EnchantmentCallStar extends RaryBase {
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
-                        List<EntityLivingBase> entities = entityArrow.world.getEntitiesWithinAABB(
+                        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
-                                new AxisAlignedBB(entityArrow.getPosition()).expand(bonusLevel * 2, bonusLevel * 2, bonusLevel * 2),
+                                entityArrow,
+                                bonusLevel * 2,
                                 entityLivingBase -> !entityLivingBase.equals(attacker)
                         );
                         for (EntityLivingBase entityLivingBase : entities) {
                             double x = entityLivingBase.posX - entityArrow.posX;
                             double z = entityLivingBase.posZ - entityArrow.posZ;
-                            float stronge = (float) (bonusLevel * 0.35 * Math.max(Math.abs(x), Math.abs(z)) / 7);
+                            float stronge = (float) (bonusLevel * 0.35f * Math.max(Math.abs(x), Math.abs(z)) / 7);
                             entityLivingBase.knockBack(attacker, stronge, x, z);
                         }
                         new SynchronizationTask(20) {
 
                             @Override
                             public void run() {
-                                List<EntityLivingBase> entities = entityArrow.world.getEntitiesWithinAABB(
+                                List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                         EntityLivingBase.class,
-                                        new AxisAlignedBB(entityArrow.getPosition()).expand(bonusLevel, bonusLevel, bonusLevel),
+                                        entityArrow,
+                                        bonusLevel,
                                         entityLivingBase -> !entityLivingBase.equals(attacker)
                                 );
                                 if (!entities.isEmpty()) {

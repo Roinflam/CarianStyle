@@ -37,7 +37,7 @@ public class EnchantmentBlessedDewTalisman extends UncommonBase {
                         }
                     }
                     if (bonusLevel > 0) {
-                        entityPlayer.heal((float) (entityPlayer.getMaxHealth() * bonusLevel * 0.002 / 20));
+                        entityPlayer.heal(entityPlayer.getMaxHealth() * bonusLevel * 0.002f / 20);
                     }
                 }
             }

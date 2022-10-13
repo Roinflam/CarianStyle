@@ -49,7 +49,7 @@ public class EnchantmentGiantFlame extends VeryRaryBase {
                             }
                         }
                         if (bonusLevel > 0) {
-                            attacker.attackEntityFrom(DamageSource.IN_FIRE, (float) (evt.getAmount() * 0.5));
+                            attacker.attackEntityFrom(DamageSource.IN_FIRE, evt.getAmount() * 0.5f);
                         }
                     }
                 }
@@ -69,7 +69,7 @@ public class EnchantmentGiantFlame extends VeryRaryBase {
                     }
                 }
                 if (bonusLevel > 0) {
-                    evt.setAmount(evt.getAmount() - (float) (evt.getAmount() * (hurter.getHealth() / hurter.getMaxHealth()) * 0.25));
+                    evt.setAmount(evt.getAmount() - (evt.getAmount() * (hurter.getHealth() / hurter.getMaxHealth()) * 0.25f));
                 }
             }
         }

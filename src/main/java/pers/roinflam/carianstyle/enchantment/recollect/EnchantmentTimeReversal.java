@@ -57,7 +57,7 @@ public class EnchantmentTimeReversal extends VeryRaryBase {
                             @Override
                             public void run() {
                                 if (hurter.isEntityAlive()) {
-                                    hurter.heal((float) (REVERSAL.get(hurter.getUniqueID()) * 0.25));
+                                    hurter.heal(REVERSAL.get(hurter.getUniqueID()) * 0.25f);
                                 }
                                 REVERSAL.remove(hurter.getUniqueID());
                             }

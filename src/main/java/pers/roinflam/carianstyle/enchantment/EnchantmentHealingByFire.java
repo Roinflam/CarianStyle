@@ -15,7 +15,6 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.ArrayList;
@@ -56,6 +55,7 @@ public class EnchantmentHealingByFire extends UncommonBase {
                                 if (potionEffects.size() > 0) {
                                     PotionEffect potionEffect = potionEffects.get(RandomUtil.getInt(0, potionEffects.size() - 1));
                                     hurter.removePotionEffect(potionEffect.getPotion());
+                                    hurter.setAbsorptionAmount(hurter.getAbsorptionAmount() + hurter.getMaxHealth() * 0.1f);
                                 }
                             }
                         }

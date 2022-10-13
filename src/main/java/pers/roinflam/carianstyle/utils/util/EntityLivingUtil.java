@@ -15,6 +15,7 @@ public class EntityLivingUtil {
             ObfuscationReflectionHelper.setPrivateValue(EntityLivingBase.class, entityLivingBase, 10, "jumpTicks");
         } catch (Exception exception) {
             ObfuscationReflectionHelper.setPrivateValue(EntityLivingBase.class, entityLivingBase, 10, "field_70773_bE");
+            exception.printStackTrace();
         }
     }
 

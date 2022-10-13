@@ -7,13 +7,13 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 @Mod.EventBusSubscriber
 public class EnchantmentRegressivePrinciple extends RaryBase {
@@ -40,10 +40,11 @@ public class EnchantmentRegressivePrinciple extends RaryBase {
                             }
                         }
                         if (bonusLevel > 0) {
-                            entityPlayer.world.getEntitiesWithinAABB(
-                                    EntityLivingBase.class,
-                                    new AxisAlignedBB(entityPlayer.getPosition()).expand(bonusLevel * 3, bonusLevel * 3, bonusLevel * 3),
-                                    entityLivingBase -> entityLivingBase.getActivePotionEffects().size() > 0)
+                            EntityUtil.getNearbyEntities(
+                                            EntityLivingBase.class,
+                                            entityPlayer,
+                                            bonusLevel * 3,
+                                            entityLivingBase -> entityLivingBase.getActivePotionEffects().size() > 0)
                                     .forEach((entityLivingBase) -> {
                                         entityLivingBase.clearActivePotions();
                                     });

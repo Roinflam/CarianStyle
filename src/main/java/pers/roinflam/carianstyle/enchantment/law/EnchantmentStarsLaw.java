@@ -5,7 +5,6 @@ import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.MobEffects;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.potion.PotionEffect;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
@@ -17,7 +16,6 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
 public class EnchantmentStarsLaw extends VeryRaryBase {
@@ -54,7 +52,7 @@ public class EnchantmentStarsLaw extends VeryRaryBase {
                     if (bonusLevel > 0) {
                         if (hurter.isPotionActive(CarianStylePotion.FROSTBITE)) {
                             if (evt.getSource().isMagicDamage()) {
-                                evt.setAmount((float) (evt.getAmount() + evt.getAmount() * hurter.getActivePotionEffect(CarianStylePotion.FROSTBITE).getAmplifier() * 0.05));
+                                evt.setAmount(evt.getAmount() + evt.getAmount() * (hurter.getActivePotionEffect(CarianStylePotion.FROSTBITE).getAmplifier() + 1) * 0.075f);
                             }
                             int level = Math.min(hurter.getActivePotionEffect(CarianStylePotion.FROSTBITE).getAmplifier() + 1, 9);
                             hurter.addPotionEffect(new PotionEffect(CarianStylePotion.FROSTBITE, 200, level));
@@ -90,7 +88,7 @@ public class EnchantmentStarsLaw extends VeryRaryBase {
             if (!healer.getHeldItem(healer.getActiveHand()).isEmpty()) {
                 int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), healer.getHeldItem(healer.getActiveHand()));
                 if (bonusLevel > 0) {
-                    evt.setAmount((float) (evt.getAmount() + evt.getAmount() * 0.5));
+                    evt.setAmount(evt.getAmount() + evt.getAmount() * 0.5f);
                 }
             }
         }
@@ -105,8 +103,7 @@ public class EnchantmentStarsLaw extends VeryRaryBase {
                     if (!entityPlayer.getHeldItem(entityPlayer.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityPlayer.getHeldItem(entityPlayer.getActiveHand()));
                         if (bonusLevel > 0) {
-                            entityPlayer.addPotionEffect(new PotionEffect(MobEffects.SPEED, 50));
-                            entityPlayer.addPotionEffect(new PotionEffect(MobEffects.JUMP_BOOST, 50));
+                            entityPlayer.addPotionEffect(new PotionEffect(CarianStylePotion.SPEED_BOOST, 2, 25));
                         }
                     }
                 }

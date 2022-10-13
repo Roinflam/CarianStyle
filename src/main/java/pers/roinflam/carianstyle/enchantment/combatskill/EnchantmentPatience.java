@@ -14,7 +14,6 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 import java.util.HashMap;
 import java.util.UUID;
@@ -65,7 +64,7 @@ public class EnchantmentPatience extends RaryBase {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                     if (bonusLevel > 0) {
                         float damage = PATIENCE.getOrDefault(hurter.getUniqueID(), 0f);
-                        damage = (float) Math.min(damage + evt.getAmount() * bonusLevel * 0.1, hurter.getMaxHealth() * bonusLevel * 0.4);
+                        damage = Math.min(damage + evt.getAmount() * bonusLevel * 0.1f, hurter.getMaxHealth() * bonusLevel * 0.4f);
                         PATIENCE.put(hurter.getUniqueID(), damage);
                     }
                 }

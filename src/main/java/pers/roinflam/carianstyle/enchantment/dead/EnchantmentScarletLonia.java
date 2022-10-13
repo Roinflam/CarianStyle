@@ -9,7 +9,6 @@ import net.minecraft.init.MobEffects;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.potion.PotionEffect;
-import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
@@ -62,9 +61,10 @@ public class EnchantmentScarletLonia extends RaryBase {
                         hurter.setHealth(1);
                         hurter.addPotionEffect(new PotionEffect(MobEffects.SLOWNESS, 30, 6));
 
-                        List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
-                                new AxisAlignedBB(hurter.getPosition()).expand(bonusLevel * 4, bonusLevel * 4, bonusLevel * 4),
+                                hurter,
+                                bonusLevel * 4,
                                 entityLivingBase -> !entityLivingBase.equals(hurter)
                         );
                         for (EntityLivingBase entityLivingBase : entities) {
@@ -78,19 +78,20 @@ public class EnchantmentScarletLonia extends RaryBase {
 
                             @Override
                             public void run() {
-                                List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                                List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                         EntityLivingBase.class,
-                                        new AxisAlignedBB(hurter.getPosition()).expand(finalBonusLevel * 2, finalBonusLevel * 2, finalBonusLevel * 2),
+                                        hurter,
+                                        finalBonusLevel * 2,
                                         entityLivingBase -> !entityLivingBase.equals(hurter)
                                 );
                                 if (!entities.isEmpty()) {
                                     for (Entity entity : entities) {
                                         EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
-                                        entityLivingBase.setHealth((float) (entityLivingBase.getHealth() - entityLivingBase.getHealth() * finalBonusLevel * 0.05));
+                                        entityLivingBase.setHealth(entityLivingBase.getHealth() - entityLivingBase.getHealth() * finalBonusLevel * 0.05f);
                                         entityLivingBase.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_ROT, finalBonusLevel * 10 * 20, finalBonusLevel - 1));
                                         double x = hurter.posX - entityLivingBase.posX;
                                         double z = hurter.posZ - entityLivingBase.posZ;
-                                        entityLivingBase.knockBack(hurter, (float) (finalBonusLevel * 0.75), x, z);
+                                        entityLivingBase.knockBack(hurter, finalBonusLevel * 0.75f, x, z);
                                     }
                                 }
                                 SCARLET_LONIA.remove(hurter.getUniqueID());

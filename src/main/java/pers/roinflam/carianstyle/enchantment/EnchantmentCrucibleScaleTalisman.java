@@ -36,7 +36,7 @@ public class EnchantmentCrucibleScaleTalisman extends RaryBase {
                     }
                 }
                 if (bonusLevel > 0) {
-                    evt.setAmount((float) (evt.getAmount() - evt.getAmount() * Math.min(bonusLevel, 6) * 0.15));
+                    evt.setAmount(evt.getAmount() - evt.getAmount() * Math.min(bonusLevel, 6) * 0.15f);
                 }
             }
         }

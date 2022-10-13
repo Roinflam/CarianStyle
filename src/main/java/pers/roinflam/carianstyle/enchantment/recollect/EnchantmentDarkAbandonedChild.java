@@ -16,7 +16,6 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -71,7 +70,7 @@ public class EnchantmentDarkAbandonedChild extends VeryRaryBase {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                     if (bonusLevel > 0) {
                         if (!hurter.world.isDaytime()) {
-                            evt.setAmount((float) (evt.getAmount() * 0.9));
+                            evt.setAmount(evt.getAmount() * 0.9f);
                         }
                     }
                 }
@@ -88,7 +87,7 @@ public class EnchantmentDarkAbandonedChild extends VeryRaryBase {
                     if (!entityPlayer.getHeldItem(entityPlayer.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityPlayer.getHeldItem(entityPlayer.getActiveHand()));
                         if (bonusLevel > 0) {
-                            entityPlayer.heal((float) (entityPlayer.getMaxHealth() * 0.015 / 20));
+                            entityPlayer.heal(entityPlayer.getMaxHealth() * 0.015f / 20);
                         }
                     }
                 }

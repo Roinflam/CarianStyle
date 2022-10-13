@@ -61,7 +61,7 @@ public class EnchantmentCarianPhalanx extends RaryBase {
                                             entityGlintblades.posZ = posZ;
 
                                             entityGlintblades.setDamageSource(DamageSource.causeThrownDamage(entityGlintblades, attacker).setMagicDamage());
-                                            entityGlintblades.setDamage((float) (evt.getAmount() * bonusLevel * 0.05));
+                                            entityGlintblades.setDamage(evt.getAmount() * bonusLevel * 0.05f);
                                             entityGlintblades.shoot(1);
                                             hurter.world.spawnEntity(entityGlintblades);
                                         }

@@ -37,10 +37,10 @@ public class EnchantmentBloodSlash extends RaryBase {
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
-                        evt.setAmount((float) (evt.getAmount() + hurter.getHealth() * bonusLevel * 0.05));
+                        evt.setAmount(evt.getAmount() + hurter.getHealth() * bonusLevel * 0.05f);
                         if (!(attacker instanceof EntityPlayer) || !((EntityPlayer) attacker).isCreative()) {
                             if (attacker.getHealth() > attacker.getMaxHealth() * 0.1) {
-                                attacker.setHealth((float) (attacker.getHealth() - attacker.getMaxHealth() * 0.1));
+                                attacker.setHealth(attacker.getHealth() - attacker.getMaxHealth() * 0.1f);
                             } else {
                                 EntityLivingUtil.kill(attacker, NewDamageSource.HEMORRHAGE);
                             }
@@ -61,9 +61,9 @@ public class EnchantmentBloodSlash extends RaryBase {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), killer.getHeldItem(killer.getActiveHand()));
                         if (bonusLevel > 0) {
                             if (EnchantmentHelper.getEnchantmentLevel(EnchantmentBloodSlash.getEnchantment(), killer.getHeldItem(killer.getActiveHand())) > 0) {
-                                killer.heal((float) (killer.getMaxHealth() * 0.05 * bonusLevel));
+                                killer.heal(killer.getMaxHealth() * bonusLevel * 0.05f);
                             } else {
-                                killer.heal((float) (killer.getMaxHealth() * 0.025 * bonusLevel));
+                                killer.heal(killer.getMaxHealth() * bonusLevel * 0.025f);
                             }
                         }
                     }

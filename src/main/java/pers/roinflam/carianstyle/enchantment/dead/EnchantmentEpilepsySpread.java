@@ -10,7 +10,6 @@ import net.minecraft.init.SoundEvents;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.potion.PotionEffect;
-import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
@@ -23,6 +22,7 @@ import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.HashSet;
 import java.util.List;
@@ -60,12 +60,13 @@ public class EnchantmentEpilepsySpread extends RaryBase {
                             EPILEPSY_SPREAD_COOLDING.add(hurter.getUniqueID());
 
                             evt.setCanceled(true);
-                            hurter.setHealth((float) (hurter.getMaxHealth() * 0.3));
+                            hurter.setHealth(hurter.getMaxHealth() * 0.3f);
                             hurter.addPotionEffect(new PotionEffect(MobEffects.SLOWNESS, 100, 6));
 
-                            List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                            List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                     EntityLivingBase.class,
-                                    new AxisAlignedBB(hurter.getPosition()).expand(bonusLevel * 4, bonusLevel * 4, bonusLevel * 4)
+                                    hurter,
+                                    bonusLevel * 4
                             );
                             for (EntityLivingBase entityLivingBase : entities) {
                                 entityLivingBase.playSound(SoundEvents.ENTITY_GHAST_HURT, 1, 1);
@@ -96,7 +97,7 @@ public class EnchantmentEpilepsySpread extends RaryBase {
                                                         return;
                                                     }
                                                     if (entityLivingBase.equals(hurter)) {
-                                                        float damage = (float) (hurter.getMaxHealth() * 0.3 / 60);
+                                                        float damage = hurter.getMaxHealth() * 0.3f / 60;
                                                         if (hurter.getHealth() - damage * 2 > 0) {
                                                             hurter.setHealth(hurter.getHealth() - damage);
                                                         } else {
@@ -105,7 +106,7 @@ public class EnchantmentEpilepsySpread extends RaryBase {
                                                             this.cancel();
                                                         }
                                                     } else {
-                                                        float damage = (float) (hurter.getMaxHealth() * finalBonusLevel * 0.3 * 2 / 60);
+                                                        float damage = hurter.getMaxHealth() * finalBonusLevel * 0.3f * 2 / 60;
                                                         if (entityLivingBase.getHealth() - damage * 2 > 0) {
                                                             entityLivingBase.setHealth(entityLivingBase.getHealth() - damage);
                                                         } else {

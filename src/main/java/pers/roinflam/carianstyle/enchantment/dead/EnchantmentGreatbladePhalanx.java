@@ -48,7 +48,7 @@ public class EnchantmentGreatbladePhalanx extends RaryBase {
                 if (bonusLevel > 0) {
                     if (!DEAD.contains(hurter.getUniqueID())) {
                         for (int i = 0; i < 3; i++) {
-                            EntityGlintblades entityGlintblades_show = new EntityGlintblades(hurter, attacker).setDeadTick(75 + i * 25).setSize((float) 7.5);
+                            EntityGlintblades entityGlintblades_show = new EntityGlintblades(hurter, attacker).setDeadTick(75 + i * 25).setSize(7.5f);
                             entityGlintblades_show.posY += 5;
                             if (i == 0) {
                                 entityGlintblades_show.posX -= 10;
@@ -70,13 +70,13 @@ public class EnchantmentGreatbladePhalanx extends RaryBase {
                                     double y = entityGlintblades_show.posY;
                                     double z = entityGlintblades_show.posZ;
                                     EntityGlintblades entityGlintblades = new EntityGlintblades(hurter, attacker);
-                                    entityGlintblades.setSize((float) 7.5);
+                                    entityGlintblades.setSize(7.5f);
                                     entityGlintblades.posX = x;
                                     entityGlintblades.posY = y;
                                     entityGlintblades.posZ = z;
 
                                     entityGlintblades.setDamageSource(DamageSource.causeThrownDamage(entityGlintblades, hurter).setMagicDamage());
-                                    entityGlintblades.setDamage((float) ((attacker.getMaxHealth() - attacker.getHealth()) * finalBonusLevel * 0.1));
+                                    entityGlintblades.setDamage((attacker.getMaxHealth() - attacker.getHealth()) * finalBonusLevel * 0.1f);
                                     entityGlintblades.shoot(1);
 
                                     hurter.world.spawnEntity(entityGlintblades);

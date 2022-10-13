@@ -7,7 +7,6 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.DamageSource;
-import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
@@ -15,6 +14,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.HashMap;
 import java.util.List;
@@ -56,13 +56,14 @@ public class EnchantmentCausalityPrinciple extends RaryBase {
                     if (bonusLevel > 0) {
                         if (CAUSALITY_PRINCIPLE.getOrDefault(hurter.getUniqueID(), 0) >= 5) {
                             CAUSALITY_PRINCIPLE.remove(hurter.getUniqueID());
-                            List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                            List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                     EntityLivingBase.class,
-                                    new AxisAlignedBB(hurter.getPosition()).expand(bonusLevel * 3, bonusLevel * 3, bonusLevel * 3),
+                                    hurter,
+                                    bonusLevel * 3,
                                     entityLivingBase -> !entityLivingBase.equals(hurter)
                             );
                             for (EntityLivingBase entityLivingBase : entities) {
-                                entityLivingBase.attackEntityFrom(DamageSource.causeMobDamage(hurter), (float) (evt.getAmount() * bonusLevel * 0.75));
+                                entityLivingBase.attackEntityFrom(DamageSource.causeMobDamage(hurter), evt.getAmount() * bonusLevel * 0.75f);
                             }
                         } else {
                             CAUSALITY_PRINCIPLE.put(hurter.getUniqueID(), CAUSALITY_PRINCIPLE.getOrDefault(hurter.getUniqueID(), 0) + 1);

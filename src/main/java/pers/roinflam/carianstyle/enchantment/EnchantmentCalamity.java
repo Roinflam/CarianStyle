@@ -8,7 +8,6 @@ import net.minecraft.entity.monster.EntityMob;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
@@ -17,6 +16,7 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
 
@@ -64,9 +64,10 @@ public class EnchantmentCalamity extends VeryRaryBase {
                             }
                         }
                         if (bonusLevel > 0) {
-                            List<EntityMob> entities = entityPlayer.world.getEntitiesWithinAABB(
+                            List<EntityMob> entities = EntityUtil.getNearbyEntities(
                                     EntityMob.class,
-                                    new AxisAlignedBB(entityPlayer.getPosition()).expand(32, 32, 32)
+                                    entityPlayer,
+                                    32
                             );
                             for (EntityMob entityMob : entities) {
                                 EntityLivingBase attackTarget = entityMob.getAttackTarget();

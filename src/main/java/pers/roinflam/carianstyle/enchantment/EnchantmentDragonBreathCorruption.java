@@ -7,7 +7,6 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.projectile.EntityArrow;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.potion.PotionEffect;
-import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.event.entity.ProjectileImpactEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
@@ -15,6 +14,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
 
@@ -38,9 +38,10 @@ public class EnchantmentDragonBreathCorruption extends RaryBase {
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
-                        List<EntityLivingBase> entities = entityArrow.world.getEntitiesWithinAABB(
+                        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
-                                new AxisAlignedBB(entityArrow.getPosition()).expand(bonusLevel * 2, bonusLevel * 2, bonusLevel * 2)
+                                entityArrow,
+                                bonusLevel * 2
                         );
                         for (EntityLivingBase entityLivingBase : entities) {
                             entityLivingBase.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_ROT, bonusLevel * 5 * 20, bonusLevel - 1));

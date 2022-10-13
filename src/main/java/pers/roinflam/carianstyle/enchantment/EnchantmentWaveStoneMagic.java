@@ -36,7 +36,7 @@ public class EnchantmentWaveStoneMagic extends VeryRaryBase {
                         if (bonusLevel > 0) {
                             evt.setCanceled(true);
                             hurter.hurtResistantTime = hurter.maxHurtResistantTime / 2;
-                            hurter.attackEntityFrom(NewDamageSource.WAVE_STONE_MAGIC, (float) (evt.getAmount() + evt.getAmount() * 0.5));
+                            hurter.attackEntityFrom(NewDamageSource.WAVE_STONE_MAGIC, evt.getAmount() + evt.getAmount() * 0.5f);
                         }
                     }
                 }

@@ -12,7 +12,6 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 @Mod.EventBusSubscriber
@@ -38,7 +37,7 @@ public class EnchantmentFireGivesPower extends UncommonBase {
                             if (EntityUtil.getFire(attacker) < 200) {
                                 attacker.setFire(10);
                             }
-                            evt.setAmount((float) (evt.getAmount() + evt.getAmount() * 0.075 * bonusLevel));
+                            evt.setAmount(evt.getAmount() + evt.getAmount() * bonusLevel * 0.075f);
                         } else {
                             if (!(attacker instanceof EntityPlayer) || !((EntityPlayer) attacker).isCreative()) {
                                 attacker.setFire(10);
@@ -59,7 +58,7 @@ public class EnchantmentFireGivesPower extends UncommonBase {
                     if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                         if (bonusLevel > 0) {
-                            evt.setAmount((float) (evt.getAmount() - evt.getAmount() * 0.0375 * bonusLevel));
+                            evt.setAmount(evt.getAmount() - evt.getAmount() * bonusLevel * 0.0375f);
                         }
                     }
                 }

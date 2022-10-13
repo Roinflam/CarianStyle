@@ -41,7 +41,7 @@ public class EnchantmentBlackFlameShelter extends RaryBase {
                     }
                 }
                 if (bonusLevel > 0) {
-                    evt.setAmount((float) (evt.getAmount() - evt.getAmount() * bonusLevel * 0.125));
+                    evt.setAmount(evt.getAmount() - evt.getAmount() * bonusLevel * 0.125f);
                 }
             }
         }
@@ -58,7 +58,7 @@ public class EnchantmentBlackFlameShelter extends RaryBase {
                 }
             }
             if (bonusLevel > 0) {
-                evt.setAmount((float) (evt.getAmount() - evt.getAmount() * bonusLevel * 0.25));
+                evt.setAmount(evt.getAmount() - evt.getAmount() * bonusLevel * 0.25f);
             }
         }
     }

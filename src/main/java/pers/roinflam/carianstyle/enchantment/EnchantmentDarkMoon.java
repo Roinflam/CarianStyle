@@ -19,7 +19,6 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentFullMoon;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
 public class EnchantmentDarkMoon extends VeryRaryBase {
@@ -51,9 +50,9 @@ public class EnchantmentDarkMoon extends VeryRaryBase {
                                 }
                             }
                             if (hasFullMoon) {
-                                evt.setAmount((float) (evt.getAmount() - evt.getAmount() * 0.375));
+                                evt.setAmount(evt.getAmount() - evt.getAmount() * 0.375f);
                             } else {
-                                evt.setAmount((float) (evt.getAmount() - evt.getAmount() * 0.25));
+                                evt.setAmount(evt.getAmount() - evt.getAmount() * 0.25f);
                             }
                         }
                     }
@@ -72,16 +71,16 @@ public class EnchantmentDarkMoon extends VeryRaryBase {
                                     }
                                 }
                                 if (hasFullMoon) {
-                                    evt.setAmount((float) (evt.getAmount() + evt.getAmount() * 0.375));
+                                    evt.setAmount(evt.getAmount() + evt.getAmount() * 0.375f);
                                     if (hurter.getAttackTarget() != null && hurter.getAttackTarget().equals(attacker)) {
-                                        evt.setAmount(evt.getAmount() + (float) (hurter.getHealth() * 0.075));
-                                        attacker.heal((float) Math.min(evt.getAmount() * 0.075, attacker.getMaxHealth() * 0.075));
+                                        evt.setAmount(evt.getAmount() + (hurter.getHealth() * 0.075f));
+                                        attacker.heal(Math.min(evt.getAmount() * 0.075f, attacker.getMaxHealth() * 0.075f));
                                     }
                                 } else {
-                                    evt.setAmount((float) (evt.getAmount() + evt.getAmount() * 0.25));
+                                    evt.setAmount(evt.getAmount() + evt.getAmount() * 0.25f);
                                     if (hurter.getAttackTarget() != null && hurter.getAttackTarget().equals(attacker)) {
-                                        evt.setAmount(evt.getAmount() + (float) (hurter.getHealth() * 0.05));
-                                        attacker.heal((float) Math.min(evt.getAmount() * 0.05, attacker.getMaxHealth() * 0.05));
+                                        evt.setAmount(evt.getAmount() + (hurter.getHealth() * 0.05f));
+                                        attacker.heal(Math.min(evt.getAmount() * 0.05f, attacker.getMaxHealth() * 0.05f));
                                     }
                                 }
                             }
@@ -109,9 +108,9 @@ public class EnchantmentDarkMoon extends VeryRaryBase {
                         }
                     }
                     if (hasFullMoon) {
-                        evt.setAmount((float) (evt.getAmount() + evt.getAmount() * 0.375));
+                        evt.setAmount(evt.getAmount() + evt.getAmount() * 0.375f);
                     } else {
-                        evt.setAmount((float) (evt.getAmount() + evt.getAmount() * 0.25));
+                        evt.setAmount(evt.getAmount() + evt.getAmount() * 0.25f);
                     }
                 }
             }

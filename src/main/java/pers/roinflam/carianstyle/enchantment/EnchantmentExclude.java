@@ -7,7 +7,6 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.MathHelper;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -15,6 +14,7 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
 
@@ -41,9 +41,10 @@ public class EnchantmentExclude extends RaryBase {
                     }
                 }
                 if (bonusLevel > 0) {
-                    List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                    List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                             EntityLivingBase.class,
-                            new AxisAlignedBB(hurter.getPosition()).expand(5 + (bonusLevel - 1) * 0.75, 5 + (bonusLevel - 1) * 0.75, 5 + (bonusLevel - 1) * 0.75),
+                            hurter,
+                            (int) (5 + (bonusLevel - 1) * 0.75),
                             entityLivingBase -> !entityLivingBase.equals(hurter)
                     );
                     for (Entity entity : entities) {

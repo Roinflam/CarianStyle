@@ -37,12 +37,12 @@ public class EnchantmentBadOmen extends VeryRaryBase {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                         if (bonusLevel > 0) {
                             if (hurter.isPotionActive(CarianStylePotion.BAD_OMEN)) {
-                                double damage = evt.getAmount();
+                                float damage = evt.getAmount();
                                 if (damage * 0.5 >= hurter.getHealth()) {
                                     EntityLivingUtil.kill(hurter, evt.getSource().setDamageAllowedInCreativeMode());
                                 } else {
-                                    hurter.setHealth((float) (hurter.getHealth() - damage * 0.5));
-                                    evt.setAmount((float) (damage * 0.5));
+                                    hurter.setHealth(hurter.getHealth() - damage * 0.5f);
+                                    evt.setAmount(damage * 0.5f);
                                 }
                             }
                             hurter.addPotionEffect(new PotionEffect(CarianStylePotion.BAD_OMEN, 200, 0));

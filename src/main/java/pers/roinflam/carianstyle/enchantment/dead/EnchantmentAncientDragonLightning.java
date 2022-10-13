@@ -8,7 +8,6 @@ import net.minecraft.entity.effect.EntityLightningBolt;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.DamageSource;
-import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.World;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
@@ -20,6 +19,7 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.HashSet;
 import java.util.List;
@@ -52,9 +52,11 @@ public class EnchantmentAncientDragonLightning extends RaryBase {
                 if (!THUNDER.contains(hurter.getUniqueID())) {
                     if (!hurter.isDead) {
                         THUNDER.add(hurter.getUniqueID());
-                        List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
-                                new AxisAlignedBB(hurter.getPosition()).expand(60, 15, 60),
+                                hurter,
+                                60,
+                                15,
                                 entityLivingBase -> !entityLivingBase.equals(hurter));
                         List<Integer> list = RandomUtil.randomList(bonusLevel * 100, entities.size());
                         for (int i = 0; i < list.size(); i++) {
@@ -90,7 +92,7 @@ public class EnchantmentAncientDragonLightning extends RaryBase {
                                     } else if (entityLivingBase.world.isThundering()) {
                                         magnification *= 4;
                                     }
-                                    entityLivingBase.attackEntityFrom(DamageSource.LIGHTNING_BOLT, (float) (entityLivingBase.getHealth() * 0.05 + entityLivingBase.getMaxHealth() * 0.005 * magnification));
+                                    entityLivingBase.attackEntityFrom(DamageSource.LIGHTNING_BOLT, entityLivingBase.getHealth() * 0.05f + entityLivingBase.getMaxHealth() * 0.005f * magnification);
                                     if (entityLivingBase.onGround) {
                                         double x = RandomUtils.nextBoolean() ? hurter.posX - entityLivingBase.posX : entityLivingBase.posX - hurter.posX;
                                         double z = RandomUtils.nextBoolean() ? hurter.posZ - entityLivingBase.posZ : entityLivingBase.posZ - hurter.posZ;

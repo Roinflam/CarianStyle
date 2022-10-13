@@ -1,22 +1,13 @@
 package pers.roinflam.carianstyle.potion;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Gui;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraft.potion.Potion;
-import net.minecraft.potion.PotionEffect;
 import net.minecraft.util.ResourceLocation;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
-import pers.roinflam.carianstyle.utils.util.PotionUtil;
 
-@Mod.EventBusSubscriber
+
 public class MobEffectFrostbite extends IconBase {
 
     public MobEffectFrostbite(boolean isBadEffectIn, int liquidColorIn) {
@@ -27,7 +18,7 @@ public class MobEffectFrostbite extends IconBase {
 
     @Override
     public void performEffect(EntityLivingBase entityLivingBaseIn, int amplifier) {
-        float damage = (float) (entityLivingBaseIn.getMaxHealth() * 0.0025);
+        float damage = entityLivingBaseIn.getMaxHealth() * 0.0025f;
         damage += damage * amplifier;
         entityLivingBaseIn.attackEntityFrom(NewDamageSource.FROSTBITE, damage);
     }

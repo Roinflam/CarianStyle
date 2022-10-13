@@ -2,14 +2,11 @@ package pers.roinflam.carianstyle.potion;
 
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraft.potion.Potion;
 import net.minecraft.util.ResourceLocation;
-import net.minecraftforge.fml.common.Mod;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.Reference;
 
-@Mod.EventBusSubscriber
+
 public class MobEffectBlessingOfTheErdtree extends IconBase {
 
     public MobEffectBlessingOfTheErdtree(boolean isBadEffectIn, int liquidColorIn) {
@@ -25,7 +22,7 @@ public class MobEffectBlessingOfTheErdtree extends IconBase {
 
     @Override
     public void performEffect(EntityLivingBase entityLivingBaseIn, int amplifier) {
-        entityLivingBaseIn.heal((float) (entityLivingBaseIn.getMaxHealth() * (amplifier + 1) * 0.04));
+        entityLivingBaseIn.heal(entityLivingBaseIn.getMaxHealth() * (amplifier + 1) * 0.04f);
     }
 
     @Override

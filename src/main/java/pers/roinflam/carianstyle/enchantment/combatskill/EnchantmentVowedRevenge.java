@@ -6,12 +6,12 @@ import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
 
@@ -35,13 +35,14 @@ public class EnchantmentVowedRevenge extends RaryBase {
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
-                        List<Entity> entities = attacker.world.getEntitiesWithinAABB(
+                        List<Entity> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
-                                new AxisAlignedBB(attacker.getPosition()).expand(bonusLevel * 2, bonusLevel * 2, bonusLevel * 2),
+                                attacker,
+                                bonusLevel * 2,
                                 entityLivingBase -> !entityLivingBase.equals(attacker));
-                        evt.setAmount((float) (evt.getAmount() + evt.getAmount() * bonusLevel * entities.size() * 0.025));
+                        evt.setAmount(evt.getAmount() + evt.getAmount() * bonusLevel * entities.size() * 0.025f);
                         if (attacker.getRevengeTarget() != null && attacker.getRevengeTarget().equals(hurter)) {
-                            evt.setAmount((float) (evt.getAmount() + evt.getAmount() * bonusLevel * 0.05));
+                            evt.setAmount(evt.getAmount() + evt.getAmount() * bonusLevel * 0.05f);
                         }
                     }
                 }

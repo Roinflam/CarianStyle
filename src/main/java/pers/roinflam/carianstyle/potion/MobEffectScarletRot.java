@@ -1,20 +1,17 @@
 package pers.roinflam.carianstyle.potion;
 
 import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.potion.Potion;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
-@Mod.EventBusSubscriber
+
 public class MobEffectScarletRot extends IconBase {
 
     public MobEffectScarletRot(boolean isBadEffectIn, int liquidColorIn) {
@@ -26,7 +23,7 @@ public class MobEffectScarletRot extends IconBase {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase healer = evt.getEntityLiving();
             if (healer.isPotionActive(this)) {
-                evt.setAmount((float) (evt.getAmount() * 0.75));
+                evt.setAmount(evt.getAmount() * 0.75f);
             }
         }
     }
@@ -34,7 +31,7 @@ public class MobEffectScarletRot extends IconBase {
     @Override
     public void performEffect(EntityLivingBase entityLivingBaseIn, int amplifier) {
         if (EntityUtil.getFire(entityLivingBaseIn) <= 0 || RandomUtil.percentageChance(25)) {
-            float damage = (float) (entityLivingBaseIn.getHealth() * 0.02 + entityLivingBaseIn.getMaxHealth() * 0.0005);
+            float damage = entityLivingBaseIn.getHealth() * 0.02f + entityLivingBaseIn.getMaxHealth() * 0.0005f;
             damage += damage * amplifier * 0.25;
             entityLivingBaseIn.attackEntityFrom(NewDamageSource.SCARLET_ROT, damage);
         }

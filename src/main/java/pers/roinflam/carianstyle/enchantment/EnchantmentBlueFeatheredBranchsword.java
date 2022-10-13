@@ -10,7 +10,6 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 @Mod.EventBusSubscriber
 public class EnchantmentBlueFeatheredBranchsword extends UncommonBase {
@@ -32,7 +31,7 @@ public class EnchantmentBlueFeatheredBranchsword extends UncommonBase {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                     if (bonusLevel > 0) {
                         if (hurter.getHealth() <= hurter.getMaxHealth() * 0.2) {
-                            evt.setAmount(evt.getAmount() - (float) (evt.getAmount() * bonusLevel * 0.1));
+                            evt.setAmount(evt.getAmount() - (evt.getAmount() * bonusLevel * 0.1f));
                         }
                     }
                 }

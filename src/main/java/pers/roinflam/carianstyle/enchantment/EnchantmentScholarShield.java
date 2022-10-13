@@ -40,7 +40,7 @@ public class EnchantmentScholarShield extends VeryRaryBase {
                     if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                         if (bonusLevel > 0) {
-                            attacker.attackEntityFrom(DamageSource.causeMobDamage(hurter).setMagicDamage(), (float) (evt.getAmount() * bonusLevel * 0.1));
+                            attacker.attackEntityFrom(DamageSource.causeMobDamage(hurter).setMagicDamage(), evt.getAmount() * bonusLevel * 0.1f);
                         }
                     }
                 }
@@ -58,7 +58,7 @@ public class EnchantmentScholarShield extends VeryRaryBase {
                     if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                         if (bonusLevel > 0) {
-                            evt.setAmount((float) (evt.getAmount() - evt.getAmount() * bonusLevel * 0.075));
+                            evt.setAmount(evt.getAmount() - evt.getAmount() * bonusLevel * 0.075f);
                         }
                     }
                 }

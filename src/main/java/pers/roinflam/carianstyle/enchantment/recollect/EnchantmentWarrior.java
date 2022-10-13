@@ -12,7 +12,6 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
@@ -35,7 +34,7 @@ public class EnchantmentWarrior extends VeryRaryBase {
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
-                        evt.setAmount((float) (evt.getAmount() + evt.getAmount() * 0.25));
+                        evt.setAmount(evt.getAmount() + evt.getAmount() * 0.25f);
                     }
                 }
             }
@@ -49,7 +48,7 @@ public class EnchantmentWarrior extends VeryRaryBase {
             if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
                 int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                 if (bonusLevel > 0) {
-                    evt.setAmount((float) (evt.getAmount() * 0.5));
+                    evt.setAmount(evt.getAmount() * 0.5f);
                     float damage = evt.getAmount() / 60;
                     new SynchronizationTask(5, 1) {
                         private int tick = 0;
@@ -82,7 +81,7 @@ public class EnchantmentWarrior extends VeryRaryBase {
                 if (!killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), killer.getHeldItem(killer.getActiveHand()));
                     if (bonusLevel > 0) {
-                        killer.heal((float) ((killer.getMaxHealth() - killer.getHealth()) * 0.25));
+                        killer.heal((killer.getMaxHealth() - killer.getHealth()) * 0.25f);
                     }
                 }
             }

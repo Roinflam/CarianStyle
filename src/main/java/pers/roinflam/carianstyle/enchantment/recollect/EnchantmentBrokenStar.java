@@ -34,7 +34,7 @@ public class EnchantmentBrokenStar extends VeryRaryBase {
                             if (!attacker.world.isDaytime()) {
                                 evt.setAmount(evt.getAmount() * 2);
                             } else {
-                                evt.setAmount((float) (evt.getAmount() * 1.5));
+                                evt.setAmount(evt.getAmount() * 1.5f);
                             }
                         }
                     }
@@ -47,9 +47,9 @@ public class EnchantmentBrokenStar extends VeryRaryBase {
                     if (bonusLevel > 0) {
                         if (hurter.getHealth() <= hurter.getMaxHealth() / 2) {
                             if (!hurter.world.isDaytime()) {
-                                evt.setAmount((float) (evt.getAmount() * 0.75));
+                                evt.setAmount(evt.getAmount() * 0.75f);
                             } else {
-                                evt.setAmount((float) (evt.getAmount() * 0.5));
+                                evt.setAmount(evt.getAmount() * 0.5f);
                             }
                         }
                     }

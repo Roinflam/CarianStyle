@@ -35,7 +35,7 @@ public class EnchantmentBlasphemy extends VeryRaryBase {
                     if (!killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), killer.getHeldItem(killer.getActiveHand()));
                         if (bonusLevel > 0) {
-                            killer.heal((float) (deader.getMaxHealth() * 0.1));
+                            killer.heal(deader.getMaxHealth() * 0.1f);
                             if (killer instanceof EntityPlayer) {
                                 EntityPlayer entityPlayer = (EntityPlayer) killer;
                                 FoodStats foodStats = entityPlayer.getFoodStats();

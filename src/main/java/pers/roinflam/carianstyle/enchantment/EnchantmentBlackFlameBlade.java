@@ -13,7 +13,6 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
-import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
@@ -37,7 +36,7 @@ public class EnchantmentBlackFlameBlade extends RaryBase {
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
-                        float damage = (float) (evt.getAmount() * bonusLevel * 0.15 / 100);
+                        float damage = evt.getAmount() * bonusLevel * 0.15f / 100;
                         hurter.addPotionEffect(new PotionEffect(CarianStylePotion.DESTRUCTION_FIRE_BURNING, 5 * 20 + 5, 0));
                         new SynchronizationTask(5, 1) {
                             private int tick = 0;

@@ -34,7 +34,7 @@ public class EnchantmentLionClaw extends RaryBase {
                     if (bonusLevel > 0) {
                         if (RandomUtil.percentageChance(20)) {
                             evt.getSource().setDamageBypassesArmor();
-                            evt.setAmount((float) (evt.getAmount() + evt.getAmount() * 0.15 * bonusLevel));
+                            evt.setAmount(evt.getAmount() + evt.getAmount() * bonusLevel * 0.15f);
                         }
                     }
                 }

@@ -14,7 +14,7 @@ apply plugin: 'net.minecraftforge.gradle'
 apply plugin: 'eclipse'
 apply plugin: 'maven-publish'
 
-version = '1.0.8'
+version = '1.0.9'
 group = 'pers.roinflam.carianstyle' // http://maven.apache.org/guides/mini/guide-naming-conventions.html
 archivesBaseName = 'CarianStyle-1.12.2'
 
@@ -87,15 +87,13 @@ dependencies {
 // Example for how to get properties into the manifest for reading by the runtime..
 jar {
     manifest {
-        attributes([
-                "Specification-Title"     : "examplemod",
-                "Specification-Vendor"    : "examplemodsareus",
-                "Specification-Version"   : "1", // We are version 1 of ourselves
-                "Implementation-Title"    : project.name,
-                "Implementation-Version"  : "${version}",
-                "Implementation-Vendor"   : "examplemodsareus",
-                "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
-        ])
+        attributes(["Specification-Title"     : "examplemod",
+                    "Specification-Vendor"    : "examplemodsareus",
+                    "Specification-Version"   : "1", // We are version 1 of ourselves
+                    "Implementation-Title"    : project.name,
+                    "Implementation-Version"  : "${version}",
+                    "Implementation-Vendor"   : "examplemodsareus",
+                    "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")])
     }
 }
 
@@ -117,3 +115,23 @@ publishing {
         }
     }
 }
+
+sourceSets {
+    main {
+        output.resourcesDir = output.classesDir
+    }
+}
+//
+//processResources {
+//    inputs.property "version", project.version
+//    inputs.property "mcversion", project.minecraft.version
+//
+//    from(sourceSets.main.resources.srcDir) {
+//        include 'mcmod.info'
+//        expand 'version': project.version, 'mcversion': project.minecraft.version
+//    }
+//
+//    from(sourceSets.main.resources.srcDir) {
+//        exclude 'mcmod.info'
+//    }
+//}

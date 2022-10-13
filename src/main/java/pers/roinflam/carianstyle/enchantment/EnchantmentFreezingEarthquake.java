@@ -7,7 +7,6 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.potion.PotionEffect;
-import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.common.ForgeHooks;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingKnockBackEvent;
@@ -17,6 +16,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
 
@@ -44,9 +44,10 @@ public class EnchantmentFreezingEarthquake extends RaryBase {
                         }
                     }
                     if (bonusLevel > 0) {
-                        List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
-                                new AxisAlignedBB(hurter.getPosition()).expand(3 + (bonusLevel - 1) * 2, 3 + (bonusLevel - 1) * 2, 3 + (bonusLevel - 1) * 2),
+                                hurter,
+                                3 + (bonusLevel - 1) * 2,
                                 entityLivingBase -> entityLivingBase.onGround && !entityLivingBase.equals(hurter)
                         );
                         for (EntityLivingBase entityLivingBase : entities) {

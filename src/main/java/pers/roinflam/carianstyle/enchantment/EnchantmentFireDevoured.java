@@ -6,7 +6,6 @@ import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.util.DamageSource;
-import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
@@ -39,13 +38,14 @@ public class EnchantmentFireDevoured extends RaryBase {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         if (EntityUtil.getFire(attacker) > 0) {
-                            List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                            List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                     EntityLivingBase.class,
-                                    new AxisAlignedBB(hurter.getPosition()).expand(bonusLevel, bonusLevel, bonusLevel),
+                                    hurter,
+                                    bonusLevel,
                                     entityLivingBase -> !entityLivingBase.equals(hurter) || entityLivingBase.equals(attacker)
                             );
                             for (EntityLivingBase entityLivingBase : entities) {
-                                entityLivingBase.attackEntityFrom(DamageSource.IN_FIRE, (float) (evt.getAmount() * bonusLevel * 0.15));
+                                entityLivingBase.attackEntityFrom(DamageSource.IN_FIRE, evt.getAmount() * bonusLevel * 0.15f);
                                 if (EntityUtil.getFire(entityLivingBase) < 200) {
                                     entityLivingBase.setFire(10);
                                 }

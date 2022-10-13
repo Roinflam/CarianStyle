@@ -69,7 +69,7 @@ public class EnchantmentCarianRetaliation extends RaryBase {
                                         entityGlintblades.posZ = z;
 
                                         entityGlintblades.setDamageSource(DamageSource.causeThrownDamage(entityGlintblades, hurter).setMagicDamage());
-                                        entityGlintblades.setDamage((float) (evt.getAmount() * bonusLevel * 0.2));
+                                        entityGlintblades.setDamage(evt.getAmount() * bonusLevel * 0.2f);
                                         entityGlintblades.shoot(1);
                                         hurter.world.spawnEntity(entityGlintblades);
                                     }

@@ -50,7 +50,7 @@ public class EnchantmentEpilepsyFire extends RaryBase {
                                         this.cancel();
                                         return;
                                     }
-                                    float damage = (float) (attacker.getMaxHealth() * 0.3 / 60);
+                                    float damage = attacker.getMaxHealth() * 0.3f / 60;
                                     if (attacker.getHealth() - damage * 2 > 0) {
                                         attacker.setHealth(attacker.getHealth() - damage);
                                     } else {
@@ -71,7 +71,7 @@ public class EnchantmentEpilepsyFire extends RaryBase {
                                     this.cancel();
                                     return;
                                 }
-                                float damage = (float) (attacker.getMaxHealth() * 0.3 * bonusLevel * 0.5 / 60);
+                                float damage = attacker.getMaxHealth() * 0.3f * bonusLevel * 0.5f / 60;
                                 if (hurter.getHealth() - damage * 2 > 0) {
                                     hurter.setHealth(hurter.getHealth() - damage);
                                 } else {

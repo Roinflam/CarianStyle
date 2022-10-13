@@ -73,7 +73,7 @@ public class EnchantmentPreciseLightning extends RaryBase {
                             } else if (attacker.world.isThundering()) {
                                 magnification *= 4;
                             }
-                            attacker.attackEntityFrom(DamageSource.LIGHTNING_BOLT, (float) (evt.getAmount() * 0.3) * magnification);
+                            attacker.attackEntityFrom(DamageSource.LIGHTNING_BOLT, evt.getAmount() * 0.3f * magnification);
                             if (attacker.onGround) {
                                 double x = RandomUtils.nextBoolean() ? hurter.posX - attacker.posX : attacker.posX - hurter.posX;
                                 double z = RandomUtils.nextBoolean() ? hurter.posZ - attacker.posZ : attacker.posZ - hurter.posZ;

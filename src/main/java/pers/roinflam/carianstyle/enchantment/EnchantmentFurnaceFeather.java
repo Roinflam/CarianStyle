@@ -40,7 +40,7 @@ public class EnchantmentFurnaceFeather extends RaryBase {
                 }
             }
             if (bonusLevel > 0) {
-                evt.setAmount((float) (evt.getAmount() + evt.getAmount() * 0.25));
+                evt.setAmount(evt.getAmount() + evt.getAmount() * 0.25f);
             }
         }
     }

@@ -7,7 +7,6 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.projectile.EntityArrow;
 import net.minecraft.init.Enchantments;
 import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.event.entity.ProjectileImpactEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.living.LivingKnockBackEvent;
@@ -16,6 +15,7 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
 
@@ -54,13 +54,14 @@ public class EnchantmentHardArrow extends UncommonBase {
                 if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                     if (bonusLevel > 0) {
-                        List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
-                                new AxisAlignedBB(hurter.getPosition()).expand(12, 12, 12),
+                                hurter,
+                                12,
                                 entityLivingBase -> !entityLivingBase.equals(hurter)
                         );
                         if (!entities.isEmpty()) {
-                            evt.setAmount((float) (evt.getAmount() + evt.getAmount() * bonusLevel * 0.8));
+                            evt.setAmount(evt.getAmount() + evt.getAmount() * bonusLevel * 0.8f);
                         }
                     }
                 }
@@ -75,13 +76,14 @@ public class EnchantmentHardArrow extends UncommonBase {
             if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
                 int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                 if (bonusLevel > 0) {
-                    List<EntityLivingBase> entities = hurter.world.getEntitiesWithinAABB(
+                    List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                             EntityLivingBase.class,
-                            new AxisAlignedBB(hurter.getPosition()).expand(12, 12, 12),
+                            hurter,
+                            12,
                             entityLivingBase -> !entityLivingBase.equals(hurter)
                     );
                     if (!entities.isEmpty()) {
-                        evt.setStrength((float) (evt.getStrength() + evt.getStrength() * bonusLevel * 0.75));
+                        evt.setStrength(evt.getStrength() + evt.getStrength() * bonusLevel * 0.75f);
                     }
                 }
             }

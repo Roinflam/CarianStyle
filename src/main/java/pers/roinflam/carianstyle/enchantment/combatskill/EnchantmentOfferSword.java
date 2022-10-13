@@ -32,7 +32,7 @@ public class EnchantmentOfferSword extends UncommonBase {
                     if (attacker.getHealth() >= attacker.getMaxHealth()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                         if (bonusLevel > 0) {
-                            evt.setAmount((float) (evt.getAmount() + evt.getAmount() * bonusLevel * 0.1));
+                            evt.setAmount(evt.getAmount() + evt.getAmount() * bonusLevel * 0.1f);
                         }
                     }
                 }

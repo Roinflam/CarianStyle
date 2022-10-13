@@ -7,17 +7,13 @@ import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.AxisAlignedBB;
-import net.minecraftforge.client.event.EntityViewRenderEvent;
-import net.minecraftforge.client.event.RenderLivingEvent;
-import net.minecraftforge.client.event.RenderPlayerEvent;
 import net.minecraftforge.event.entity.living.LivingSetAttackTargetEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
 
@@ -47,9 +43,10 @@ public class EnchantmentMoonOfNoxtura extends VeryRaryBase {
                 if (bonusLevel > 0) {
                     if (RandomUtil.percentageChance(2.5)) {
                         double distance = entityLiving.getDistance(target);
-                        List<EntityLivingBase> entities = entityLiving.world.getEntitiesWithinAABB(
+                        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
-                                new AxisAlignedBB(entityLiving.getPosition()).expand(distance, distance, distance),
+                                entityLiving,
+                                (int) distance,
                                 entityLivingBase -> entityLivingBase.getClass() != (entityLiving.getClass()) && entityLiving.canEntityBeSeen(entityLivingBase) && !entityLivingBase.equals(entityLiving) && !entityLivingBase.equals(target)
                         );
                         if (!entities.isEmpty()) {

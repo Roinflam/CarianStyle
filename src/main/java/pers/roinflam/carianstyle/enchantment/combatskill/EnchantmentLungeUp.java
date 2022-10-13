@@ -54,7 +54,7 @@ public class EnchantmentLungeUp extends RaryBase {
                                 }
 
                             }.start();
-                            evt.setAmount((float) (evt.getAmount() + evt.getAmount() * bonusLevel * 0.15));
+                            evt.setAmount(evt.getAmount() + evt.getAmount() * bonusLevel * 0.15f);
                         }
                     }
                 }

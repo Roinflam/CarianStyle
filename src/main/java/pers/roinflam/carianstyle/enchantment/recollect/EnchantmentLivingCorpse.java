@@ -60,7 +60,7 @@ public class EnchantmentLivingCorpse extends VeryRaryBase {
                                     this.cancel();
                                     return;
                                 }
-                                float damage = (float) (hurter.getMaxHealth() * 0.01 / 20);
+                                float damage = hurter.getMaxHealth() * 0.01f / 20;
                                 damage = damage * 5 + damage * ++tick / 75;
                                 if (hurter.getHealth() - damage * 2 > 0) {
                                     hurter.setHealth(hurter.getHealth() - damage);
@@ -102,7 +102,7 @@ public class EnchantmentLivingCorpse extends VeryRaryBase {
                                 this.cancel();
                                 return;
                             }
-                            float damage = (float) (hurter.getMaxHealth() * 0.01 / 20);
+                            float damage = hurter.getMaxHealth() * 0.01f / 20;
                             damage = damage * 6 + damage * ++tick / 30;
                             if (hurter.getHealth() - damage * 2 > 0) {
                                 hurter.setHealth(hurter.getHealth() - damage);

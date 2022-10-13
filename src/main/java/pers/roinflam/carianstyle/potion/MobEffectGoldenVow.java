@@ -1,17 +1,14 @@
 package pers.roinflam.carianstyle.potion;
 
 import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.potion.Potion;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.Reference;
 
-@Mod.EventBusSubscriber
+
 public class MobEffectGoldenVow extends IconBase {
 
     public MobEffectGoldenVow(boolean isBadEffectIn, int liquidColorIn) {
@@ -26,13 +23,13 @@ public class MobEffectGoldenVow extends IconBase {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 if (hurter.isPotionActive(this)) {
                     int amplifier = hurter.getActivePotionEffect(this).getAmplifier();
-                    evt.setAmount((float) (evt.getAmount() - evt.getAmount() * (amplifier + 1) * 0.1));
+                    evt.setAmount(evt.getAmount() - evt.getAmount() * (amplifier + 1) * 0.1f);
                 }
                 if (damageSource.getTrueSource() instanceof EntityLivingBase) {
                     EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
                     if (attacker.isPotionActive(this)) {
                         int amplifier = attacker.getActivePotionEffect(this).getAmplifier();
-                        evt.setAmount((float) (evt.getAmount() + evt.getAmount() * (amplifier + 1) * 0.15));
+                        evt.setAmount(evt.getAmount() + evt.getAmount() * (amplifier + 1) * 0.15f);
                     }
                 }
             }

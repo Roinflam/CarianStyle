@@ -71,7 +71,7 @@ public class EnchantmentParry extends UncommonBase {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (PARRY.containsKey(attacker.getUniqueID())) {
-                    evt.setAmount((float) (evt.getAmount() + evt.getAmount() * PARRY.get(attacker.getUniqueID()) * 0.25));
+                    evt.setAmount(evt.getAmount() + evt.getAmount() * PARRY.get(attacker.getUniqueID()) * 0.25f);
                     PARRY.remove(attacker.getUniqueID());
                     COOLDING.add(attacker.getUniqueID());
                     new SynchronizationTask(40) {

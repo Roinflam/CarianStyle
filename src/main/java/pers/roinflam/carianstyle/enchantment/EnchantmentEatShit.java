@@ -63,14 +63,14 @@ public class EnchantmentEatShit extends UncommonBase {
     public static void onLivingHeal(LivingHealEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (EAT_SHIT.contains(evt.getEntity().getUniqueID())) {
-                evt.setAmount((float) (evt.getAmount() - evt.getAmount() * 0.75));
+                evt.setAmount(evt.getAmount() - evt.getAmount() * 0.75f);
             }
         }
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 35 + (enchantmentLevel - 1) * 1;
+        return 35 + (enchantmentLevel - 1);
     }
 
 }

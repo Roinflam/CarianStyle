@@ -15,7 +15,6 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -45,7 +44,7 @@ public class EnchantmentVicDragonThunder extends RaryBase {
                             evt.setCanceled(true);
                             return;
                         }
-                        evt.setAmount((float) (evt.getAmount() - evt.getAmount() * bonusLevel * 0.15));
+                        evt.setAmount(evt.getAmount() - evt.getAmount() * bonusLevel * 0.15f);
                     }
                 }
             }
@@ -72,7 +71,7 @@ public class EnchantmentVicDragonThunder extends RaryBase {
                             } else if (attacker.world.isThundering()) {
                                 magnification *= 4;
                             }
-                            hurter.attackEntityFrom(DamageSource.LIGHTNING_BOLT, (float) (evt.getAmount() * bonusLevel * 0.5 * magnification));
+                            hurter.attackEntityFrom(DamageSource.LIGHTNING_BOLT, evt.getAmount() * bonusLevel * 0.5f * magnification);
                         }
                     }
                 }
