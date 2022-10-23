@@ -14,6 +14,8 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.List;
 
 @Mod.EventBusSubscriber
@@ -23,28 +25,29 @@ public class EnchantmentFireDevoured extends RaryBase {
         super(typeIn, slots, "fire_devoured");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.FIRE_DEVOURED;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingAttack(LivingAttackEvent evt) {
+    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 DamageSource damageSource = evt.getSource();
                 EntityLivingBase hurter = evt.getEntityLiving();
-                EntityLivingBase attacker = (EntityLivingBase) damageSource.getImmediateSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) damageSource.getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         if (EntityUtil.getFire(attacker) > 0) {
-                            List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                            @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                     EntityLivingBase.class,
                                     hurter,
                                     bonusLevel,
                                     entityLivingBase -> !entityLivingBase.equals(hurter) || entityLivingBase.equals(attacker)
                             );
-                            for (EntityLivingBase entityLivingBase : entities) {
+                            for (@Nonnull EntityLivingBase entityLivingBase : entities) {
                                 entityLivingBase.attackEntityFrom(DamageSource.IN_FIRE, evt.getAmount() * bonusLevel * 0.15f);
                                 if (EntityUtil.getFire(entityLivingBase) < 200) {
                                     entityLivingBase.setFire(10);

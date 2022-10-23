@@ -18,6 +18,9 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 @Mod.EventBusSubscriber
 public class EnchantmentScholarShield extends VeryRaryBase {
 
@@ -25,18 +28,19 @@ public class EnchantmentScholarShield extends VeryRaryBase {
         super(typeIn, slots, "scholar_shield");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.SCHOLAR_SHIELD;
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingAttack(LivingAttackEvent evt) {
+    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (hurter.isHandActive()) {
-                    ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
+                    @Nonnull ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
                     if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                         if (bonusLevel > 0) {
@@ -49,12 +53,12 @@ public class EnchantmentScholarShield extends VeryRaryBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
             if (evt.getSource().getImmediateSource() != null) {
                 if (hurter.isHandActive()) {
-                    ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
+                    @Nonnull ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
                     if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                         if (bonusLevel > 0) {

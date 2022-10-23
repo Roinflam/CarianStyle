@@ -16,6 +16,8 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -28,12 +30,13 @@ public class EnchantmentVicDragonThunder extends RaryBase {
         super(typeIn, slots, "vic_dragon_thunder");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.VIC_DRAGON_THUNDER;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(LivingDamageEvent evt) {
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
             if (!evt.getSource().canHarmInCreative() && evt.getSource().damageType.equals("lightningBolt")) {
@@ -49,7 +52,7 @@ public class EnchantmentVicDragonThunder extends RaryBase {
                 }
             }
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {

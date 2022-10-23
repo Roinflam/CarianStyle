@@ -17,6 +17,7 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,26 +28,27 @@ public class EnchantmentHealingByFire extends UncommonBase {
         super(typeIn, slots, "healing_by_fire");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.HEALING_BY_FIRE;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingAttack(LivingAttackEvent evt) {
+    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 if (EntityUtil.getFire(hurter) > 0) {
                     if (hurter.getActivePotionEffects().size() > 0) {
                         int bonusLevel = 0;
-                        for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+                        for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                             if (!itemStack.isEmpty()) {
                                 bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                             }
                         }
                         if (bonusLevel > 0) {
                             if (RandomUtil.percentageChance(bonusLevel * 2.5)) {
-                                List<PotionEffect> potionEffects = new ArrayList<>(hurter.getActivePotionEffects());
+                                @Nonnull List<PotionEffect> potionEffects = new ArrayList<>(hurter.getActivePotionEffects());
                                 potionEffects.removeIf(potionEffect ->
                                         !potionEffect.getPotion().isBadEffect() ||
                                                 potionEffect.getPotion().isInstant() ||

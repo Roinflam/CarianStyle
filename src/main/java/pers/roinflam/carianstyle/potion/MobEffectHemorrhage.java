@@ -8,6 +8,8 @@ import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
+import javax.annotation.Nonnull;
+
 
 public class MobEffectHemorrhage extends IconBase {
 
@@ -16,7 +18,7 @@ public class MobEffectHemorrhage extends IconBase {
     }
 
     @Override
-    public void performEffect(EntityLivingBase entityLivingBaseIn, int amplifier) {
+    public void performEffect(@Nonnull EntityLivingBase entityLivingBaseIn, int amplifier) {
         float damage = entityLivingBaseIn.getMaxHealth() * (0.07f + 0.01f * amplifier) / 30;
         new SynchronizationTask(1) {
 
@@ -37,6 +39,7 @@ public class MobEffectHemorrhage extends IconBase {
         return true;
     }
 
+    @Nonnull
     @Override
     protected ResourceLocation getResourceLocation() {
         return new ResourceLocation(Reference.MOD_ID, "textures/effect/hemorrhage.png");

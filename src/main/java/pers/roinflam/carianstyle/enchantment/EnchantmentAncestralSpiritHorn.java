@@ -17,6 +17,8 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
+import javax.annotation.Nonnull;
+
 @Mod.EventBusSubscriber
 public class EnchantmentAncestralSpiritHorn extends RaryBase {
 
@@ -24,18 +26,19 @@ public class EnchantmentAncestralSpiritHorn extends RaryBase {
         super(typeIn, slots, "ancestral_spirit_horn");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.ANCESTRAL_SPIRIT_HORN;
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage_hurt(LivingDamageEvent evt) {
+    public static void onLivingDamage_hurt(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             DamageSource damageSource = evt.getSource();
             if (!damageSource.canHarmInCreative() && damageSource.isMagicDamage()) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 int bonusLevel = 0;
-                for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+                for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                     if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
@@ -48,13 +51,13 @@ public class EnchantmentAncestralSpiritHorn extends RaryBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage_heal(LivingDamageEvent evt) {
+    public static void onLivingDamage_heal(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             DamageSource damageSource = evt.getSource();
             if (!damageSource.canHarmInCreative() && damageSource.isMagicDamage()) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 int bonusLevel = 0;
-                for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+                for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                     if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }

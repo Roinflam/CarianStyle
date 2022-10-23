@@ -14,6 +14,8 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 
+import javax.annotation.Nonnull;
+
 @Mod.EventBusSubscriber
 public class EnchantmentQuickstep extends UncommonBase {
 
@@ -21,18 +23,19 @@ public class EnchantmentQuickstep extends UncommonBase {
         super(typeIn, slots, "quickstep");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.QUICKSTEP;
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(TickEvent.PlayerTickEvent evt) {
+    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
         if (!evt.player.world.isRemote) {
             if (evt.phase.equals(TickEvent.Phase.START)) {
-                EntityPlayer entityPlayer = evt.player;
+                @Nonnull EntityPlayer entityPlayer = evt.player;
                 if (entityPlayer.isEntityAlive()) {
                     int bonusLevel = 0;
-                    for (ItemStack itemStack : entityPlayer.getArmorInventoryList()) {
+                    for (@Nonnull ItemStack itemStack : entityPlayer.getArmorInventoryList()) {
                         if (!itemStack.isEmpty()) {
                             bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                         }

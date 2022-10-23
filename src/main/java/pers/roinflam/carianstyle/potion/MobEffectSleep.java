@@ -16,6 +16,9 @@ import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 public class MobEffectSleep extends IconBase {
 
     public MobEffectSleep(boolean isBadEffectIn, int liquidColorIn) {
@@ -25,7 +28,7 @@ public class MobEffectSleep extends IconBase {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public void onLivingSetAttackTarget(LivingSetAttackTargetEvent evt) {
+    public void onLivingSetAttackTarget(@Nonnull LivingSetAttackTargetEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getTarget() != null) {
                 if (evt.getEntityLiving() instanceof EntityLiving) {
@@ -39,10 +42,10 @@ public class MobEffectSleep extends IconBase {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public void onLivingAttack(LivingAttackEvent evt) {
+    public void onLivingAttack(@Nonnull LivingAttackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
                 if (attacker.isPotionActive(this)) {
                     evt.setCanceled(true);
                 }
@@ -51,7 +54,7 @@ public class MobEffectSleep extends IconBase {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public void onLivingDamage(LivingDamageEvent evt) {
+    public void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
@@ -64,7 +67,7 @@ public class MobEffectSleep extends IconBase {
     }
 
     @SubscribeEvent
-    public void onLivingUpdate(LivingEvent.LivingUpdateEvent evt) {
+    public void onLivingUpdate(@Nonnull LivingEvent.LivingUpdateEvent evt) {
         EntityLivingBase entityLiving = evt.getEntityLiving();
         if (entityLiving.isPotionActive(this)) {
             EntityLivingUtil.setJumped(entityLiving);
@@ -74,7 +77,7 @@ public class MobEffectSleep extends IconBase {
     @Override
     public void performEffect(EntityLivingBase entityLivingBaseIn, int amplifier) {
         if (entityLivingBaseIn instanceof EntityLiving) {
-            EntityLiving entityLiving = (EntityLiving) entityLivingBaseIn;
+            @Nonnull EntityLiving entityLiving = (EntityLiving) entityLivingBaseIn;
             entityLiving.setAttackTarget(null);
         }
         entityLivingBaseIn.addPotionEffect(new PotionEffect(MobEffects.BLINDNESS, 21));
@@ -85,6 +88,7 @@ public class MobEffectSleep extends IconBase {
         return true;
     }
 
+    @Nonnull
     @Override
     protected ResourceLocation getResourceLocation() {
         return new ResourceLocation(Reference.MOD_ID, "textures/effect/sleep.png");

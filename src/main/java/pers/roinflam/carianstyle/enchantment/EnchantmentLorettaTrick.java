@@ -18,6 +18,8 @@ import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
+
 @Mod.EventBusSubscriber
 public class EnchantmentLorettaTrick extends VeryRaryBase {
 
@@ -25,12 +27,13 @@ public class EnchantmentLorettaTrick extends VeryRaryBase {
         super(typeIn, slots, "loretta_trick");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.LORETTA_TRICK;
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onProjectileImpact_Arrow(ProjectileImpactEvent.Arrow evt) {
+    public static void onProjectileImpact_Arrow(@Nonnull ProjectileImpactEvent.Arrow evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getArrow().shootingEntity != null) {
                 EntityArrow entityArrow = evt.getArrow();
@@ -47,7 +50,7 @@ public class EnchantmentLorettaTrick extends VeryRaryBase {
                                 this.cancel();
                                 return;
                             }
-                            Explosion explosion = attacker.world.createExplosion(attacker, entityArrow.posX - 2.5 + RandomUtil.getInt(0, 5), entityArrow.posY, entityArrow.posZ - 2.5 + RandomUtil.getInt(0, 5), EntityUtil.getFire(entityArrow) > 0 ? 4 : 3, false);
+                            @Nonnull Explosion explosion = attacker.world.createExplosion(attacker, entityArrow.posX - 2.5 + RandomUtil.getInt(0, 5), entityArrow.posY, entityArrow.posZ - 2.5 + RandomUtil.getInt(0, 5), EntityUtil.getFire(entityArrow) > 0 ? 4 : 3, false);
                         }
 
                     }.start();

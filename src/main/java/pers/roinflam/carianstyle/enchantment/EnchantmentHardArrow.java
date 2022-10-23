@@ -17,6 +17,7 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
 import java.util.List;
 
 @Mod.EventBusSubscriber
@@ -26,16 +27,17 @@ public class EnchantmentHardArrow extends UncommonBase {
         super(typeIn, slots, "hard_arrow");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.HARD_ARROW;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onProjectileImpact_Arrow(ProjectileImpactEvent.Arrow evt) {
+    public static void onProjectileImpact_Arrow(@Nonnull ProjectileImpactEvent.Arrow evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityArrow entityArrow = evt.getArrow();
             if (entityArrow.shootingEntity instanceof EntityLivingBase) {
-                EntityLivingBase attacker = (EntityLivingBase) entityArrow.shootingEntity;
+                @Nonnull EntityLivingBase attacker = (EntityLivingBase) entityArrow.shootingEntity;
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
@@ -47,14 +49,14 @@ public class EnchantmentHardArrow extends UncommonBase {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                     if (bonusLevel > 0) {
-                        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                        @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
                                 hurter,
                                 12,
@@ -70,13 +72,13 @@ public class EnchantmentHardArrow extends UncommonBase {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingKnockBack(LivingKnockBackEvent evt) {
+    public static void onLivingKnockBack(@Nonnull LivingKnockBackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
             if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
                 int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                 if (bonusLevel > 0) {
-                    List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                    @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                             EntityLivingBase.class,
                             hurter,
                             12,

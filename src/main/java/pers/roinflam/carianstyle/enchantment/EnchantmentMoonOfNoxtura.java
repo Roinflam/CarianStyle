@@ -15,6 +15,7 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
 import java.util.List;
 
 @Mod.EventBusSubscriber
@@ -24,18 +25,19 @@ public class EnchantmentMoonOfNoxtura extends VeryRaryBase {
         super(typeIn, slots, "moon_of_noxtura");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.MOON_OF_NOXTURA;
     }
 
     @SubscribeEvent
-    public static void onLivingSetAttackTarget(LivingSetAttackTargetEvent evt) {
+    public static void onLivingSetAttackTarget(@Nonnull LivingSetAttackTargetEvent evt) {
         if (!evt.getEntity().world.isRemote && !evt.getEntity().world.isDaytime()) {
             if (evt.getEntityLiving() instanceof EntityLiving && evt.getTarget() != null) {
                 EntityLivingBase target = evt.getTarget();
                 EntityLiving entityLiving = (EntityLiving) evt.getEntityLiving();
                 int bonusLevel = 0;
-                for (ItemStack itemStack : target.getArmorInventoryList()) {
+                for (@Nonnull ItemStack itemStack : target.getArmorInventoryList()) {
                     if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
@@ -43,7 +45,7 @@ public class EnchantmentMoonOfNoxtura extends VeryRaryBase {
                 if (bonusLevel > 0) {
                     if (RandomUtil.percentageChance(2.5)) {
                         double distance = entityLiving.getDistance(target);
-                        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                        @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
                                 entityLiving,
                                 (int) distance,
@@ -64,7 +66,7 @@ public class EnchantmentMoonOfNoxtura extends VeryRaryBase {
     }
 
     @Override
-    public boolean canApplyTogether(Enchantment ench) {
+    public boolean canApplyTogether(@Nonnull Enchantment ench) {
         return !ench.equals(CarianStyleEnchantments.HEALING_BY_FIRE) &&
                 !ench.equals(CarianStyleEnchantments.SHELTER_OF_FIRE) &&
                 !ench.equals(CarianStyleEnchantments.PRECISE_LIGHTNING) &&

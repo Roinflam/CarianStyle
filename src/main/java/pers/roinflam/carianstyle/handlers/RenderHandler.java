@@ -7,11 +7,13 @@ import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
 import pers.roinflam.carianstyle.entity.render.GlintbladesRender;
 import pers.roinflam.carianstyle.init.CarianStyleItem;
 
+import javax.annotation.Nonnull;
+
 public class RenderHandler {
 
     public static void registerEntityRenders() {
         RenderingRegistry.registerEntityRenderingHandler(EntityGlintblades.class, manager -> {
-            RenderItem renderItem = Minecraft.getMinecraft().getRenderItem();
+            @Nonnull RenderItem renderItem = Minecraft.getMinecraft().getRenderItem();
             return new GlintbladesRender<EntityGlintblades>(manager, CarianStyleItem.GLINTBLADES, renderItem);
         });
     }

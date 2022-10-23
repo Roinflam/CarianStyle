@@ -11,6 +11,8 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.carianstyle.base.potion.hide.HideBase;
 import pers.roinflam.carianstyle.network.NetworkRegistryHandler;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.List;
 
 public abstract class NetworkBase extends HideBase {
@@ -21,12 +23,12 @@ public abstract class NetworkBase extends HideBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public void onPotionRemove(PotionEvent.PotionRemoveEvent evt) {
+    public void onPotionRemove(@Nonnull PotionEvent.PotionRemoveEvent evt) {
         if (evt.getPotion().equals(this)) {
             EntityLivingBase entityLivingBase = evt.getEntityLiving();
-            MinecraftServer minecraftServer = entityLivingBase.world.getMinecraftServer();
+            @Nullable MinecraftServer minecraftServer = entityLivingBase.world.getMinecraftServer();
             if (minecraftServer != null) {
-                for (EntityPlayer entityPlayer : entityLivingBase.world.getMinecraftServer().getPlayerList().getPlayers()) {
+                for (@Nonnull EntityPlayer entityPlayer : entityLivingBase.world.getMinecraftServer().getPlayerList().getPlayers()) {
                     if (entityLivingBase.world.equals(entityPlayer.world)) {
                         NetworkRegistryHandler.RenderingEffect.sendClientCustomPacket(getSerialNumber(), entityPlayer, entityLivingBase.getEntityId(), false);
                     }
@@ -36,12 +38,12 @@ public abstract class NetworkBase extends HideBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public void onPotionExpiry(PotionEvent.PotionExpiryEvent evt) {
+    public void onPotionExpiry(@Nonnull PotionEvent.PotionExpiryEvent evt) {
         if (evt.getPotionEffect().getPotion().equals(this)) {
             EntityLivingBase entityLivingBase = evt.getEntityLiving();
-            MinecraftServer minecraftServer = entityLivingBase.world.getMinecraftServer();
+            @Nullable MinecraftServer minecraftServer = entityLivingBase.world.getMinecraftServer();
             if (minecraftServer != null) {
-                for (EntityPlayer entityPlayer : entityLivingBase.world.getMinecraftServer().getPlayerList().getPlayers()) {
+                for (@Nonnull EntityPlayer entityPlayer : entityLivingBase.world.getMinecraftServer().getPlayerList().getPlayers()) {
                     if (entityLivingBase.world.equals(entityPlayer.world)) {
                         NetworkRegistryHandler.RenderingEffect.sendClientCustomPacket(getSerialNumber(), entityPlayer, entityLivingBase.getEntityId(), false);
                     }
@@ -51,13 +53,13 @@ public abstract class NetworkBase extends HideBase {
     }
 
     @SubscribeEvent
-    public void onPlayerTick(TickEvent.PlayerTickEvent evt) {
+    public void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
         if (!evt.player.world.isRemote && evt.phase.equals(TickEvent.Phase.END)) {
-            EntityLivingBase entityLivingBase = evt.player;
+            @Nonnull EntityLivingBase entityLivingBase = evt.player;
             if (!entityLivingBase.isEntityAlive()) {
-                MinecraftServer minecraftServer = entityLivingBase.world.getMinecraftServer();
+                @Nullable MinecraftServer minecraftServer = entityLivingBase.world.getMinecraftServer();
                 if (minecraftServer != null) {
-                    for (EntityPlayer entityPlayer : entityLivingBase.world.getMinecraftServer().getPlayerList().getPlayers()) {
+                    for (@Nonnull EntityPlayer entityPlayer : entityLivingBase.world.getMinecraftServer().getPlayerList().getPlayers()) {
                         if (entityLivingBase.world.equals(entityPlayer.world)) {
                             NetworkRegistryHandler.RenderingEffect.sendClientCustomPacket(getSerialNumber(), entityPlayer, entityLivingBase.getEntityId(), false);
                         }
@@ -68,10 +70,10 @@ public abstract class NetworkBase extends HideBase {
     }
 
     @Override
-    public void performEffect(EntityLivingBase entityLivingBaseIn, int amplifier) {
-        MinecraftServer minecraftServer = entityLivingBaseIn.world.getMinecraftServer();
+    public void performEffect(@Nonnull EntityLivingBase entityLivingBaseIn, int amplifier) {
+        @Nullable MinecraftServer minecraftServer = entityLivingBaseIn.world.getMinecraftServer();
         if (minecraftServer != null) {
-            for (EntityPlayer entityPlayer : entityLivingBaseIn.world.getMinecraftServer().getPlayerList().getPlayers()) {
+            for (@Nonnull EntityPlayer entityPlayer : entityLivingBaseIn.world.getMinecraftServer().getPlayerList().getPlayers()) {
                 if (entityLivingBaseIn.world.equals(entityPlayer.world)) {
                     NetworkRegistryHandler.RenderingEffect.sendClientCustomPacket(getSerialNumber(), entityPlayer, entityLivingBaseIn.getEntityId(), true);
                 }

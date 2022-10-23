@@ -18,6 +18,9 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 @Mod.EventBusSubscriber
 public class EnchantmentGoldenVow extends RaryBase {
 
@@ -25,19 +28,20 @@ public class EnchantmentGoldenVow extends RaryBase {
         super(typeIn, slots, "golden_vow");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.GOLDEN_VOW;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingAttack(LivingAttackEvent evt) {
+    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             DamageSource damageSource = evt.getSource();
             if (damageSource.getTrueSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                EntityLivingBase attacker = (EntityLivingBase) damageSource.getTrueSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) damageSource.getTrueSource();
                 int bonusLevel = 0;
-                for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+                for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                     if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
@@ -46,7 +50,7 @@ public class EnchantmentGoldenVow extends RaryBase {
                     hurter.addPotionEffect(new PotionEffect(CarianStylePotion.GOLDEN_VOW, (int) (2.5 * bonusLevel * 20), bonusLevel - 1));
                 }
                 bonusLevel = 0;
-                for (ItemStack itemStack : attacker.getArmorInventoryList()) {
+                for (@Nonnull ItemStack itemStack : attacker.getArmorInventoryList()) {
                     if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }

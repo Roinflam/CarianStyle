@@ -21,6 +21,9 @@ import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentFullMoon;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 @Mod.EventBusSubscriber
 public class EnchantmentDarkMoon extends VeryRaryBase {
 
@@ -28,12 +31,13 @@ public class EnchantmentDarkMoon extends VeryRaryBase {
         super(typeIn, slots, "dark_moon");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.DARK_MOON;
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote && !evt.getEntity().world.isDaytime()) {
             if (evt.getEntityLiving() instanceof EntityLiving) {
                 EntityLiving hurter = (EntityLiving) evt.getEntityLiving();
@@ -42,7 +46,7 @@ public class EnchantmentDarkMoon extends VeryRaryBase {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
                         if (bonusLevel > 0) {
                             boolean hasFullMoon = false;
-                            for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+                            for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                                 if (!itemStack.isEmpty()) {
                                     if (EnchantmentHelper.getEnchantmentLevel(EnchantmentFullMoon.getEnchantment(), itemStack) > 0) {
                                         hasFullMoon = true;
@@ -58,7 +62,7 @@ public class EnchantmentDarkMoon extends VeryRaryBase {
                         }
                     }
                     if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                        EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                        @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                         if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                             int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                             if (bonusLevel > 0) {
@@ -68,7 +72,7 @@ public class EnchantmentDarkMoon extends VeryRaryBase {
                                     }
                                 }
                                 boolean hasFullMoon = false;
-                                for (ItemStack itemStack : attacker.getArmorInventoryList()) {
+                                for (@Nonnull ItemStack itemStack : attacker.getArmorInventoryList()) {
                                     if (!itemStack.isEmpty()) {
                                         if (EnchantmentHelper.getEnchantmentLevel(EnchantmentFullMoon.getEnchantment(), itemStack) > 0) {
                                             hasFullMoon = true;
@@ -98,14 +102,14 @@ public class EnchantmentDarkMoon extends VeryRaryBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHeal(LivingHealEvent evt) {
+    public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
         if (!evt.getEntity().world.isRemote && !evt.getEntity().world.isDaytime()) {
             EntityLivingBase healer = evt.getEntityLiving();
             if (!healer.getHeldItem(healer.getActiveHand()).isEmpty()) {
                 int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), healer.getHeldItem(healer.getActiveHand()));
                 if (bonusLevel > 0) {
                     boolean hasFullMoon = false;
-                    for (ItemStack itemStack : healer.getArmorInventoryList()) {
+                    for (@Nonnull ItemStack itemStack : healer.getArmorInventoryList()) {
                         if (!itemStack.isEmpty()) {
                             if (EnchantmentHelper.getEnchantmentLevel(EnchantmentFullMoon.getEnchantment(), itemStack) > 0) {
                                 hasFullMoon = true;
@@ -124,10 +128,10 @@ public class EnchantmentDarkMoon extends VeryRaryBase {
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(TickEvent.PlayerTickEvent evt) {
+    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
         if (!evt.player.world.isRemote && !evt.player.world.isDaytime()) {
             if (evt.phase.equals(TickEvent.Phase.START)) {
-                EntityPlayer entityPlayer = evt.player;
+                @Nonnull EntityPlayer entityPlayer = evt.player;
                 if (entityPlayer.isEntityAlive()) {
                     if (!entityPlayer.getHeldItem(entityPlayer.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityPlayer.getHeldItem(entityPlayer.getActiveHand()));

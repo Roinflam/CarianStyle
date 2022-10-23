@@ -13,6 +13,7 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.IHasModel;
 import pers.roinflam.carianstyle.utils.util.BlockUtil;
 
+import javax.annotation.Nonnull;
 import java.util.Random;
 
 public abstract class FireBase extends BlockFire implements IHasModel {
@@ -28,7 +29,7 @@ public abstract class FireBase extends BlockFire implements IHasModel {
     }
 
     @Override
-    public void onBlockClicked(World worldIn, BlockPos pos, EntityPlayer playerIn) {
+    public void onBlockClicked(@Nonnull World worldIn, BlockPos pos, EntityPlayer playerIn) {
         worldIn.setBlockToAir(pos);
     }
 }

@@ -2,9 +2,12 @@ package pers.roinflam.carianstyle.utils.util;
 
 import net.minecraft.potion.Potion;
 
+import javax.annotation.Nonnull;
+
 public class PotionUtil {
 
-    public static Potion registerPotion(Potion potion, String name) {
+    @Nonnull
+    public static Potion registerPotion(@Nonnull Potion potion, @Nonnull String name) {
         potion.setPotionName("effect." + name);
         potion.setRegistryName(name);
         return potion;

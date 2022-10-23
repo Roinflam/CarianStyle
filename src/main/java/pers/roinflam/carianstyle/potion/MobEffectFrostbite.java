@@ -7,6 +7,8 @@ import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
 
+import javax.annotation.Nonnull;
+
 
 public class MobEffectFrostbite extends IconBase {
 
@@ -17,7 +19,7 @@ public class MobEffectFrostbite extends IconBase {
     }
 
     @Override
-    public void performEffect(EntityLivingBase entityLivingBaseIn, int amplifier) {
+    public void performEffect(@Nonnull EntityLivingBase entityLivingBaseIn, int amplifier) {
         float damage = entityLivingBaseIn.getMaxHealth() * 0.0025f;
         damage += damage * amplifier;
         entityLivingBaseIn.attackEntityFrom(NewDamageSource.FROSTBITE, damage);
@@ -28,6 +30,7 @@ public class MobEffectFrostbite extends IconBase {
         return duration % 10 == 0;
     }
 
+    @Nonnull
     @Override
     protected ResourceLocation getResourceLocation() {
         return new ResourceLocation(Reference.MOD_ID, "textures/effect/frostbite.png");

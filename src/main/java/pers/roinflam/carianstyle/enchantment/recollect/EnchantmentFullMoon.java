@@ -17,6 +17,7 @@ import pers.roinflam.carianstyle.enchantment.EnchantmentDarkMoon;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
+import javax.annotation.Nonnull;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -30,17 +31,18 @@ public class EnchantmentFullMoon extends VeryRaryBase {
         super(typeIn, slots, "full_moon");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.FULL_MOON;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingDeath(LivingDeathEvent evt) {
+    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (!evt.getSource().canHarmInCreative()) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 int bonusLevel = 0;
-                for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+                for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                     if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
@@ -103,12 +105,12 @@ public class EnchantmentFullMoon extends VeryRaryBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (!evt.getSource().canHarmInCreative()) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 int bonusLevel = 0;
-                for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+                for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                     if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
@@ -123,11 +125,11 @@ public class EnchantmentFullMoon extends VeryRaryBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHeal(LivingHealEvent evt) {
+    public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
         if (!evt.getEntity().world.isRemote && !evt.getEntity().world.isDaytime()) {
             EntityLivingBase healer = evt.getEntityLiving();
             int bonusLevel = 0;
-            for (ItemStack itemStack : healer.getArmorInventoryList()) {
+            for (@Nonnull ItemStack itemStack : healer.getArmorInventoryList()) {
                 if (!itemStack.isEmpty()) {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }

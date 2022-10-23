@@ -21,6 +21,7 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 
+import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,20 +32,21 @@ public class EnchantmentRockBlaster extends RaryBase {
         super(typeIn, slots, "rock_blaster");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.ROCK_BLASTER;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onBreak(BlockEvent.BreakEvent evt) {
+    public static void onBreak(@Nonnull BlockEvent.BreakEvent evt) {
         if (!evt.getPlayer().world.isRemote) {
             EntityPlayer entityPlayer = evt.getPlayer();
             if (entityPlayer.swingingHand != null) {
-                ItemStack itemStack = entityPlayer.getHeldItem(entityPlayer.swingingHand);
+                @Nonnull ItemStack itemStack = entityPlayer.getHeldItem(entityPlayer.swingingHand);
                 if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemPickaxe) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     if (bonusLevel > 0) {
-                        List<BlockPos> blockPosList = new ArrayList<>();
+                        @Nonnull List<BlockPos> blockPosList = new ArrayList<>();
                         int radius = 1 + bonusLevel / 2;
                         radius = Math.min(radius, ConfigLoader.rockblaster_maxrange);
                         for (int x = -radius; x <= radius; x++) {
@@ -56,14 +58,14 @@ public class EnchantmentRockBlaster extends RaryBase {
                             }
                         }
                         World world = entityPlayer.world;
-                        for (BlockPos blockPos : blockPosList) {
+                        for (@Nonnull BlockPos blockPos : blockPosList) {
                             if (itemStack.isItemStackDamageable()) {
                                 if (itemStack.getItemDamage() >= itemStack.getMaxDamage() - 1) {
                                     return;
                                 }
                             }
-                            IBlockState blockState = world.getBlockState(blockPos);
-                            Block block = blockState.getBlock();
+                            @Nonnull IBlockState blockState = world.getBlockState(blockPos);
+                            @Nonnull Block block = blockState.getBlock();
                             if (blockState.getBlock().equals(evt.getState().getBlock())) {
                                 if (!entityPlayer.capabilities.isCreativeMode) {
                                     block.onBlockHarvested(world, blockPos, blockState, entityPlayer);

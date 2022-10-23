@@ -18,6 +18,9 @@ import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 @Mod.EventBusSubscriber
 public class EnchantmentEpilepsyFire extends RaryBase {
 
@@ -25,16 +28,17 @@ public class EnchantmentEpilepsyFire extends RaryBase {
         super(typeIn, slots, "epilepsy_fire");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.EPILEPSY_FIRE;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(LivingDamageEvent evt) {
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {

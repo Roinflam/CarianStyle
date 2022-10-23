@@ -13,6 +13,8 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 
+import javax.annotation.Nonnull;
+
 @Mod.EventBusSubscriber
 public class EnchantmentCrucibleScaleTalisman extends RaryBase {
 
@@ -20,17 +22,18 @@ public class EnchantmentCrucibleScaleTalisman extends RaryBase {
         super(typeIn, slots, "crucible_scale_talisman");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.CRUCIBLE_SCALE_TALISMAN;
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage(LivingDamageEvent evt) {
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
             if (evt.getAmount() >= hurter.getMaxHealth()) {
                 int bonusLevel = 0;
-                for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+                for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                     if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }

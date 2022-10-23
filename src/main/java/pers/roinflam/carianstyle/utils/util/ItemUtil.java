@@ -4,9 +4,12 @@ import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.item.Item;
 import pers.roinflam.carianstyle.CarianStyle;
 
+import javax.annotation.Nonnull;
+
 public class ItemUtil {
 
-    public static Item registerItem(Item item, String name, CreativeTabs creativeTabs) {
+    @Nonnull
+    public static Item registerItem(@Nonnull Item item, @Nonnull String name, @Nonnull CreativeTabs creativeTabs) {
         item.setUnlocalizedName(name);
         item.setRegistryName(name);
         item.setCreativeTab(creativeTabs);

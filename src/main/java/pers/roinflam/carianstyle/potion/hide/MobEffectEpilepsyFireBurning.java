@@ -7,6 +7,8 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.potion.flame.FlameBase;
 import pers.roinflam.carianstyle.utils.Reference;
 
+import javax.annotation.Nonnull;
+
 
 public class MobEffectEpilepsyFireBurning extends FlameBase {
 
@@ -15,7 +17,7 @@ public class MobEffectEpilepsyFireBurning extends FlameBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public void onLivingHeal(LivingHealEvent evt) {
+    public void onLivingHeal(@Nonnull LivingHealEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase healer = evt.getEntityLiving();
             if (healer.isPotionActive(this)) {
@@ -29,11 +31,13 @@ public class MobEffectEpilepsyFireBurning extends FlameBase {
         return 1;
     }
 
+    @Nonnull
     @Override
     protected String getLevelOneName() {
         return Reference.MOD_ID + ":blocks/yellow_flame_layer_0";
     }
 
+    @Nonnull
     @Override
     protected String getLevelTwoName() {
         return Reference.MOD_ID + ":blocks/yellow_flame_layer_1";

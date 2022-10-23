@@ -19,6 +19,8 @@ import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.HashMap;
 import java.util.UUID;
 
@@ -39,16 +41,17 @@ public class EnchantmentBlood extends VeryRaryBase {
         }.start();
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.BLOOD;
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {

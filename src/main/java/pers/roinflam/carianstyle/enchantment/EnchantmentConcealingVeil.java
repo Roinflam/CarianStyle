@@ -18,6 +18,8 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -39,12 +41,13 @@ public class EnchantmentConcealingVeil extends VeryRaryBase {
         }.start();
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.CONCEALING_VEIL;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingAttack(LivingAttackEvent evt) {
+    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getEntityLiving() instanceof EntityPlayer) {
                 EntityPlayer hurter = (EntityPlayer) evt.getEntityLiving();
@@ -59,7 +62,7 @@ public class EnchantmentConcealingVeil extends VeryRaryBase {
                 }.start();
             }
             if (evt.getSource().getImmediateSource() instanceof EntityPlayer) {
-                EntityPlayer attacker = (EntityPlayer) evt.getSource().getImmediateSource();
+                @Nullable EntityPlayer attacker = (EntityPlayer) evt.getSource().getImmediateSource();
                 BATTLE.add(attacker.getUniqueID());
                 new SynchronizationTask(60) {
 
@@ -74,13 +77,13 @@ public class EnchantmentConcealingVeil extends VeryRaryBase {
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(TickEvent.PlayerTickEvent evt) {
+    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
         if (!evt.player.world.isRemote) {
             if (evt.phase.equals(TickEvent.Phase.START)) {
-                EntityPlayer entityPlayer = evt.player;
+                @Nonnull EntityPlayer entityPlayer = evt.player;
                 if (entityPlayer.isSneaking() && !BATTLE.contains(entityPlayer.getUniqueID())) {
                     int bonusLevel = 0;
-                    for (ItemStack itemStack : entityPlayer.getArmorInventoryList()) {
+                    for (@Nonnull ItemStack itemStack : entityPlayer.getArmorInventoryList()) {
                         if (!itemStack.isEmpty()) {
                             bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                         }

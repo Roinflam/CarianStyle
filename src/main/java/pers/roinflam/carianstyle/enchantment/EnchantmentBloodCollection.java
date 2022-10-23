@@ -13,6 +13,9 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 @Mod.EventBusSubscriber
 public class EnchantmentBloodCollection extends RaryBase {
 
@@ -20,15 +23,16 @@ public class EnchantmentBloodCollection extends RaryBase {
         super(typeIn, slots, "blood_collection");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.BLOOD_COLLECTION;
     }
 
     @SubscribeEvent
-    public static void onLivingDamage(LivingDamageEvent evt) {
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {

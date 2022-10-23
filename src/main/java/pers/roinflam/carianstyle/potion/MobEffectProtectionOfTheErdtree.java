@@ -9,6 +9,8 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.utils.Reference;
 
+import javax.annotation.Nonnull;
+
 
 public class MobEffectProtectionOfTheErdtree extends IconBase {
 
@@ -17,7 +19,7 @@ public class MobEffectProtectionOfTheErdtree extends IconBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public void onLivingDamage(LivingDamageEvent evt) {
+    public void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             DamageSource damageSource = evt.getSource();
             if (!damageSource.canHarmInCreative() && !damageSource.isDamageAbsolute()) {
@@ -37,6 +39,7 @@ public class MobEffectProtectionOfTheErdtree extends IconBase {
         return true;
     }
 
+    @Nonnull
     @Override
     protected ResourceLocation getResourceLocation() {
         return new ResourceLocation(Reference.MOD_ID, "textures/effect/protection_of_the_erdtree.png");

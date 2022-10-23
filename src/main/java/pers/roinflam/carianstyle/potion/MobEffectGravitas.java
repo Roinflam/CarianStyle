@@ -9,6 +9,8 @@ import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
+import javax.annotation.Nonnull;
+
 
 public class MobEffectGravitas extends IconBase {
 
@@ -21,13 +23,14 @@ public class MobEffectGravitas extends IconBase {
     }
 
     @SubscribeEvent
-    public void onLivingUpdate(LivingEvent.LivingUpdateEvent evt) {
+    public void onLivingUpdate(@Nonnull LivingEvent.LivingUpdateEvent evt) {
         EntityLivingBase entityLiving = evt.getEntityLiving();
         if (entityLiving.isPotionActive(this)) {
             EntityLivingUtil.setJumped(entityLiving);
         }
     }
 
+    @Nonnull
     @Override
     protected ResourceLocation getResourceLocation() {
         return new ResourceLocation(Reference.MOD_ID, "textures/effect/gravitas.png");

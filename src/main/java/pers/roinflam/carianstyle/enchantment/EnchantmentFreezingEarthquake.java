@@ -18,6 +18,7 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
 import java.util.List;
 
 @Mod.EventBusSubscriber
@@ -27,32 +28,33 @@ public class EnchantmentFreezingEarthquake extends RaryBase {
         super(typeIn, slots, "freezing_earthquake");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.FREEZING_EARTHQUAKE;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(LivingDamageEvent evt) {
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
                 if (evt.getAmount() >= evt.getEntityLiving().getMaxHealth() * 0.25) {
                     EntityLivingBase hurter = evt.getEntityLiving();
                     int bonusLevel = 0;
-                    for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+                    for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                         if (!itemStack.isEmpty()) {
                             bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                         }
                     }
                     if (bonusLevel > 0) {
-                        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                        @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
                                 hurter,
                                 3 + (bonusLevel - 1) * 2,
                                 entityLivingBase -> entityLivingBase.onGround && !entityLivingBase.equals(hurter)
                         );
-                        for (EntityLivingBase entityLivingBase : entities) {
+                        for (@Nonnull EntityLivingBase entityLivingBase : entities) {
                             if (entityLivingBase.onGround) {
-                                LivingKnockBackEvent livingKnockBackEvent = ForgeHooks.onLivingKnockBack(entityLivingBase, hurter, bonusLevel * 0.35f, 0, 0);
+                                @Nonnull LivingKnockBackEvent livingKnockBackEvent = ForgeHooks.onLivingKnockBack(entityLivingBase, hurter, bonusLevel * 0.35f, 0, 0);
                                 if (!livingKnockBackEvent.isCanceled()) {
                                     entityLivingBase.motionY = livingKnockBackEvent.getStrength();
                                     entityLivingBase.addPotionEffect(new PotionEffect(CarianStylePotion.FROSTBITE, bonusLevel * 5 * 20, bonusLevel - 1));

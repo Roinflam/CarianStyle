@@ -12,6 +12,8 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
+import javax.annotation.Nonnull;
+
 @Mod.EventBusSubscriber
 public class EnchantmentGoldenDungTurtle extends UncommonBase {
 
@@ -19,12 +21,13 @@ public class EnchantmentGoldenDungTurtle extends UncommonBase {
         super(typeIn, slots, "golden_dung_turtle");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.GOLDEN_DUNG_TURTLE;
     }
 
     @SubscribeEvent
-    public static void onLivingExperienceDrop(LivingExperienceDropEvent evt) {
+    public static void onLivingExperienceDrop(@Nonnull LivingExperienceDropEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getAttackingPlayer() != null) {
                 EntityPlayer player = evt.getAttackingPlayer();

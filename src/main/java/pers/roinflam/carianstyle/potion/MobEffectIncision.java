@@ -15,6 +15,7 @@ import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
+import javax.annotation.Nonnull;
 import java.util.UUID;
 
 
@@ -32,19 +33,19 @@ public class MobEffectIncision extends IconBase {
     }
 
     @Override
-    public void removeAttributesModifiersFromEntity(EntityLivingBase entityLivingBaseIn, AbstractAttributeMap attributeMapIn, int amplifier) {
+    public void removeAttributesModifiersFromEntity(@Nonnull EntityLivingBase entityLivingBaseIn, AbstractAttributeMap attributeMapIn, int amplifier) {
         entityLivingBaseIn.getEntityAttribute(SharedMonsterAttributes.MOVEMENT_SPEED).removeModifier(ID);
         super.removeAttributesModifiersFromEntity(entityLivingBaseIn, attributeMapIn, amplifier);
     }
 
     @Override
-    public void applyAttributesModifiersToEntity(EntityLivingBase entityLivingBaseIn, AbstractAttributeMap attributeMapIn, int amplifier) {
+    public void applyAttributesModifiersToEntity(@Nonnull EntityLivingBase entityLivingBaseIn, AbstractAttributeMap attributeMapIn, int amplifier) {
         entityLivingBaseIn.getEntityAttribute(SharedMonsterAttributes.MOVEMENT_SPEED).applyModifier(new AttributeModifier(ID, NAME, 1.2, 2));
         super.applyAttributesModifiersToEntity(entityLivingBaseIn, attributeMapIn, amplifier);
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public void onLivingHeal(LivingHealEvent evt) {
+    public void onLivingHeal(@Nonnull LivingHealEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase healer = evt.getEntityLiving();
             if (healer.isPotionActive(this)) {
@@ -54,7 +55,7 @@ public class MobEffectIncision extends IconBase {
     }
 
     @Override
-    public void performEffect(EntityLivingBase entityLivingBaseIn, int amplifier) {
+    public void performEffect(@Nonnull EntityLivingBase entityLivingBaseIn, int amplifier) {
         float damage = entityLivingBaseIn.getMaxHealth() * 0.125f / 20;
         new SynchronizationTask(1) {
 
@@ -68,7 +69,7 @@ public class MobEffectIncision extends IconBase {
             }
 
         }.start();
-        IAttributeInstance attributeInstance = entityLivingBaseIn.getEntityAttribute(SharedMonsterAttributes.MOVEMENT_SPEED);
+        @Nonnull IAttributeInstance attributeInstance = entityLivingBaseIn.getEntityAttribute(SharedMonsterAttributes.MOVEMENT_SPEED);
         if (attributeInstance.getModifier(ID) != null) {
             double base = attributeInstance.getModifier(ID).getAmount();
             if (base > 0.3f) {
@@ -83,6 +84,7 @@ public class MobEffectIncision extends IconBase {
         return true;
     }
 
+    @Nonnull
     @Override
     protected ResourceLocation getResourceLocation() {
         return new ResourceLocation(Reference.MOD_ID, "textures/effect/incision.png");

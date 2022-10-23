@@ -15,6 +15,8 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
+import javax.annotation.Nonnull;
+
 @Mod.EventBusSubscriber
 public class EnchantmentLongTailCat extends RaryBase {
 
@@ -22,17 +24,18 @@ public class EnchantmentLongTailCat extends RaryBase {
         super(typeIn, slots, "long_tail_cat");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.LONG_TAIL_CAT;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingAttack(LivingAttackEvent evt) {
+    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().damageType.equals("fall")) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 int bonusLevel = 0;
-                for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+                for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                     if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }

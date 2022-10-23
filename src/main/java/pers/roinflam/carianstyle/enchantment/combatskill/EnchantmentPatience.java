@@ -15,6 +15,8 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.HashMap;
 import java.util.UUID;
 
@@ -35,15 +37,16 @@ public class EnchantmentPatience extends RaryBase {
         }.start();
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.PATIENCE;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
@@ -56,7 +59,7 @@ public class EnchantmentPatience extends RaryBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(LivingDamageEvent evt) {
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
@@ -73,7 +76,7 @@ public class EnchantmentPatience extends RaryBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDeath(LivingDeathEvent evt) {
+    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             PATIENCE.remove(evt.getEntityLiving().getUniqueID());
         }

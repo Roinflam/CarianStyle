@@ -17,6 +17,7 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
+import javax.annotation.Nonnull;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -30,16 +31,17 @@ public class EnchantmentLivingCorpse extends VeryRaryBase {
         super(typeIn, slots, "living_corpse");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.LIVING_CORPSE;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingDeath(LivingDeathEvent evt) {
+    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
             int bonusLevel = 0;
-            for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+            for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                 if (!itemStack.isEmpty()) {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
@@ -88,7 +90,7 @@ public class EnchantmentLivingCorpse extends VeryRaryBase {
 
 
     @SubscribeEvent
-    public static void onEntityJoinWorld(EntityJoinWorldEvent evt) {
+    public static void onEntityJoinWorld(@Nonnull EntityJoinWorldEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getEntity() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = (EntityLivingBase) evt.getEntity();

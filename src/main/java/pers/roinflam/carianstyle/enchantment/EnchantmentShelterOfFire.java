@@ -17,6 +17,8 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
+
 @Mod.EventBusSubscriber
 public class EnchantmentShelterOfFire extends UncommonBase {
 
@@ -24,17 +26,18 @@ public class EnchantmentShelterOfFire extends UncommonBase {
         super(typeIn, slots, "shelter_of_fire");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.SHELTER_OF_FIRE;
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage(LivingDamageEvent evt) {
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
             if (EntityUtil.getFire(hurter) > 0) {
                 int bonusLevel = 0;
-                for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+                for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                     if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
@@ -51,14 +54,14 @@ public class EnchantmentShelterOfFire extends UncommonBase {
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(TickEvent.PlayerTickEvent evt) {
+    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
         if (!evt.player.world.isRemote) {
             if (evt.phase.equals(TickEvent.Phase.START)) {
-                EntityPlayer entityPlayer = evt.player;
+                @Nonnull EntityPlayer entityPlayer = evt.player;
                 if (EntityUtil.getFire(entityPlayer) > 0) {
                     if (entityPlayer.isEntityAlive()) {
                         int bonusLevel = 0;
-                        for (ItemStack itemStack : entityPlayer.getArmorInventoryList()) {
+                        for (@Nonnull ItemStack itemStack : entityPlayer.getArmorInventoryList()) {
                             if (!itemStack.isEmpty()) {
                                 bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                             }

@@ -18,14 +18,18 @@ import pers.roinflam.carianstyle.enchantment.dead.EnchantmentScarletLonia;
 import pers.roinflam.carianstyle.enchantment.law.EnchantmentStarsLaw;
 import pers.roinflam.carianstyle.enchantment.recollect.*;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 public class CarianStyleEnchantments {
+    @Nullable
     public static final EnumEnchantmentType SHIELD = EnumHelper.addEnchantmentType("cs_shield", item -> item instanceof ItemShield);
+    @Nullable
     public static final EnumEnchantmentType ARMS = EnumHelper.addEnchantmentType("cs_arms", item -> item instanceof ItemSword || item instanceof ItemBow);
+    @Nullable
     public static final EnumEnchantmentType PICKAEX = EnumHelper.addEnchantmentType("cs_pickaxe", item -> item instanceof ItemPickaxe);
     public static final int RECOLLECT_ENCHANTABILITY = 38;
     public static final List<Enchantment> ENCHANTMENTS = new ArrayList<Enchantment>();

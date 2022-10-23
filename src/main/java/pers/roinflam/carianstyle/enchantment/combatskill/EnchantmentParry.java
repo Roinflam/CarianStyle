@@ -16,6 +16,8 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
@@ -30,18 +32,19 @@ public class EnchantmentParry extends UncommonBase {
         super(typeIn, slots, "parry");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.PARRY;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingHurt_Shield(LivingHurtEvent evt) {
+    public static void onLivingHurt_Shield(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getAmount() <= 0) {
                 if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                     EntityLivingBase hurter = evt.getEntityLiving();
                     if (hurter.isHandActive()) {
-                        ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
+                        @Nonnull ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
                         if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                             int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                             if (bonusLevel > 0) {
@@ -66,10 +69,10 @@ public class EnchantmentParry extends UncommonBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHurt_Attack(LivingHurtEvent evt) {
+    public static void onLivingHurt_Attack(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (PARRY.containsKey(attacker.getUniqueID())) {
                     evt.setAmount(evt.getAmount() + evt.getAmount() * PARRY.get(attacker.getUniqueID()) * 0.25f);
                     PARRY.remove(attacker.getUniqueID());

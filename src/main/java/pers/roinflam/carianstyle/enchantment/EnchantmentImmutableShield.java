@@ -15,6 +15,9 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 @Mod.EventBusSubscriber
 public class EnchantmentImmutableShield extends RaryBase {
 
@@ -22,21 +25,22 @@ public class EnchantmentImmutableShield extends RaryBase {
         super(typeIn, slots, "immutable_shield");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.IMMUTABLE_SHIELD;
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
             if (hurter.isHandActive()) {
-                ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
+                @Nonnull ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
                 if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     if (bonusLevel > 0) {
                         if (evt.getAmount() <= 0 && evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                            EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                            @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                             attacker.clearActivePotions();
                             hurter.heal(hurter.getMaxHealth() * bonusLevel * 0.01f);
                         } else {

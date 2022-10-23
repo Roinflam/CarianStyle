@@ -8,6 +8,9 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.utils.Reference;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 
 public class MobEffectGoldenVow extends IconBase {
 
@@ -16,7 +19,7 @@ public class MobEffectGoldenVow extends IconBase {
     }
 
     @SubscribeEvent
-    public void onLivingHurt(LivingHurtEvent evt) {
+    public void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             DamageSource damageSource = evt.getSource();
             if (!damageSource.canHarmInCreative()) {
@@ -26,7 +29,7 @@ public class MobEffectGoldenVow extends IconBase {
                     evt.setAmount(evt.getAmount() - evt.getAmount() * (amplifier + 1) * 0.1f);
                 }
                 if (damageSource.getTrueSource() instanceof EntityLivingBase) {
-                    EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
+                    @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
                     if (attacker.isPotionActive(this)) {
                         int amplifier = attacker.getActivePotionEffect(this).getAmplifier();
                         evt.setAmount(evt.getAmount() + evt.getAmount() * (amplifier + 1) * 0.15f);
@@ -41,6 +44,7 @@ public class MobEffectGoldenVow extends IconBase {
         return true;
     }
 
+    @Nonnull
     @Override
     protected ResourceLocation getResourceLocation() {
         return new ResourceLocation(Reference.MOD_ID, "textures/effect/golden_vow.png");

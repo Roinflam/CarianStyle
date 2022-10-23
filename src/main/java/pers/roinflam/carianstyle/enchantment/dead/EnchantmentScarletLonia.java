@@ -23,6 +23,7 @@ import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -37,17 +38,18 @@ public class EnchantmentScarletLonia extends RaryBase {
         super(typeIn, slots, "scarlet_lonia");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.SCARLET_LONIA;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingDeath(LivingDeathEvent evt) {
+    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (!evt.getSource().canHarmInCreative()) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 int bonusLevel = 0;
-                for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+                for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                     if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
@@ -61,13 +63,13 @@ public class EnchantmentScarletLonia extends RaryBase {
                         hurter.setHealth(1);
                         hurter.addPotionEffect(new PotionEffect(MobEffects.SLOWNESS, 30, 6));
 
-                        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                        @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
                                 hurter,
                                 bonusLevel * 4,
                                 entityLivingBase -> !entityLivingBase.equals(hurter)
                         );
-                        for (EntityLivingBase entityLivingBase : entities) {
+                        for (@Nonnull EntityLivingBase entityLivingBase : entities) {
                             double x = entityLivingBase.posX - hurter.posX;
                             double z = entityLivingBase.posZ - hurter.posZ;
                             float stronge = (float) (bonusLevel * 0.7 * Math.max(Math.abs(x), Math.abs(z)) / 14);
@@ -78,7 +80,7 @@ public class EnchantmentScarletLonia extends RaryBase {
 
                             @Override
                             public void run() {
-                                List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                                @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                         EntityLivingBase.class,
                                         hurter,
                                         finalBonusLevel * 2,
@@ -119,7 +121,7 @@ public class EnchantmentScarletLonia extends RaryBase {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingAttack(LivingAttackEvent evt) {
+    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
             if (SCARLET_LONIA.contains(hurter.getUniqueID())) {
@@ -129,7 +131,7 @@ public class EnchantmentScarletLonia extends RaryBase {
     }
 
     @SubscribeEvent
-    public static void onLivingUpdate(LivingEvent.LivingUpdateEvent evt) {
+    public static void onLivingUpdate(@Nonnull LivingEvent.LivingUpdateEvent evt) {
         if (evt.getEntity().world.isRemote) {
             EntityLivingBase entityLiving = evt.getEntityLiving();
             if (SCARLET_LONIA.contains(entityLiving.getUniqueID())) {

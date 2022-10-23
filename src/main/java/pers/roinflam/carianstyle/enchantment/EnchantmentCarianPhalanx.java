@@ -18,6 +18,9 @@ import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 @Mod.EventBusSubscriber
 public class EnchantmentCarianPhalanx extends RaryBase {
 
@@ -25,24 +28,25 @@ public class EnchantmentCarianPhalanx extends RaryBase {
         super(typeIn, slots, "carian_phalanx");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.CARIAN_PHALANX;
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage(LivingDamageEvent evt) {
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             DamageSource damageSource = evt.getSource();
             if (damageSource.getImmediateSource() instanceof EntityArrow && damageSource.getTrueSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         if (RandomUtil.percentageChance(bonusLevel * 2)) {
                             for (int x = -1; x < 2; x++) {
                                 for (int z = -1; z < 2; z++) {
-                                    EntityGlintblades entityGlintblades_show = new EntityGlintblades(attacker, hurter).setDeadTick((int) (55 + x * 7.5 + z * 7.5));
+                                    @Nonnull EntityGlintblades entityGlintblades_show = new EntityGlintblades(attacker, hurter).setDeadTick((int) (55 + x * 7.5 + z * 7.5));
                                     entityGlintblades_show.posX += x;
                                     entityGlintblades_show.posY += 1;
                                     entityGlintblades_show.posZ += z;
@@ -55,7 +59,7 @@ public class EnchantmentCarianPhalanx extends RaryBase {
                                             double posX = entityGlintblades_show.posX;
                                             double posY = entityGlintblades_show.posY;
                                             double posZ = entityGlintblades_show.posZ;
-                                            EntityGlintblades entityGlintblades = new EntityGlintblades(attacker, hurter);
+                                            @Nonnull EntityGlintblades entityGlintblades = new EntityGlintblades(attacker, hurter);
                                             entityGlintblades.posX = posX;
                                             entityGlintblades.posY = posY;
                                             entityGlintblades.posZ = posZ;

@@ -14,6 +14,8 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 
+import javax.annotation.Nonnull;
+
 @Mod.EventBusSubscriber
 public class EnchantmentGreenTurtle extends UncommonBase {
 
@@ -21,16 +23,17 @@ public class EnchantmentGreenTurtle extends UncommonBase {
         super(typeIn, slots, "green_turtle");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.GREEN_TURTLE;
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHeal(LivingHealEvent evt) {
+    public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase entityLivingBase = evt.getEntityLiving();
             int bonusLevel = 0;
-            for (ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
+            for (@Nonnull ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
                 if (!itemStack.isEmpty()) {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
@@ -47,7 +50,7 @@ public class EnchantmentGreenTurtle extends UncommonBase {
     }
 
     @Override
-    public boolean canApplyTogether(Enchantment ench) {
+    public boolean canApplyTogether(@Nonnull Enchantment ench) {
         return super.canApplyTogether(ench) && !ench.equals(Enchantments.PROTECTION) && !ench.equals(CarianStyleEnchantments.BLACK_FLAME_SHELTER);
     }
 

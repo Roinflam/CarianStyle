@@ -14,6 +14,8 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.List;
 
 @Mod.EventBusSubscriber
@@ -23,24 +25,25 @@ public class EnchantmentRealmOfMagic extends VeryRaryBase {
         super(typeIn, slots, "realm_of_magic");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.REALM_OF_MAGIC;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
                 if (evt.getSource().isMagicDamage()) {
-                    EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
-                    List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                    @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
+                    @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                             EntityLivingBase.class,
                             attacker,
                             6,
                             entityLivingBase -> entityLivingBase.getClass() == (attacker.getClass())
                     );
-                    for (EntityLivingBase entityLivingBase : entities) {
-                        for (ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
+                    for (@Nonnull EntityLivingBase entityLivingBase : entities) {
+                        for (@Nonnull ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
                             if (!itemStack.isEmpty()) {
                                 if (EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack) > 0) {
                                     evt.setAmount(evt.getAmount() + evt.getAmount() * 0.5f);

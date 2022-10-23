@@ -20,6 +20,8 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.UUID;
@@ -49,16 +51,17 @@ public class EnchantmentPrayerfulStrike extends VeryRaryBase {
         }.start();
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.PRAYERFUL_STRIKE;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(LivingDamageEvent evt) {
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
@@ -68,7 +71,7 @@ public class EnchantmentPrayerfulStrike extends VeryRaryBase {
                                 float health = Math.min(attacker.getMaxHealth() * 0.05f + hurter.getHealth() * 0.15f, hurter.getMaxHealth() * 0.3f);
                                 evt.setAmount(evt.getAmount() + health);
 
-                                IAttributeInstance attributeInstance = attacker.getEntityAttribute(SharedMonsterAttributes.MAX_HEALTH);
+                                @Nonnull IAttributeInstance attributeInstance = attacker.getEntityAttribute(SharedMonsterAttributes.MAX_HEALTH);
                                 if (attributeInstance.getModifier(ID) == null) {
                                     attributeInstance.applyModifier(new AttributeModifier(ID, NAME, health / 2, 0));
                                 } else {
@@ -103,14 +106,14 @@ public class EnchantmentPrayerfulStrike extends VeryRaryBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDeath(LivingDeathEvent evt) {
+    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
         READY.remove(evt.getEntityLiving().getUniqueID());
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(TickEvent.PlayerTickEvent evt) {
+    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
         if (evt.phase.equals(TickEvent.Phase.START) && evt.player.ticksExisted % 20 == 0) {
-            EntityPlayer entityPlayer = evt.player;
+            @Nonnull EntityPlayer entityPlayer = evt.player;
             if (entityPlayer.isEntityAlive()) {
                 int coolding = READY.getOrDefault(entityPlayer.getUniqueID(), 0);
                 if (coolding >= 4 * 20 && coolding < 8 * 20) {

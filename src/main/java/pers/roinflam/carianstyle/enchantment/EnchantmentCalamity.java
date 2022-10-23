@@ -18,6 +18,8 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.List;
 
 @Mod.EventBusSubscriber
@@ -27,16 +29,17 @@ public class EnchantmentCalamity extends VeryRaryBase {
         super(typeIn, slots, "calamity");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.CALAMITY;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
             int bonusLevel = 0;
-            for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+            for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                 if (!itemStack.isEmpty()) {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
@@ -48,29 +51,29 @@ public class EnchantmentCalamity extends VeryRaryBase {
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(TickEvent.PlayerTickEvent evt) {
+    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
         if (!evt.player.world.isRemote) {
             if (evt.phase.equals(TickEvent.Phase.START)) {
                 if (RandomUtil.percentageChance(2)) {
-                    EntityPlayer entityPlayer = evt.player;
+                    @Nonnull EntityPlayer entityPlayer = evt.player;
                     if (entityPlayer.isEntityAlive()) {
                         int bonusLevel = 0;
                         if (!entityPlayer.getHeldItem(entityPlayer.getActiveHand()).isEmpty()) {
                             bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityPlayer.getHeldItem(entityPlayer.getActiveHand()));
                         }
-                        for (ItemStack itemStack : entityPlayer.getArmorInventoryList()) {
+                        for (@Nonnull ItemStack itemStack : entityPlayer.getArmorInventoryList()) {
                             if (!itemStack.isEmpty()) {
                                 bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                             }
                         }
                         if (bonusLevel > 0) {
-                            List<EntityMob> entities = EntityUtil.getNearbyEntities(
+                            @Nonnull List<EntityMob> entities = EntityUtil.getNearbyEntities(
                                     EntityMob.class,
                                     entityPlayer,
                                     32
                             );
-                            for (EntityMob entityMob : entities) {
-                                EntityLivingBase attackTarget = entityMob.getAttackTarget();
+                            for (@Nonnull EntityMob entityMob : entities) {
+                                @Nullable EntityLivingBase attackTarget = entityMob.getAttackTarget();
                                 if (attackTarget == null || !entityMob.getAttackTarget().isEntityAlive()) {
                                     if (RandomUtil.percentageChance(25)) {
                                         entityMob.setAttackTarget(entityPlayer);

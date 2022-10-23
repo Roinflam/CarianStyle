@@ -14,19 +14,21 @@ import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
 
+import javax.annotation.Nonnull;
+
 @SideOnly(Side.CLIENT)
 public class GlintbladesRender<T extends EntityGlintblades> extends Render<T> {
     protected final Item item;
     private final RenderItem itemRenderer;
 
-    public GlintbladesRender(RenderManager renderManagerIn, Item itemIn, RenderItem itemRendererIn) {
+    public GlintbladesRender(@Nonnull RenderManager renderManagerIn, Item itemIn, RenderItem itemRendererIn) {
         super(renderManagerIn);
         this.item = itemIn;
         this.itemRenderer = itemRendererIn;
     }
 
     @Override
-    public void doRender(T entity, double x, double y, double z, float entityYaw, float partialTicks) {
+    public void doRender(@Nonnull T entity, double x, double y, double z, float entityYaw, float partialTicks) {
         GlStateManager.pushMatrix();
         GlStateManager.translate((float) x, (float) y, (float) z);
         GlStateManager.enableRescaleNormal();

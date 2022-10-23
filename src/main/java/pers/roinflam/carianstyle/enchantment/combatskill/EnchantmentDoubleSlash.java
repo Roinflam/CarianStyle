@@ -14,6 +14,9 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 @Mod.EventBusSubscriber
 public class EnchantmentDoubleSlash extends RaryBase {
 
@@ -21,16 +24,17 @@ public class EnchantmentDoubleSlash extends RaryBase {
         super(typeIn, slots, "double_slash");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.DOUBLE_SLASH;
     }
 
     @SubscribeEvent
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (attacker instanceof EntityPlayer) {
                     if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
                         return;
@@ -55,7 +59,7 @@ public class EnchantmentDoubleSlash extends RaryBase {
     }
 
     @Override
-    public boolean canApplyTogether(Enchantment ench) {
+    public boolean canApplyTogether(@Nonnull Enchantment ench) {
         return !CarianStyleEnchantments.COMBAT_SKILL.contains(ench);
     }
 

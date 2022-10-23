@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.utils.java.random;
 
+import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -22,9 +23,10 @@ public class RandomUtil {
     }
 
 
+    @Nonnull
     public static List<Integer> randomList(int totalNumber, int count) {
-        List<Integer> list = new ArrayList<>();
-        Random rand = new Random();
+        @Nonnull List<Integer> list = new ArrayList<>();
+        @Nonnull Random rand = new Random();
         int leftNumber = totalNumber;
         int leftCount = count;
         for (int i = 0; i < count - 1; i++) {

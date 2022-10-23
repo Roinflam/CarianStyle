@@ -4,6 +4,7 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
+import javax.annotation.Nonnull;
 import java.util.HashMap;
 import java.util.Random;
 
@@ -49,7 +50,7 @@ public abstract class SynchronizationTask implements Runnable {
     }
 
     @SubscribeEvent
-    public void onTick(TickEvent.ServerTickEvent evt) {
+    public void onTick(@Nonnull TickEvent.ServerTickEvent evt) {
         if (evt.phase.equals(TickEvent.Phase.START)) {
             tick++;
             if (first) {

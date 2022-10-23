@@ -16,6 +16,7 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
@@ -37,18 +38,19 @@ public class EnchantmentCausalityPrinciple extends RaryBase {
         }.start();
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.CAUSALITY_PRINCIPLE;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingDamage(LivingDamageEvent evt) {
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (!evt.getSource().canHarmInCreative()) {
                 if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
                     EntityLivingBase hurter = evt.getEntityLiving();
                     int bonusLevel = 0;
-                    for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+                    for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                         if (!itemStack.isEmpty()) {
                             bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                         }
@@ -56,13 +58,13 @@ public class EnchantmentCausalityPrinciple extends RaryBase {
                     if (bonusLevel > 0) {
                         if (CAUSALITY_PRINCIPLE.getOrDefault(hurter.getUniqueID(), 0) >= 5) {
                             CAUSALITY_PRINCIPLE.remove(hurter.getUniqueID());
-                            List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                            @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                     EntityLivingBase.class,
                                     hurter,
                                     bonusLevel * 3,
                                     entityLivingBase -> !entityLivingBase.equals(hurter)
                             );
-                            for (EntityLivingBase entityLivingBase : entities) {
+                            for (@Nonnull EntityLivingBase entityLivingBase : entities) {
                                 entityLivingBase.attackEntityFrom(DamageSource.causeMobDamage(hurter), evt.getAmount() * bonusLevel * 0.75f);
                             }
                         } else {

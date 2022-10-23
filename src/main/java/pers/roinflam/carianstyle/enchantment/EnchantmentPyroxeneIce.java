@@ -21,6 +21,9 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 @Mod.EventBusSubscriber
 public class EnchantmentPyroxeneIce extends UncommonBase {
 
@@ -28,16 +31,17 @@ public class EnchantmentPyroxeneIce extends UncommonBase {
         super(typeIn, slots, "pyroxene_ice");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.PYROXENE_ICE;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingDamage(LivingHurtEvent evt) {
+    public static void onLivingDamage(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             DamageSource damageSource = evt.getSource();
             if (damageSource.getImmediateSource() instanceof EntityArrow && damageSource.getTrueSource() instanceof EntityLivingBase) {
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {

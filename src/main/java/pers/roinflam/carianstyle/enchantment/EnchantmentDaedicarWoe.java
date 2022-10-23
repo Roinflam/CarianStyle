@@ -14,6 +14,8 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
+import javax.annotation.Nonnull;
+
 @Mod.EventBusSubscriber
 public class EnchantmentDaedicarWoe extends VeryRaryBase {
 
@@ -21,16 +23,17 @@ public class EnchantmentDaedicarWoe extends VeryRaryBase {
         super(typeIn, slots, "daedicar_woe");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.DAEDICAR_WOE;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
             int bonusLevel = 0;
-            for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+            for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                 if (!itemStack.isEmpty()) {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }

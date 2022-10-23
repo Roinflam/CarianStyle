@@ -18,6 +18,8 @@ import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.List;
 
 @Mod.EventBusSubscriber
@@ -27,16 +29,17 @@ public class EnchantmentAduraMoonlightSword extends RaryBase {
         super(typeIn, slots, "adura_moonlight_sword");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.ADURA_MOONLIGHT_SWORD;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingDamage(LivingHurtEvent evt) {
+    public static void onLivingDamage(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
@@ -46,14 +49,14 @@ public class EnchantmentAduraMoonlightSword extends RaryBase {
                             }
                         }
                         evt.getSource().setMagicDamage();
-                        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                        @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
                                 hurter,
                                 bonusLevel,
                                 entityLivingBase -> !entityLivingBase.equals(attacker)
                         );
                         if (attacker.world.isDaytime()) {
-                            for (EntityLivingBase entityLivingBase : entities) {
+                            for (@Nonnull EntityLivingBase entityLivingBase : entities) {
                                 if (entityLivingBase.isPotionActive(CarianStylePotion.FROSTBITE)) {
                                     int level = Math.min(entityLivingBase.getActivePotionEffect(CarianStylePotion.FROSTBITE).getAmplifier() + 1, 9);
                                     entityLivingBase.addPotionEffect(new PotionEffect(CarianStylePotion.FROSTBITE, 200, level));

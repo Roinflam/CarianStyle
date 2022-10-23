@@ -4,9 +4,13 @@ import net.minecraft.block.Block;
 import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.item.ItemBlock;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 public class BlockUtil {
 
-    public static ItemBlock registerBlock(Block block, String name, CreativeTabs creativeTabs, boolean itemBlock) {
+    @Nullable
+    public static ItemBlock registerBlock(@Nonnull Block block, @Nonnull String name, @Nonnull CreativeTabs creativeTabs, boolean itemBlock) {
         block.setUnlocalizedName(name);
         block.setRegistryName(name);
         block.setCreativeTab(creativeTabs);

@@ -16,6 +16,9 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 @Mod.EventBusSubscriber
 public class EnchantmentShieldBash extends UncommonBase {
 
@@ -23,18 +26,19 @@ public class EnchantmentShieldBash extends UncommonBase {
         super(typeIn, slots, "shield_bash");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.SHIELD_BASH;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (hurter.isHandActive()) {
-                    ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
+                    @Nonnull ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
                     if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                         if (bonusLevel > 0) {

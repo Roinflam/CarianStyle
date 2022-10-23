@@ -10,6 +10,8 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.utils.Reference;
 
+import javax.annotation.Nonnull;
+
 
 public class MobEffectBadOmen extends IconBase {
 
@@ -21,7 +23,7 @@ public class MobEffectBadOmen extends IconBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public void onLivingHurt(LivingHurtEvent evt) {
+    public void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
             if (hurter.isPotionActive(this)) {
@@ -31,7 +33,7 @@ public class MobEffectBadOmen extends IconBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public void onLivingHeal(LivingHealEvent evt) {
+    public void onLivingHeal(@Nonnull LivingHealEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase healer = evt.getEntityLiving();
             if (healer.isPotionActive(this)) {
@@ -45,6 +47,7 @@ public class MobEffectBadOmen extends IconBase {
         return duration % 20 == 0;
     }
 
+    @Nonnull
     @Override
     protected ResourceLocation getResourceLocation() {
         return new ResourceLocation(Reference.MOD_ID, "textures/effect/bad_omen.png");

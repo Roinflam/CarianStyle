@@ -17,6 +17,8 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
+import javax.annotation.Nonnull;
+
 @Mod.EventBusSubscriber
 public class EnchantmentBlackFlameShelter extends RaryBase {
 
@@ -24,18 +26,19 @@ public class EnchantmentBlackFlameShelter extends RaryBase {
         super(typeIn, slots, "black_flame_shelter");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.BLACK_FLAME_SHELTER;
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage(LivingDamageEvent evt) {
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             DamageSource damageSource = evt.getSource();
             if (!damageSource.isMagicDamage() && !damageSource.isUnblockable()) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 int bonusLevel = 0;
-                for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+                for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                     if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
@@ -48,11 +51,11 @@ public class EnchantmentBlackFlameShelter extends RaryBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHeal(LivingHealEvent evt) {
+    public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase entityLivingBase = evt.getEntityLiving();
             int bonusLevel = 0;
-            for (ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
+            for (@Nonnull ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
                 if (!itemStack.isEmpty()) {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }

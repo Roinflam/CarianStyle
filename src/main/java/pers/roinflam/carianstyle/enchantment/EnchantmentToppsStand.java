@@ -15,6 +15,8 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.List;
 
 @Mod.EventBusSubscriber
@@ -24,22 +26,23 @@ public class EnchantmentToppsStand extends VeryRaryBase {
         super(typeIn, slots, "topps_stand");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.TOPPS_STAND;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(LivingDamageEvent evt) {
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().isMagicDamage()) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                         EntityLivingBase.class,
                         hurter,
                         6
                 );
                 if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
-                    EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
+                    @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
                     entities.addAll(EntityUtil.getNearbyEntities(
                             EntityLivingBase.class,
                             attacker,
@@ -48,7 +51,7 @@ public class EnchantmentToppsStand extends VeryRaryBase {
                 }
                 for (Entity entity : entities) {
                     EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
-                    for (ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
+                    for (@Nonnull ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
                         if (!itemStack.isEmpty()) {
                             if (EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack) > 0) {
                                 evt.setCanceled(true);

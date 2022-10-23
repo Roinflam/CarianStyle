@@ -14,6 +14,9 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 @Mod.EventBusSubscriber
 public class EnchantmentFireGivesPower extends UncommonBase {
 
@@ -21,15 +24,16 @@ public class EnchantmentFireGivesPower extends UncommonBase {
         super(typeIn, slots, "fire_gives_power");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.FIRE_GIVES_POWER;
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage_Attack(LivingDamageEvent evt) {
+    public static void onLivingDamage_Attack(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
@@ -50,7 +54,7 @@ public class EnchantmentFireGivesPower extends UncommonBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage_Hurt(LivingDamageEvent evt) {
+    public static void onLivingDamage_Hurt(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
             if (EntityUtil.getFire(hurter) > 0) {

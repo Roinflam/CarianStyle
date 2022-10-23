@@ -21,6 +21,7 @@ import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -34,16 +35,17 @@ public class EnchantmentAncientDragonLightning extends RaryBase {
         super(typeIn, slots, "ancient_dragon_lightning");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.ANCIENT_DRAGON_LIGHTNING;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingDeath(LivingDeathEvent evt) {
+    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
             int bonusLevel = 0;
-            for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+            for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                 if (!itemStack.isEmpty()) {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
@@ -52,13 +54,13 @@ public class EnchantmentAncientDragonLightning extends RaryBase {
                 if (!THUNDER.contains(hurter.getUniqueID())) {
                     if (!hurter.isDead) {
                         THUNDER.add(hurter.getUniqueID());
-                        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                        @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
                                 hurter,
                                 60,
                                 15,
                                 entityLivingBase -> !entityLivingBase.equals(hurter));
-                        List<Integer> list = RandomUtil.randomList(bonusLevel * 100, entities.size());
+                        @Nonnull List<Integer> list = RandomUtil.randomList(bonusLevel * 100, entities.size());
                         for (int i = 0; i < list.size(); i++) {
                             EntityLivingBase entityLivingBase = entities.get(i);
                             int timeLightning = Math.min(list.get(i), bonusLevel * 15);

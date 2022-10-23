@@ -17,6 +17,8 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -29,18 +31,19 @@ public class EnchantmentGreatbladePhalanx extends RaryBase {
         super(typeIn, slots, "greatblade_phalanx");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.GREATBLADE_PHALANX;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingDeath(LivingDeathEvent evt) {
+    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
                 int bonusLevel = 0;
-                for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+                for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                     if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
@@ -48,7 +51,7 @@ public class EnchantmentGreatbladePhalanx extends RaryBase {
                 if (bonusLevel > 0) {
                     if (!DEAD.contains(hurter.getUniqueID())) {
                         for (int i = 0; i < 3; i++) {
-                            EntityGlintblades entityGlintblades_show = new EntityGlintblades(hurter, attacker).setDeadTick(75 + i * 25).setSize(7.5f);
+                            @Nonnull EntityGlintblades entityGlintblades_show = new EntityGlintblades(hurter, attacker).setDeadTick(75 + i * 25).setSize(7.5f);
                             entityGlintblades_show.posY += 5;
                             if (i == 0) {
                                 entityGlintblades_show.posX -= 10;
@@ -69,7 +72,7 @@ public class EnchantmentGreatbladePhalanx extends RaryBase {
                                     double x = entityGlintblades_show.posX;
                                     double y = entityGlintblades_show.posY;
                                     double z = entityGlintblades_show.posZ;
-                                    EntityGlintblades entityGlintblades = new EntityGlintblades(hurter, attacker);
+                                    @Nonnull EntityGlintblades entityGlintblades = new EntityGlintblades(hurter, attacker);
                                     entityGlintblades.setSize(7.5f);
                                     entityGlintblades.posX = x;
                                     entityGlintblades.posY = y;

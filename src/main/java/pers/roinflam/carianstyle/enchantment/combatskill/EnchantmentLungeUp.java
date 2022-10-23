@@ -16,6 +16,9 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import static net.minecraft.init.MobEffects.SLOWNESS;
 
 @Mod.EventBusSubscriber
@@ -25,16 +28,17 @@ public class EnchantmentLungeUp extends RaryBase {
         super(typeIn, slots, "lunge_up");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.LUNGE_UP;
     }
 
     @SubscribeEvent
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (attacker.isSprinting()) {
                     if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
@@ -46,7 +50,7 @@ public class EnchantmentLungeUp extends RaryBase {
                                 @Override
                                 public void run() {
                                     if (attacker.isEntityAlive()) {
-                                        LivingKnockBackEvent livingKnockBackEvent = ForgeHooks.onLivingKnockBack(hurter, attacker, bonusLevel * 0.3f, 0, 0);
+                                        @Nonnull LivingKnockBackEvent livingKnockBackEvent = ForgeHooks.onLivingKnockBack(hurter, attacker, bonusLevel * 0.3f, 0, 0);
                                         if (!livingKnockBackEvent.isCanceled()) {
                                             hurter.motionY = livingKnockBackEvent.getStrength();
                                         }

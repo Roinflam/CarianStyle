@@ -19,6 +19,8 @@ import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -49,16 +51,17 @@ public class EnchantmentGravitas extends UncommonBase {
         }.start();
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.GRAVITAS;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(LivingDamageEvent evt) {
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
@@ -71,20 +74,20 @@ public class EnchantmentGravitas extends UncommonBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDeath(LivingDeathEvent evt) {
+    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             ACTIVE.remove(evt.getEntityLiving().getUniqueID());
         }
     }
 
     @SubscribeEvent
-    public static void onLivingUpdate(LivingEvent.LivingUpdateEvent evt) {
+    public static void onLivingUpdate(@Nonnull LivingEvent.LivingUpdateEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase entityLivingBase = evt.getEntityLiving();
             if (entityLivingBase.isEntityAlive()) {
                 if (ACTIVE.containsKey(entityLivingBase.getUniqueID())) {
-                    List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(EntityLivingBase.class, entityLivingBase, 12, e -> !e.equals(entityLivingBase));
-                    for (EntityLivingBase e : entities) {
+                    @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(EntityLivingBase.class, entityLivingBase, 12, e -> !e.equals(entityLivingBase));
+                    for (@Nonnull EntityLivingBase e : entities) {
                         e.addPotionEffect(new PotionEffect(CarianStylePotion.GRAVITAS, 2, 9));
                     }
                 }

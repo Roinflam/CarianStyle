@@ -15,6 +15,8 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
+
 @Mod.EventBusSubscriber
 public class EnchantmentRegressivePrinciple extends RaryBase {
 
@@ -22,19 +24,20 @@ public class EnchantmentRegressivePrinciple extends RaryBase {
         super(typeIn, slots, "regressive_principle");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.REGRESSIVE_PRINCIPLE;
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(TickEvent.PlayerTickEvent evt) {
+    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
         if (!evt.player.world.isRemote) {
             if (evt.phase.equals(TickEvent.Phase.START)) {
                 if (RandomUtil.percentageChance(5)) {
-                    EntityPlayer entityPlayer = evt.player;
+                    @Nonnull EntityPlayer entityPlayer = evt.player;
                     if (entityPlayer.isEntityAlive()) {
                         int bonusLevel = 0;
-                        for (ItemStack itemStack : entityPlayer.getArmorInventoryList()) {
+                        for (@Nonnull ItemStack itemStack : entityPlayer.getArmorInventoryList()) {
                             if (!itemStack.isEmpty()) {
                                 bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                             }

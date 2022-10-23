@@ -15,6 +15,7 @@ import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
+import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -44,14 +45,14 @@ public class NetworkRegistryHandler {
 
         @SubscribeEvent
         @SideOnly(Side.CLIENT)
-        public static void onClientCustomPacket(FMLNetworkEvent.ClientCustomPacketEvent evt) {
+        public static void onClientCustomPacket(@Nonnull FMLNetworkEvent.ClientCustomPacketEvent evt) {
             ByteBuf byteBuf = evt.getPacket().payload();
-            Minecraft minecraft = Minecraft.getMinecraft();
+            @Nonnull Minecraft minecraft = Minecraft.getMinecraft();
             minecraft.addScheduledTask(() -> {
                 EntityPlayer player = minecraft.player;
                 int serialNumber = byteBuf.readInt();
                 int length = byteBuf.readInt();
-                List<Integer> entities = new ArrayList<>();
+                @Nonnull List<Integer> entities = new ArrayList<>();
                 for (int i = 0; i < length; i++) {
                     entities.add(byteBuf.readInt());
                 }
@@ -69,7 +70,7 @@ public class NetworkRegistryHandler {
                 entites_id.remove(id);
             }
 
-            PacketBuffer packetBuffer = new PacketBuffer(Unpooled.buffer());
+            @Nonnull PacketBuffer packetBuffer = new PacketBuffer(Unpooled.buffer());
             packetBuffer.writeInt(serialNumber);
             packetBuffer.writeInt(entites_id.size());
             for (Integer integer : entites_id) {

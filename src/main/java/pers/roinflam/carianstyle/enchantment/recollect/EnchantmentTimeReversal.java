@@ -15,6 +15,8 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
@@ -29,16 +31,17 @@ public class EnchantmentTimeReversal extends VeryRaryBase {
         super(typeIn, slots, "time_reversal");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.TIME_REVERSAL;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingDeath(LivingDeathEvent evt) {
+    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
             int bonusLevel = 0;
-            for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+            for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                 if (!itemStack.isEmpty()) {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
@@ -78,11 +81,11 @@ public class EnchantmentTimeReversal extends VeryRaryBase {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingAttack(LivingAttackEvent evt) {
+    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
             int bonusLevel = 0;
-            for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+            for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                 if (!itemStack.isEmpty()) {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
@@ -93,7 +96,7 @@ public class EnchantmentTimeReversal extends VeryRaryBase {
                         evt.setCanceled(true);
                         REVERSAL.put(hurter.getUniqueID(), REVERSAL.get(hurter.getUniqueID()) + evt.getAmount());
                         if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
-                            EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
+                            @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
                             attacker.attackEntityFrom(evt.getSource(), evt.getAmount());
                         }
                     }

@@ -16,6 +16,7 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
 import java.util.List;
 
 @Mod.EventBusSubscriber
@@ -25,12 +26,13 @@ public class EnchantmentDragonBreathCorruption extends RaryBase {
         super(typeIn, slots, "dragon_breath_corruption");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.DRAGON_BREATH_CORRUPTION;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onProjectileImpact_Arrow(ProjectileImpactEvent.Arrow evt) {
+    public static void onProjectileImpact_Arrow(@Nonnull ProjectileImpactEvent.Arrow evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getArrow().shootingEntity != null && evt.getRayTraceResult().entityHit == null) {
                 EntityArrow entityArrow = evt.getArrow();
@@ -38,12 +40,12 @@ public class EnchantmentDragonBreathCorruption extends RaryBase {
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
-                        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                        @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
                                 entityArrow,
                                 bonusLevel * 2
                         );
-                        for (EntityLivingBase entityLivingBase : entities) {
+                        for (@Nonnull EntityLivingBase entityLivingBase : entities) {
                             entityLivingBase.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_ROT, bonusLevel * 5 * 20, bonusLevel - 1));
                         }
                     }

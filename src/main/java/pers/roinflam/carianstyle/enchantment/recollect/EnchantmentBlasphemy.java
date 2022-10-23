@@ -14,6 +14,9 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 @Mod.EventBusSubscriber
 public class EnchantmentBlasphemy extends VeryRaryBase {
 
@@ -21,15 +24,16 @@ public class EnchantmentBlasphemy extends VeryRaryBase {
         super(typeIn, slots, "blasphemy");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.BLASPHEMY;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDeath(LivingDeathEvent evt) {
+    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase killer = (EntityLivingBase) evt.getSource().getImmediateSource();
+                @Nullable EntityLivingBase killer = (EntityLivingBase) evt.getSource().getImmediateSource();
                 EntityLivingBase deader = evt.getEntityLiving();
                 if (killer.isEntityAlive() && !evt.getEntityLiving().equals(killer)) {
                     if (!killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
@@ -37,8 +41,8 @@ public class EnchantmentBlasphemy extends VeryRaryBase {
                         if (bonusLevel > 0) {
                             killer.heal(deader.getMaxHealth() * 0.1f);
                             if (killer instanceof EntityPlayer) {
-                                EntityPlayer entityPlayer = (EntityPlayer) killer;
-                                FoodStats foodStats = entityPlayer.getFoodStats();
+                                @Nonnull EntityPlayer entityPlayer = (EntityPlayer) killer;
+                                @Nonnull FoodStats foodStats = entityPlayer.getFoodStats();
                                 foodStats.setFoodLevel(Math.min(foodStats.getFoodLevel() + 2, 20));
                             }
                         }

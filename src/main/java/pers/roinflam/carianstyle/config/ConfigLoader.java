@@ -4,6 +4,7 @@ import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import org.apache.logging.log4j.Logger;
 
+import javax.annotation.Nonnull;
 import java.util.Arrays;
 import java.util.List;
 
@@ -13,7 +14,7 @@ public class ConfigLoader {
     private static Configuration config;
     private static Logger logger;
 
-    public ConfigLoader(FMLPreInitializationEvent evt) {
+    public ConfigLoader(@Nonnull FMLPreInitializationEvent evt) {
         logger = evt.getModLog();
         config = new Configuration(evt.getSuggestedConfigurationFile());
 
@@ -23,7 +24,7 @@ public class ConfigLoader {
 
     public static void load() {
         logger.info("Started loading config.");
-        String comment = "Fill in the id of the enchantment you want to disable registration here, you can find the id of the relevant enchantment in en_us.lang.";
+        @Nonnull String comment = "Fill in the id of the enchantment you want to disable registration here, you can find the id of the relevant enchantment in en_us.lang.";
 
         uninstall_enchantment = Arrays.asList(config.get(Configuration.CATEGORY_GENERAL, "uninstall", new String[]{}, comment).getStringList());
 

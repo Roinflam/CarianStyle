@@ -14,6 +14,8 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -26,16 +28,17 @@ public class EnchantmentGoldenLaw extends VeryRaryBase {
         super(typeIn, slots, "golden_law");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.GOLDEN_LAW;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (!evt.getSource().canHarmInCreative()) {
                 if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                    EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                    @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                     if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                         if (bonusLevel > 0) {
@@ -58,7 +61,7 @@ public class EnchantmentGoldenLaw extends VeryRaryBase {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingAttack(LivingAttackEvent evt) {
+    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (!evt.getSource().canHarmInCreative()) {
                 EntityLivingBase hurter = evt.getEntityLiving();

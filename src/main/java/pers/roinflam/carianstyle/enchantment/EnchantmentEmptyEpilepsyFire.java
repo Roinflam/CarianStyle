@@ -18,6 +18,8 @@ import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
+import javax.annotation.Nonnull;
+
 @Mod.EventBusSubscriber
 public class EnchantmentEmptyEpilepsyFire extends RaryBase {
 
@@ -25,12 +27,13 @@ public class EnchantmentEmptyEpilepsyFire extends RaryBase {
         super(typeIn, slots, "empty_epilepsy_fire");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.EMPTY_EPILEPSY_FIRE;
     }
 
     @SubscribeEvent
-    public static void onProjectileImpact_Arrow(ProjectileImpactEvent.Arrow evt) {
+    public static void onProjectileImpact_Arrow(@Nonnull ProjectileImpactEvent.Arrow evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getArrow().shootingEntity != null && evt.getRayTraceResult().entityHit instanceof EntityLivingBase) {
                 EntityArrow entityArrow = evt.getArrow();

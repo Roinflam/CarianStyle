@@ -16,6 +16,8 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
+import javax.annotation.Nonnull;
+
 @Mod.EventBusSubscriber
 public class EnchantmentContinuousShooting extends VeryRaryBase {
 
@@ -23,12 +25,13 @@ public class EnchantmentContinuousShooting extends VeryRaryBase {
         super(typeIn, slots, "continuous_shooting");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.CONTINUOUS_SHOOTING;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onProjectileImpact_Arrow(ProjectileImpactEvent.Arrow evt) {
+    public static void onProjectileImpact_Arrow(@Nonnull ProjectileImpactEvent.Arrow evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getArrow().shootingEntity != null && evt.getRayTraceResult().entityHit != null) {
                 EntityArrow entityArrow = evt.getArrow();
@@ -42,7 +45,7 @@ public class EnchantmentContinuousShooting extends VeryRaryBase {
     }
 
     @SubscribeEvent
-    public static void onLivingUpdate(LivingEvent.LivingUpdateEvent evt) {
+    public static void onLivingUpdate(@Nonnull LivingEvent.LivingUpdateEvent evt) {
         EntityLivingBase entityLivingBase = evt.getEntityLiving();
         if (entityLivingBase.isHandActive()) {
             if (!entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()).isEmpty()) {
@@ -62,7 +65,7 @@ public class EnchantmentContinuousShooting extends VeryRaryBase {
     }
 
     @Override
-    public boolean canApplyTogether(Enchantment ench) {
+    public boolean canApplyTogether(@Nonnull Enchantment ench) {
         return !CarianStyleEnchantments.COMBAT_SKILL.contains(ench) && !ench.equals(Enchantments.INFINITY);
     }
 }

@@ -19,6 +19,8 @@ import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import pers.roinflam.carianstyle.base.potion.NetworkBase;
 
+import javax.annotation.Nonnull;
+
 public abstract class FlameBase extends NetworkBase {
 
     protected FlameBase(boolean isBadEffectIn, int liquidColorIn, String name) {
@@ -27,11 +29,11 @@ public abstract class FlameBase extends NetworkBase {
     }
 
     @SideOnly(Side.CLIENT)
-    public void renderFireInFirstPerson(String iconName) {
-        Minecraft minecraft = Minecraft.getMinecraft();
+    public void renderFireInFirstPerson(@Nonnull String iconName) {
+        @Nonnull Minecraft minecraft = Minecraft.getMinecraft();
 
-        Tessellator tessellator = Tessellator.getInstance();
-        BufferBuilder builder = tessellator.getBuffer();
+        @Nonnull Tessellator tessellator = Tessellator.getInstance();
+        @Nonnull BufferBuilder builder = tessellator.getBuffer();
         GlStateManager.disableAlpha();
         GlStateManager.disableLighting();
         GlStateManager.color(1.0F, 1.0F, 1.0F, 0.9F);
@@ -42,7 +44,7 @@ public abstract class FlameBase extends NetworkBase {
 
         for (int i = 0; i < 2; i++) {
             GlStateManager.pushMatrix();
-            TextureAtlasSprite sprite = minecraft.getTextureMapBlocks().getAtlasSprite(iconName);
+            @Nonnull TextureAtlasSprite sprite = minecraft.getTextureMapBlocks().getAtlasSprite(iconName);
             minecraft.getTextureManager().bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
             float minU = sprite.getMinU();
             float maxU = sprite.getMaxU();
@@ -68,19 +70,19 @@ public abstract class FlameBase extends NetworkBase {
     }
 
     @SideOnly(Side.CLIENT)
-    public void renderEntityOnFire(Entity entity, double posX, double posY, double posZ, String iconName_0, String iconName_1) {
-        Minecraft minecraft = Minecraft.getMinecraft();
+    public void renderEntityOnFire(@Nonnull Entity entity, double posX, double posY, double posZ, @Nonnull String iconName_0, @Nonnull String iconName_1) {
+        @Nonnull Minecraft minecraft = Minecraft.getMinecraft();
 
         GlStateManager.disableLighting();
-        TextureMap textureMap = Minecraft.getMinecraft().getTextureMapBlocks();
-        TextureAtlasSprite blueFireLayer1 = textureMap.getAtlasSprite(iconName_0);
-        TextureAtlasSprite blueFireLayer2 = textureMap.getAtlasSprite(iconName_1);
+        @Nonnull TextureMap textureMap = Minecraft.getMinecraft().getTextureMapBlocks();
+        @Nonnull TextureAtlasSprite blueFireLayer1 = textureMap.getAtlasSprite(iconName_0);
+        @Nonnull TextureAtlasSprite blueFireLayer2 = textureMap.getAtlasSprite(iconName_1);
         GlStateManager.pushMatrix();
         GlStateManager.translate((float) posX, (float) posY, (float) posZ);
         float scale = entity.width * 1.4F;
         GlStateManager.scale(scale, scale, scale);
-        Tessellator tessellator = Tessellator.getInstance();
-        BufferBuilder builder = tessellator.getBuffer();
+        @Nonnull Tessellator tessellator = Tessellator.getInstance();
+        @Nonnull BufferBuilder builder = tessellator.getBuffer();
         float renderX = 0.5F;
         float height = entity.height / scale;
         float renderY = (float) (entity.posY - entity.getEntityBoundingBox().minY);
@@ -92,7 +94,7 @@ public abstract class FlameBase extends NetworkBase {
         builder.begin(7, DefaultVertexFormats.POSITION_TEX);
 
         while (height > 0.0F) {
-            TextureAtlasSprite sprite = stage % 2 == 0 ? blueFireLayer1 : blueFireLayer2;
+            @Nonnull TextureAtlasSprite sprite = stage % 2 == 0 ? blueFireLayer1 : blueFireLayer2;
             minecraft.renderEngine.bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
             float minU = sprite.getMinU();
             float minV = sprite.getMinV();
@@ -123,7 +125,7 @@ public abstract class FlameBase extends NetworkBase {
 
     @SideOnly(Side.CLIENT)
     @SubscribeEvent
-    public void onRenderLiving(RenderLivingEvent.Specials.Post evt) {
+    public void onRenderLiving(@Nonnull RenderLivingEvent.Specials.Post evt) {
         EntityLivingBase entityLivingBase = evt.getEntity();
         if (isAction(entityLivingBase.getEntityId())) {
             float partialTicks = evt.getPartialRenderTick();

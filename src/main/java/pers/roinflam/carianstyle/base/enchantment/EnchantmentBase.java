@@ -6,9 +6,11 @@ import net.minecraft.inventory.EntityEquipmentSlot;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
+import javax.annotation.Nonnull;
+
 public abstract class EnchantmentBase extends Enchantment {
 
-    protected EnchantmentBase(Rarity rarityIn, EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots, String name) {
+    protected EnchantmentBase(@Nonnull Rarity rarityIn, @Nonnull EnumEnchantmentType typeIn, @Nonnull EntityEquipmentSlot[] slots, String name) {
         super(rarityIn, typeIn, slots);
         EnchantmentUtil.registerEnchantment(this, name);
         CarianStyleEnchantments.ENCHANTMENTS.add(this);

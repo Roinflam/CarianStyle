@@ -16,6 +16,7 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
 import java.util.List;
 
 @Mod.EventBusSubscriber
@@ -25,29 +26,30 @@ public class EnchantmentExclude extends RaryBase {
         super(typeIn, slots, "exclude");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.EXCLUDE;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingAttack(LivingAttackEvent evt) {
+    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 int bonusLevel = 0;
-                for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+                for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
                     if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
                 if (bonusLevel > 0) {
-                    List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                    @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                             EntityLivingBase.class,
                             hurter,
                             (int) (5 + (bonusLevel - 1) * 0.75),
                             entityLivingBase -> !entityLivingBase.equals(hurter)
                     );
-                    for (Entity entity : entities) {
+                    for (@Nonnull Entity entity : entities) {
                         EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
 
                         double x = hurter.posX - entityLivingBase.posX;

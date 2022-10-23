@@ -14,32 +14,34 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.*;
 import pers.roinflam.carianstyle.utils.IHasModel;
 
+import javax.annotation.Nonnull;
+
 @Mod.EventBusSubscriber
 public class RegistryHandler {
 
     @SubscribeEvent
-    public static void onEnchantmentRegister(RegistryEvent.Register<Enchantment> evt) {
+    public static void onEnchantmentRegister(@Nonnull RegistryEvent.Register<Enchantment> evt) {
         CarianStyleEnchantments.ENCHANTMENTS.removeIf(enchantment -> ConfigLoader.uninstall_enchantment.contains(enchantment.getName()));
         evt.getRegistry().registerAll(CarianStyleEnchantments.ENCHANTMENTS.toArray(new Enchantment[0]));
     }
 
     @SubscribeEvent
-    public static void onPotionRegister(RegistryEvent.Register<Potion> evt) {
+    public static void onPotionRegister(@Nonnull RegistryEvent.Register<Potion> evt) {
         evt.getRegistry().registerAll(CarianStylePotion.POTIONS.toArray(new Potion[0]));
     }
 
     @SubscribeEvent
-    public static void onBlockRegister(RegistryEvent.Register<Block> evt) {
+    public static void onBlockRegister(@Nonnull RegistryEvent.Register<Block> evt) {
         evt.getRegistry().registerAll(CarianStyleBlocks.BLOCKS.toArray(new Block[0]));
     }
 
     @SubscribeEvent
-    public static void onEntityEntryRegister(RegistryEvent.Register<EntityEntry> evt) {
+    public static void onEntityEntryRegister(@Nonnull RegistryEvent.Register<EntityEntry> evt) {
         evt.getRegistry().registerAll(CarianStyleEntity.ENTITY_ENTRIES.toArray(new EntityEntry[0]));
     }
 
     @SubscribeEvent
-    public static void onItemRegister(RegistryEvent.Register<Item> evt) {
+    public static void onItemRegister(@Nonnull RegistryEvent.Register<Item> evt) {
         evt.getRegistry().registerAll(CarianStyleItem.ITEMS.toArray(new Item[0]));
     }
 

@@ -12,6 +12,8 @@ import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
+
 
 public class MobEffectScarletRot extends IconBase {
 
@@ -23,7 +25,7 @@ public class MobEffectScarletRot extends IconBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public void onLivingHeal(LivingHealEvent evt) {
+    public void onLivingHeal(@Nonnull LivingHealEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase healer = evt.getEntityLiving();
             if (healer.isPotionActive(this)) {
@@ -46,6 +48,7 @@ public class MobEffectScarletRot extends IconBase {
         return duration % 20 == 0;
     }
 
+    @Nonnull
     @Override
     protected ResourceLocation getResourceLocation() {
         return new ResourceLocation(Reference.MOD_ID, "textures/effect/scarlet_rot.png");

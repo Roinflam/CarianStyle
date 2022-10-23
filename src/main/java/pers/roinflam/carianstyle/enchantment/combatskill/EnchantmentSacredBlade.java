@@ -16,6 +16,8 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
@@ -27,16 +29,17 @@ public class EnchantmentSacredBlade extends UncommonBase {
         super(typeIn, slots, "sacred_blade");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.SACRED_BLADE;
     }
 
     @SubscribeEvent
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
@@ -46,7 +49,7 @@ public class EnchantmentSacredBlade extends UncommonBase {
                             attacker.heal(Math.min(damage * 0.2f, attacker.getMaxHealth() * 0.1f));
 
                             double injuryReduction = Math.max(bonusLevel * -0.05, -0.99);
-                            IAttributeInstance attributeInstance = attacker.getEntityAttribute(SharedMonsterAttributes.ATTACK_DAMAGE);
+                            @Nonnull IAttributeInstance attributeInstance = attacker.getEntityAttribute(SharedMonsterAttributes.ATTACK_DAMAGE);
                             if (attributeInstance.getModifier(ID) == null) {
                                 attributeInstance.applyModifier(new AttributeModifier(ID, NAME, injuryReduction, 2));
                             } else {

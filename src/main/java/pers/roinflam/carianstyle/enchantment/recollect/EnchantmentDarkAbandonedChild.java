@@ -17,6 +17,8 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,23 +29,24 @@ public class EnchantmentDarkAbandonedChild extends VeryRaryBase {
         super(typeIn, slots, "dark_abandoned_child");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.DARK_ABANDONED_CHILD;
     }
 
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingAttack(LivingAttackEvent evt) {
+    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
                         evt.getSource().setMagicDamage().setDamageBypassesArmor();
                         if (hurter.getActivePotionEffects().size() > 0) {
-                            List<PotionEffect> potionEffects = new ArrayList<>(hurter.getActivePotionEffects());
+                            @Nonnull List<PotionEffect> potionEffects = new ArrayList<>(hurter.getActivePotionEffects());
                             potionEffects.removeIf(potionEffect ->
                                     potionEffect.getPotion().isBadEffect() ||
                                             potionEffect.getPotion().isInstant() ||
@@ -62,7 +65,7 @@ public class EnchantmentDarkAbandonedChild extends VeryRaryBase {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGH)
-    public static void onLivingDamage(LivingDamageEvent evt) {
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (!evt.getSource().canHarmInCreative()) {
                 EntityLivingBase hurter = evt.getEntityLiving();
@@ -79,10 +82,10 @@ public class EnchantmentDarkAbandonedChild extends VeryRaryBase {
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(TickEvent.PlayerTickEvent evt) {
+    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
         if (!evt.player.world.isRemote && !evt.player.world.isDaytime()) {
             if (evt.phase.equals(TickEvent.Phase.START)) {
-                EntityPlayer entityPlayer = evt.player;
+                @Nonnull EntityPlayer entityPlayer = evt.player;
                 if (entityPlayer.isEntityAlive()) {
                     if (!entityPlayer.getHeldItem(entityPlayer.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityPlayer.getHeldItem(entityPlayer.getActiveHand()));

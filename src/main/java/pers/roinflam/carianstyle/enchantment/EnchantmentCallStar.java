@@ -20,6 +20,7 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
 import java.util.List;
 
 @Mod.EventBusSubscriber
@@ -29,12 +30,13 @@ public class EnchantmentCallStar extends RaryBase {
         super(typeIn, slots, "call_star");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.CALL_STAR;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onProjectileImpact_Arrow(ProjectileImpactEvent.Arrow evt) {
+    public static void onProjectileImpact_Arrow(@Nonnull ProjectileImpactEvent.Arrow evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getArrow().shootingEntity != null && evt.getRayTraceResult().entityHit == null) {
                 EntityArrow entityArrow = evt.getArrow();
@@ -42,13 +44,13 @@ public class EnchantmentCallStar extends RaryBase {
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
-                        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                        @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
                                 entityArrow,
                                 bonusLevel * 2,
                                 entityLivingBase -> !entityLivingBase.equals(attacker)
                         );
-                        for (EntityLivingBase entityLivingBase : entities) {
+                        for (@Nonnull EntityLivingBase entityLivingBase : entities) {
                             double x = entityLivingBase.posX - entityArrow.posX;
                             double z = entityLivingBase.posZ - entityArrow.posZ;
                             float stronge = (float) (bonusLevel * 0.35f * Math.max(Math.abs(x), Math.abs(z)) / 7);
@@ -58,14 +60,14 @@ public class EnchantmentCallStar extends RaryBase {
 
                             @Override
                             public void run() {
-                                List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                                @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                         EntityLivingBase.class,
                                         entityArrow,
                                         bonusLevel,
                                         entityLivingBase -> !entityLivingBase.equals(attacker)
                                 );
                                 if (!entities.isEmpty()) {
-                                    for (EntityLivingBase entityLivingBase : entities) {
+                                    for (@Nonnull EntityLivingBase entityLivingBase : entities) {
                                         World world = entityLivingBase.world;
                                         world.addWeatherEffect(
                                                 new EntityLightningBolt(

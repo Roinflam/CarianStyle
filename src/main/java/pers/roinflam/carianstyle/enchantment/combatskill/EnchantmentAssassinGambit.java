@@ -15,6 +15,9 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 @Mod.EventBusSubscriber
 public class EnchantmentAssassinGambit extends RaryBase {
 
@@ -22,16 +25,17 @@ public class EnchantmentAssassinGambit extends RaryBase {
         super(typeIn, slots, "assassin_gambit");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.ASSASSIN_GAMBIT;
     }
 
     @SubscribeEvent
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (attacker.getActivePotionEffect(CarianStylePotion.STEALTH) != null) {
                     if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
@@ -52,7 +56,7 @@ public class EnchantmentAssassinGambit extends RaryBase {
     }
 
     @SubscribeEvent
-    public static void onCriticalHit(CriticalHitEvent evt) {
+    public static void onCriticalHit(@Nonnull CriticalHitEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.isVanillaCritical()) {
                 if (evt.getTarget() instanceof EntityLivingBase) {

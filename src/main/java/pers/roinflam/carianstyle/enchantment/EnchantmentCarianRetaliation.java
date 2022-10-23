@@ -19,6 +19,9 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 @Mod.EventBusSubscriber
 public class EnchantmentCarianRetaliation extends RaryBase {
 
@@ -26,24 +29,25 @@ public class EnchantmentCarianRetaliation extends RaryBase {
         super(typeIn, slots, "carian_retaliation");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.CARIAN_RETALIATION;
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingAttack(LivingAttackEvent evt) {
+    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             DamageSource damageSource = evt.getSource();
             if (damageSource.getTrueSource() != null && (!damageSource.getImmediateSource().equals(damageSource.getTrueSource()) || damageSource.isMagicDamage())) {
                 EntityLivingBase hurter = evt.getEntityLiving();
-                Entity attacker = damageSource.getTrueSource();
+                @Nullable Entity attacker = damageSource.getTrueSource();
                 if (hurter.isHandActive()) {
-                    ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
+                    @Nonnull ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
                     if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                         if (bonusLevel > 0) {
                             for (int i = 0; i < 3; i++) {
-                                EntityGlintblades entityGlintblades_show = new EntityGlintblades(hurter, attacker).setDeadTick(40 + i * 5);
+                                @Nonnull EntityGlintblades entityGlintblades_show = new EntityGlintblades(hurter, attacker).setDeadTick(40 + i * 5);
                                 entityGlintblades_show.posY += 0.5;
                                 if (i == 0) {
                                     entityGlintblades_show.posX -= 1;
@@ -63,7 +67,7 @@ public class EnchantmentCarianRetaliation extends RaryBase {
                                         double x = entityGlintblades_show.posX;
                                         double y = entityGlintblades_show.posY;
                                         double z = entityGlintblades_show.posZ;
-                                        EntityGlintblades entityGlintblades = new EntityGlintblades(hurter, attacker);
+                                        @Nonnull EntityGlintblades entityGlintblades = new EntityGlintblades(hurter, attacker);
                                         entityGlintblades.posX = x;
                                         entityGlintblades.posY = y;
                                         entityGlintblades.posZ = z;
@@ -89,7 +93,7 @@ public class EnchantmentCarianRetaliation extends RaryBase {
     }
 
     @Override
-    public boolean canApplyTogether(Enchantment ench) {
+    public boolean canApplyTogether(@Nonnull Enchantment ench) {
         return !ench.equals(CarianStyleEnchantments.SCHOLAR_SHIELD) &&
                 !ench.equals(CarianStyleEnchantments.IMMUTABLE_SHIELD);
     }

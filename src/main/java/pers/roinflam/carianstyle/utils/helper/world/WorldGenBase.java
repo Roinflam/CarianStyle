@@ -10,6 +10,7 @@ import net.minecraft.world.gen.feature.WorldGenMinable;
 import net.minecraftforge.fml.common.IWorldGenerator;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 
+import javax.annotation.Nonnull;
 import java.util.Random;
 
 public class WorldGenBase implements IWorldGenerator {
@@ -34,16 +35,16 @@ public class WorldGenBase implements IWorldGenerator {
     }
 
     @Override
-    public void generate(Random random, int chunkX, int chunkZ, World world, IChunkGenerator chunkGenerator, IChunkProvider chunkProvider) {
+    public void generate(@Nonnull Random random, int chunkX, int chunkZ, @Nonnull World world, IChunkGenerator chunkGenerator, IChunkProvider chunkProvider) {
         if (world.provider.getDimensionType().equals(dimensionType)) {
             generateOre(blockState, world, random, chunkX * 16, chunkZ * 16);
         }
     }
 
-    private void generateOre(IBlockState ore, World world, Random random, int x, int z) {
+    private void generateOre(@Nonnull IBlockState ore, @Nonnull World world, @Nonnull Random random, int x, int z) {
         for (int i = 0; i < RandomUtil.getInt(minChances, maxChances); i++) {
-            BlockPos pos = new BlockPos(x + random.nextInt(16), RandomUtil.getInt(minY, maxY), z + random.nextInt(16));
-            WorldGenMinable generator = new WorldGenMinable(ore, RandomUtil.getInt(minSize, maxSize));
+            @Nonnull BlockPos pos = new BlockPos(x + random.nextInt(16), RandomUtil.getInt(minY, maxY), z + random.nextInt(16));
+            @Nonnull WorldGenMinable generator = new WorldGenMinable(ore, RandomUtil.getInt(minSize, maxSize));
             generator.generate(world, random, pos);
         }
     }

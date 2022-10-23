@@ -15,6 +15,8 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 
+import javax.annotation.Nonnull;
+
 @Mod.EventBusSubscriber
 public class EnchantmentLucidity extends UncommonBase {
 
@@ -22,23 +24,24 @@ public class EnchantmentLucidity extends UncommonBase {
         super(typeIn, slots, "lucidity");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.LUCIDITY;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onPotionAdded(PotionEvent.PotionAddedEvent evt) {
+    public static void onPotionAdded(@Nonnull PotionEvent.PotionAddedEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase entityLivingBase = evt.getEntityLiving();
             int bonusLevel = 0;
-            for (ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
+            for (@Nonnull ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
                 if (!itemStack.isEmpty()) {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
             }
             if (bonusLevel > 0) {
-                PotionEffect potionEffect = evt.getPotionEffect();
-                Potion potion = potionEffect.getPotion();
+                @Nonnull PotionEffect potionEffect = evt.getPotionEffect();
+                @Nonnull Potion potion = potionEffect.getPotion();
                 if (!potion.isInstant() && potionEffect.getPotion().shouldRender(potionEffect) && potion.isBadEffect()) {
                     evt.getPotionEffect().combine(new PotionEffect(potionEffect.getPotion(), (int) (potionEffect.getDuration() - potionEffect.getDuration() * bonusLevel * 0.15), potionEffect.getAmplifier() + 1));
                 }

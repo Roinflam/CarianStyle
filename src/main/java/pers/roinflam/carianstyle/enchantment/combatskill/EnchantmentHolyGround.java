@@ -16,6 +16,7 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import javax.annotation.Nonnull;
 import java.util.List;
 
 @Mod.EventBusSubscriber
@@ -25,18 +26,19 @@ public class EnchantmentHolyGround extends RaryBase {
         super(typeIn, slots, "holy_ground");
     }
 
+    @Nonnull
     public static Enchantment getEnchantment() {
         return CarianStyleEnchantments.HOLY_GROUND;
     }
 
     @SubscribeEvent
-    public static void onLivingHurt(LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             EntityLivingBase hurter = evt.getEntityLiving();
-            List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(EntityLivingBase.class, hurter, 16, entityLivingBase -> entityLivingBase.getClass() == (hurter.getClass()));
-            for (EntityLivingBase entityLivingBase : entities) {
+            @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(EntityLivingBase.class, hurter, 16, entityLivingBase -> entityLivingBase.getClass() == (hurter.getClass()));
+            for (@Nonnull EntityLivingBase entityLivingBase : entities) {
                 if (entityLivingBase.isHandActive()) {
-                    ItemStack itemStack = entityLivingBase.getHeldItem(entityLivingBase.getActiveHand());
+                    @Nonnull ItemStack itemStack = entityLivingBase.getHeldItem(entityLivingBase.getActiveHand());
                     if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                         if (bonusLevel > 0) {
@@ -49,21 +51,21 @@ public class EnchantmentHolyGround extends RaryBase {
     }
 
     @SubscribeEvent
-    public static void onLivingUpdate(LivingEvent.LivingUpdateEvent evt) {
+    public static void onLivingUpdate(@Nonnull LivingEvent.LivingUpdateEvent evt) {
         if (evt.getEntity().ticksExisted % 60 == 0) {
             EntityLivingBase entityLiving = evt.getEntityLiving();
             if (entityLiving.isHandActive()) {
-                ItemStack itemStack = entityLiving.getHeldItem(entityLiving.getActiveHand());
+                @Nonnull ItemStack itemStack = entityLiving.getHeldItem(entityLiving.getActiveHand());
                 if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     if (bonusLevel > 0) {
-                        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                        @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
                                 entityLiving,
                                 16,
                                 entityLivingBase -> entityLivingBase.getClass() == (entityLiving.getClass())
                         );
-                        for (EntityLivingBase entityLivingBase : entities) {
+                        for (@Nonnull EntityLivingBase entityLivingBase : entities) {
                             boolean used = false;
                             if (entityLivingBase.getHealth() < entityLivingBase.getMaxHealth()) {
                                 entityLivingBase.heal(entityLivingBase.getMaxHealth() * bonusLevel * 0.015f);
