@@ -38,6 +38,11 @@ public class EnchantmentEpilepsyFire extends RaryBase {
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
+                        if (attacker instanceof EntityPlayer) {
+                            if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
+                                return;
+                            }
+                        }
                         float hurtDamage = evt.getAmount();
                         if (!(attacker instanceof EntityPlayer) || !((EntityPlayer) attacker).isCreative()) {
                             attacker.addPotionEffect(new PotionEffect(CarianStylePotion.EPILEPSY_FIRE_BURNING, 3 * 20 + 5, 0));

@@ -17,7 +17,7 @@ public class MobEffectHemorrhage extends IconBase {
 
     @Override
     public void performEffect(EntityLivingBase entityLivingBaseIn, int amplifier) {
-        float damage = entityLivingBaseIn.getMaxHealth() * (0.07f + 0.01f * amplifier) / 20;
+        float damage = entityLivingBaseIn.getMaxHealth() * (0.07f + 0.01f * amplifier) / 30;
         new SynchronizationTask(1) {
 
             @Override

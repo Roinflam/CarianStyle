@@ -4,6 +4,7 @@ import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.potion.PotionEffect;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
@@ -16,6 +17,7 @@ import pers.roinflam.carianstyle.enchantment.EnchantmentBloodSlash;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import java.util.HashMap;
 import java.util.UUID;
@@ -50,8 +52,13 @@ public class EnchantmentBlood extends VeryRaryBase {
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
-                        if (INJURIES.getOrDefault(hurter.getUniqueID(), 0) == 2) {
-                            INJURIES.remove(hurter.getUniqueID());
+                        if (attacker instanceof EntityPlayer) {
+                            if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
+                                return;
+                            }
+                        }
+                        if (INJURIES.getOrDefault(attacker.getUniqueID(), 0) == 2) {
+                            INJURIES.remove(attacker.getUniqueID());
                             float damage = hurter.getHealth() * 0.12f;
 
                             attacker.heal(Math.min(damage, attacker.getMaxHealth() * 0.18f));
@@ -63,7 +70,7 @@ public class EnchantmentBlood extends VeryRaryBase {
                                 hurter.addPotionEffect(new PotionEffect(CarianStylePotion.HEMORRHAGE, 30, 0));
                             }
                         } else {
-                            INJURIES.put(hurter.getUniqueID(), INJURIES.getOrDefault(hurter.getUniqueID(), 0) + 1);
+                            INJURIES.put(attacker.getUniqueID(), INJURIES.getOrDefault(attacker.getUniqueID(), 0) + 1);
                         }
                     }
                 }

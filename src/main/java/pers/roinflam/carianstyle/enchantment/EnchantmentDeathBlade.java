@@ -14,7 +14,6 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
-import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
@@ -40,7 +39,7 @@ public class EnchantmentDeathBlade extends VeryRaryBase {
                     if (bonusLevel > 0) {
                         DamageSource damageSource = evt.getSource();
                         if (!damageSource.damageType.equals("deathBlade") && !damageSource.canHarmInCreative()) {
-                            float damage = evt.getAmount() * 0.5f / 100;
+                            float damage = evt.getAmount() * 0.75f / 100;
                             evt.setAmount(evt.getAmount() * 0.5f);
                             damageSource.damageType = "deathBlade";
                             hurter.addPotionEffect(new PotionEffect(CarianStylePotion.DOOMED_DEATH_BURNING, 5 * 20 + 5, 0));

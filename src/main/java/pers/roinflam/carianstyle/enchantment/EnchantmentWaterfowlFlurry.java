@@ -4,6 +4,7 @@ import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.util.DamageSource;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
@@ -13,6 +14,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 @Mod.EventBusSubscriber
 public class EnchantmentWaterfowlFlurry extends RaryBase {
@@ -34,9 +36,14 @@ public class EnchantmentWaterfowlFlurry extends RaryBase {
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
+                        if (attacker instanceof EntityPlayer) {
+                            if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
+                                return;
+                            }
+                        }
                         DamageSource damageSource = evt.getSource();
                         if (!damageSource.damageType.equals("waterfowlDance") && !damageSource.damageType.equals("noDeathBlade")) {
-                            float damage = (evt.getAmount() / (bonusLevel + 1)) * (1 - bonusLevel * 0.3f);
+                            float damage = evt.getAmount() / (bonusLevel + 1);
                             evt.setAmount(damage);
 
                             damageSource.damageType = "waterfowlDance";

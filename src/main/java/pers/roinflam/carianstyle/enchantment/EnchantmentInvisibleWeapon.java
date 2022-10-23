@@ -5,10 +5,7 @@ import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.projectile.EntityArrow;
-import net.minecraft.init.MobEffects;
 import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemArmor;
-import net.minecraft.item.ItemStack;
 import net.minecraft.potion.PotionEffect;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -16,7 +13,7 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
+import pers.roinflam.carianstyle.init.CarianStylePotion;
 
 @Mod.EventBusSubscriber
 public class EnchantmentInvisibleWeapon extends RaryBase {
@@ -39,9 +36,9 @@ public class EnchantmentInvisibleWeapon extends RaryBase {
                     if (bonusLevel > 0) {
                         int magnification = 1;
                         if (evt.getSource().getImmediateSource() instanceof EntityArrow) {
-                            magnification += 1;
+                            magnification += 2;
                         }
-                        attacker.addPotionEffect(new PotionEffect(MobEffects.INVISIBILITY, bonusLevel * 20 * magnification));
+                        attacker.addPotionEffect(new PotionEffect(CarianStylePotion.STEALTH, bonusLevel * 10 * magnification));
                     }
                 }
             }
@@ -54,15 +51,15 @@ public class EnchantmentInvisibleWeapon extends RaryBase {
     }
 
     @Override
-    public boolean isTreasureEnchantment() {
-        return true;
-    }
-
-    @Override
     public boolean canApplyTogether(Enchantment ench) {
         return super.canApplyTogether(ench) &&
                 !ench.equals(CarianStyleEnchantments.EMPTY_EPILEPSY_FIRE) &&
                 !ench.equals(CarianStyleEnchantments.HYPNOTIC_ARROW);
+    }
+
+    @Override
+    public boolean isTreasureEnchantment() {
+        return true;
     }
 
 }

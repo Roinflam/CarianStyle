@@ -7,6 +7,7 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.init.Enchantments;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.DamageSource;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
@@ -29,16 +30,19 @@ public class EnchantmentIndomitable extends VeryRaryBase {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingAttack(LivingAttackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
-            EntityLivingBase hurter = evt.getEntityLiving();
-            int bonusLevel = 0;
-            for (ItemStack itemStack : hurter.getArmorInventoryList()) {
-                if (!itemStack.isEmpty()) {
-                    bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
+            DamageSource damageSource = evt.getSource();
+            if (!damageSource.canHarmInCreative()) {
+                EntityLivingBase hurter = evt.getEntityLiving();
+                int bonusLevel = 0;
+                for (ItemStack itemStack : hurter.getArmorInventoryList()) {
+                    if (!itemStack.isEmpty()) {
+                        bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
+                    }
                 }
-            }
-            if (bonusLevel > 0) {
-                if (RandomUtil.percentageChance((1 - hurter.getHealth() / hurter.getMaxHealth()) * 100 * 0.75)) {
-                    evt.setCanceled(true);
+                if (bonusLevel > 0) {
+                    if (RandomUtil.percentageChance((1 - hurter.getHealth() / hurter.getMaxHealth()) * 100 * 0.75)) {
+                        evt.setCanceled(true);
+                    }
                 }
             }
         }

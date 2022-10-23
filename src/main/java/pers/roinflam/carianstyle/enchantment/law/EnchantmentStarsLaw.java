@@ -16,6 +16,7 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 @Mod.EventBusSubscriber
 public class EnchantmentStarsLaw extends VeryRaryBase {
@@ -50,6 +51,11 @@ public class EnchantmentStarsLaw extends VeryRaryBase {
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
+                        if (attacker instanceof EntityPlayer) {
+                            if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
+                                return;
+                            }
+                        }
                         if (hurter.isPotionActive(CarianStylePotion.FROSTBITE)) {
                             if (evt.getSource().isMagicDamage()) {
                                 evt.setAmount(evt.getAmount() + evt.getAmount() * (hurter.getActivePotionEffect(CarianStylePotion.FROSTBITE).getAmplifier() + 1) * 0.075f);

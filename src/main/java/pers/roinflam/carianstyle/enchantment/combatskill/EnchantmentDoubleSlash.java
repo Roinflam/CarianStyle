@@ -1,0 +1,62 @@
+package pers.roinflam.carianstyle.enchantment.combatskill;
+
+import net.minecraft.enchantment.Enchantment;
+import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+
+@Mod.EventBusSubscriber
+public class EnchantmentDoubleSlash extends RaryBase {
+
+    public EnchantmentDoubleSlash(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "double_slash");
+    }
+
+    public static Enchantment getEnchantment() {
+        return CarianStyleEnchantments.DOUBLE_SLASH;
+    }
+
+    @SubscribeEvent
+    public static void onLivingHurt(LivingHurtEvent evt) {
+        if (!evt.getEntity().world.isRemote) {
+            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
+                EntityLivingBase hurter = evt.getEntityLiving();
+                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                if (attacker instanceof EntityPlayer) {
+                    if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
+                        return;
+                    }
+                }
+                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+                    if (bonusLevel > 0) {
+                        if (RandomUtil.percentageChance(bonusLevel * 5 + 20)) {
+                            hurter.hurtResistantTime = hurter.maxHurtResistantTime / 2;
+                            hurter.attackEntityFrom(evt.getSource(), (float) (evt.getAmount() * bonusLevel * 0.2));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Override
+    public int getMinEnchantability(int enchantmentLevel) {
+        return 20 + (enchantmentLevel - 1) * 8;
+    }
+
+    @Override
+    public boolean canApplyTogether(Enchantment ench) {
+        return !CarianStyleEnchantments.COMBAT_SKILL.contains(ench);
+    }
+
+}

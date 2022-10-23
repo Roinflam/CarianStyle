@@ -19,6 +19,7 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentFullMoon;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 @Mod.EventBusSubscriber
 public class EnchantmentDarkMoon extends VeryRaryBase {
@@ -61,6 +62,11 @@ public class EnchantmentDarkMoon extends VeryRaryBase {
                         if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                             int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                             if (bonusLevel > 0) {
+                                if (attacker instanceof EntityPlayer) {
+                                    if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
+                                        return;
+                                    }
+                                }
                                 boolean hasFullMoon = false;
                                 for (ItemStack itemStack : attacker.getArmorInventoryList()) {
                                     if (!itemStack.isEmpty()) {

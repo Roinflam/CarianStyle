@@ -1,4 +1,4 @@
-package pers.roinflam.carianstyle.enchantment;
+package pers.roinflam.carianstyle.enchantment.combatskill;
 
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
@@ -6,28 +6,29 @@ import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.potion.PotionEffect;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.source.NewDamageSource;
+import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 @Mod.EventBusSubscriber
-public class EnchantmentBloodSlash extends RaryBase {
+public class EnchantmentIncision extends VeryRaryBase {
 
-    public EnchantmentBloodSlash(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "blood_slash");
+    public EnchantmentIncision(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
+        super(typeIn, slots, "incision");
     }
 
     public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.BLOOD_SLASH;
+        return CarianStyleEnchantments.INCISION;
     }
 
-    @SubscribeEvent(priority = EventPriority.LOW)
+    @SubscribeEvent
     public static void onLivingDamage(LivingDamageEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
@@ -41,13 +42,14 @@ public class EnchantmentBloodSlash extends RaryBase {
                                 return;
                             }
                         }
-                        evt.setAmount(evt.getAmount() + hurter.getHealth() * bonusLevel * 0.05f);
-                        if (!(attacker instanceof EntityPlayer) || !((EntityPlayer) attacker).isCreative()) {
-                            if (attacker.getHealth() > attacker.getMaxHealth() * 0.1) {
-                                attacker.setHealth(attacker.getHealth() - attacker.getMaxHealth() * 0.1f);
-                            } else {
-                                EntityLivingUtil.kill(attacker, NewDamageSource.HEMORRHAGE);
+                        if (attacker.getActivePotionEffect(CarianStylePotion.INCISION) == null) {
+                            if (attacker.getHealth() >= attacker.getMaxHealth() * 0.75) {
+                                attacker.setHealth(attacker.getHealth() - attacker.getMaxHealth() * 0.5f);
+                                attacker.addPotionEffect(new PotionEffect(CarianStylePotion.INCISION, 200, 0));
                             }
+                        } else {
+                            attacker.heal(Math.min(evt.getAmount() * 0.25f, attacker.getMaxHealth() * 0.25f));
+                            hurter.addPotionEffect(new PotionEffect(CarianStylePotion.HEMORRHAGE, 30, 0));
                         }
                     }
                 }
@@ -64,10 +66,9 @@ public class EnchantmentBloodSlash extends RaryBase {
                     if (!killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), killer.getHeldItem(killer.getActiveHand()));
                         if (bonusLevel > 0) {
-                            if (EnchantmentHelper.getEnchantmentLevel(EnchantmentBloodSlash.getEnchantment(), killer.getHeldItem(killer.getActiveHand())) > 0) {
-                                killer.heal(killer.getMaxHealth() * bonusLevel * 0.05f);
-                            } else {
-                                killer.heal(killer.getMaxHealth() * bonusLevel * 0.025f);
+                            if (killer.getActivePotionEffect(CarianStylePotion.INCISION) != null) {
+                                killer.heal((killer.getMaxHealth() - killer.getHealth()) * 0.1f);
+                                killer.addPotionEffect(new PotionEffect(CarianStylePotion.INCISION, Math.min(killer.getActivePotionEffect(CarianStylePotion.INCISION).getDuration() + 100, 200), 0));
                             }
                         }
                     }
@@ -78,7 +79,7 @@ public class EnchantmentBloodSlash extends RaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 20 + (enchantmentLevel - 1) * 10;
+        return 35;
     }
 
     @Override

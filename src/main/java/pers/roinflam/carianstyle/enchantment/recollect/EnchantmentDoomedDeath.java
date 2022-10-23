@@ -4,8 +4,7 @@ import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraft.entity.ai.attributes.AttributeModifier;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.potion.PotionEffect;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
@@ -17,8 +16,6 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
-
-import java.util.UUID;
 
 @Mod.EventBusSubscriber
 public class EnchantmentDoomedDeath extends VeryRaryBase {
@@ -40,11 +37,13 @@ public class EnchantmentDoomedDeath extends VeryRaryBase {
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
                     if (bonusLevel > 0) {
+                        if (attacker instanceof EntityPlayer) {
+                            if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
+                                return;
+                            }
+                        }
                         hurter.addPotionEffect(new PotionEffect(CarianStylePotion.DOOMED_DEATH_BURNING, 5 * 20 + 5, 0));
                         hurter.addPotionEffect(new PotionEffect(CarianStylePotion.DOOMED_DEATH, 10 * 20 + 5, 0));
-                        if (hurter.getEntityAttribute(SharedMonsterAttributes.MAX_HEALTH).getModifier(UUID.fromString("5313f444-0598-ad68-f26c-66ac0152f427")) == null) {
-                            hurter.getEntityAttribute(SharedMonsterAttributes.MAX_HEALTH).applyModifier(new AttributeModifier(UUID.fromString("5313f444-0598-ad68-f26c-66ac0152f427"), "demo", 2.0, 2));
-                        }
                         float hurtDamage = evt.getAmount();
                         new SynchronizationTask(5, 1) {
                             private int tick = 0;
@@ -55,7 +54,7 @@ public class EnchantmentDoomedDeath extends VeryRaryBase {
                                     this.cancel();
                                     return;
                                 }
-                                float damage = (hurtDamage * 0.5f + hurter.getHealth() * 0.05f) / 100;
+                                float damage = (hurtDamage * 0.5f + hurter.getHealth() * 0.1f) / 100;
                                 damage = damage * 0.3f + damage * tick / 50 * 0.7f;
                                 if (hurter.getHealth() - damage * 2 > 0) {
                                     hurter.setHealth(hurter.getHealth() - damage);

@@ -19,6 +19,7 @@ public class CarianStylePotion {
     public static final MobEffectProtectionOfTheErdtree PROTECTION_OF_THE_ERDTREE = new MobEffectProtectionOfTheErdtree(false, 0xffd700);
     public static final MobEffectHemorrhage HEMORRHAGE = new MobEffectHemorrhage(true, 0xc70000);
     public static final MobEffectGravitas GRAVITAS = new MobEffectGravitas(true, 0x7200c5);
+    public static final MobEffectIncision INCISION = new MobEffectIncision(false, 0xff2a00);
 
     public static final MobEffectDoomedDeath DOOMED_DEATH = new MobEffectDoomedDeath(true, 0);
     public static final MobEffectStealth STEALTH = new MobEffectStealth(false, 0);
