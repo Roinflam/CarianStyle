@@ -4,6 +4,7 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
+import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
@@ -15,8 +16,8 @@ import pers.roinflam.carianstyle.utils.util.EntityUtil;
 import javax.annotation.Nonnull;
 
 
-public class MobEffectScarletRot extends IconBase {
 
+public class MobEffectScarletRot extends IconBase {
     public MobEffectScarletRot(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn, liquidColorIn, "scarlet_rot");
 

@@ -436,6 +436,10 @@ public class CarianStyleEnchantments {
             EnumEnchantmentType.WEAPON,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
     );
+    public static final EnchantmentHowlShabriri HOWL_SHABRIRI = new EnchantmentHowlShabriri(
+            EnumEnchantmentType.WEAPON,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
+    );
     public static final Set<Enchantment> RECOLLECT = new HashSet<>(ImmutableList.of(BROKEN_STAR, BLASPHEMY, DOOMED_DEATH, FULL_MOON, LIVING_CORPSE, MIKAELA_BLADE, BAD_OMEN, GIANT_FLAME, BLOOD, TIME_REVERSAL, WARRIOR, GOLDEN_LAW, ANCESTRAL_SPIRITS, DARK_ABANDONED_CHILD));
     public static final Set<Enchantment> LAW = new HashSet<>(ImmutableList.of(GOLDEN_LAW, STARS_LAW));
     public static final Set<Enchantment> DEAD = new HashSet<>(ImmutableList.of(FULL_MOON, LIVING_CORPSE, TIME_REVERSAL, ANCIENT_DRAGON_LIGHTNING, SCARLET_LONIA, EPILEPSY_SPREAD, GREATBLADE_PHALANX));

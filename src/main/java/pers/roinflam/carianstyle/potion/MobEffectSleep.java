@@ -10,6 +10,7 @@ import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.living.LivingSetAttackTargetEvent;
+import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
@@ -19,8 +20,8 @@ import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-public class MobEffectSleep extends IconBase {
 
+public class MobEffectSleep extends IconBase {
     public MobEffectSleep(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn, liquidColorIn, "sleep");
 

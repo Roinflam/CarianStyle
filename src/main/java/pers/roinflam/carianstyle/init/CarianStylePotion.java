@@ -21,10 +21,12 @@ public class CarianStylePotion {
     public static final MobEffectGravitas GRAVITAS = new MobEffectGravitas(true, 0x7200c5);
     public static final MobEffectIncision INCISION = new MobEffectIncision(false, 0xff2a00);
 
+
     public static final MobEffectDoomedDeath DOOMED_DEATH = new MobEffectDoomedDeath(true, 0);
     public static final MobEffectStealth STEALTH = new MobEffectStealth(false, 0);
     public static final MobEffectSpeedBoost SPEED_BOOST = new MobEffectSpeedBoost(false, 0);
     public static final MobEffectAttackBoost ATTACK_BOOST = new MobEffectAttackBoost(false, 0);
+    public static final MobEffectHowlShabriri HOWL_SHABRIRI = new MobEffectHowlShabriri(true, 0xe3c600);
 
     public static final MobEffectDoomedDeathBurning DOOMED_DEATH_BURNING = new MobEffectDoomedDeathBurning(true, 0);
     public static final MobEffectDestructionFireBurning DESTRUCTION_FIRE_BURNING = new MobEffectDestructionFireBurning(true, 0);

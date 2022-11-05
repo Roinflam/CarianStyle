@@ -3,13 +3,10 @@ package pers.roinflam.carianstyle.base.block.flame;
 import net.minecraft.block.BlockFire;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.creativetab.CreativeTabs;
-import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import pers.roinflam.carianstyle.init.CarianStyleBlocks;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.IHasModel;
 import pers.roinflam.carianstyle.utils.util.BlockUtil;
 
