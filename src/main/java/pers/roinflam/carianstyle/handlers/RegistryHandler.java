@@ -4,6 +4,7 @@ import net.minecraft.block.Block;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.item.Item;
 import net.minecraft.potion.Potion;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraftforge.client.event.ModelRegistryEvent;
 import net.minecraftforge.event.RegistryEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -12,6 +13,7 @@ import net.minecraftforge.fml.common.registry.EntityEntry;
 import pers.roinflam.carianstyle.CarianStyle;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.*;
+import pers.roinflam.carianstyle.tileentity.MoveLight;
 import pers.roinflam.carianstyle.utils.IHasModel;
 
 import javax.annotation.Nonnull;
@@ -33,6 +35,7 @@ public class RegistryHandler {
     @SubscribeEvent
     public static void onBlockRegister(@Nonnull RegistryEvent.Register<Block> evt) {
         evt.getRegistry().registerAll(CarianStyleBlocks.BLOCKS.toArray(new Block[0]));
+        TileEntity.register(MoveLight.ID, MoveLight.class);
     }
 
     @SubscribeEvent
@@ -44,6 +47,7 @@ public class RegistryHandler {
     public static void onItemRegister(@Nonnull RegistryEvent.Register<Item> evt) {
         evt.getRegistry().registerAll(CarianStyleItem.ITEMS.toArray(new Item[0]));
     }
+
 
     @SubscribeEvent
     public static void onModelRegister(ModelRegistryEvent evt) {

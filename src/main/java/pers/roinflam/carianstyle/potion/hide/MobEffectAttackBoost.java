@@ -1,11 +1,10 @@
 package pers.roinflam.carianstyle.potion.hide;
 
 import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraftforge.fml.common.Mod;
-import pers.roinflam.carianstyle.base.potion.PotionBase;
+import pers.roinflam.carianstyle.base.potion.hide.HideBase;
 
 
-public class MobEffectAttackBoost extends PotionBase {
+public class MobEffectAttackBoost extends HideBase {
 
     public MobEffectAttackBoost(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn, liquidColorIn, "attack_boost");

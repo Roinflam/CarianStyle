@@ -27,6 +27,7 @@ public class CarianStylePotion {
     public static final MobEffectSpeedBoost SPEED_BOOST = new MobEffectSpeedBoost(false, 0);
     public static final MobEffectAttackBoost ATTACK_BOOST = new MobEffectAttackBoost(false, 0);
     public static final MobEffectHowlShabriri HOWL_SHABRIRI = new MobEffectHowlShabriri(true, 0xe3c600);
+    public static final MobEffectDragoncrestGreatshield DRAGONCREST_GREATSHIELD = new MobEffectDragoncrestGreatshield(false, 0);
 
     public static final MobEffectDoomedDeathBurning DOOMED_DEATH_BURNING = new MobEffectDoomedDeathBurning(true, 0);
     public static final MobEffectDestructionFireBurning DESTRUCTION_FIRE_BURNING = new MobEffectDestructionFireBurning(true, 0);

@@ -33,12 +33,19 @@ public class EntityLivingUtil {
     }
 
 
+    public static void setTicksSinceLastSwing(EntityLivingBase entityLivingBase, int ticksSinceLastSwing) {
+        try {
+            ObfuscationReflectionHelper.setPrivateValue(EntityLivingBase.class, entityLivingBase, ticksSinceLastSwing, "ticksSinceLastSwing");
+        } catch (Exception exception) {
+            ObfuscationReflectionHelper.setPrivateValue(EntityLivingBase.class, entityLivingBase, ticksSinceLastSwing, "field_184617_aD");
+        }
+    }
+
     public static void setJumped(EntityLivingBase entityLivingBase) {
         try {
             ObfuscationReflectionHelper.setPrivateValue(EntityLivingBase.class, entityLivingBase, 10, "jumpTicks");
         } catch (Exception exception) {
             ObfuscationReflectionHelper.setPrivateValue(EntityLivingBase.class, entityLivingBase, 10, "field_70773_bE");
-            exception.printStackTrace();
         }
     }
 

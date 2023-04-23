@@ -3,6 +3,7 @@ package pers.roinflam.carianstyle.base.enchantment;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
@@ -19,5 +20,14 @@ public abstract class EnchantmentBase extends Enchantment {
     @Override
     public int getMaxEnchantability(int enchantmentLevel) {
         return getMinEnchantability(enchantmentLevel) * 2;
+    }
+
+    @Override
+    public boolean isTreasureEnchantment() {
+        if (ConfigLoader.isTreasureEnchantment) {
+            return true;
+        } else {
+            return super.isTreasureEnchantment();
+        }
     }
 }

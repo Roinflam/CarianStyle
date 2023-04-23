@@ -430,8 +430,6 @@ public class CarianStyleEnchantments {
             EnumEnchantmentType.ARMOR_LEGS,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.LEGS}
     );
-
-    public static final Set<Enchantment> COMBAT_SKILL = new HashSet<>(ImmutableList.of(OFFER_SWORD, LUNGE_UP, VOWED_REVENGE, PATIENCE, CONTINUOUS_SHOOTING, LION_CLAW, CORPSE_PILER, QUICKSTEP, PRAYERFUL_STRIKE, HOLY_GROUND, INDOMITABLE));
     public static final EnchantmentGravitas GRAVITAS = new EnchantmentGravitas(
             EnumEnchantmentType.WEAPON,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
@@ -440,7 +438,33 @@ public class CarianStyleEnchantments {
             EnumEnchantmentType.WEAPON,
             new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
     );
+    public static final EnchantmentUnsheathe UNSHEATHE = new EnchantmentUnsheathe(
+            EnumEnchantmentType.WEAPON,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
+    );
+    public static final EnchantmentStarlight STARLIGHT = new EnchantmentStarlight(
+            EnumEnchantmentType.ARMOR_HEAD,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.HEAD}
+    );
+    public static final EnchantmentBlackFlameRitual BLACK_FLAME_RITUAL = new EnchantmentBlackFlameRitual (
+            EnumEnchantmentType.ARMOR_LEGS,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.LEGS}
+    );
+    public static final EnchantmentAeonia AEONIA = new EnchantmentAeonia(
+            EnumEnchantmentType.WEAPON,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}
+    );
+    public static final EnchantmentSacredOrder SACRED_ORDER = new EnchantmentSacredOrder(
+            EnumEnchantmentType.ARMOR_CHEST,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST}
+    );
+    public static final EnchantmentDragoncrestGreatshield DRAGONCREST_GREATSHIELD = new EnchantmentDragoncrestGreatshield(
+            EnumEnchantmentType.ARMOR_CHEST,
+            new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST}
+    );
     public static final Set<Enchantment> RECOLLECT = new HashSet<>(ImmutableList.of(BROKEN_STAR, BLASPHEMY, DOOMED_DEATH, FULL_MOON, LIVING_CORPSE, MIKAELA_BLADE, BAD_OMEN, GIANT_FLAME, BLOOD, TIME_REVERSAL, WARRIOR, GOLDEN_LAW, ANCESTRAL_SPIRITS, DARK_ABANDONED_CHILD));
+
+    public static final Set<Enchantment> COMBAT_SKILL = new HashSet<>(ImmutableList.of(OFFER_SWORD, LUNGE_UP, VOWED_REVENGE, PATIENCE, CONTINUOUS_SHOOTING, LION_CLAW, CORPSE_PILER, QUICKSTEP, PRAYERFUL_STRIKE, HOLY_GROUND, INDOMITABLE, UNSHEATHE));
     public static final Set<Enchantment> LAW = new HashSet<>(ImmutableList.of(GOLDEN_LAW, STARS_LAW));
     public static final Set<Enchantment> DEAD = new HashSet<>(ImmutableList.of(FULL_MOON, LIVING_CORPSE, TIME_REVERSAL, ANCIENT_DRAGON_LIGHTNING, SCARLET_LONIA, EPILEPSY_SPREAD, GREATBLADE_PHALANX));
 }

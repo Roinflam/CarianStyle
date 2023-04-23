@@ -61,7 +61,7 @@ public class EnchantmentAncientDragonLightning extends RaryBase {
                                 15,
                                 entityLivingBase -> !entityLivingBase.equals(hurter));
                         @Nonnull List<Integer> list = RandomUtil.randomList(bonusLevel * 100, entities.size());
-                        for (int i = 0; i < list.size(); i++) {
+                        for (int i = 0; i < entities.size(); i++) {
                             EntityLivingBase entityLivingBase = entities.get(i);
                             int timeLightning = Math.min(list.get(i), bonusLevel * 15);
                             new SynchronizationTask(40, 5) {

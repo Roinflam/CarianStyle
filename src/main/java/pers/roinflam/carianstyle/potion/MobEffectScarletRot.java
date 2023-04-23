@@ -1,20 +1,25 @@
 package pers.roinflam.carianstyle.potion;
 
+import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.SharedMonsterAttributes;
+import net.minecraft.potion.PotionEffect;
 import net.minecraft.util.ResourceLocation;
+import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
+import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import javax.annotation.Nonnull;
-
+import java.util.ArrayList;
+import java.util.List;
 
 
 public class MobEffectScarletRot extends IconBase {
@@ -35,12 +40,92 @@ public class MobEffectScarletRot extends IconBase {
         }
     }
 
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void onLivingDamage(@Nonnull LivingDamageEvent evt) {
+        if (!evt.getEntity().world.isRemote) {
+            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
+                EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+                PotionEffect potionEffect = attacker.getActivePotionEffect(this);
+                if (potionEffect != null) {
+                    if (RandomUtil.percentageChance(25)) {
+                        @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                                EntityLivingBase.class,
+                                attacker,
+                                32
+                        );
+                        for (EntityLivingBase entityLivingBase : entities) {
+                            if (!entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()).isEmpty()) {
+                                int bonusLevel = EnchantmentHelper.getEnchantmentLevel(CarianStyleEnchantments.AEONIA, entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()));
+                                if (bonusLevel > 0) {
+                                    EntityLivingBase hurter = evt.getEntityLiving();System.out.println(potionEffect.getDuration());
+                                    hurter.addPotionEffect(new PotionEffect(this, potionEffect.getDuration(), potionEffect.getAmplifier()));
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void onLivingDeath(@Nonnull LivingDeathEvent evt) {
+        if (!evt.getEntity().world.isRemote) {
+            EntityLivingBase dead = evt.getEntityLiving();
+            PotionEffect potionEffect = dead.getActivePotionEffect(this);
+            if (potionEffect != null) {
+                @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                        EntityLivingBase.class,
+                        dead,
+                        32
+                );
+                for (EntityLivingBase entityLivingBase : new ArrayList<>(entities)) {
+                    if (!entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()).isEmpty()) {
+                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(CarianStyleEnchantments.AEONIA, entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()));
+                        if (bonusLevel > 0) {
+                            entities = EntityUtil.getNearbyEntities(
+                                    EntityLivingBase.class,
+                                    dead,
+                                    16
+                            );
+                            for (EntityLivingBase target : new ArrayList<>(entities)) {
+                                if (RandomUtil.percentageChance(50)) {
+                                    System.out.println(potionEffect.getDuration());
+                                    target.addPotionEffect(new PotionEffect(this, potionEffect.getDuration(), potionEffect.getAmplifier()));
+                                }
+                            }
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     @Override
     public void performEffect(EntityLivingBase entityLivingBaseIn, int amplifier) {
-        if (EntityUtil.getFire(entityLivingBaseIn) <= 0 || RandomUtil.percentageChance(25)) {
-            float damage = entityLivingBaseIn.getHealth() * 0.03f + entityLivingBaseIn.getMaxHealth() * 0.00075f;
-            damage += damage * amplifier * 0.33;
-            entityLivingBaseIn.attackEntityFrom(NewDamageSource.SCARLET_ROT, damage);
+        if (!entityLivingBaseIn.world.isRemote) {
+            if (EntityUtil.getFire(entityLivingBaseIn) <= 0 || RandomUtil.percentageChance(25)) {
+                float damage = entityLivingBaseIn.getHealth() * 0.03f + entityLivingBaseIn.getMaxHealth() * 0.00075f;
+                damage += damage * amplifier * 0.33;
+
+                @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                        EntityLivingBase.class,
+                        entityLivingBaseIn,
+                        32
+                );
+                for (EntityLivingBase entityLivingBase : entities) {
+                    if (!entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()).isEmpty()) {
+                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(CarianStyleEnchantments.AEONIA, entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()));
+                        if (bonusLevel > 0) {
+                            entityLivingBaseIn.attackEntityFrom(NewDamageSource.SCARLET_ROT, damage * 2.5f);
+                            return;
+                        }
+                    }
+                }
+                entityLivingBaseIn.attackEntityFrom(NewDamageSource.SCARLET_ROT, damage);
+            }
         }
     }
 

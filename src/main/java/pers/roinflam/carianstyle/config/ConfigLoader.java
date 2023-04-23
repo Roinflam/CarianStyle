@@ -11,6 +11,10 @@ import java.util.List;
 public class ConfigLoader {
     public static List<String> uninstall_enchantment;
     public static int rockblaster_maxrange;
+    public static int prayerfulStrike_maxHealth;
+    public static boolean isTreasureEnchantment;
+
+    public static boolean levelLimit;
     private static Configuration config;
     private static Logger logger;
 
@@ -31,6 +35,14 @@ public class ConfigLoader {
         comment = "The maximum mining radius of the Rock Blaster Enchantment.";
         rockblaster_maxrange = config.get(Configuration.CATEGORY_GENERAL, "rockBlasterMaxRange", 10, comment).getInt();
 
+        comment = "Set the maximum stackable life limit for the Prayer Strike Enchantment.";
+        prayerfulStrike_maxHealth = config.get(Configuration.CATEGORY_GENERAL, "prayerfulStrike_maxHealth", 1000, comment).getInt();
+
+        comment = "Set all enchantments to Treasure Enchantments.";
+        isTreasureEnchantment = config.get(Configuration.CATEGORY_GENERAL, "isTreasureEnchantment", false, comment).getBoolean();
+
+        comment = "Set the level cap for the GoldenVow Limit and Protection of The Erdtree Enchantment to level 5.";
+        levelLimit = config.get(Configuration.CATEGORY_GENERAL, "levelLimit", false, comment).getBoolean();
 
         config.save();
         logger.info("Finished loading config.");

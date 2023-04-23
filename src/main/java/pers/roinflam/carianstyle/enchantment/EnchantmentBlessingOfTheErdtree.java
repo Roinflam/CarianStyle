@@ -16,7 +16,6 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -56,6 +55,7 @@ public class EnchantmentBlessingOfTheErdtree extends RaryBase {
                     }
                 }
                 if (bonusLevel > 0) {
+                    bonusLevel = Math.min(bonusLevel, 5);
                     attacker.addPotionEffect(new PotionEffect(CarianStylePotion.BLESSING_OF_THE_ERDTREE, (int) (2.5 * bonusLevel * 20), bonusLevel - 1));
                 }
             }

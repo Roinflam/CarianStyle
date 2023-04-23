@@ -43,6 +43,8 @@ public class EnchantmentWaterfowlFlurry extends RaryBase {
                         if (attacker instanceof EntityPlayer) {
                             if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
                                 return;
+                            } else {
+                                ((EntityPlayer) attacker).resetCooldown();
                             }
                         }
                         DamageSource damageSource = evt.getSource();

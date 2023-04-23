@@ -32,20 +32,23 @@ public class EnchantmentDoubleSlash extends RaryBase {
     @SubscribeEvent
     public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
+            if (!evt.getSource().damageType.equals("waterfowlDance") && evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (attacker instanceof EntityPlayer) {
                     if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
                         return;
+                    } else {
+                        ((EntityPlayer) attacker).resetCooldown();
                     }
-                }
-                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (bonusLevel > 0) {
-                        if (RandomUtil.percentageChance(bonusLevel * 5 + 20)) {
-                            hurter.hurtResistantTime = hurter.maxHurtResistantTime / 2;
-                            hurter.attackEntityFrom(evt.getSource(), (float) (evt.getAmount() * bonusLevel * 0.2));
+                    if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+                        if (bonusLevel > 0) {
+                            if (RandomUtil.percentageChance(bonusLevel * 5 + 20)) {
+                                hurter.hurtResistantTime = hurter.maxHurtResistantTime / 2;
+                                evt.getSource().damageType = "waterfowlDance";
+                                hurter.attackEntityFrom(evt.getSource(), (float) (evt.getAmount() * bonusLevel * 0.2));
+                            }
                         }
                     }
                 }

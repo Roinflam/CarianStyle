@@ -14,9 +14,9 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -47,6 +47,9 @@ public class EnchantmentProtectionOfTheErdtree extends RaryBase {
                     }
                 }
                 if (bonusLevel > 0) {
+                    if (ConfigLoader.levelLimit) {
+                        bonusLevel = Math.min(bonusLevel, 5);
+                    }
                     hurter.addPotionEffect(new PotionEffect(CarianStylePotion.PROTECTION_OF_THE_ERDTREE, (int) (2.5 * bonusLevel * 20), bonusLevel - 1));
                 }
                 bonusLevel = 0;
@@ -56,6 +59,7 @@ public class EnchantmentProtectionOfTheErdtree extends RaryBase {
                     }
                 }
                 if (bonusLevel > 0) {
+                    bonusLevel = Math.min(bonusLevel, 5);
                     attacker.addPotionEffect(new PotionEffect(CarianStylePotion.PROTECTION_OF_THE_ERDTREE, (int) (2.5 * bonusLevel * 20), bonusLevel - 1));
                 }
             }

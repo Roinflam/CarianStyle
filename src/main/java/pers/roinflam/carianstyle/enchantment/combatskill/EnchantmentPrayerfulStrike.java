@@ -15,8 +15,10 @@ import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.PlayerEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
@@ -68,7 +70,7 @@ public class EnchantmentPrayerfulStrike extends VeryRaryBase {
                         if (READY.containsKey(attacker.getUniqueID())) {
                             if (READY.get(attacker.getUniqueID()) <= 4 * 20) {
                                 READY.put(attacker.getUniqueID(), 8 * 20);
-                                float health = Math.min(attacker.getMaxHealth() * 0.05f + hurter.getHealth() * 0.15f, hurter.getMaxHealth() * 0.3f);
+                                float health = Math.min(attacker.getMaxHealth() * 0.025f + hurter.getHealth() * 0.075f, hurter.getMaxHealth() * 0.1f);
                                 evt.setAmount(evt.getAmount() + health);
 
                                 @Nonnull IAttributeInstance attributeInstance = attacker.getEntityAttribute(SharedMonsterAttributes.MAX_HEALTH);
@@ -77,7 +79,7 @@ public class EnchantmentPrayerfulStrike extends VeryRaryBase {
                                 } else {
                                     double base = attributeInstance.getModifier(ID).getAmount();
                                     attributeInstance.removeModifier(ID);
-                                    attributeInstance.applyModifier(new AttributeModifier(ID, NAME, base + Math.min(health / 2, attacker.getMaxHealth() * 0.1), 0));
+                                    attributeInstance.applyModifier(new AttributeModifier(ID, NAME, Math.min(base + Math.min(health / 2, attacker.getMaxHealth() * 0.05), ConfigLoader.prayerfulStrike_maxHealth), 0));
                                 }
 
                                 attacker.heal(health);
@@ -102,6 +104,14 @@ public class EnchantmentPrayerfulStrike extends VeryRaryBase {
                     }
                 }
             }
+        }
+    }
+
+    @SubscribeEvent
+    public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent evt) {
+        if (!evt.player.world.isRemote && !evt.isEndConquered()) {
+            EntityPlayer entityPlayer = evt.player;
+            entityPlayer.getEntityAttribute(SharedMonsterAttributes.MAX_HEALTH).removeModifier(ID);
         }
     }
 
