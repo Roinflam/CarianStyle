@@ -37,7 +37,8 @@ public class EnchantmentVowedRevenge extends RaryBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         @Nonnull List<Entity> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
                                 attacker,

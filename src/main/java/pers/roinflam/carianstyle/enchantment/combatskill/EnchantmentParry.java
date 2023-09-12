@@ -47,7 +47,8 @@ public class EnchantmentParry extends UncommonBase {
                         @Nonnull ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
                         if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                             int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
-                            if (bonusLevel > 0) {
+
+                if (bonusLevel > 0) {
                                 if (!COOLDING.contains(hurter.getUniqueID()) && !PARRY.containsKey(hurter.getUniqueID())) {
                                     PARRY.put(hurter.getUniqueID(), bonusLevel);
                                     new SynchronizationTask(10) {

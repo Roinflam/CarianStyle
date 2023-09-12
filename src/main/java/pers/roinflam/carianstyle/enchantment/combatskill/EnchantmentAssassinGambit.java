@@ -12,6 +12,7 @@ import net.minecraftforge.event.entity.player.CriticalHitEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 
@@ -39,6 +40,9 @@ public class EnchantmentAssassinGambit extends RaryBase {
                 if (attacker.getActivePotionEffect(CarianStylePotion.STEALTH) != null) {
                     if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+                        if (ConfigLoader.levelLimit) {
+                            bonusLevel = Math.min(bonusLevel, 10);
+                        }
                         if (bonusLevel > 0) {
                             attacker.removePotionEffect(CarianStylePotion.STEALTH);
                             evt.setAmount(evt.getAmount() + evt.getAmount() * bonusLevel * 0.25f);
@@ -47,7 +51,8 @@ public class EnchantmentAssassinGambit extends RaryBase {
                 }
                 if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         hurter.addPotionEffect(new PotionEffect(CarianStylePotion.STEALTH, bonusLevel * 20));
                     }
                 }
@@ -65,7 +70,8 @@ public class EnchantmentAssassinGambit extends RaryBase {
                     if (attacker.getActivePotionEffect(CarianStylePotion.STEALTH) != null) {
                         if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                             int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                            if (bonusLevel > 0) {
+
+                if (bonusLevel > 0) {
                                 attacker.removePotionEffect(CarianStylePotion.STEALTH);
                                 evt.setDamageModifier(evt.getDamageModifier() * 2);
                             }

@@ -14,6 +14,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
@@ -43,6 +44,9 @@ public class EnchantmentBlackFlameShelter extends RaryBase {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
+                if (ConfigLoader.levelLimit) {
+                    bonusLevel = Math.min(bonusLevel, 10);
+                }
                 if (bonusLevel > 0) {
                     evt.setAmount(evt.getAmount() - evt.getAmount() * bonusLevel * 0.125f);
                 }
@@ -59,6 +63,9 @@ public class EnchantmentBlackFlameShelter extends RaryBase {
                 if (!itemStack.isEmpty()) {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
+            }
+            if (ConfigLoader.levelLimit) {
+                bonusLevel = Math.min(bonusLevel, 10);
             }
             if (bonusLevel > 0) {
                 evt.setAmount(evt.getAmount() - evt.getAmount() * bonusLevel * 0.25f);

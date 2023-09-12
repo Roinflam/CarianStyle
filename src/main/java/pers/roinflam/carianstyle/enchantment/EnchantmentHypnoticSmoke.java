@@ -11,6 +11,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
@@ -39,13 +40,17 @@ public class EnchantmentHypnoticSmoke extends UncommonBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+                    if (ConfigLoader.levelLimit) {
+                        bonusLevel = Math.min(bonusLevel, 10);
+                    }
                     if (bonusLevel > 0) {
                         if (RandomUtil.percentageChance(bonusLevel * 2)) {
+                            int finalBonusLevel = bonusLevel;
                             new SynchronizationTask(5) {
 
                                 @Override
                                 public void run() {
-                                    hurter.addPotionEffect(new PotionEffect(CarianStylePotion.SLEEP, bonusLevel * 3 * 20, bonusLevel - 1));
+                                    hurter.addPotionEffect(new PotionEffect(CarianStylePotion.SLEEP, finalBonusLevel * 3 * 20, finalBonusLevel - 1));
                                 }
 
                             }.start();

@@ -17,6 +17,7 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
@@ -44,6 +45,9 @@ public class EnchantmentPyroxeneIce extends UncommonBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+                    if (ConfigLoader.levelLimit) {
+                        bonusLevel = Math.min(bonusLevel, 10);
+                    }
                     if (bonusLevel > 0) {
                         damageSource.setMagicDamage();
                         evt.getEntityLiving().addPotionEffect(new PotionEffect(CarianStylePotion.FROSTBITE, 10 * 20, bonusLevel - 1));

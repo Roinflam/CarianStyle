@@ -12,6 +12,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 
 import javax.annotation.Nonnull;
@@ -38,7 +39,8 @@ public class EnchantmentGreenTurtle extends UncommonBase {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
             }
-            if (bonusLevel > 0) {
+            
+                if (bonusLevel > 0) {
                 evt.setAmount(evt.getAmount() + evt.getAmount() * bonusLevel * 0.075f + bonusLevel * 0.15f * (1 - entityLivingBase.getHealth() / entityLivingBase.getMaxHealth()));
             }
         }

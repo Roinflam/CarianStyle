@@ -7,7 +7,6 @@ import net.minecraftforge.fml.common.SidedProxy;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.network.NetworkRegistryHandler;
 import pers.roinflam.carianstyle.proxy.CommonProxy;
@@ -18,7 +17,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-@Mod(modid = Reference.MOD_ID, useMetadata = true)
+@Mod(modid = Reference.MOD_ID, useMetadata = true, guiFactory = "pers.roinflam.carianstyle.gui.ConfigGuiFactory")
 public class CarianStyle {
     @Mod.Instance
     public static CarianStyle instance;
@@ -28,7 +27,6 @@ public class CarianStyle {
 
     @Mod.EventHandler
     public static void preInit(@Nonnull FMLPreInitializationEvent evt) {
-        new ConfigLoader(evt);
         NetworkRegistryHandler.register();
         proxy.registerEntityRenderer();
 

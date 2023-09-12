@@ -41,7 +41,8 @@ public class EnchantmentHolyGround extends RaryBase {
                     @Nonnull ItemStack itemStack = entityLivingBase.getHeldItem(entityLivingBase.getActiveHand());
                     if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
-                        if (bonusLevel > 0) {
+
+                if (bonusLevel > 0) {
                             evt.setAmount(evt.getAmount() - evt.getAmount() * bonusLevel * 0.05f);
                         }
                     }
@@ -58,7 +59,8 @@ public class EnchantmentHolyGround extends RaryBase {
                 @Nonnull ItemStack itemStack = entityLiving.getHeldItem(entityLiving.getActiveHand());
                 if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
                                 entityLiving,

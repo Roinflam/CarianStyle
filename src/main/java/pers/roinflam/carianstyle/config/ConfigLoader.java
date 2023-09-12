@@ -1,54 +1,47 @@
 package pers.roinflam.carianstyle.config;
 
-import net.minecraftforge.common.config.Configuration;
-import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
-import org.apache.logging.log4j.Logger;
+import net.minecraftforge.common.config.Config;
+import net.minecraftforge.common.config.ConfigManager;
+import net.minecraftforge.fml.client.event.ConfigChangedEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
+import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
-import java.util.Arrays;
-import java.util.List;
 
-public class ConfigLoader {
-    public static List<String> uninstall_enchantment;
-    public static int rockblaster_maxrange;
-    public static int prayerfulStrike_maxHealth;
-    public static boolean isTreasureEnchantment;
+@Mod.EventBusSubscriber
+@Config(modid = Reference.MOD_ID)
+public final class ConfigLoader {
+    @Config.Comment("Fill in the id of the enchantment you want to disable registration here, you can find the id of the relevant enchantment in en_us.lang.")
+    public static String[] uninstallEnchantment = {};
 
-    public static boolean levelLimit;
-    private static Configuration config;
-    private static Logger logger;
+    @Config.Comment("The maximum mining radius of the Rock Blaster Enchantment.")
+    @Config.RangeInt(min = 0)
+    public static int rockBlasterMaxRange = 10;
 
-    public ConfigLoader(@Nonnull FMLPreInitializationEvent evt) {
-        logger = evt.getModLog();
-        config = new Configuration(evt.getSuggestedConfigurationFile());
+    @Config.Comment("Set the maximum stackable life limit for the Prayer Strike Enchantment.")
+    @Config.RangeInt(min = 0)
+    public static int prayerfulStrikeMaxHealth = 1000;
 
-        config.load();
-        load();
-    }
+    @Config.Comment("Set all enchantments to Treasure Very Rary Enchantments.")
+    public static boolean isTreasureVeryRaryEnchantment = false;
 
-    public static void load() {
-        logger.info("Started loading config.");
-        @Nonnull String comment = "Fill in the id of the enchantment you want to disable registration here, you can find the id of the relevant enchantment in en_us.lang.";
+    @Config.Comment("Set all enchantments to Treasure Rary Enchantments.")
+    public static boolean isTreasureRaryEnchantment = false;
 
-        uninstall_enchantment = Arrays.asList(config.get(Configuration.CATEGORY_GENERAL, "uninstall", new String[]{}, comment).getStringList());
+    @Config.Comment("Set all enchantments to Treasure Uncommon Enchantments.")
+    public static boolean isTreasureUncommonEnchantment = false;
 
-        comment = "The maximum mining radius of the Rock Blaster Enchantment.";
-        rockblaster_maxrange = config.get(Configuration.CATEGORY_GENERAL, "rockBlasterMaxRange", 10, comment).getInt();
+    @Config.Comment("Setting a limit on some enchantments after exceeding the level cap to prevent too much invincibility.")
+    public static boolean levelLimit = false;
 
-        comment = "Set the maximum stackable life limit for the Prayer Strike Enchantment.";
-        prayerfulStrike_maxHealth = config.get(Configuration.CATEGORY_GENERAL, "prayerfulStrike_maxHealth", 1000, comment).getInt();
-
-        comment = "Set all enchantments to Treasure Enchantments.";
-        isTreasureEnchantment = config.get(Configuration.CATEGORY_GENERAL, "isTreasureEnchantment", false, comment).getBoolean();
-
-        comment = "Set the level cap for the GoldenVow Limit and Protection of The Erdtree Enchantment to level 5.";
-        levelLimit = config.get(Configuration.CATEGORY_GENERAL, "levelLimit", false, comment).getBoolean();
-
-        config.save();
-        logger.info("Finished loading config.");
-    }
-
-    public static Logger getLogger() {
-        return logger;
+    @SideOnly(Side.CLIENT)
+    @SubscribeEvent
+    public static void onConfigChanged(@Nonnull ConfigChangedEvent.OnConfigChangedEvent evt) {
+        if (evt.getModID().equals(Reference.MOD_ID)) {
+            ConfigManager.sync(Reference.MOD_ID, Config.Type.INSTANCE);
+        }
     }
 }

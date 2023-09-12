@@ -12,6 +12,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
@@ -39,6 +40,9 @@ public class EnchantmentBloodSlash extends RaryBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+                    if (ConfigLoader.levelLimit) {
+                        bonusLevel = Math.min(bonusLevel, 10);
+                    }
                     if (bonusLevel > 0) {
                         if (attacker instanceof EntityPlayer) {
                             if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
@@ -67,6 +71,9 @@ public class EnchantmentBloodSlash extends RaryBase {
                 if (killer.isEntityAlive() && !evt.getEntityLiving().equals(killer)) {
                     if (!killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), killer.getHeldItem(killer.getActiveHand()));
+                        if (ConfigLoader.levelLimit) {
+                            bonusLevel = Math.min(bonusLevel, 10);
+                        }
                         if (bonusLevel > 0) {
                             if (EnchantmentHelper.getEnchantmentLevel(EnchantmentBloodSlash.getEnchantment(), killer.getHeldItem(killer.getActiveHand())) > 0) {
                                 killer.heal(killer.getMaxHealth() * bonusLevel * 0.05f);

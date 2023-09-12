@@ -14,6 +14,7 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 
@@ -43,6 +44,9 @@ public class EnchantmentDarkAbandonedChild extends VeryRaryBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+                    if (ConfigLoader.levelLimit) {
+                        bonusLevel = Math.min(bonusLevel, 10);
+                    }
                     if (bonusLevel > 0) {
                         evt.getSource().setMagicDamage().setDamageBypassesArmor();
                         if (hurter.getActivePotionEffects().size() > 0) {
@@ -71,7 +75,8 @@ public class EnchantmentDarkAbandonedChild extends VeryRaryBase {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         if (!hurter.world.isDaytime()) {
                             evt.setAmount(evt.getAmount() * 0.9f);
                         }
@@ -89,7 +94,8 @@ public class EnchantmentDarkAbandonedChild extends VeryRaryBase {
                 if (entityPlayer.isEntityAlive()) {
                     if (!entityPlayer.getHeldItem(entityPlayer.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityPlayer.getHeldItem(entityPlayer.getActiveHand()));
-                        if (bonusLevel > 0) {
+
+                if (bonusLevel > 0) {
                             entityPlayer.heal(entityPlayer.getMaxHealth() * 0.015f / 20);
                         }
                     }

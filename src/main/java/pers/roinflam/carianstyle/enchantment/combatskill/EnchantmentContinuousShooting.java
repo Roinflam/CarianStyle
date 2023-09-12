@@ -37,6 +37,7 @@ public class EnchantmentContinuousShooting extends VeryRaryBase {
                 EntityArrow entityArrow = evt.getArrow();
                 EntityLivingBase attacker = (EntityLivingBase) evt.getArrow().shootingEntity;
                 int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+                
                 if (bonusLevel > 0) {
                     entityArrow.setDamage(entityArrow.getDamage() - entityArrow.getDamage() * 0.5);
                 }
@@ -50,6 +51,7 @@ public class EnchantmentContinuousShooting extends VeryRaryBase {
         if (entityLivingBase.isHandActive()) {
             if (!entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()).isEmpty()) {
                 int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()));
+                
                 if (bonusLevel > 0) {
                     for (int i = 0; i < 4; i++) {
                         EntityLivingUtil.updateHeld(entityLivingBase);

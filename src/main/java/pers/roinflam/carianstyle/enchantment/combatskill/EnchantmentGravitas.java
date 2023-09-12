@@ -64,7 +64,8 @@ public class EnchantmentGravitas extends UncommonBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         ACTIVE.put(attacker.getUniqueID(), bonusLevel * 4 * 20);
                         hurter.addPotionEffect(new PotionEffect(CarianStylePotion.GRAVITAS, bonusLevel * 2 * 20, 10 + bonusLevel * 4 - 1));
                     }

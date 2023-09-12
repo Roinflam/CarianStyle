@@ -44,6 +44,7 @@ public class EnchantmentSacredOrder extends VeryRaryBase {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
+                
                 if (bonusLevel > 0) {
                     if (killer.getAbsorptionAmount() < killer.getMaxHealth() * 3) {
                         float damageAbsorption = Math.min(killer.getMaxHealth() * 3, killer.getAbsorptionAmount() + killer.getMaxHealth() * 0.1f);
@@ -66,6 +67,7 @@ public class EnchantmentSacredOrder extends VeryRaryBase {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
+                
                 if (bonusLevel > 0) {
                     evt.setAmount(evt.getAmount() * 0.75f);
                     if (damageSource.getTrueSource() instanceof EntityLivingBase) {
@@ -83,7 +85,8 @@ public class EnchantmentSacredOrder extends VeryRaryBase {
                             bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                         }
                     }
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         evt.setAmount(evt.getAmount() * 1.5f);
                     }
                 }
@@ -103,7 +106,8 @@ public class EnchantmentSacredOrder extends VeryRaryBase {
                             bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                         }
                     }
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         entityLivingBase.setAbsorptionAmount(entityLivingBase.getMaxHealth());
                     }
                 }
@@ -121,7 +125,8 @@ public class EnchantmentSacredOrder extends VeryRaryBase {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
             }
-            if (bonusLevel > 0) {
+            
+                if (bonusLevel > 0) {
                 evt.setCanceled(true);
             }
         }

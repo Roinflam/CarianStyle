@@ -9,6 +9,7 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 
 import javax.annotation.Nonnull;
@@ -33,6 +34,9 @@ public class EnchantmentBrokenStar extends VeryRaryBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+                    if (ConfigLoader.levelLimit) {
+                        bonusLevel = Math.min(bonusLevel, 10);
+                    }
                     if (bonusLevel > 0) {
                         if (attacker.getHealth() >= attacker.getMaxHealth() / 2) {
                             if (!attacker.world.isDaytime()) {
@@ -48,7 +52,8 @@ public class EnchantmentBrokenStar extends VeryRaryBase {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         if (hurter.getHealth() <= hurter.getMaxHealth() / 2) {
                             if (!hurter.world.isDaytime()) {
                                 evt.setAmount(evt.getAmount() * 0.75f);

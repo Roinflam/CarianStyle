@@ -40,7 +40,7 @@ public class EnchantmentQuickstep extends UncommonBase {
                             bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                         }
                     }
-                    if (bonusLevel > 0) {
+                if (bonusLevel > 0) {
                         int level = (int) ((1 - entityPlayer.getHealth() / entityPlayer.getMaxHealth()) * 100 / 5 * bonusLevel);
                         if (level > 0) {
                             entityPlayer.addPotionEffect(new PotionEffect(CarianStylePotion.SPEED_BOOST, 2, level - 1));

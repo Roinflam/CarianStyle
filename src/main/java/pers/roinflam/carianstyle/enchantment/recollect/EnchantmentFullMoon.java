@@ -13,6 +13,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.EnchantmentDarkMoon;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
@@ -46,6 +47,9 @@ public class EnchantmentFullMoon extends VeryRaryBase {
                     if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
+                }
+                if (ConfigLoader.levelLimit) {
+                    bonusLevel = Math.min(bonusLevel, 10);
                 }
                 if (bonusLevel > 0) {
                     if (!FULL_MOON_COOLDING.contains(hurter.getUniqueID())) {
@@ -115,6 +119,7 @@ public class EnchantmentFullMoon extends VeryRaryBase {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
+                
                 if (bonusLevel > 0) {
                     if (FULL_MOON.contains(hurter.getUniqueID())) {
                         evt.setAmount(evt.getAmount() * 0.5f);
@@ -134,7 +139,8 @@ public class EnchantmentFullMoon extends VeryRaryBase {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
             }
-            if (bonusLevel > 0) {
+            
+                if (bonusLevel > 0) {
                 evt.setAmount(evt.getAmount() + evt.getAmount() * 0.25f);
             }
         }

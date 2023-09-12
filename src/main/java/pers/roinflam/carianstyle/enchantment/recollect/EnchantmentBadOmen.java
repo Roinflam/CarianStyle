@@ -11,6 +11,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
@@ -39,6 +40,9 @@ public class EnchantmentBadOmen extends VeryRaryBase {
                     @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                     if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+                        if (ConfigLoader.levelLimit) {
+                            bonusLevel = Math.min(bonusLevel, 10);
+                        }
                         if (bonusLevel > 0) {
                             if (hurter.isPotionActive(CarianStylePotion.BAD_OMEN)) {
                                 float damage = evt.getAmount();

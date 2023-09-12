@@ -44,6 +44,7 @@ public class EnchantmentDragoncrestGreatshield extends VeryRaryBase {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
+                
                 if (bonusLevel > 0) {
                     @Nullable PotionEffect potionEffect = hurter.getActivePotionEffect(CarianStylePotion.DRAGONCREST_GREATSHIELD);
                     if (potionEffect == null) {

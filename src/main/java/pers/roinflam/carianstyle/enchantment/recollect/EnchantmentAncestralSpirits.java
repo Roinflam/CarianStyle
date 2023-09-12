@@ -40,12 +40,13 @@ public class EnchantmentAncestralSpirits extends VeryRaryBase {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
+                
                 if (bonusLevel > 0) {
                     if (evt.getSource().isMagicDamage()) {
-                        evt.setAmount(evt.getAmount() * 0.25f);
+                        evt.setAmount(evt.getAmount() * 0.5f);
                     }
                     if (hurter.isEntityAlive()) {
-                        float heal = (hurter.getMaxHealth() - hurter.getHealth()) * 0.1f / 20;
+                        float heal = (hurter.getMaxHealth() - hurter.getHealth()) * 0.05f / 20;
                         new SynchronizationTask(10, 10) {
                             private int tick = 0;
 

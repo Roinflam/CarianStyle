@@ -12,6 +12,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
@@ -41,6 +42,9 @@ public class EnchantmentEpilepsyFire extends RaryBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+                    if (ConfigLoader.levelLimit) {
+                        bonusLevel = Math.min(bonusLevel, 10);
+                    }
                     if (bonusLevel > 0) {
                         if (attacker instanceof EntityPlayer) {
                             if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
@@ -71,6 +75,7 @@ public class EnchantmentEpilepsyFire extends RaryBase {
                             }.start();
                         }
                         hurter.addPotionEffect(new PotionEffect(CarianStylePotion.EPILEPSY_FIRE_BURNING, 3 * 20 + 5, 0));
+                        int finalBonusLevel = bonusLevel;
                         new SynchronizationTask(5, 1) {
                             private int tick = 0;
 
@@ -80,7 +85,7 @@ public class EnchantmentEpilepsyFire extends RaryBase {
                                     this.cancel();
                                     return;
                                 }
-                                float damage = attacker.getMaxHealth() * 0.3f * bonusLevel * 0.5f / 60;
+                                float damage = attacker.getMaxHealth() * 0.3f * finalBonusLevel * 0.5f / 60;
                                 if (hurter.getHealth() - damage * 2 > 0) {
                                     hurter.setHealth(hurter.getHealth() - damage);
                                 } else {

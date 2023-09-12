@@ -45,10 +45,13 @@ public class EnchantmentRockBlaster extends RaryBase {
                 @Nonnull ItemStack itemStack = entityPlayer.getHeldItem(entityPlayer.swingingHand);
                 if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemPickaxe) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
+                    if (ConfigLoader.levelLimit) {
+                        bonusLevel = Math.min(bonusLevel, 10);
+                    }
                     if (bonusLevel > 0) {
                         @Nonnull List<BlockPos> blockPosList = new ArrayList<>();
                         int radius = 1 + bonusLevel / 2;
-                        radius = Math.min(radius, ConfigLoader.rockblaster_maxrange);
+                        radius = Math.min(radius, ConfigLoader.rockBlasterMaxRange);
                         for (int x = -radius; x <= radius; x++) {
                             for (int z = -radius; z <= radius; z++) {
                                 for (int y = -radius; y <= radius; y++) {

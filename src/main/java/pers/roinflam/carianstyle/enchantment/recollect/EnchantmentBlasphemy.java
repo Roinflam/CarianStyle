@@ -12,6 +12,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 
 import javax.annotation.Nonnull;
@@ -38,6 +39,9 @@ public class EnchantmentBlasphemy extends VeryRaryBase {
                 if (killer.isEntityAlive() && !evt.getEntityLiving().equals(killer)) {
                     if (!killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), killer.getHeldItem(killer.getActiveHand()));
+                        if (ConfigLoader.levelLimit) {
+                            bonusLevel = Math.min(bonusLevel, 10);
+                        }
                         if (bonusLevel > 0) {
                             killer.heal(deader.getMaxHealth() * 0.1f);
                             if (killer instanceof EntityPlayer) {

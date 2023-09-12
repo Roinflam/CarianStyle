@@ -15,6 +15,7 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
@@ -43,6 +44,9 @@ public class EnchantmentScholarShield extends VeryRaryBase {
                     @Nonnull ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
                     if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
+                        if (ConfigLoader.levelLimit) {
+                            bonusLevel = Math.min(bonusLevel, 10);
+                        }
                         if (bonusLevel > 0) {
                             attacker.attackEntityFrom(DamageSource.causeMobDamage(hurter).setMagicDamage(), evt.getAmount() * bonusLevel * 0.1f);
                         }
@@ -61,6 +65,9 @@ public class EnchantmentScholarShield extends VeryRaryBase {
                     @Nonnull ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
                     if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
+                        if (ConfigLoader.levelLimit) {
+                            bonusLevel = Math.min(bonusLevel, 10);
+                        }
                         if (bonusLevel > 0) {
                             evt.setAmount(evt.getAmount() - evt.getAmount() * bonusLevel * 0.075f);
                         }

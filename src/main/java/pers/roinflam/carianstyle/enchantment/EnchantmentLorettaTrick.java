@@ -12,6 +12,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
@@ -39,6 +40,9 @@ public class EnchantmentLorettaTrick extends VeryRaryBase {
                 EntityArrow entityArrow = evt.getArrow();
                 EntityLivingBase attacker = (EntityLivingBase) evt.getArrow().shootingEntity;
                 int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+                if (ConfigLoader.levelLimit) {
+                    bonusLevel = Math.min(bonusLevel, 10);
+                }
                 if (bonusLevel > 0) {
                     entityArrow.setDamage(entityArrow.getDamage() - entityArrow.getDamage() * 0.25);
                     new SynchronizationTask(1, 5) {

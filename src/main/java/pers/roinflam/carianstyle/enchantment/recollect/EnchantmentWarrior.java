@@ -11,6 +11,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
@@ -37,6 +38,9 @@ public class EnchantmentWarrior extends VeryRaryBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+                    if (ConfigLoader.levelLimit) {
+                        bonusLevel = Math.min(bonusLevel, 10);
+                    }
                     if (bonusLevel > 0) {
                         evt.setAmount(evt.getAmount() + evt.getAmount() * 0.25f);
                     }
@@ -51,6 +55,9 @@ public class EnchantmentWarrior extends VeryRaryBase {
             EntityLivingBase hurter = evt.getEntityLiving();
             if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
                 int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
+                if (ConfigLoader.levelLimit) {
+                    bonusLevel = Math.min(bonusLevel, 10);
+                }
                 if (bonusLevel > 0) {
                     evt.setAmount(evt.getAmount() * 0.5f);
                     float damage = evt.getAmount() / 60;
@@ -84,6 +91,9 @@ public class EnchantmentWarrior extends VeryRaryBase {
                 @Nullable EntityLivingBase killer = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), killer.getHeldItem(killer.getActiveHand()));
+                    if (ConfigLoader.levelLimit) {
+                        bonusLevel = Math.min(bonusLevel, 10);
+                    }
                     if (bonusLevel > 0) {
                         killer.heal((killer.getMaxHealth() - killer.getHealth()) * 0.25f);
                     }

@@ -11,6 +11,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 
 import javax.annotation.Nonnull;
@@ -38,6 +39,9 @@ public class EnchantmentBlessedDewTalisman extends UncommonBase {
                         if (!itemStack.isEmpty()) {
                             bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                         }
+                    }
+                    if (ConfigLoader.levelLimit) {
+                        bonusLevel = Math.min(bonusLevel, 10);
                     }
                     if (bonusLevel > 0) {
                         entityPlayer.heal(entityPlayer.getMaxHealth() * bonusLevel * 0.002f / 20);

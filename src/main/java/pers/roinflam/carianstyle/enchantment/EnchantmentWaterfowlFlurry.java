@@ -12,6 +12,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
@@ -39,6 +40,9 @@ public class EnchantmentWaterfowlFlurry extends RaryBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+                    if (ConfigLoader.levelLimit) {
+                        bonusLevel = Math.min(bonusLevel, 10);
+                    }
                     if (bonusLevel > 0) {
                         if (attacker instanceof EntityPlayer) {
                             if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
@@ -54,12 +58,13 @@ public class EnchantmentWaterfowlFlurry extends RaryBase {
 
                             damageSource.damageType = "waterfowlDance";
 
+                            int finalBonusLevel = bonusLevel;
                             new SynchronizationTask(1, 2) {
                                 private int time = 0;
 
                                 @Override
                                 public void run() {
-                                    if (++time > bonusLevel || !hurter.isEntityAlive()) {
+                                    if (++time > finalBonusLevel || !hurter.isEntityAlive()) {
                                         this.cancel();
                                         return;
                                     }

@@ -35,7 +35,8 @@ public class EnchantmentLionClaw extends RaryBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         if (RandomUtil.percentageChance(20)) {
                             evt.getSource().setDamageBypassesArmor();
                             evt.setAmount(evt.getAmount() + evt.getAmount() * bonusLevel * 0.15f);

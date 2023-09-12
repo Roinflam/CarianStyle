@@ -39,7 +39,8 @@ public class EnchantmentMillicentProsthesis extends RaryBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         if (attacker instanceof EntityPlayer) {
                             if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
                                 return;
@@ -66,7 +67,8 @@ public class EnchantmentMillicentProsthesis extends RaryBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         @Nullable PotionEffect potionEffect = attacker.getActivePotionEffect(CarianStylePotion.ATTACK_BOOST);
                         if (potionEffect != null && potionEffect.getAmplifier() >= bonusLevel * 7 - 1) {
                             evt.setAmount(evt.getAmount() + evt.getAmount() * bonusLevel * 0.1f);

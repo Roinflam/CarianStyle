@@ -49,7 +49,8 @@ public class EnchantmentPatience extends RaryBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         evt.setAmount(evt.getAmount() + PATIENCE.getOrDefault(attacker.getUniqueID(), 0f));
                         PATIENCE.remove(attacker.getUniqueID());
                     }
@@ -65,7 +66,8 @@ public class EnchantmentPatience extends RaryBase {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         float damage = PATIENCE.getOrDefault(hurter.getUniqueID(), 0f);
                         damage = Math.min(damage + evt.getAmount() * bonusLevel * 0.1f, hurter.getMaxHealth() * bonusLevel * 0.4f);
                         PATIENCE.put(hurter.getUniqueID(), damage);

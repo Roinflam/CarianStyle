@@ -9,6 +9,7 @@ import net.minecraftforge.event.entity.living.LivingExperienceDropEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
@@ -33,6 +34,9 @@ public class EnchantmentGoldenDungTurtle extends UncommonBase {
                 EntityPlayer player = evt.getAttackingPlayer();
                 if (!player.getHeldItem(player.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), player.getHeldItem(player.getActiveHand()));
+                    if (ConfigLoader.levelLimit) {
+                        bonusLevel = Math.min(bonusLevel, 10);
+                    }
                     if (bonusLevel > 0) {
                         evt.setDroppedExperience((int) (evt.getDroppedExperience() + evt.getDroppedExperience() * bonusLevel * 0.3));
                     }

@@ -14,6 +14,7 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
@@ -42,6 +43,9 @@ public class EnchantmentShelterOfFire extends UncommonBase {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
+                if (ConfigLoader.levelLimit) {
+                    bonusLevel = Math.min(bonusLevel, 10);
+                }
                 if (bonusLevel > 0) {
                     if (bonusLevel * 0.02 >= 1) {
                         evt.setCanceled(true);
@@ -65,6 +69,9 @@ public class EnchantmentShelterOfFire extends UncommonBase {
                             if (!itemStack.isEmpty()) {
                                 bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                             }
+                        }
+                        if (ConfigLoader.levelLimit) {
+                            bonusLevel = Math.min(bonusLevel, 10);
                         }
                         if (bonusLevel > 0) {
                             entityPlayer.heal(entityPlayer.getMaxHealth() * bonusLevel * 0.001f / 20);

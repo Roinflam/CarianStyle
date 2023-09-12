@@ -36,7 +36,8 @@ public class EnchantmentSwordDance extends VeryRaryBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         hurter.hurtResistantTime = hurter.maxHurtResistantTime / 2;
                         if (attacker instanceof EntityPlayer) {
                             evt.setAmount(evt.getAmount() * Math.max(EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker), 0.4f));

@@ -17,13 +17,15 @@ import pers.roinflam.carianstyle.tileentity.MoveLight;
 import pers.roinflam.carianstyle.utils.IHasModel;
 
 import javax.annotation.Nonnull;
+import java.util.ArrayList;
+import java.util.Arrays;
 
 @Mod.EventBusSubscriber
 public class RegistryHandler {
 
     @SubscribeEvent
     public static void onEnchantmentRegister(@Nonnull RegistryEvent.Register<Enchantment> evt) {
-        CarianStyleEnchantments.ENCHANTMENTS.removeIf(enchantment -> ConfigLoader.uninstall_enchantment.contains(enchantment.getName()));
+        CarianStyleEnchantments.ENCHANTMENTS.removeIf(enchantment -> new ArrayList<>(Arrays.asList(ConfigLoader.uninstallEnchantment)).contains(enchantment.getName()));
         evt.getRegistry().registerAll(CarianStyleEnchantments.ENCHANTMENTS.toArray(new Enchantment[0]));
     }
 

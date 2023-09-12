@@ -46,10 +46,10 @@ public class EnchantmentProtectionOfTheErdtree extends RaryBase {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
+                if (ConfigLoader.levelLimit) {
+                    bonusLevel = Math.min(bonusLevel, 10);
+                }
                 if (bonusLevel > 0) {
-                    if (ConfigLoader.levelLimit) {
-                        bonusLevel = Math.min(bonusLevel, 5);
-                    }
                     hurter.addPotionEffect(new PotionEffect(CarianStylePotion.PROTECTION_OF_THE_ERDTREE, (int) (2.5 * bonusLevel * 20), bonusLevel - 1));
                 }
                 bonusLevel = 0;
@@ -57,6 +57,9 @@ public class EnchantmentProtectionOfTheErdtree extends RaryBase {
                     if (!itemStack.isEmpty()) {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
+                }
+                if (ConfigLoader.levelLimit) {
+                    bonusLevel = Math.min(bonusLevel, 10);
                 }
                 if (bonusLevel > 0) {
                     bonusLevel = Math.min(bonusLevel, 5);

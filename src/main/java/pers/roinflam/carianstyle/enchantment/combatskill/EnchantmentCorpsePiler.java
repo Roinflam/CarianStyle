@@ -11,6 +11,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
@@ -49,7 +50,8 @@ public class EnchantmentCorpsePiler extends RaryBase {
                 @Nullable EntityLivingBase killer = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), killer.getHeldItem(killer.getActiveHand()));
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         if (killer.world.rand.nextBoolean()) {
                             KILL_NUMBER.put(killer.getUniqueID(), Math.min(KILL_NUMBER.getOrDefault(killer.getUniqueID(), 0) + 1, 50));
                         }
@@ -70,7 +72,8 @@ public class EnchantmentCorpsePiler extends RaryBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         int number = KILL_NUMBER.getOrDefault(attacker.getUniqueID(), 0);
                         if (number > 0) {
                             evt.setAmount(evt.getAmount() + evt.getAmount() * number * bonusLevel * 0.01f);

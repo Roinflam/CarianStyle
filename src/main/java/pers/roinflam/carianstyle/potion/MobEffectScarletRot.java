@@ -11,6 +11,7 @@ import net.minecraftforge.event.entity.living.LivingHealEvent;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
@@ -56,8 +57,11 @@ public class MobEffectScarletRot extends IconBase {
                         for (EntityLivingBase entityLivingBase : entities) {
                             if (!entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()).isEmpty()) {
                                 int bonusLevel = EnchantmentHelper.getEnchantmentLevel(CarianStyleEnchantments.AEONIA, entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()));
+                                if (ConfigLoader.levelLimit) {
+                                    bonusLevel = Math.min(bonusLevel, 10);
+                                }
                                 if (bonusLevel > 0) {
-                                    EntityLivingBase hurter = evt.getEntityLiving();System.out.println(potionEffect.getDuration());
+                                    EntityLivingBase hurter = evt.getEntityLiving();
                                     hurter.addPotionEffect(new PotionEffect(this, potionEffect.getDuration(), potionEffect.getAmplifier()));
                                     return;
                                 }
@@ -83,6 +87,9 @@ public class MobEffectScarletRot extends IconBase {
                 for (EntityLivingBase entityLivingBase : new ArrayList<>(entities)) {
                     if (!entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(CarianStyleEnchantments.AEONIA, entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()));
+                        if (ConfigLoader.levelLimit) {
+                            bonusLevel = Math.min(bonusLevel, 10);
+                        }
                         if (bonusLevel > 0) {
                             entities = EntityUtil.getNearbyEntities(
                                     EntityLivingBase.class,
@@ -91,7 +98,6 @@ public class MobEffectScarletRot extends IconBase {
                             );
                             for (EntityLivingBase target : new ArrayList<>(entities)) {
                                 if (RandomUtil.percentageChance(50)) {
-                                    System.out.println(potionEffect.getDuration());
                                     target.addPotionEffect(new PotionEffect(this, potionEffect.getDuration(), potionEffect.getAmplifier()));
                                 }
                             }
@@ -118,6 +124,9 @@ public class MobEffectScarletRot extends IconBase {
                 for (EntityLivingBase entityLivingBase : entities) {
                     if (!entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(CarianStyleEnchantments.AEONIA, entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()));
+                        if (ConfigLoader.levelLimit) {
+                            bonusLevel = Math.min(bonusLevel, 10);
+                        }
                         if (bonusLevel > 0) {
                             entityLivingBaseIn.attackEntityFrom(NewDamageSource.SCARLET_ROT, damage * 2.5f);
                             return;

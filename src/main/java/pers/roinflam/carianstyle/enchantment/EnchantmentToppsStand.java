@@ -49,9 +49,8 @@ public class EnchantmentToppsStand extends VeryRaryBase {
                             6
                     ));
                 }
-                for (Entity entity : entities) {
-                    EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
-                    for (@Nonnull ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
+                for (EntityLivingBase entity : entities) {
+                    for (@Nonnull ItemStack itemStack : entity.getArmorInventoryList()) {
                         if (!itemStack.isEmpty()) {
                             if (EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack) > 0) {
                                 evt.setCanceled(true);

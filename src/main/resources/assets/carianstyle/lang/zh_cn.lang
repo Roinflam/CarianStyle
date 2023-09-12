@@ -1,7 +1,7 @@
 enchantment.full_moon=满月
 enchantment.carianstyle.full_moon.desc=夜晚时：受到的恢复效果提高25%%；受到致命伤害时，防止此伤害并在10秒内每秒恢复10%%最大生命值（夜晚时：当主手武器拥有暗月附魔时，持续时间翻倍），期间获得50%%的伤害减免，此效果有180秒的冷却时间（夜晚时冷却时间减半）
 enchantment.ancestral_spirits=祖灵
-enchantment.carianstyle.ancestral_spirits.desc=获得75%%的魔法伤害减免；受到伤害后，在10秒内恢复10%%已损失生命值
+enchantment.carianstyle.ancestral_spirits.desc=获得50%%的魔法伤害减免；受到伤害后，在10秒内恢复5%%已损失生命值
 enchantment.broken_star=碎星
 enchantment.carianstyle.broken_star.desc=生命值高于50%%时，造成的伤害提高50%%；生命值低于50%%时，获得25%%的伤害减免（夜晚时效果翻倍）
 enchantment.dark_abandoned_child=黑暗弃子
@@ -118,7 +118,7 @@ enchantment.carianstyle.fire_devoured.desc=自身着火时：攻击会对目标[
 enchantment.black_flame_shelter=黑焰庇护
 enchantment.carianstyle.black_flame_shelter.desc=获得[附魔等级]*12.5%%的物理伤害减免（会被无视护甲类型伤害所无视），但受到的恢复效果降低[附魔等级]*18.75%%
 enchantment.ancestral_spirit_horn=祖灵角
-enchantment.carianstyle.ancestral_spirit_horn.desc=获得50%%的魔法伤害减免；受到魔法伤害后，在10秒内[附魔等级]*10%%伤害值的生命值
+enchantment.carianstyle.ancestral_spirit_horn.desc=获得25%%的魔法伤害减免；受到魔法伤害后，在10秒内[附魔等级]*5%%伤害值的生命值
 enchantment.regressive_principle=回归性原理
 enchantment.carianstyle.regressive_principle.desc=消除[附魔等级]*3格内包括自身以内所有生物的所有增益负面效果
 enchantment.black_flame_blade=黑焰刀刃

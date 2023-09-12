@@ -17,6 +17,7 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentFullMoon;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
@@ -44,6 +45,9 @@ public class EnchantmentDarkMoon extends VeryRaryBase {
                 if (evt.getSource().isMagicDamage()) {
                     if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
+                        if (ConfigLoader.levelLimit) {
+                            bonusLevel = Math.min(bonusLevel, 10);
+                        }
                         if (bonusLevel > 0) {
                             boolean hasFullMoon = false;
                             for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
@@ -65,6 +69,9 @@ public class EnchantmentDarkMoon extends VeryRaryBase {
                         @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                         if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                             int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+                            if (ConfigLoader.levelLimit) {
+                                bonusLevel = Math.min(bonusLevel, 10);
+                            }
                             if (bonusLevel > 0) {
                                 if (attacker instanceof EntityPlayer) {
                                     if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
@@ -107,6 +114,9 @@ public class EnchantmentDarkMoon extends VeryRaryBase {
             EntityLivingBase healer = evt.getEntityLiving();
             if (!healer.getHeldItem(healer.getActiveHand()).isEmpty()) {
                 int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), healer.getHeldItem(healer.getActiveHand()));
+                if (ConfigLoader.levelLimit) {
+                    bonusLevel = Math.min(bonusLevel, 10);
+                }
                 if (bonusLevel > 0) {
                     boolean hasFullMoon = false;
                     for (@Nonnull ItemStack itemStack : healer.getArmorInventoryList()) {
@@ -135,6 +145,9 @@ public class EnchantmentDarkMoon extends VeryRaryBase {
                 if (entityPlayer.isEntityAlive()) {
                     if (!entityPlayer.getHeldItem(entityPlayer.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityPlayer.getHeldItem(entityPlayer.getActiveHand()));
+                        if (ConfigLoader.levelLimit) {
+                            bonusLevel = Math.min(bonusLevel, 10);
+                        }
                         if (bonusLevel > 0) {
                             entityPlayer.addPotionEffect(new PotionEffect(MobEffects.NIGHT_VISION, 210));
                         }

@@ -42,7 +42,8 @@ public class EnchantmentLungeUp extends RaryBase {
                 if (attacker.isSprinting()) {
                     if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                        if (bonusLevel > 0) {
+
+                if (bonusLevel > 0) {
                             attacker.setSprinting(false);
                             attacker.addPotionEffect(new PotionEffect(SLOWNESS, 10, 6));
                             new SynchronizationTask(5) {

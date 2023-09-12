@@ -41,7 +41,8 @@ public class EnchantmentStarlight extends UncommonBase {
                 bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
             }
         }
-        if (bonusLevel > 0) {
+        
+                if (bonusLevel > 0) {
             World world = entityLivingBase.world;
             int blockX = MathHelper.floor(entityLivingBase.posX);
             int blockY = MathHelper.floor(entityLivingBase.posY - 0.2D - entityLivingBase.getYOffset());
@@ -50,7 +51,6 @@ public class EnchantmentStarlight extends UncommonBase {
             if (world.isAirBlock(blockPos)) {
                 if (world.getTileEntity(blockPos) instanceof MoveLight) {
                     MoveLight moveLight = (MoveLight) world.getTileEntity(blockPos);
-                    System.out.println(1);
                     moveLight.retime();
                 } else if (world.getBlockState(blockPos).getBlock() instanceof HideLight) {
                     world.setBlockToAir(blockPos);

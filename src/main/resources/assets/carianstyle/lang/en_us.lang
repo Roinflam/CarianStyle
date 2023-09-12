@@ -1,7 +1,7 @@
 enchantment.full_moon=Full Moon
 enchantment.carianstyle.full_moon.desc=At night, the recovery effect received is increased by 25%%; when taking fatal damage, the damage is prevented and 10%% of the maximum health is restored per second for 10 seconds (at night, when the main hand weapon has the Dark Moon enchantment, the duration is doubledtimes), gain 50%% damage reduction during the period, this effect has a 180-second cooldown (half the cooldown at night)
 enchantment.ancestral_spirits=Ancestral Spirit
-enchantment.carianstyle.ancestral_spirits.desc=Gain 75%% magic damage reduction; after taking damage, restore 10%% of missing health over 10 seconds
+enchantment.carianstyle.ancestral_spirits.desc=Gain 50%% magic damage reduction; after taking damage, restore 5%% of missing health over 10 seconds
 enchantment.broken_star=Starscourge
 enchantment.carianstyle.broken_star.desc=When health is above 50%%, damage dealt is increased by 50%%; when health is below 50%%, damage reduction is increased by 25%%(The effect is doubled at night)
 enchantment.dark_abandoned_child=Naturalborn Of The Void
@@ -118,7 +118,7 @@ enchantment.carianstyle.fire_devoured.desc=When the self is on fire: the attack 
 enchantment.black_flame_shelter=Black Flame's Protection
 enchantment.carianstyle.black_flame_shelter.desc=Obtain [Enchantment Level]*12.5%% of physical damage reduction (will be ignored by armor type damage), but the recovery effect received is reduced by [Enchantment Level]*18.75%%
 enchantment.ancestral_spirit_horn=Ancestral Spirit's Horn
-enchantment.carianstyle.ancestral_spirit_horn.desc=Gain 50%% magic damage reduction; after receiving magic damage, recover HP by [Enchantment Level]*10%% damage value within 10 seconds
+enchantment.carianstyle.ancestral_spirit_horn.desc=Gain 25%% magic damage reduction; after receiving magic damage, recover HP by [Enchantment Level]*5%% damage value within 10 seconds
 enchantment.regressive_principle=Law of Regression
 enchantment.carianstyle.regressive_principle.desc=Eliminate all buffs and negative effects of all creatures within the range of [Enchantment Level]*3, including yourself
 enchantment.black_flame_blade=Black Flame Blade

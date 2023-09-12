@@ -13,6 +13,7 @@ import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.network.internal.FMLProxyPacket;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
+import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
 import javax.annotation.Nonnull;
@@ -27,7 +28,7 @@ public class NetworkRegistryHandler {
     }
 
     public static class RenderingEffect {
-        private static final String NAME = "RENDERING_EFFECT";
+        private static final String NAME = Reference.NAME + "_RENDERING_EFFECT";
         private static final FMLEventChannel CHANNEL = NetworkRegistry.INSTANCE.newEventDrivenChannel(NAME);
 
         private static final HashMap<Integer, List<Integer>> ENTITIES_ID = new HashMap<>();

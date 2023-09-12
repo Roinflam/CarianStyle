@@ -42,7 +42,8 @@ public class EnchantmentSacredBlade extends UncommonBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         if (hurter.getCreatureAttribute().equals(EnumCreatureAttribute.UNDEAD)) {
                             float damage = evt.getAmount() * bonusLevel * 0.25f * (hurter.getHealth() / hurter.getMaxHealth());
                             evt.setAmount(evt.getAmount() + damage);

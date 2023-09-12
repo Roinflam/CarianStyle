@@ -14,10 +14,10 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -38,13 +38,16 @@ public class EnchantmentCarianRetaliation extends RaryBase {
     public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             DamageSource damageSource = evt.getSource();
-            if (damageSource.getTrueSource() != null && (!damageSource.getImmediateSource().equals(damageSource.getTrueSource()) || damageSource.isMagicDamage())) {
+            if (damageSource.getTrueSource() != null && (!damageSource.getTrueSource().equals(damageSource.getImmediateSource()) || damageSource.isMagicDamage())) {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 @Nullable Entity attacker = damageSource.getTrueSource();
                 if (hurter.isHandActive()) {
                     @Nonnull ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
                     if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
+                        if (ConfigLoader.levelLimit) {
+                            bonusLevel = Math.min(bonusLevel, 10);
+                        }
                         if (bonusLevel > 0) {
                             for (int i = 0; i < 3; i++) {
                                 @Nonnull EntityGlintblades entityGlintblades_show = new EntityGlintblades(hurter, attacker).setDeadTick(40 + i * 5);
@@ -60,6 +63,7 @@ public class EnchantmentCarianRetaliation extends RaryBase {
                                 }
                                 hurter.world.spawnEntity(entityGlintblades_show);
 
+                                int finalBonusLevel = bonusLevel;
                                 new SynchronizationTask(40 + i * 5) {
 
                                     @Override
@@ -73,7 +77,7 @@ public class EnchantmentCarianRetaliation extends RaryBase {
                                         entityGlintblades.posZ = z;
 
                                         entityGlintblades.setDamageSource(DamageSource.causeThrownDamage(entityGlintblades, hurter).setMagicDamage());
-                                        entityGlintblades.setDamage(evt.getAmount() * bonusLevel * 0.2f);
+                                        entityGlintblades.setDamage(evt.getAmount() * finalBonusLevel * 0.2f);
                                         entityGlintblades.shoot(1);
                                         hurter.world.spawnEntity(entityGlintblades);
                                     }

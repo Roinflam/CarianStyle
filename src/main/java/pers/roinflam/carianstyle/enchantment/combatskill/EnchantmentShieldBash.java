@@ -41,7 +41,8 @@ public class EnchantmentShieldBash extends UncommonBase {
                     @Nonnull ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
                     if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
-                        if (bonusLevel > 0) {
+
+                if (bonusLevel > 0) {
                             double x = hurter.posX - attacker.posX;
                             double z = hurter.posZ - attacker.posZ;
                             attacker.knockBack(hurter, bonusLevel * 0.25f, x, z);

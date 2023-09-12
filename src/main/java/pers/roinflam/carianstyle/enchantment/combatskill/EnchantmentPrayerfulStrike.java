@@ -66,7 +66,8 @@ public class EnchantmentPrayerfulStrike extends VeryRaryBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         if (READY.containsKey(attacker.getUniqueID())) {
                             if (READY.get(attacker.getUniqueID()) <= 4 * 20) {
                                 READY.put(attacker.getUniqueID(), 8 * 20);
@@ -79,7 +80,7 @@ public class EnchantmentPrayerfulStrike extends VeryRaryBase {
                                 } else {
                                     double base = attributeInstance.getModifier(ID).getAmount();
                                     attributeInstance.removeModifier(ID);
-                                    attributeInstance.applyModifier(new AttributeModifier(ID, NAME, Math.min(base + Math.min(health / 2, attacker.getMaxHealth() * 0.05), ConfigLoader.prayerfulStrike_maxHealth), 0));
+                                    attributeInstance.applyModifier(new AttributeModifier(ID, NAME, Math.min(base + Math.min(health / 2, attacker.getMaxHealth() * 0.05), ConfigLoader.prayerfulStrikeMaxHealth), 0));
                                 }
 
                                 attacker.heal(health);
@@ -93,7 +94,8 @@ public class EnchantmentPrayerfulStrike extends VeryRaryBase {
                 }
                 if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         if (READY.containsKey(hurter.getUniqueID())) {
                             if (READY.get(hurter.getUniqueID()) <= 4 * 20) {
                                 READY.put(hurter.getUniqueID(), 4 * 20);

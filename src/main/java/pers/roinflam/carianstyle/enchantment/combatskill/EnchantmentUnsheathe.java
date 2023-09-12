@@ -69,7 +69,8 @@ public class EnchantmentUnsheathe extends RaryBase {
                     }
                     if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                        if (bonusLevel > 0) {
+
+                if (bonusLevel > 0) {
                             if (RandomUtil.percentageChance(1 + NUM_OF_ATTACKS.getOrDefault(attacker.getUniqueID(), 0) * 0.5)) {
                                 @Nonnull IAttributeInstance attributeInstance = attacker.getEntityAttribute(SharedMonsterAttributes.ATTACK_SPEED);
                                 evt.setAmount(evt.getAmount() * bonusLevel * 3.3f);

@@ -46,6 +46,7 @@ public class EnchantmentBlackFlameRitual extends VeryRaryBase {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
+                
                 if (bonusLevel > 0) {
                     float damageMultiplier = 1;
                     for (PotionEffect potionEffect : attacker.getActivePotionEffects()) {
@@ -70,7 +71,8 @@ public class EnchantmentBlackFlameRitual extends VeryRaryBase {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
             }
-            if (bonusLevel > 0) {
+            
+                if (bonusLevel > 0) {
                 boolean hasPotion = false;
                 for (PotionEffect potionEffect : entityLivingBase.getActivePotionEffects()) {
                     Potion potion = potionEffect.getPotion();

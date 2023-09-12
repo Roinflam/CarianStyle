@@ -46,7 +46,8 @@ public class EnchantmentAeonia extends VeryRaryBase {
                     }
                     if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                        if (bonusLevel > 0) {
+
+                if (bonusLevel > 0) {
                             attacker.heal(attacker.getMaxHealth() * 0.1f);
                         }
                     }
@@ -61,6 +62,7 @@ public class EnchantmentAeonia extends VeryRaryBase {
             EntityLivingBase entityLivingBase = evt.getEntityLiving();
             if (!entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()).isEmpty()) {
                 int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()));
+                
                 if (bonusLevel > 0) {
                     entityLivingBase.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_ROT, 21, 0));
                 }

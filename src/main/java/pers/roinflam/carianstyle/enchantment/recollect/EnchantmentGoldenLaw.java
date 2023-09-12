@@ -41,7 +41,8 @@ public class EnchantmentGoldenLaw extends VeryRaryBase {
                     @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                     if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                        if (bonusLevel > 0) {
+
+                if (bonusLevel > 0) {
                             float damage = evt.getAmount() * 0.15f + evt.getAmount() * 0.45f * (1 - attacker.getHealth() / attacker.getMaxHealth());
                             evt.setAmount(evt.getAmount() + damage);
                         }
@@ -51,7 +52,8 @@ public class EnchantmentGoldenLaw extends VeryRaryBase {
                     EntityLivingBase hurter = evt.getEntityLiving();
                     if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
-                        if (bonusLevel > 0) {
+
+                if (bonusLevel > 0) {
                             evt.setAmount(evt.getAmount() - evt.getAmount() * 0.15f);
                         }
                     }
@@ -67,7 +69,8 @@ public class EnchantmentGoldenLaw extends VeryRaryBase {
                 EntityLivingBase hurter = evt.getEntityLiving();
                 if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItemMainhand());
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         if (evt.getAmount() <= hurter.getHealth() * 0.15) {
                             evt.setCanceled(true);
                         } else if (!GOLDEN_LAW.contains(hurter.getUniqueID())) {

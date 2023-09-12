@@ -14,6 +14,7 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
@@ -44,6 +45,9 @@ public class EnchantmentCalamity extends VeryRaryBase {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
             }
+            if (ConfigLoader.levelLimit) {
+                bonusLevel = Math.min(bonusLevel, 10);
+            }
             if (bonusLevel > 0) {
                 evt.setAmount(evt.getAmount() * 2);
             }
@@ -65,6 +69,9 @@ public class EnchantmentCalamity extends VeryRaryBase {
                             if (!itemStack.isEmpty()) {
                                 bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                             }
+                        }
+                        if (ConfigLoader.levelLimit) {
+                            bonusLevel = Math.min(bonusLevel, 10);
                         }
                         if (bonusLevel > 0) {
                             @Nonnull List<EntityMob> entities = EntityUtil.getNearbyEntities(

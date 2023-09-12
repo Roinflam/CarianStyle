@@ -46,7 +46,8 @@ public class EnchantmentTimeReversal extends VeryRaryBase {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
             }
-            if (bonusLevel > 0) {
+            
+                if (bonusLevel > 0) {
                 if (!REVERSAL_COOLDING.contains(hurter.getUniqueID())) {
                     if (!hurter.isDead) {
                         evt.setCanceled(true);
@@ -90,7 +91,8 @@ public class EnchantmentTimeReversal extends VeryRaryBase {
                     bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                 }
             }
-            if (bonusLevel > 0) {
+            
+                if (bonusLevel > 0) {
                 if (REVERSAL.containsKey(hurter.getUniqueID())) {
                     if (!evt.getEntity().equals(evt.getSource().getTrueSource())) {
                         evt.setCanceled(true);

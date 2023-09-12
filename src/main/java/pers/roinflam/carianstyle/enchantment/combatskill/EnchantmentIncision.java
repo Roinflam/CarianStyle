@@ -40,7 +40,8 @@ public class EnchantmentIncision extends VeryRaryBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (bonusLevel > 0) {
+                    
+                if (bonusLevel > 0) {
                         if (attacker instanceof EntityPlayer) {
                             if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
                                 return;
@@ -69,7 +70,8 @@ public class EnchantmentIncision extends VeryRaryBase {
                 if (killer.isEntityAlive() && !evt.getEntityLiving().equals(killer)) {
                     if (!killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
                         int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), killer.getHeldItem(killer.getActiveHand()));
-                        if (bonusLevel > 0) {
+
+                if (bonusLevel > 0) {
                             if (killer.getActivePotionEffect(CarianStylePotion.INCISION) != null) {
                                 killer.heal((killer.getMaxHealth() - killer.getHealth()) * 0.1f);
                                 killer.addPotionEffect(new PotionEffect(CarianStylePotion.INCISION, Math.min(killer.getActivePotionEffect(CarianStylePotion.INCISION).getDuration() + 100, 200), 0));

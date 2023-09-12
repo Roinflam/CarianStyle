@@ -12,6 +12,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
@@ -42,6 +43,9 @@ public class EnchantmentCarianPhalanx extends RaryBase {
                 @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+                    if (ConfigLoader.levelLimit) {
+                        bonusLevel = Math.min(bonusLevel, 10);
+                    }
                     if (bonusLevel > 0) {
                         if (RandomUtil.percentageChance(bonusLevel * 2)) {
                             for (int x = -1; x < 2; x++) {
@@ -52,6 +56,7 @@ public class EnchantmentCarianPhalanx extends RaryBase {
                                     entityGlintblades_show.posZ += z;
                                     hurter.world.spawnEntity(entityGlintblades_show);
 
+                                    int finalBonusLevel = bonusLevel;
                                     new SynchronizationTask((int) (55 + x * 7.5 + z * 7.5)) {
 
                                         @Override
@@ -65,7 +70,7 @@ public class EnchantmentCarianPhalanx extends RaryBase {
                                             entityGlintblades.posZ = posZ;
 
                                             entityGlintblades.setDamageSource(DamageSource.causeThrownDamage(entityGlintblades, attacker).setMagicDamage());
-                                            entityGlintblades.setDamage(evt.getAmount() * bonusLevel * 0.05f);
+                                            entityGlintblades.setDamage(evt.getAmount() * finalBonusLevel * 0.05f);
                                             entityGlintblades.shoot(1);
                                             hurter.world.spawnEntity(entityGlintblades);
                                         }

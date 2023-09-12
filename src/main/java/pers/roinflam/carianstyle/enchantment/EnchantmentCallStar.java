@@ -16,6 +16,7 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import org.apache.commons.lang3.RandomUtils;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
@@ -43,6 +44,9 @@ public class EnchantmentCallStar extends RaryBase {
                 EntityLivingBase attacker = (EntityLivingBase) evt.getArrow().shootingEntity;
                 if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
                     int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+                    if (ConfigLoader.levelLimit) {
+                        bonusLevel = Math.min(bonusLevel, 10);
+                    }
                     if (bonusLevel > 0) {
                         @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                 EntityLivingBase.class,
@@ -56,6 +60,7 @@ public class EnchantmentCallStar extends RaryBase {
                             float stronge = (float) (bonusLevel * 0.35f * Math.max(Math.abs(x), Math.abs(z)) / 7);
                             entityLivingBase.knockBack(attacker, stronge, x, z);
                         }
+                        int finalBonusLevel = bonusLevel;
                         new SynchronizationTask(20) {
 
                             @Override
@@ -63,7 +68,7 @@ public class EnchantmentCallStar extends RaryBase {
                                 @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
                                         EntityLivingBase.class,
                                         entityArrow,
-                                        bonusLevel,
+                                        finalBonusLevel,
                                         entityLivingBase -> !entityLivingBase.equals(attacker)
                                 );
                                 if (!entities.isEmpty()) {
@@ -82,7 +87,7 @@ public class EnchantmentCallStar extends RaryBase {
                                         if (!entityLivingBase.world.isDaytime()) {
                                             magnification *= 3;
                                         }
-                                        entityLivingBase.attackEntityFrom(DamageSource.LIGHTNING_BOLT, (float) (evt.getArrow().getDamage() * bonusLevel * 0.3 * magnification));
+                                        entityLivingBase.attackEntityFrom(DamageSource.LIGHTNING_BOLT, (float) (evt.getArrow().getDamage() * finalBonusLevel * 0.3 * magnification));
                                         if (entityLivingBase.onGround) {
                                             double x = RandomUtils.nextBoolean() ? entityArrow.posX - entityLivingBase.posX : entityLivingBase.posX - entityArrow.posX;
                                             double z = RandomUtils.nextBoolean() ? entityArrow.posZ - entityLivingBase.posZ : entityLivingBase.posZ - entityArrow.posZ;

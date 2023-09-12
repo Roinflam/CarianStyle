@@ -42,6 +42,7 @@ public class EnchantmentIndomitable extends VeryRaryBase {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
+                
                 if (bonusLevel > 0) {
                     if (RandomUtil.percentageChance((1 - hurter.getHealth() / hurter.getMaxHealth()) * 100 * 0.75)) {
                         evt.setCanceled(true);

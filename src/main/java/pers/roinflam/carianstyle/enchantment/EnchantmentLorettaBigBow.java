@@ -13,6 +13,7 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
@@ -38,6 +39,9 @@ public class EnchantmentLorettaBigBow extends VeryRaryBase {
                 EntityArrow entityArrow = evt.getArrow();
                 EntityLivingBase attacker = (EntityLivingBase) evt.getArrow().shootingEntity;
                 int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+                if (ConfigLoader.levelLimit) {
+                    bonusLevel = Math.min(bonusLevel, 10);
+                }
                 if (bonusLevel > 0) {
                     entityArrow.setDamage(entityArrow.getDamage() + entityArrow.getDamage() * 0.5);
                     @Nonnull Explosion explosion = attacker.world.createExplosion(attacker, entityArrow.posX, entityArrow.posY, entityArrow.posZ, (float) EntityUtil.getFire(entityArrow) > 0 ? 3 : 2, false);
