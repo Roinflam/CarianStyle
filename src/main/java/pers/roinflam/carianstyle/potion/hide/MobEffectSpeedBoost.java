@@ -1,7 +1,6 @@
 package pers.roinflam.carianstyle.potion.hide;
 
 import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraftforge.fml.common.Mod;
 import pers.roinflam.carianstyle.base.potion.hide.HideBase;
 
 

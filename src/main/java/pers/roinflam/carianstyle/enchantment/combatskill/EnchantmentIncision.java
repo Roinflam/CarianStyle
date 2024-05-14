@@ -13,6 +13,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
@@ -85,7 +86,7 @@ public class EnchantmentIncision extends VeryRaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 35;
+        return (int) (35 * ConfigLoader.enchantingDifficulty);
     }
 
     @Override

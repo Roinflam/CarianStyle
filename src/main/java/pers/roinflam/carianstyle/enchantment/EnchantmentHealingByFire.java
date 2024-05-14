@@ -73,7 +73,7 @@ public class EnchantmentHealingByFire extends UncommonBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 20 + (enchantmentLevel - 1) * 5;
+        return (int) ((20 + (enchantmentLevel - 1) * 5) * ConfigLoader.enchantingDifficulty);
     }
 
     @Override

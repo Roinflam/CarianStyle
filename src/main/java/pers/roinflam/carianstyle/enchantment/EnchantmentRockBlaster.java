@@ -94,7 +94,7 @@ public class EnchantmentRockBlaster extends RaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 30 + (enchantmentLevel - 1) * 35;
+        return (int) ((30 + (enchantmentLevel - 1) * 35) * ConfigLoader.enchantingDifficulty);
     }
 
 

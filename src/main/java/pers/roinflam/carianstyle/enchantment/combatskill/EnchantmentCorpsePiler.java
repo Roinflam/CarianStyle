@@ -87,7 +87,7 @@ public class EnchantmentCorpsePiler extends RaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 35 + (enchantmentLevel - 1) * 15;
+        return (int) ((35 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
     }
 
 

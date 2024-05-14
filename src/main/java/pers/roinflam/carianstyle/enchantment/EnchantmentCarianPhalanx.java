@@ -17,7 +17,6 @@ import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -83,6 +82,10 @@ public class EnchantmentCarianPhalanx extends RaryBase {
                 }
             }
         }
+    }
+
+    public int getMinEnchantability(int enchantmentLevel) {
+        return (int) ((20 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
     }
 
     @Override

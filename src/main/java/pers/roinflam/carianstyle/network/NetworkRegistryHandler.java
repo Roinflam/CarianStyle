@@ -28,7 +28,7 @@ public class NetworkRegistryHandler {
     }
 
     public static class RenderingEffect {
-        private static final String NAME = Reference.NAME + "_RENDERING_EFFECT";
+        private static final String NAME = Reference.NAME + "_RENDER";
         private static final FMLEventChannel CHANNEL = NetworkRegistry.INSTANCE.newEventDrivenChannel(NAME);
 
         private static final HashMap<Integer, List<Integer>> ENTITIES_ID = new HashMap<>();

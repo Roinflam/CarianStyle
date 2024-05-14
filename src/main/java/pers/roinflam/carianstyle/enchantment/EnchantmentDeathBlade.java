@@ -79,7 +79,7 @@ public class EnchantmentDeathBlade extends VeryRaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 50;
+        return (int) (50 * ConfigLoader.enchantingDifficulty);
     }
 
     @Override

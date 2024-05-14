@@ -118,7 +118,7 @@ public class EnchantmentCallStar extends RaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 30 + (enchantmentLevel - 1) * 15;
+        return (int) ((30 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
     }
 
     @Override

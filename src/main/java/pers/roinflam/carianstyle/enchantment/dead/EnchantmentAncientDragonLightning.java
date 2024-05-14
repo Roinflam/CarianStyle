@@ -125,7 +125,7 @@ public class EnchantmentAncientDragonLightning extends RaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 36 + (enchantmentLevel - 1) * 20;
+        return (int) ((36 + (enchantmentLevel - 1) * 20) * ConfigLoader.enchantingDifficulty);
     }
 
     @Override

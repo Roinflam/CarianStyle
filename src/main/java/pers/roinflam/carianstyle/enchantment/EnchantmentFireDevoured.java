@@ -66,7 +66,7 @@ public class EnchantmentFireDevoured extends RaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 10 + (enchantmentLevel - 1) * 15;
+        return (int) ((10 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
     }
 
 }

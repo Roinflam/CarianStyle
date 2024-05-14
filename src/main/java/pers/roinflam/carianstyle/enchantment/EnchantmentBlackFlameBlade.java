@@ -72,7 +72,7 @@ public class EnchantmentBlackFlameBlade extends RaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 25 + (enchantmentLevel - 1) * 15;
+        return (int) ((25 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
     }
 
 

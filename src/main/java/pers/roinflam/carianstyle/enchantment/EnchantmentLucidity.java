@@ -55,7 +55,7 @@ public class EnchantmentLucidity extends UncommonBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 10 + (enchantmentLevel - 1) * 25;
+        return (int) ((10 + (enchantmentLevel - 1) * 25) * ConfigLoader.enchantingDifficulty);
     }
 
     @Override

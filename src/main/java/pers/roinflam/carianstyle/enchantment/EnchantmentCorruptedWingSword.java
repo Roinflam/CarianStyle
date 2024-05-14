@@ -66,7 +66,7 @@ public class EnchantmentCorruptedWingSword extends UncommonBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 15 + (enchantmentLevel - 1) * 5;
+        return (int) ((15 + (enchantmentLevel - 1) * 5) * ConfigLoader.enchantingDifficulty);
     }
 
 }

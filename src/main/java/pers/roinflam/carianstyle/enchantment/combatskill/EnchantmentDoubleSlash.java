@@ -6,10 +6,12 @@ import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.util.DamageSource;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
@@ -48,7 +50,7 @@ public class EnchantmentDoubleSlash extends RaryBase {
                             if (RandomUtil.percentageChance(bonusLevel * 5 + 20)) {
                                 hurter.hurtResistantTime = hurter.maxHurtResistantTime / 2;
                                 evt.getSource().damageType = "waterfowlDance";
-                                hurter.attackEntityFrom(evt.getSource(), (float) (evt.getAmount() * bonusLevel * 0.2));
+                                hurter.attackEntityFrom(DamageSource.MAGIC, (float) (evt.getAmount() * bonusLevel * 0.2));
                             }
                         }
                     }
@@ -59,7 +61,7 @@ public class EnchantmentDoubleSlash extends RaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 20 + (enchantmentLevel - 1) * 8;
+        return (int) ((20 + (enchantmentLevel - 1) * 8) * ConfigLoader.enchantingDifficulty);
     }
 
     @Override

@@ -14,6 +14,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 
@@ -44,7 +45,7 @@ public class EnchantmentDragoncrestGreatshield extends VeryRaryBase {
                         bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
                     }
                 }
-                
+
                 if (bonusLevel > 0) {
                     @Nullable PotionEffect potionEffect = hurter.getActivePotionEffect(CarianStylePotion.DRAGONCREST_GREATSHIELD);
                     if (potionEffect == null) {
@@ -63,7 +64,7 @@ public class EnchantmentDragoncrestGreatshield extends VeryRaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 30;
+        return (int) (30 * ConfigLoader.enchantingDifficulty);
     }
 
     @Override

@@ -16,7 +16,6 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import javax.annotation.Nonnull;
@@ -65,7 +64,7 @@ public class EnchantmentLorettaTrick extends VeryRaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 35;
+        return (int) (35 * ConfigLoader.enchantingDifficulty);
     }
 
     @Override

@@ -93,7 +93,7 @@ public class EnchantmentCarianRetaliation extends RaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 20 + (enchantmentLevel - 1) * 15;
+        return (int) ((20 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
     }
 
     @Override

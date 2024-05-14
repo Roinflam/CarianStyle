@@ -6,8 +6,8 @@ import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -33,7 +33,7 @@ public class EnchantmentBloodSlash extends RaryBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (!evt.getEntity().world.isRemote) {
             if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
                 EntityLivingBase hurter = evt.getEntityLiving();
@@ -49,7 +49,7 @@ public class EnchantmentBloodSlash extends RaryBase {
                                 return;
                             }
                         }
-                        evt.setAmount(evt.getAmount() + hurter.getHealth() * bonusLevel * 0.05f);
+                        evt.setAmount(evt.getAmount() + Math.min(hurter.getHealth() * bonusLevel * 0.05f, hurter.getMaxHealth()));
                         if (!(attacker instanceof EntityPlayer) || !((EntityPlayer) attacker).isCreative()) {
                             if (attacker.getHealth() > attacker.getMaxHealth() * 0.1) {
                                 attacker.setHealth(attacker.getHealth() - attacker.getMaxHealth() * 0.1f);
@@ -89,7 +89,7 @@ public class EnchantmentBloodSlash extends RaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 20 + (enchantmentLevel - 1) * 10;
+        return (int) ((20 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
     }
 
     @Override

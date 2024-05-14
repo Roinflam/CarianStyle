@@ -82,7 +82,7 @@ public class EnchantmentWaterfowlFlurry extends RaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 30 + (enchantmentLevel - 1) * 30;
+        return (int) ((30 + (enchantmentLevel - 1) * 30) * ConfigLoader.enchantingDifficulty);
     }
 
     @Override

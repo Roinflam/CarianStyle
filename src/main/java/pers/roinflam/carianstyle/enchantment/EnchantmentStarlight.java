@@ -14,6 +14,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.block.light.HideLight;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleBlocks;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.tileentity.MoveLight;
@@ -64,7 +65,7 @@ public class EnchantmentStarlight extends UncommonBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 23 + (enchantmentLevel - 1) * 9;
+        return (int) ((23 + (enchantmentLevel - 1) * 9) * ConfigLoader.enchantingDifficulty);
     }
 
 }

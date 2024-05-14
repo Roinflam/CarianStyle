@@ -69,7 +69,7 @@ public class EnchantmentExclude extends RaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 25 + (enchantmentLevel - 1) * 10;
+        return (int) ((25 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
     }
 
 }

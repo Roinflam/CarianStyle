@@ -37,6 +37,9 @@ public final class ConfigLoader {
     @Config.Comment("Setting a limit on some enchantments after exceeding the level cap to prevent too much invincibility.")
     public static boolean levelLimit = false;
 
+    @Config.Comment("Set the difficulty of enchantment. 1 is the default difficulty. The higher the value, the greater the difficulty.")
+    public static double enchantingDifficulty = 1;
+
     @SideOnly(Side.CLIENT)
     @SubscribeEvent
     public static void onConfigChanged(@Nonnull ConfigChangedEvent.OnConfigChangedEvent evt) {

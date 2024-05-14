@@ -71,7 +71,7 @@ public class EnchantmentGoldenVow extends RaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 35 + (enchantmentLevel - 1) * 25;
+        return (int) ((35 + (enchantmentLevel - 1) * 25) * ConfigLoader.enchantingDifficulty);
     }
 
     @Override

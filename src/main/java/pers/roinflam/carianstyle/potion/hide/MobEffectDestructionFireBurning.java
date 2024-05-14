@@ -1,6 +1,5 @@
 package pers.roinflam.carianstyle.potion.hide;
 
-import net.minecraftforge.fml.common.Mod;
 import pers.roinflam.carianstyle.base.potion.flame.FlameBase;
 import pers.roinflam.carianstyle.utils.Reference;
 

@@ -16,7 +16,6 @@ import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -75,9 +74,8 @@ public class EnchantmentEatShit extends UncommonBase {
         }
     }
 
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 35 + (enchantmentLevel - 1);
+        return (int) ((25 + (enchantmentLevel - 1) * 2) * ConfigLoader.enchantingDifficulty);
     }
 
 }

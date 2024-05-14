@@ -50,18 +50,6 @@ public class EnchantmentConcealingVeil extends VeryRaryBase {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
         if (!evt.getEntity().world.isRemote) {
-            if (evt.getEntityLiving() instanceof EntityPlayer) {
-                EntityPlayer hurter = (EntityPlayer) evt.getEntityLiving();
-                BATTLE.add(hurter.getUniqueID());
-                new SynchronizationTask(60) {
-
-                    @Override
-                    public void run() {
-                        BATTLE.remove(hurter.getUniqueID());
-                    }
-
-                }.start();
-            }
             if (evt.getSource().getImmediateSource() instanceof EntityPlayer) {
                 @Nullable EntityPlayer attacker = (EntityPlayer) evt.getSource().getImmediateSource();
                 BATTLE.add(attacker.getUniqueID());
@@ -103,7 +91,7 @@ public class EnchantmentConcealingVeil extends VeryRaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 30;
+        return (int) (30 * ConfigLoader.enchantingDifficulty);
     }
 
 

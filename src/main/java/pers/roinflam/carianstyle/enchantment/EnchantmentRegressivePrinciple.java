@@ -64,7 +64,7 @@ public class EnchantmentRegressivePrinciple extends RaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 15 + (enchantmentLevel - 1) * 15;
+        return (int) ((15 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
     }
 
     @Override

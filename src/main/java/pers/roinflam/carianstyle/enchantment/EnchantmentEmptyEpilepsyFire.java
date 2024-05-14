@@ -94,9 +94,8 @@ public class EnchantmentEmptyEpilepsyFire extends RaryBase {
 
     }
 
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 10 * 10;
+        return (int) ((5 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
     }
 
 }

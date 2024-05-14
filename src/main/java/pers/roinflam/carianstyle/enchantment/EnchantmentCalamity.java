@@ -102,7 +102,7 @@ public class EnchantmentCalamity extends VeryRaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 35;
+        return (int) (35 * ConfigLoader.enchantingDifficulty);
     }
 
     @Override

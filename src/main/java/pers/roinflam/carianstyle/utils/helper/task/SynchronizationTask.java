@@ -27,12 +27,7 @@ public abstract class SynchronizationTask implements Runnable {
     }
 
     public SynchronizationTask(int initialDelay, int delay) {
-        int id;
-        do {
-            id = new Random().nextInt(Short.MAX_VALUE);
-        } while (TASK_LIST.containsKey(id));
-
-        this.TASKID = id;
+        this.TASKID = new Random().nextInt(Short.MAX_VALUE);
         this.first = true;
         this.CYCLE = delay >= 0;
         this.tick = 0;

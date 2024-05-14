@@ -69,7 +69,7 @@ public class EnchantmentBrokenStar extends VeryRaryBase {
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return CarianStyleEnchantments.RECOLLECT_ENCHANTABILITY;
+        return (int) (CarianStyleEnchantments.RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
     }
 
     @Override

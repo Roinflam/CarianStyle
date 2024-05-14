@@ -102,9 +102,8 @@ public class EnchantmentHardArrow extends UncommonBase {
         }
     }
 
-    @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return 5 * 10;
+        return (int) ((5 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
     }
 
     @Override
