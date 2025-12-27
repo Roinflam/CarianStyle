@@ -238,4 +238,36 @@ death.attack.wave_stone_magic.player=在%1$s与%2$s战斗中，%2$s不讲法德�
 death.attack.hemorrhage=%1$s出血过多而死
 death.attack.hemorrhage.player=在%1$s与%2$s战斗中，%2$s让%1$s出血身亡
 
-item.glintblades.name=Glintbladesentity.glintblades=Glintbladesitem.glintblades.name=Glintbladesentity.glintblades=魔法辉剑
+item.glintblades.name=Glintblades
+entity.glintblades=魔法辉剑
+
+# 日志系统配置
+config.carianstyle.enableDetailedLogging=启用详细日志
+config.carianstyle.enableDetailedLogging.tooltip=启用详细日志以便调试
+
+# 附魔系统配置
+config.carianstyle.uninstallEnchantment=禁用的附魔
+config.carianstyle.uninstallEnchantment.tooltip=填入你想要禁用的附魔ID
+
+config.carianstyle.rockBlasterMaxRange=碎岩者最大范围
+config.carianstyle.rockBlasterMaxRange.tooltip=碎岩者附魔的最大挖掘半径
+
+config.carianstyle.prayerfulStrikeMaxHealth=祈祷打击最大生命值
+config.carianstyle.prayerfulStrikeMaxHealth.tooltip=设置祈祷打击附魔的最大可叠加生命值上限
+
+# 附魔稀有度配置
+config.carianstyle.isTreasureVeryRaryEnchantment=宝藏级超稀有附魔
+config.carianstyle.isTreasureVeryRaryEnchantment.tooltip=将所有附魔设置为宝藏级超稀有
+
+config.carianstyle.isTreasureRaryEnchantment=宝藏级稀有附魔
+config.carianstyle.isTreasureRaryEnchantment.tooltip=将所有附魔设置为宝藏级稀有
+
+config.carianstyle.isTreasureUncommonEnchantment=宝藏级罕见附魔
+config.carianstyle.isTreasureUncommonEnchantment.tooltip=将所有附魔设置为宝藏级罕见
+
+# 游戏平衡配置
+config.carianstyle.levelLimit=附魔等级限制
+config.carianstyle.levelLimit.tooltip=为某些附魔设置限制以防止过于无敌
+
+config.carianstyle.enchantingDifficulty=附魔难度倍率
+config.carianstyle.enchantingDifficulty.tooltip=设置附魔的难度（1.0 = 默认）

@@ -239,5 +239,35 @@ death.attack.hemorrhage=%1$s died of excessive bleeding
 death.attack.hemorrhage.player=During %1$s and %2$s battle, %2$s let %1$s bleed to death
 
 entity.glintblades=Glintblades
-
 item.glintblades.name=Glintblades
+
+# 日志系统配置
+config.carianstyle.enableDetailedLogging=Enable Detailed Logging
+config.carianstyle.enableDetailedLogging.tooltip=Enable detailed logging for debugging purposes
+
+# 附魔系统配置
+config.carianstyle.uninstallEnchantment=Uninstall Enchantments
+config.carianstyle.uninstallEnchantment.tooltip=Fill in the IDs of enchantments you want to disable
+
+config.carianstyle.rockBlasterMaxRange=Rock Blaster Max Range
+config.carianstyle.rockBlasterMaxRange.tooltip=The maximum mining radius of the Rock Blaster Enchantment
+
+config.carianstyle.prayerfulStrikeMaxHealth=Prayerful Strike Max Health
+config.carianstyle.prayerfulStrikeMaxHealth.tooltip=Set the maximum stackable life limit for the Prayer Strike Enchantment
+
+# 附魔稀有度配置
+config.carianstyle.isTreasureVeryRaryEnchantment=Treasure Very Rare Enchantments
+config.carianstyle.isTreasureVeryRaryEnchantment.tooltip=Set all enchantments to Treasure Very Rare
+
+config.carianstyle.isTreasureRaryEnchantment=Treasure Rare Enchantments
+config.carianstyle.isTreasureRaryEnchantment.tooltip=Set all enchantments to Treasure Rare
+
+config.carianstyle.isTreasureUncommonEnchantment=Treasure Uncommon Enchantments
+config.carianstyle.isTreasureUncommonEnchantment.tooltip=Set all enchantments to Treasure Uncommon
+
+# 游戏平衡配置
+config.carianstyle.levelLimit=Enchantment Level Limit
+config.carianstyle.levelLimit.tooltip=Setting a limit on some enchantments to prevent invincibility
+
+config.carianstyle.enchantingDifficulty=Enchanting Difficulty Multiplier
+config.carianstyle.enchantingDifficulty.tooltip=Set the difficulty of enchantment (1.0 = default)
