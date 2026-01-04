@@ -32,5 +32,5 @@ public class CarianStylePotion {
     public static final MobEffectDoomedDeathBurning DOOMED_DEATH_BURNING = new MobEffectDoomedDeathBurning(true, 0);
     public static final MobEffectDestructionFireBurning DESTRUCTION_FIRE_BURNING = new MobEffectDestructionFireBurning(true, 0);
     public static final MobEffectEpilepsyFireBurning EPILEPSY_FIRE_BURNING = new MobEffectEpilepsyFireBurning(true, 0);
-
+    public static final MobEffectCragblade CRAGBLADE = new MobEffectCragblade(true, 0);
 }
