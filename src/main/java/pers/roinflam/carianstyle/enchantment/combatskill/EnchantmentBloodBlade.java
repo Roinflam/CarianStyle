@@ -1,70 +1,76 @@
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+import pers.roinflam.carianstyle.enchantment.EnchantmentDarkMoon;
+import pers.roinflam.carianstyle.enchantment.EnchantmentFireDevoured;
+import pers.roinflam.carianstyle.enchantment.EnchantmentFireGivesPower;
+import pers.roinflam.carianstyle.enchantment.EnchantmentScarletCorruption;
+import pers.roinflam.carianstyle.enchantment.EnchantmentVicDragonThunder;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
-@Mod.EventBusSubscriber
-public class EnchantmentBloodBlade extends RaryBase {
+/**
+ * 血刃附魔
+ *
+ * 消耗10%当前血量，造成额外伤害
+ * 额外伤害 = (伤害×等级×0.33 + 目标血量×等级×0.033) × 自身血量比例
+ * 玩家需刚挥剑，非玩家可直接触发
+ */
+@AutoRegisterEnchantment(
+        id = "blood_blade",
+        category = EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.RARE,
+        conflictsWith = {
+                EnchantmentScarletCorruption.class,
+                EnchantmentFireGivesPower.class,
+                EnchantmentFireDevoured.class,
+                EnchantmentVicDragonThunder.class,
+                EnchantmentDarkMoon.class
+        }
+)
+public class EnchantmentBloodBlade extends EnchantmentBase {
 
-    public EnchantmentBloodBlade(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "blood_blade");
+    public EnchantmentBloodBlade() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.BLOOD_BLADE;
-    }
+    @Override
+    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+        EntityLivingBase victim = ctx.getVictim();
 
-    @SubscribeEvent
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    
-                if (bonusLevel > 0) {
-                        if (attacker instanceof EntityPlayer) {
-                            if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
-                                return;
-                            }
-                        }                        float damage = (evt.getAmount() * bonusLevel * 0.33f + hurter.getHealth() * bonusLevel * 0.033f) * (attacker.getHealth() / attacker.getMaxHealth());
-                        attacker.setHealth(attacker.getHealth() - attacker.getHealth() * 0.1f);
-                        evt.setAmount(evt.getAmount() + damage);
-                    }
-                }
+        if (victim == null) {
+            return;
+        }
+
+        // 玩家需要刚挥剑，非玩家可直接触发
+        if (ctx.isHolderPlayer()) {
+            if (!isJustSwung(ctx.getHolderAsPlayer())) {
+                return;
             }
         }
+
+        // 额外伤害 = (当前伤害×等级×0.33 + 目标血量×等级×0.033) × 自身血量比例
+        float healthRatio = attacker.getHealth() / attacker.getMaxHealth();
+        float bonusDamage = (ctx.getDamage() * level * 0.33f + victim.getHealth() * level * 0.033f) * healthRatio;
+
+        // 消耗自身10%当前血量
+        attacker.setHealth(attacker.getHealth() - attacker.getHealth() * 0.1f);
+
+        // 增加伤害
+        ctx.addDamage(bonusDamage);
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) ((10 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
     }
-
-    @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) &&
-                !ench.equals(CarianStyleEnchantments.SCARLET_ROT) &&
-                !ench.equals(CarianStyleEnchantments.FIRE_GIVES_POWER) &&
-                !ench.equals(CarianStyleEnchantments.FIRE_DEVOURED) &&
-                !ench.equals(CarianStyleEnchantments.VIC_DRAGON_THUNDER) &&
-                !ench.equals(CarianStyleEnchantments.DARK_MOON);
-    }
-
 }

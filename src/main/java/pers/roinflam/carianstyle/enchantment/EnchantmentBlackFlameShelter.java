@@ -13,76 +13,103 @@ import net.minecraftforge.event.entity.living.LivingHealEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
 import javax.annotation.Nonnull;
 
+/**
+ * 黑焰庇护附魔
+ *
+ * 受击：非魔法非无视防御伤害减少（等级×12.5%）
+ * 代价：治疗量减少（等级×25%）
+ */
+@AutoRegisterEnchantment(
+        id = "black_flame_shelter",
+        category = EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        conflictsWith = {
+                EnchantmentShelterOfFire.class,
+                EnchantmentHealingByFire.class
+        }
+)
 @Mod.EventBusSubscriber
-public class EnchantmentBlackFlameShelter extends RaryBase {
+public class EnchantmentBlackFlameShelter extends EnchantmentBase {
 
-    public EnchantmentBlackFlameShelter(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "black_flame_shelter");
+    public EnchantmentBlackFlameShelter() {
+        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.BLACK_FLAME_SHELTER;
+    private static int getTotalLevel(EntityLivingBase entity) {
+        Enchantment blackFlameShelter = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBlackFlameShelter.class);
+        if (blackFlameShelter == null) {
+            return 0;
+        }
+
+        int totalLevel = 0;
+        for (ItemStack armor : entity.getArmorInventoryList()) {
+            if (!armor.isEmpty()) {
+                totalLevel += EnchantmentHelper.getEnchantmentLevel(blackFlameShelter, armor);
+            }
+        }
+        if (ConfigLoader.levelLimit) {
+            totalLevel = Math.min(totalLevel, 10);
+        }
+        return totalLevel;
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            DamageSource damageSource = evt.getSource();
-            if (!damageSource.isMagicDamage() && !damageSource.isUnblockable()) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                int bonusLevel = 0;
-                for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
-                    if (!itemStack.isEmpty()) {
-                        bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
-                    }
-                }
-                if (ConfigLoader.levelLimit) {
-                    bonusLevel = Math.min(bonusLevel, 10);
-                }
-                if (bonusLevel > 0) {
-                    evt.setAmount(evt.getAmount() - evt.getAmount() * bonusLevel * 0.125f);
-                }
-            }
+        if (evt.getEntity().world.isRemote) {
+            return;
         }
+
+        DamageSource damageSource = evt.getSource();
+
+        if (damageSource.isMagicDamage() || damageSource.isUnblockable()) {
+            return;
+        }
+
+        EntityLivingBase holder = evt.getEntityLiving();
+
+        int totalLevel = getTotalLevel(holder);
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        evt.setAmount(evt.getAmount() * (1 - totalLevel * 0.125f));
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            EntityLivingBase entityLivingBase = evt.getEntityLiving();
-            int bonusLevel = 0;
-            for (@Nonnull ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
-                if (!itemStack.isEmpty()) {
-                    bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
-                }
-            }
-            if (ConfigLoader.levelLimit) {
-                bonusLevel = Math.min(bonusLevel, 10);
-            }
-            if (bonusLevel > 0) {
-                evt.setAmount(evt.getAmount() - evt.getAmount() * bonusLevel * 0.25f);
-            }
+        if (evt.getEntity().world.isRemote) {
+            return;
         }
+
+        EntityLivingBase holder = evt.getEntityLiving();
+
+        int totalLevel = getTotalLevel(holder);
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        evt.setAmount(evt.getAmount() * (1 - totalLevel * 0.25f));
+    }
+
+    @Override
+    public boolean canApplyTogether(@Nonnull Enchantment ench) {
+        if (ench == Enchantments.PROTECTION) {
+            return false;
+        }
+        return super.canApplyTogether(ench);
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) ((20 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
     }
-
-    @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) &&
-                !ench.equals(Enchantments.PROTECTION) &&
-                !ench.equals(CarianStyleEnchantments.SHELTER_OF_FIRE) &&
-                !ench.equals(CarianStyleEnchantments.HEALING_BY_FIRE);
-    }
-
 }

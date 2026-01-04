@@ -10,42 +10,71 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
 import javax.annotation.Nonnull;
 
+/**
+ * 戴狄卡之祸附魔（诅咒）
+ *
+ * 护甲诅咒附魔
+ * 受到伤害时：
+ * - 伤害 ×5（严重增伤）
+ * - 无敌时间减少到75%（更容易连续受击）
+ */
+@AutoRegisterEnchantment(
+        id = "daedicar_woe",
+        category = EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.VERY_RARE,
+        forceTreasure = true
+)
 @Mod.EventBusSubscriber
-public class EnchantmentDaedicarWoe extends VeryRaryBase {
+public class EnchantmentDaedicarWoe extends EnchantmentBase {
 
-    public EnchantmentDaedicarWoe(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "daedicar_woe");
-    }
-
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.DAEDICAR_WOE;
+    public EnchantmentDaedicarWoe() {
+        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
+                EntityEquipmentSlot.HEAD,
+                EntityEquipmentSlot.CHEST,
+                EntityEquipmentSlot.LEGS,
+                EntityEquipmentSlot.FEET
+        });
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            EntityLivingBase hurter = evt.getEntityLiving();
-            int bonusLevel = 0;
-            for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
-                if (!itemStack.isEmpty()) {
-                    bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
-                }
-            }
-            if (ConfigLoader.levelLimit) {
-                bonusLevel = Math.min(bonusLevel, 10);
-            }
-            if (bonusLevel > 0) {
-                hurter.hurtResistantTime = (int) (hurter.maxHurtResistantTime * 0.75);
-                evt.setAmount(evt.getAmount() * 5);
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        EntityLivingBase victim = evt.getEntityLiving();
+
+        Enchantment daedicarWoe = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDaedicarWoe.class);
+        if (daedicarWoe == null) {
+            return;
+        }
+
+        int totalLevel = 0;
+        for (ItemStack armor : victim.getArmorInventoryList()) {
+            if (!armor.isEmpty()) {
+                totalLevel += EnchantmentHelper.getEnchantmentLevel(daedicarWoe, armor);
             }
         }
+
+        if (ConfigLoader.levelLimit) {
+            totalLevel = Math.min(totalLevel, 10);
+        }
+
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        victim.hurtResistantTime = (int) (victim.maxHurtResistantTime * 0.75);
+        evt.setAmount(evt.getAmount() * 5);
     }
 
     @Override

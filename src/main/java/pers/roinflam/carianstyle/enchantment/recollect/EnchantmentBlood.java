@@ -1,95 +1,95 @@
 package pers.roinflam.carianstyle.enchantment.recollect;
 
-import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemStack;
 import net.minecraft.potion.PotionEffect;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.EnchantmentBloodCollection;
 import pers.roinflam.carianstyle.enchantment.EnchantmentBloodSlash;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
+import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
-import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import java.util.HashMap;
 import java.util.UUID;
 
-@Mod.EventBusSubscriber
-public class EnchantmentBlood extends VeryRaryBase {
-    private static final HashMap<UUID, Integer> INJURIES = new HashMap<>();
+/**
+ * 血附魔
+ *
+ * 每3次攻击触发一次：
+ * - 造成目标当前血量×12%的直接伤害
+ * - 治疗自身（最多自身最大血量×18%）
+ * - 施加出血效果
+ */
+@AutoRegisterEnchantment(
+        id = "blood",
+        category = EnchantmentCategory.RECOLLECT,
+        rarity = EnchantmentRarity.VERY_RARE
+)
+public class EnchantmentBlood extends EnchantmentBase {
 
-    public EnchantmentBlood(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "blood");
+    private static final String ATTACK_COUNT_KEY = "blood_attack_count";
+    private static final int RECOLLECT_ENCHANTABILITY = 35;
 
-        new SynchronizationTask(6000, 6000) {
+    public EnchantmentBlood() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
 
-            @Override
-            public void run() {
-                INJURIES.clear();
+    @Override
+    protected void onHurtAsAttackerLow(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+        EntityLivingBase victim = ctx.getVictim();
+
+        if (victim == null) {
+            return;
+        }
+
+        if (ctx.isHolderPlayer()) {
+            if (!isJustSwung(ctx.getHolderAsPlayer())) {
+                return;
             }
+        }
 
-        }.start();
-    }
+        UUID uuid = attacker.getUniqueID();
+        int attackCount = EnchantmentDataManager.getCounter(ATTACK_COUNT_KEY, uuid);
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.BLOOD;
-    }
+        if (attackCount >= 2) {
+            EnchantmentDataManager.resetCounter(ATTACK_COUNT_KEY, uuid);
 
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    
-                if (bonusLevel > 0) {
-                        if (attacker instanceof EntityPlayer) {
-                            if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
-                                return;
-                            }
-                        }
-                        if (INJURIES.getOrDefault(attacker.getUniqueID(), 0) == 2) {
-                            INJURIES.remove(attacker.getUniqueID());
-                            float damage = hurter.getHealth() * 0.12f;
+            float damage = victim.getHealth() * 0.12f;
+            attacker.heal(Math.min(damage, attacker.getMaxHealth() * 0.18f));
+            victim.setHealth(victim.getHealth() - damage);
 
-                            attacker.heal(Math.min(damage, attacker.getMaxHealth() * 0.18f));
-                            hurter.setHealth(hurter.getHealth() - damage);
+            // 检查是否同时有血斩和血收附魔
+            int hemorrhageLevel = 0;
+            ItemStack heldItem = attacker.getHeldItem(attacker.getActiveHand());
 
-                            if (EnchantmentHelper.getEnchantmentLevel(EnchantmentBloodSlash.getEnchantment(), attacker.getHeldItem(attacker.getActiveHand())) > 0 && EnchantmentHelper.getEnchantmentLevel(EnchantmentBloodCollection.getEnchantment(), attacker.getHeldItem(attacker.getActiveHand())) > 0) {
-                                hurter.addPotionEffect(new PotionEffect(CarianStylePotion.HEMORRHAGE, 30, 7));
-                            } else {
-                                hurter.addPotionEffect(new PotionEffect(CarianStylePotion.HEMORRHAGE, 30, 0));
-                            }
-                        } else {
-                            INJURIES.put(attacker.getUniqueID(), INJURIES.getOrDefault(attacker.getUniqueID(), 0) + 1);
-                        }
-                    }
+            net.minecraft.enchantment.Enchantment bloodSlash = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBloodSlash.class);
+            net.minecraft.enchantment.Enchantment bloodCollection = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBloodCollection.class);
+
+            if (bloodSlash != null && bloodCollection != null) {
+                if (EnchantmentHelper.getEnchantmentLevel(bloodSlash, heldItem) > 0 &&
+                        EnchantmentHelper.getEnchantmentLevel(bloodCollection, heldItem) > 0) {
+                    hemorrhageLevel = 7;
                 }
             }
+
+            victim.addPotionEffect(new PotionEffect(CarianStylePotion.HEMORRHAGE, 30, hemorrhageLevel));
+        } else {
+            EnchantmentDataManager.incrementCounter(ATTACK_COUNT_KEY, uuid, 6000);
         }
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return (int) (CarianStyleEnchantments.RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
-    }
-
-    @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return !CarianStyleEnchantments.RECOLLECT.contains(ench);
+        return (int) (RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
     }
 }

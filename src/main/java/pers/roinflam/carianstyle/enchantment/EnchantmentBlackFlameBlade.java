@@ -1,89 +1,85 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.potion.PotionEffect;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
-@Mod.EventBusSubscriber
-public class EnchantmentBlackFlameBlade extends RaryBase {
+/**
+ * 黑焰刃附魔
+ *
+ * 攻击时施加灭绝火焰燃烧效果
+ * 持续伤害：伤害×等级×0.15/100 每tick，持续100tick
+ */
+@AutoRegisterEnchantment(
+        id = "black_flame_blade",
+        category = EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        forceTreasure = true,
+        conflictsWith = {
+                EnchantmentInvisibleWeapon.class
+        }
+)
+public class EnchantmentBlackFlameBlade extends EnchantmentBase {
 
-    public EnchantmentBlackFlameBlade(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "black_flame_blade");
+    public EnchantmentBlackFlameBlade() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.BLACK_FLAME_BLADE;
-    }
+    @Override
+    protected void onDamageAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase victim = ctx.getVictim();
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (ConfigLoader.levelLimit) {
-                        bonusLevel = Math.min(bonusLevel, 10);
-                    }
-                    if (bonusLevel > 0) {
-                        float damage = evt.getAmount() * bonusLevel * 0.15f / 100;
-                        hurter.addPotionEffect(new PotionEffect(CarianStylePotion.DESTRUCTION_FIRE_BURNING, 5 * 20 + 5, 0));
-                        new SynchronizationTask(5, 1) {
-                            private int tick = 0;
+        if (victim == null) {
+            return;
+        }
 
-                            @Override
-                            public void run() {
-                                if (++tick > 100 || !hurter.isEntityAlive()) {
-                                    this.cancel();
-                                    return;
-                                }
-                                if (hurter.getHealth() - damage * 2 > 0) {
-                                    hurter.setHealth(hurter.getHealth() - damage);
-                                } else {
-                                    EntityLivingUtil.kill(hurter, evt.getSource());
-                                    this.cancel();
-                                }
-                            }
+        // 手动应用等级限制
+        int effectiveLevel = level;
+        if (ConfigLoader.levelLimit) {
+            effectiveLevel = Math.min(effectiveLevel, 10);
+        }
 
-                        }.start();
-                    }
+        // 施加灭绝火焰燃烧效果
+        victim.addPotionEffect(new PotionEffect(CarianStylePotion.DESTRUCTION_FIRE_BURNING, 5 * 20 + 5, 0));
+
+        // 每tick伤害 = 原伤害×等级×0.15/100
+        float damagePerTick = ctx.getDamage() * effectiveLevel * 0.15f / 100;
+
+        // 持续伤害任务
+        new SynchronizationTask(5, 1) {
+            private int tick = 0;
+
+            @Override
+            public void run() {
+                if (++tick > 100 || !victim.isEntityAlive()) {
+                    this.cancel();
+                    return;
+                }
+
+                if (victim.getHealth() - damagePerTick * 2 > 0) {
+                    victim.setHealth(victim.getHealth() - damagePerTick);
+                } else {
+                    EntityLivingUtil.kill(victim, ctx.getDamageSource());
+                    this.cancel();
                 }
             }
-        }
+        }.start();
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) ((25 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
     }
-
-
-    @Override
-    public boolean isTreasureEnchantment() {
-        return true;
-    }
-
-    @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) && !ench.equals(CarianStyleEnchantments.INVISIBLE_WEAPON);
-    }
-
 }

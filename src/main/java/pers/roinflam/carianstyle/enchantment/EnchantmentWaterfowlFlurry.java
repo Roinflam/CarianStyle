@@ -1,83 +1,92 @@
 package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.util.DamageSource;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
-@Mod.EventBusSubscriber
-public class EnchantmentWaterfowlFlurry extends RaryBase {
+/**
+ * 水鸟乱舞附魔
+ *
+ * 武器附魔，连击系统
+ * 攻击时：
+ * - 将伤害分成(等级+1)段
+ * - 重置玩家攻击冷却
+ * - 每2tick造成一段伤害
+ */
+@AutoRegisterEnchantment(
+        id = "waterfowl_flurry",
+        category = EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE
+)
+public class EnchantmentWaterfowlFlurry extends EnchantmentBase {
 
-    public EnchantmentWaterfowlFlurry(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "waterfowl_flurry");
+    public EnchantmentWaterfowlFlurry() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.WATERFOWL_FLURRY;
-    }
+    /**
+     * 攻击时触发连击
+     */
+    @Override
+    protected void onHurtAsAttackerHighest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+        EntityLivingBase victim = ctx.getVictim();
+        DamageSource damageSource = ctx.getDamageSource();
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (ConfigLoader.levelLimit) {
-                        bonusLevel = Math.min(bonusLevel, 10);
-                    }
-                    if (bonusLevel > 0) {
-                        if (attacker instanceof EntityPlayer) {
-                            if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
-                                return;
-                            } else {
-                                ((EntityPlayer) attacker).resetCooldown();
-                            }
-                        }
-                        DamageSource damageSource = evt.getSource();
-                        if (!damageSource.damageType.equals("waterfowlDance") && !damageSource.damageType.equals("noDeathBlade")) {
-                            float damage = evt.getAmount() / (bonusLevel + 1);
-                            evt.setAmount(damage);
-
-                            damageSource.damageType = "waterfowlDance";
-
-                            int finalBonusLevel = bonusLevel;
-                            new SynchronizationTask(1, 2) {
-                                private int time = 0;
-
-                                @Override
-                                public void run() {
-                                    if (++time > finalBonusLevel || !hurter.isEntityAlive()) {
-                                        this.cancel();
-                                        return;
-                                    }
-                                    hurter.hurtResistantTime = hurter.maxHurtResistantTime / 2;
-                                    hurter.attackEntityFrom(damageSource, damage);
-                                }
-
-                            }.start();
-                        }
-                    }
-                }
-            }
+        if (victim == null || damageSource == null) {
+            return;
         }
+
+        // 玩家必须是刚挥动武器
+        if (attacker instanceof EntityPlayer) {
+            if (!isJustSwung((EntityPlayer) attacker)) {
+                return;
+            }
+            // 重置攻击冷却
+            ((EntityPlayer) attacker).resetCooldown();
+        }
+
+        // 防止递归：检查伤害类型
+        if (damageSource.damageType.equals("waterfowlDance") || damageSource.damageType.equals("noDeathBlade")) {
+            return;
+        }
+
+        // 将伤害分成(等级+1)段
+        float damagePerHit = ctx.getDamage() / (level + 1);
+        ctx.setDamage(damagePerHit);
+
+        // 标记伤害类型防止递归
+        damageSource.damageType = "waterfowlDance";
+
+        // 延迟造成剩余伤害
+        new SynchronizationTask(1, 2) {
+            private int time = 0;
+
+            @Override
+            public void run() {
+                if (++time > level || !victim.isEntityAlive()) {
+                    this.cancel();
+                    return;
+                }
+
+                // 重置无敌帧
+                victim.hurtResistantTime = victim.maxHurtResistantTime / 2;
+                victim.attackEntityFrom(damageSource, damagePerHit);
+            }
+        }.start();
     }
 
     @Override

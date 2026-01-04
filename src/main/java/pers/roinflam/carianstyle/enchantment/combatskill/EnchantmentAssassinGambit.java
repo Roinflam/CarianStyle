@@ -11,74 +11,128 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.player.CriticalHitEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
+/**
+ * 刺客赌局附魔
+ *
+ * 受击时获得隐身效果（等级×20tick）
+ * 隐身状态下攻击：移除隐身，增伤+25%×等级
+ * 隐身状态下暴击：移除隐身，暴击倍率×2
+ */
+@AutoRegisterEnchantment(
+        id = "assassin_gambit",
+        category = EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.RARE,
+        forceTreasure = true
+)
 @Mod.EventBusSubscriber
-public class EnchantmentAssassinGambit extends RaryBase {
+public class EnchantmentAssassinGambit extends EnchantmentBase {
 
-    public EnchantmentAssassinGambit(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "assassin_gambit");
+    public EnchantmentAssassinGambit() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.ASSASSIN_GAMBIT;
-    }
-
+    /**
+     * 攻击者视角：隐身状态下增伤
+     * 受击者视角：获得隐身
+     * 由于需要同时处理攻击者和受击者双方，保留静态监听器
+     */
     @SubscribeEvent
     public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (attacker.getActivePotionEffect(CarianStylePotion.STEALTH) != null) {
-                    if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                        if (ConfigLoader.levelLimit) {
-                            bonusLevel = Math.min(bonusLevel, 10);
-                        }
-                        if (bonusLevel > 0) {
-                            attacker.removePotionEffect(CarianStylePotion.STEALTH);
-                            evt.setAmount(evt.getAmount() + evt.getAmount() * bonusLevel * 0.25f);
-                        }
-                    }
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        if (!(evt.getSource().getImmediateSource() instanceof EntityLivingBase)) {
+            return;
+        }
+
+        EntityLivingBase victim = evt.getEntityLiving();
+        EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+
+        Enchantment assassinGambit = EnchantmentRegistry.getEnchantmentByClass(EnchantmentAssassinGambit.class);
+        if (assassinGambit == null) {
+            return;
+        }
+
+        // 攻击者视角：隐身状态下增伤
+        if (attacker.getActivePotionEffect(CarianStylePotion.STEALTH) != null) {
+            if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+                int level = EnchantmentHelper.getEnchantmentLevel(
+                        assassinGambit,
+                        attacker.getHeldItem(attacker.getActiveHand()));
+
+                if (ConfigLoader.levelLimit) {
+                    level = Math.min(level, 10);
                 }
-                if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
-                    
-                if (bonusLevel > 0) {
-                        hurter.addPotionEffect(new PotionEffect(CarianStylePotion.STEALTH, bonusLevel * 20));
-                    }
+
+                if (level > 0) {
+                    attacker.removePotionEffect(CarianStylePotion.STEALTH);
+                    evt.setAmount(evt.getAmount() + evt.getAmount() * level * 0.25f);
                 }
+            }
+        }
+
+        // 受击者视角：获得隐身
+        if (!victim.getHeldItem(victim.getActiveHand()).isEmpty()) {
+            int level = EnchantmentHelper.getEnchantmentLevel(
+                    assassinGambit,
+                    victim.getHeldItem(victim.getActiveHand()));
+
+            if (level > 0) {
+                victim.addPotionEffect(new PotionEffect(CarianStylePotion.STEALTH, level * 20));
             }
         }
     }
 
+    /**
+     * 暴击时：隐身状态下暴击倍率×2
+     */
     @SubscribeEvent
     public static void onCriticalHit(@Nonnull CriticalHitEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.isVanillaCritical()) {
-                if (evt.getTarget() instanceof EntityLivingBase) {
-                    EntityLivingBase hurter = evt.getEntityLiving();
-                    EntityPlayer attacker = evt.getEntityPlayer();
-                    if (attacker.getActivePotionEffect(CarianStylePotion.STEALTH) != null) {
-                        if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                            int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
 
-                if (bonusLevel > 0) {
-                                attacker.removePotionEffect(CarianStylePotion.STEALTH);
-                                evt.setDamageModifier(evt.getDamageModifier() * 2);
-                            }
-                        }
-                    }
-                }
-            }
+        if (!evt.isVanillaCritical()) {
+            return;
+        }
+
+        if (!(evt.getTarget() instanceof EntityLivingBase)) {
+            return;
+        }
+
+        EntityPlayer attacker = evt.getEntityPlayer();
+
+        if (attacker.getActivePotionEffect(CarianStylePotion.STEALTH) == null) {
+            return;
+        }
+
+        if (attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+            return;
+        }
+
+        Enchantment assassinGambit = EnchantmentRegistry.getEnchantmentByClass(EnchantmentAssassinGambit.class);
+        if (assassinGambit == null) {
+            return;
+        }
+
+        int level = EnchantmentHelper.getEnchantmentLevel(
+                assassinGambit,
+                attacker.getHeldItem(attacker.getActiveHand()));
+
+        if (level > 0) {
+            attacker.removePotionEffect(CarianStylePotion.STEALTH);
+            evt.setDamageModifier(evt.getDamageModifier() * 2);
         }
     }
 
@@ -86,15 +140,4 @@ public class EnchantmentAssassinGambit extends RaryBase {
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) ((25 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
     }
-
-    @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return !CarianStyleEnchantments.COMBAT_SKILL.contains(ench);
-    }
-
-    @Override
-    public boolean isTreasureEnchantment() {
-        return true;
-    }
-
 }

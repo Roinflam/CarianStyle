@@ -1,87 +1,96 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.potion.PotionEffect;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
-import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.util.List;
 
-@Mod.EventBusSubscriber
-public class EnchantmentAduraMoonlightSword extends RaryBase {
+/**
+ * 阿杜拉月光剑附魔
+ *
+ * 攻击变为魔法伤害，对目标周围敌人施加冻伤
+ * 白天：叠加+1等级，夜晚：叠加+2等级
+ */
+@AutoRegisterEnchantment(
+        id = "adura_moonlight_sword",
+        category = EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        conflictsWith = {
+                EnchantmentEpilepsyFire.class,
+                EnchantmentEatShit.class,
+                EnchantmentHypnoticSmoke.class,
+                EnchantmentFireGivesPower.class,
+                EnchantmentFireDevoured.class
+        }
+)
+public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
 
-    public EnchantmentAduraMoonlightSword(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "adura_moonlight_sword");
+    public EnchantmentAduraMoonlightSword() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.ADURA_MOONLIGHT_SWORD;
-    }
+    @Override
+    protected void onHurtAsAttackerHighest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+        EntityLivingBase victim = ctx.getVictim();
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingDamage(@Nonnull LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (ConfigLoader.levelLimit) {
-                        bonusLevel = Math.min(bonusLevel, 10);
-                    }
-                    if (bonusLevel > 0) {
-                        if (attacker instanceof EntityPlayer) {
-                            if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
-                                return;
-                            }
-                        }
-                        evt.getSource().setMagicDamage();
-                        @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
-                                EntityLivingBase.class,
-                                hurter,
-                                bonusLevel,
-                                entityLivingBase -> !entityLivingBase.equals(attacker)
-                        );
-                        if (attacker.world.isDaytime()) {
-                            for (@Nonnull EntityLivingBase entityLivingBase : entities) {
-                                if (entityLivingBase.isPotionActive(CarianStylePotion.FROSTBITE)) {
-                                    int level = Math.min(entityLivingBase.getActivePotionEffect(CarianStylePotion.FROSTBITE).getAmplifier() + 1, 9);
-                                    entityLivingBase.addPotionEffect(new PotionEffect(CarianStylePotion.FROSTBITE, 200, level));
-                                } else {
-                                    entityLivingBase.addPotionEffect(new PotionEffect(CarianStylePotion.FROSTBITE, 200, 0));
-                                }
-                            }
-                        } else {
-                            for (Entity entity : entities) {
-                                EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
-                                if (entityLivingBase.isPotionActive(CarianStylePotion.FROSTBITE)) {
-                                    int level = Math.min(entityLivingBase.getActivePotionEffect(CarianStylePotion.FROSTBITE).getAmplifier() + 2, 9);
-                                    entityLivingBase.addPotionEffect(new PotionEffect(CarianStylePotion.FROSTBITE, 200, level));
-                                } else {
-                                    entityLivingBase.addPotionEffect(new PotionEffect(CarianStylePotion.FROSTBITE, 200, 1));
-                                }
-                            }
-                        }
-                    }
-                }
+        if (victim == null) {
+            return;
+        }
+
+        // 手动应用等级限制
+        int effectiveLevel = level;
+        if (ConfigLoader.levelLimit) {
+            effectiveLevel = Math.min(effectiveLevel, 10);
+        }
+
+        // 玩家需要刚挥剑，非玩家直接触发
+        if (ctx.isHolderPlayer()) {
+            if (!isJustSwung(ctx.getHolderAsPlayer())) {
+                return;
             }
+        }
+
+        // 伤害变为魔法伤害
+        if (ctx.getDamageSource() != null) {
+            ctx.getDamageSource().setMagicDamage();
+        }
+
+        // 获取目标周围的敌人（范围=等级）
+        List<EntityLivingBase> nearbyEntities = EntityUtil.getNearbyEntities(
+                EntityLivingBase.class,
+                victim,
+                effectiveLevel,
+                entity -> !entity.equals(attacker)
+        );
+
+        // 施加冻伤效果
+        boolean isNight = !attacker.world.isDaytime();
+        int stackIncrease = isNight ? 2 : 1;
+        int initialLevel = isNight ? 1 : 0;
+
+        for (EntityLivingBase entity : nearbyEntities) {
+            PotionEffect existingEffect = entity.getActivePotionEffect(CarianStylePotion.FROSTBITE);
+
+            int newLevel;
+            if (existingEffect != null) {
+                newLevel = Math.min(existingEffect.getAmplifier() + stackIncrease, 9);
+            } else {
+                newLevel = initialLevel;
+            }
+
+            entity.addPotionEffect(new PotionEffect(CarianStylePotion.FROSTBITE, 200, newLevel));
         }
     }
 
@@ -89,15 +98,4 @@ public class EnchantmentAduraMoonlightSword extends RaryBase {
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) ((30 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
     }
-
-    @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) &&
-                !ench.equals(CarianStyleEnchantments.EPILEPSY_FIRE) &&
-                !ench.equals(CarianStyleEnchantments.EAT_SHIT) &&
-                !ench.equals(CarianStyleEnchantments.HYPNOTIC_SMOKE) &&
-                !ench.equals(CarianStyleEnchantments.FIRE_GIVES_POWER) &&
-                !ench.equals(CarianStyleEnchantments.FIRE_DEVOURED);
-    }
-
 }

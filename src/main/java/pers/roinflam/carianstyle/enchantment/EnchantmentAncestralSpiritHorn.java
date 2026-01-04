@@ -12,94 +12,105 @@ import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
 import javax.annotation.Nonnull;
 
+/**
+ * 先祖之角附魔
+ *
+ * 受到魔法伤害时减伤25%
+ * 受到魔法伤害后持续回血（伤害×等级×0.05/20 每10tick，持续200tick）
+ */
+@AutoRegisterEnchantment(
+        id = "ancestral_spirit_horn",
+        category = EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        conflictsWith = {
+                EnchantmentShelterOfFire.class,
+                EnchantmentHealingByFire.class,
+                EnchantmentBlackFlameShelter.class
+        }
+)
 @Mod.EventBusSubscriber
-public class EnchantmentAncestralSpiritHorn extends RaryBase {
+public class EnchantmentAncestralSpiritHorn extends EnchantmentBase {
 
-    public EnchantmentAncestralSpiritHorn(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "ancestral_spirit_horn");
+    public EnchantmentAncestralSpiritHorn() {
+        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.ANCESTRAL_SPIRIT_HORN;
+    private static int getTotalLevel(EntityLivingBase entity) {
+        Enchantment ancestralSpiritHorn = EnchantmentRegistry.getEnchantmentByClass(EnchantmentAncestralSpiritHorn.class);
+        if (ancestralSpiritHorn == null) {
+            return 0;
+        }
+
+        int totalLevel = 0;
+        for (ItemStack armor : entity.getArmorInventoryList()) {
+            if (!armor.isEmpty()) {
+                totalLevel += EnchantmentHelper.getEnchantmentLevel(ancestralSpiritHorn, armor);
+            }
+        }
+        if (ConfigLoader.levelLimit) {
+            totalLevel = Math.min(totalLevel, 10);
+        }
+        return totalLevel;
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage_hurt(@Nonnull LivingDamageEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            DamageSource damageSource = evt.getSource();
-            if (!damageSource.canHarmInCreative() && damageSource.isMagicDamage()) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                int bonusLevel = 0;
-                for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
-                    if (!itemStack.isEmpty()) {
-                        bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
-                    }
-                }
-                if (ConfigLoader.levelLimit) {
-                    bonusLevel = Math.min(bonusLevel, 10);
-                }
-                if (bonusLevel > 0) {
-                    evt.setAmount(evt.getAmount() * 0.75f);
-                }
-            }
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
+        if (evt.getEntity().world.isRemote) {
+            return;
         }
+
+        DamageSource damageSource = evt.getSource();
+
+        if (damageSource.canHarmInCreative() || !damageSource.isMagicDamage()) {
+            return;
+        }
+
+        EntityLivingBase holder = evt.getEntityLiving();
+
+        int totalLevel = getTotalLevel(holder);
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        evt.setAmount(evt.getAmount() * 0.75f);
+
+        float healPerTick = evt.getAmount() * totalLevel * 0.05f / 20;
+
+        new SynchronizationTask(10, 10) {
+            private int tick = 0;
+
+            @Override
+            public void run() {
+                tick += 10;
+                if (tick > 200 || !holder.isEntityAlive()) {
+                    this.cancel();
+                    return;
+                }
+                holder.heal(healPerTick);
+            }
+        }.start();
     }
 
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage_heal(@Nonnull LivingDamageEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            DamageSource damageSource = evt.getSource();
-            if (!damageSource.canHarmInCreative() && damageSource.isMagicDamage()) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                int bonusLevel = 0;
-                for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
-                    if (!itemStack.isEmpty()) {
-                        bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
-                    }
-                }
-                if (ConfigLoader.levelLimit) {
-                    bonusLevel = Math.min(bonusLevel, 10);
-                }
-                if (bonusLevel > 0) {
-                    float heal = evt.getAmount() * bonusLevel * 0.05f / 20;
-                    new SynchronizationTask(10, 10) {
-                        private int tick = 0;
-
-                        @Override
-                        public void run() {
-                            tick += 10;
-                            if (tick > 200 || !hurter.isEntityAlive()) {
-                                this.cancel();
-                                return;
-                            }
-                            hurter.heal(heal);
-                        }
-
-                    }.start();
-                }
-            }
+    @Override
+    public boolean canApplyTogether(@Nonnull Enchantment ench) {
+        if (ench == Enchantments.PROTECTION) {
+            return false;
         }
+        return super.canApplyTogether(ench);
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) ((20 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
-    }
-
-    @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) &&
-                !ench.equals(Enchantments.PROTECTION) &&
-                !ench.equals(CarianStyleEnchantments.SHELTER_OF_FIRE) &&
-                !ench.equals(CarianStyleEnchantments.HEALING_BY_FIRE) &&
-                !ench.equals(CarianStyleEnchantments.BLACK_FLAME_SHELTER);
     }
 }

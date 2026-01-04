@@ -5,94 +5,103 @@ import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
+import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import java.util.HashMap;
 import java.util.UUID;
 
+/**
+ * 忍耐附魔
+ *
+ * 受击时累积能量（累积值 = 伤害 × 等级 × 0.1，上限 = 最大血量 × 等级 × 0.4）
+ * 攻击时释放累积的能量作为额外伤害
+ */
+@AutoRegisterEnchantment(
+        id = "patience",
+        category = EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.RARE
+)
 @Mod.EventBusSubscriber
-public class EnchantmentPatience extends RaryBase {
-    private static final HashMap<UUID, Float> PATIENCE = new HashMap<>();
+public class EnchantmentPatience extends EnchantmentBase {
 
-    public EnchantmentPatience(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "patience");
+    private static final String PATIENCE_DATA_KEY = "patience_accumulated";
 
-        new SynchronizationTask(6000, 6000) {
-
-            @Override
-            public void run() {
-                PATIENCE.clear();
-            }
-
-        }.start();
+    public EnchantmentPatience() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.PATIENCE;
-    }
+    @Override
+    protected void onHurtAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+        UUID uuid = attacker.getUniqueID();
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    
-                if (bonusLevel > 0) {
-                        evt.setAmount(evt.getAmount() + PATIENCE.getOrDefault(attacker.getUniqueID(), 0f));
-                        PATIENCE.remove(attacker.getUniqueID());
-                    }
-                }
-            }
+        Float accumulated = EnchantmentDataManager.getData(PATIENCE_DATA_KEY, uuid);
+        if (accumulated != null && accumulated > 0) {
+            ctx.addDamage(accumulated);
+            EnchantmentDataManager.removeData(PATIENCE_DATA_KEY, uuid);
         }
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                if (!hurter.getHeldItem(hurter.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), hurter.getHeldItem(hurter.getActiveHand()));
-                    
-                if (bonusLevel > 0) {
-                        float damage = PATIENCE.getOrDefault(hurter.getUniqueID(), 0f);
-                        damage = Math.min(damage + evt.getAmount() * bonusLevel * 0.1f, hurter.getMaxHealth() * bonusLevel * 0.4f);
-                        PATIENCE.put(hurter.getUniqueID(), damage);
-                    }
-                }
-            }
+    public static void onLivingDamageStatic(@Nonnull net.minecraftforge.event.entity.living.LivingDamageEvent evt) {
+        if (evt.getEntity().world.isRemote) {
+            return;
         }
+
+        if (!(evt.getSource().getImmediateSource() instanceof EntityLivingBase)) {
+            return;
+        }
+
+        EntityLivingBase victim = evt.getEntityLiving();
+
+        if (victim.getHeldItem(victim.getActiveHand()).isEmpty()) {
+            return;
+        }
+
+        Enchantment patience = EnchantmentRegistry.getEnchantmentByClass(EnchantmentPatience.class);
+        if (patience == null) {
+            return;
+        }
+
+        int level = EnchantmentHelper.getEnchantmentLevel(
+                patience,
+                victim.getHeldItem(victim.getActiveHand()));
+
+        if (level <= 0) {
+            return;
+        }
+
+        UUID uuid = victim.getUniqueID();
+        Float current = EnchantmentDataManager.getData(PATIENCE_DATA_KEY, uuid);
+        float accumulated = current != null ? current : 0f;
+
+        float maxAccumulated = victim.getMaxHealth() * level * 0.4f;
+        accumulated = Math.min(accumulated + evt.getAmount() * level * 0.1f, maxAccumulated);
+
+        EnchantmentDataManager.setData(PATIENCE_DATA_KEY, uuid, accumulated);
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            PATIENCE.remove(evt.getEntityLiving().getUniqueID());
+        if (evt.getEntity().world.isRemote) {
+            return;
         }
+        EnchantmentDataManager.removeData(PATIENCE_DATA_KEY, evt.getEntityLiving().getUniqueID());
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) ((10 + (enchantmentLevel - 1) * 5) * ConfigLoader.enchantingDifficulty);
     }
-
-    @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return !CarianStyleEnchantments.COMBAT_SKILL.contains(ench);
-    }
-
 }

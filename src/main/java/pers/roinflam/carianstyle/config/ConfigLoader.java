@@ -1,5 +1,3 @@
-// 文件：ConfigLoader.java
-// 路径：src/main/java/pers/roinflam/carianstyle/config/ConfigLoader.java
 package pers.roinflam.carianstyle.config;
 
 import net.minecraftforge.common.config.Config;
@@ -20,7 +18,7 @@ import javax.annotation.Nonnull;
  * </p>
  */
 @Mod.EventBusSubscriber
-@Config(modid = Reference.MOD_ID, category = "")
+@Config(modid = Reference.MOD_ID, category = "general")
 public final class ConfigLoader {
 
     // ==================== 日志系统配置 ====================
@@ -74,45 +72,45 @@ public final class ConfigLoader {
             "This caps how much extra health can be gained from kills.",
             "设置祈祷打击附魔的最大可叠加生命值上限。",
             "这限制了从击杀中获得的额外生命值上限。",
-            "Range | 范围: 0 - 10000",
+            "Range | 范围: 0 - 1000000",
             "Default | 默认值: 1000"
     })
-    @Config.RangeInt(min = 0, max = 10000)
+    @Config.RangeInt(min = 0, max = 1000000)
     @Config.LangKey("config.carianstyle.prayerfulStrikeMaxHealth")
     public static int prayerfulStrikeMaxHealth = 1000;
 
-    // ==================== 附魔稀有度配置 ====================
+    // ==================== 宝藏附魔配置 ====================
 
-    @Config.Name("Treasure Very Rare Enchantments | 宝藏级超稀有附魔")
+    @Config.Name("Very Rare to Treasure | 超稀有附魔变为宝藏")
     @Config.Comment({
-            "Set all enchantments to Treasure Very Rare Enchantments.",
-            "When enabled, all mod enchantments will become treasure enchantments (only found in loot).",
-            "This makes them much harder to obtain through enchanting tables.",
-            "将所有附魔设置为宝藏级超稀有附魔。",
-            "启用后，所有模组附魔都将成为宝藏附魔（只能在战利品中找到）。",
-            "这使得它们更难通过附魔台获得。",
+            "Convert all Very Rare enchantments to Treasure enchantments.",
+            "When enabled, all mod enchantments with Very Rare rarity will become treasure enchantments.",
+            "Treasure enchantments cannot be obtained from enchanting tables, only from loot.",
+            "将所有超稀有(Very Rare)级别的附魔变为宝藏附魔。",
+            "启用后，本模组所有超稀有级别的附魔都将成为宝藏附魔。",
+            "宝藏附魔无法从附魔台获得，只能从战利品中获取。",
             "Default | 默认值: false"
     })
     @Config.LangKey("config.carianstyle.isTreasureVeryRaryEnchantment")
     public static boolean isTreasureVeryRaryEnchantment = false;
 
-    @Config.Name("Treasure Rare Enchantments | 宝藏级稀有附魔")
+    @Config.Name("Rare to Treasure | 稀有附魔变为宝藏")
     @Config.Comment({
-            "Set all enchantments to Treasure Rare Enchantments.",
-            "This makes enchantments rarer than normal but easier to find than Very Rare.",
-            "将所有附魔设置为宝藏级稀有附魔。",
-            "这使得附魔比普通的更稀有，但比超稀有更容易找到。",
+            "Convert all Rare enchantments to Treasure enchantments.",
+            "When enabled, all mod enchantments with Rare rarity will become treasure enchantments.",
+            "将所有稀有(Rare)级别的附魔变为宝藏附魔。",
+            "启用后，本模组所有稀有级别的附魔都将成为宝藏附魔。",
             "Default | 默认值: false"
     })
     @Config.LangKey("config.carianstyle.isTreasureRaryEnchantment")
     public static boolean isTreasureRaryEnchantment = false;
 
-    @Config.Name("Treasure Uncommon Enchantments | 宝藏级罕见附魔")
+    @Config.Name("Uncommon to Treasure | 罕见附魔变为宝藏")
     @Config.Comment({
-            "Set all enchantments to Treasure Uncommon Enchantments.",
-            "This is the least restrictive treasure setting.",
-            "将所有附魔设置为宝藏级罕见附魔。",
-            "这是限制最少的宝藏设置。",
+            "Convert all Uncommon enchantments to Treasure enchantments.",
+            "When enabled, all mod enchantments with Uncommon rarity will become treasure enchantments.",
+            "将所有罕见(Uncommon)级别的附魔变为宝藏附魔。",
+            "启用后，本模组所有罕见级别的附魔都将成为宝藏附魔。",
             "Default | 默认值: false"
     })
     @Config.LangKey("config.carianstyle.isTreasureUncommonEnchantment")

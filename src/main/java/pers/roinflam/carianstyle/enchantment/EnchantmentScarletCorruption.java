@@ -1,57 +1,55 @@
 package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.potion.PotionEffect;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
 
-@Mod.EventBusSubscriber
-public class EnchantmentScarletCorruption extends RaryBase {
-    @Nonnull
-    public static Set<UUID> SCARLET_ROT = new HashSet<>();
+/**
+ * 猩红腐败附魔
+ *
+ * 武器附魔，攻击时施加腐败效果
+ * 攻击时：
+ * - 给目标施加猩红腐败效果（持续 = 等级 × 20秒）
+ */
+@AutoRegisterEnchantment(
+        id = "scarlet_rot",
+        category = EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE
+)
+public class EnchantmentScarletCorruption extends EnchantmentBase {
 
-    public EnchantmentScarletCorruption(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "scarlet_rot");
+    public EnchantmentScarletCorruption() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.SCARLET_ROT;
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (ConfigLoader.levelLimit) {
-                        bonusLevel = Math.min(bonusLevel, 10);
-                    }
-                    if (bonusLevel > 0) {
-                        hurter.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_ROT, bonusLevel * 20 * 20, 0));
-                    }
-                }
-            }
+    /**
+     * 攻击时施加猩红腐败效果
+     */
+    @Override
+    protected void onDamageAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase victim = ctx.getVictim();
+        if (victim == null) {
+            return;
         }
+
+        // 施加猩红腐败效果
+        victim.addPotionEffect(new PotionEffect(
+                CarianStylePotion.SCARLET_ROT,
+                level * 20 * 20,
+                0
+        ));
     }
 
     @Override
@@ -61,9 +59,8 @@ public class EnchantmentScarletCorruption extends RaryBase {
 
     @Override
     public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) &&
-                !ench.equals(CarianStyleEnchantments.FIRE_GIVES_POWER) &&
-                !ench.equals(CarianStyleEnchantments.FIRE_DEVOURED);
+        return super.canApplyTogether(ench)
+                && !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentFireGivesPower.class))
+                && !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentFireDevoured.class));
     }
-
 }

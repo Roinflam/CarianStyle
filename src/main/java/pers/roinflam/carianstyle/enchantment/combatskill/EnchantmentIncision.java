@@ -4,98 +4,136 @@ import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.potion.PotionEffect;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.EnchantmentDarkMoon;
+import pers.roinflam.carianstyle.enchantment.EnchantmentFireDevoured;
+import pers.roinflam.carianstyle.enchantment.EnchantmentFireGivesPower;
+import pers.roinflam.carianstyle.enchantment.EnchantmentScarletCorruption;
+import pers.roinflam.carianstyle.enchantment.EnchantmentVicDragonThunder;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
-import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
+/**
+ * 切割附魔
+ *
+ * 激活：血量>=75%时攻击，消耗50%血量获得INCISION状态（200tick）
+ * 激活后：攻击治疗自身（min(伤害×0.25, 最大血量×0.25)），给敌人施加出血
+ * 击杀：治疗（损失血量×0.1），延长INCISION时间
+ */
+@AutoRegisterEnchantment(
+        id = "incision",
+        category = EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.VERY_RARE,
+        conflictsWith = {
+                EnchantmentScarletCorruption.class,
+                EnchantmentFireGivesPower.class,
+                EnchantmentFireDevoured.class,
+                EnchantmentVicDragonThunder.class,
+                EnchantmentDarkMoon.class
+        }
+)
 @Mod.EventBusSubscriber
-public class EnchantmentIncision extends VeryRaryBase {
+public class EnchantmentIncision extends EnchantmentBase {
 
-    public EnchantmentIncision(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "incision");
+    public EnchantmentIncision() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.INCISION;
-    }
+    @Override
+    protected void onDamageAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+        EntityLivingBase victim = ctx.getVictim();
 
-    @SubscribeEvent
-    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    
-                if (bonusLevel > 0) {
-                        if (attacker instanceof EntityPlayer) {
-                            if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
-                                return;
-                            }
-                        }
-                        if (attacker.getActivePotionEffect(CarianStylePotion.INCISION) == null) {
-                            if (attacker.getHealth() >= attacker.getMaxHealth() * 0.75) {
-                                attacker.setHealth(attacker.getHealth() - attacker.getMaxHealth() * 0.5f);
-                                attacker.addPotionEffect(new PotionEffect(CarianStylePotion.INCISION, 200, 0));
-                            }
-                        } else {
-                            attacker.heal(Math.min(evt.getAmount() * 0.25f, attacker.getMaxHealth() * 0.25f));
-                            hurter.addPotionEffect(new PotionEffect(CarianStylePotion.HEMORRHAGE, 30, 0));
-                        }
-                    }
-                }
+        if (victim == null) {
+            return;
+        }
+
+        // 玩家需要刚挥剑
+        if (ctx.isHolderPlayer()) {
+            if (!isJustSwung(ctx.getHolderAsPlayer())) {
+                return;
             }
+        }
+
+        if (attacker.getActivePotionEffect(CarianStylePotion.INCISION) == null) {
+            // 激活阶段：血量>=75%时消耗50%血量获得INCISION
+            if (attacker.getHealth() >= attacker.getMaxHealth() * 0.75f) {
+                attacker.setHealth(attacker.getHealth() - attacker.getMaxHealth() * 0.5f);
+                attacker.addPotionEffect(new PotionEffect(CarianStylePotion.INCISION, 200, 0));
+            }
+        } else {
+            // 激活后：治疗自身，给敌人施加出血
+            float healAmount = Math.min(ctx.getDamage() * 0.25f, attacker.getMaxHealth() * 0.25f);
+            attacker.heal(healAmount);
+            victim.addPotionEffect(new PotionEffect(CarianStylePotion.HEMORRHAGE, 30, 0));
         }
     }
 
+    /**
+     * 击杀敌人时：治疗并延长INCISION时间
+     */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                @Nullable EntityLivingBase killer = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (killer.isEntityAlive() && !evt.getEntityLiving().equals(killer)) {
-                    if (!killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
-                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), killer.getHeldItem(killer.getActiveHand()));
-
-                if (bonusLevel > 0) {
-                            if (killer.getActivePotionEffect(CarianStylePotion.INCISION) != null) {
-                                killer.heal((killer.getMaxHealth() - killer.getHealth()) * 0.1f);
-                                killer.addPotionEffect(new PotionEffect(CarianStylePotion.INCISION, Math.min(killer.getActivePotionEffect(CarianStylePotion.INCISION).getDuration() + 100, 200), 0));
-                            }
-                        }
-                    }
-                }
-            }
+        if (evt.getEntity().world.isRemote) {
+            return;
         }
+
+        if (!(evt.getSource().getImmediateSource() instanceof EntityLivingBase)) {
+            return;
+        }
+
+        EntityLivingBase killer = (EntityLivingBase) evt.getSource().getImmediateSource();
+
+        // 击杀者必须存活且不是自杀
+        if (!killer.isEntityAlive() || killer.equals(evt.getEntityLiving())) {
+            return;
+        }
+
+        if (killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
+            return;
+        }
+
+        Enchantment incision = EnchantmentRegistry.getEnchantmentByClass(EnchantmentIncision.class);
+        if (incision == null) {
+            return;
+        }
+
+        int level = EnchantmentHelper.getEnchantmentLevel(
+                incision,
+                killer.getHeldItem(killer.getActiveHand()));
+
+        if (level <= 0) {
+            return;
+        }
+
+        PotionEffect incisionEffect = killer.getActivePotionEffect(CarianStylePotion.INCISION);
+        if (incisionEffect == null) {
+            return;
+        }
+
+        // 治疗损失血量的10%
+        killer.heal((killer.getMaxHealth() - killer.getHealth()) * 0.1f);
+
+        // 延长INCISION时间（+100tick，上限200tick）
+        int newDuration = Math.min(incisionEffect.getDuration() + 100, 200);
+        killer.addPotionEffect(new PotionEffect(CarianStylePotion.INCISION, newDuration, 0));
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) (35 * ConfigLoader.enchantingDifficulty);
-    }
-
-    @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) &&
-                !ench.equals(CarianStyleEnchantments.SCARLET_ROT) &&
-                !ench.equals(CarianStyleEnchantments.FIRE_GIVES_POWER) &&
-                !ench.equals(CarianStyleEnchantments.FIRE_DEVOURED) &&
-                !ench.equals(CarianStyleEnchantments.VIC_DRAGON_THUNDER) &&
-                !ench.equals(CarianStyleEnchantments.DARK_MOON);
     }
 }

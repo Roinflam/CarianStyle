@@ -10,57 +10,107 @@ import net.minecraft.item.ItemStack;
 import net.minecraftforge.event.entity.living.LivingSetAttackTargetEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.dead.EnchantmentAncientDragonLightning;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import javax.annotation.Nonnull;
 import java.util.List;
 
+/**
+ * 诺克斯之月附魔
+ *
+ * 护甲附魔，夜间迷惑敌人
+ * 夜间被怪物锁定时：
+ * - 2.5%概率使怪物转移攻击目标到附近其他实体
+ */
+@AutoRegisterEnchantment(
+        id = "moon_of_noxtura",
+        category = EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.VERY_RARE
+)
 @Mod.EventBusSubscriber
-public class EnchantmentMoonOfNoxtura extends VeryRaryBase {
+public class EnchantmentMoonOfNoxtura extends EnchantmentBase {
 
-    public EnchantmentMoonOfNoxtura(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "moon_of_noxtura");
+    public EnchantmentMoonOfNoxtura() {
+        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
+                EntityEquipmentSlot.HEAD,
+                EntityEquipmentSlot.CHEST,
+                EntityEquipmentSlot.LEGS,
+                EntityEquipmentSlot.FEET
+        });
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.MOON_OF_NOXTURA;
-    }
-
+    /**
+     * 被怪物锁定时概率转移仇恨
+     * 由于 LivingSetAttackTargetEvent 没有模板方法，且需要累加护甲等级，保留静态监听器
+     */
     @SubscribeEvent
     public static void onLivingSetAttackTarget(@Nonnull LivingSetAttackTargetEvent evt) {
-        if (!evt.getEntity().world.isRemote && !evt.getEntity().world.isDaytime()) {
-            if (evt.getEntityLiving() instanceof EntityLiving && evt.getTarget() != null) {
-                EntityLivingBase target = evt.getTarget();
-                EntityLiving entityLiving = (EntityLiving) evt.getEntityLiving();
-                int bonusLevel = 0;
-                for (@Nonnull ItemStack itemStack : target.getArmorInventoryList()) {
-                    if (!itemStack.isEmpty()) {
-                        bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
-                    }
-                }
-                if (ConfigLoader.levelLimit) {
-                    bonusLevel = Math.min(bonusLevel, 10);
-                }
-                if (bonusLevel > 0) {
-                    if (RandomUtil.percentageChance(2.5)) {
-                        double distance = entityLiving.getDistance(target);
-                        @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
-                                EntityLivingBase.class,
-                                entityLiving,
-                                (int) distance,
-                                entityLivingBase -> entityLivingBase.getClass() != (entityLiving.getClass()) && entityLiving.canEntityBeSeen(entityLivingBase) && !entityLivingBase.equals(entityLiving) && !entityLivingBase.equals(target)
-                        );
-                        if (!entities.isEmpty()) {
-                            entityLiving.setAttackTarget(entities.get(RandomUtil.getInt(0, entities.size() - 1)));
-                        }
-                    }
-                }
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        // 必须是夜间
+        if (evt.getEntity().world.isDaytime()) {
+            return;
+        }
+
+        // 必须是EntityLiving锁定目标
+        if (!(evt.getEntityLiving() instanceof EntityLiving) || evt.getTarget() == null) {
+            return;
+        }
+
+        EntityLiving attacker = (EntityLiving) evt.getEntityLiving();
+        EntityLivingBase target = evt.getTarget();
+
+        Enchantment moonOfNoxtura = EnchantmentRegistry.getEnchantmentByClass(EnchantmentMoonOfNoxtura.class);
+        if (moonOfNoxtura == null) {
+            return;
+        }
+
+        // 从目标的护甲累加附魔等级
+        int totalLevel = 0;
+        for (ItemStack armor : target.getArmorInventoryList()) {
+            if (!armor.isEmpty()) {
+                totalLevel += EnchantmentHelper.getEnchantmentLevel(moonOfNoxtura, armor);
             }
+        }
+
+        if (ConfigLoader.levelLimit) {
+            totalLevel = Math.min(totalLevel, 10);
+        }
+
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        // 2.5%概率触发
+        if (!RandomUtil.percentageChance(2.5)) {
+            return;
+        }
+
+        // 获取攻击者与目标之间距离内的其他实体
+        double distance = attacker.getDistance(target);
+        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
+                EntityLivingBase.class,
+                attacker,
+                (int) distance,
+                entity -> entity.getClass() != attacker.getClass()
+                        && attacker.canEntityBeSeen(entity)
+                        && !entity.equals(attacker)
+                        && !entity.equals(target)
+        );
+
+        if (!entities.isEmpty()) {
+            // 随机选择一个新目标
+            attacker.setAttackTarget(entities.get(RandomUtil.getInt(0, entities.size() - 1)));
         }
     }
 
@@ -71,10 +121,10 @@ public class EnchantmentMoonOfNoxtura extends VeryRaryBase {
 
     @Override
     public boolean canApplyTogether(@Nonnull Enchantment ench) {
-        return !ench.equals(CarianStyleEnchantments.HEALING_BY_FIRE) &&
-                !ench.equals(CarianStyleEnchantments.SHELTER_OF_FIRE) &&
-                !ench.equals(CarianStyleEnchantments.PRECISE_LIGHTNING) &&
-                !ench.equals(CarianStyleEnchantments.ANCIENT_DRAGON_LIGHTNING);
+        return !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentHealingByFire.class))
+                && !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentShelterOfFire.class))
+                && !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentPreciseLightning.class))
+                && !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentAncientDragonLightning.class));
     }
 
     @Override

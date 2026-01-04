@@ -5,83 +5,115 @@ import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.enchantment.EnchantmentDarkMoon;
+import pers.roinflam.carianstyle.enchantment.EnchantmentFireDevoured;
+import pers.roinflam.carianstyle.enchantment.EnchantmentFireGivesPower;
+import pers.roinflam.carianstyle.enchantment.EnchantmentScarletCorruption;
+import pers.roinflam.carianstyle.enchantment.EnchantmentVicDragonThunder;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
+import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import java.util.HashMap;
 import java.util.UUID;
 
+/**
+ * 尸山血海附魔
+ *
+ * 击杀敌人50%概率增加击杀计数（上限50），自身死亡时计数减半
+ * 攻击时：增伤+1%×计数×等级，治疗=最大血量×0.05%×计数×等级
+ */
+@AutoRegisterEnchantment(
+        id = "corpse_piler",
+        category = EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.RARE,
+        forceTreasure = true,
+        conflictsWith = {
+                EnchantmentScarletCorruption.class,
+                EnchantmentFireGivesPower.class,
+                EnchantmentFireDevoured.class,
+                EnchantmentVicDragonThunder.class,
+                EnchantmentDarkMoon.class
+        }
+)
 @Mod.EventBusSubscriber
-public class EnchantmentCorpsePiler extends RaryBase {
-    public final static HashMap<UUID, Integer> KILL_NUMBER = new HashMap<>();
+public class EnchantmentCorpsePiler extends EnchantmentBase {
 
-    public EnchantmentCorpsePiler(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "corpse_piler");
+    private static final String KILL_COUNT_KEY = "corpse_piler_kills";
 
-        new SynchronizationTask(6000, 6000) {
-
-            @Override
-            public void run() {
-                KILL_NUMBER.clear();
-            }
-
-        }.start();
+    public EnchantmentCorpsePiler() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.CORPSE_PILER;
+    /**
+     * 攻击时根据击杀计数增伤和治疗（HIGHEST优先级）
+     */
+    @Override
+    protected void onDamageAsAttackerHighest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+        UUID uuid = attacker.getUniqueID();
+
+        int killCount = EnchantmentDataManager.getCounter(KILL_COUNT_KEY, uuid);
+        if (killCount <= 0) {
+            return;
+        }
+
+        // 增伤 +1% × 计数 × 等级
+        ctx.addDamage(ctx.getDamage() * killCount * level * 0.01f);
+
+        // 治疗 = 最大血量 × 0.05% × 计数 × 等级
+        attacker.heal(attacker.getMaxHealth() * killCount * level * 0.0005f);
     }
 
+    /**
+     * 击杀时增加计数，死亡时计数减半
+     */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase deader = evt.getEntityLiving();
-                @Nullable EntityLivingBase killer = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (!killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), killer.getHeldItem(killer.getActiveHand()));
-                    
-                if (bonusLevel > 0) {
-                        if (killer.world.rand.nextBoolean()) {
-                            KILL_NUMBER.put(killer.getUniqueID(), Math.min(KILL_NUMBER.getOrDefault(killer.getUniqueID(), 0) + 1, 50));
-                        }
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        EntityLivingBase dead = evt.getEntityLiving();
+
+        Enchantment corpsePiler = EnchantmentRegistry.getEnchantmentByClass(EnchantmentCorpsePiler.class);
+        if (corpsePiler == null) {
+            return;
+        }
+
+        // 击杀者增加计数
+        if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
+            EntityLivingBase killer = (EntityLivingBase) evt.getSource().getImmediateSource();
+
+            if (!killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
+                int level = EnchantmentHelper.getEnchantmentLevel(
+                        corpsePiler,
+                        killer.getHeldItem(killer.getActiveHand()));
+
+                if (level > 0) {
+                    // 50%概率增加计数
+                    if (killer.world.rand.nextBoolean()) {
+                        int current = EnchantmentDataManager.getCounter(KILL_COUNT_KEY, killer.getUniqueID());
+                        int newCount = Math.min(current + 1, 50);
+                        EnchantmentDataManager.setCounter(KILL_COUNT_KEY, killer.getUniqueID(), newCount, 6000);
                     }
-                }
-                if (KILL_NUMBER.containsKey(deader.getUniqueID())) {
-                    KILL_NUMBER.put(deader.getUniqueID(), KILL_NUMBER.get(deader.getUniqueID()) / 2);
                 }
             }
         }
-    }
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    
-                if (bonusLevel > 0) {
-                        int number = KILL_NUMBER.getOrDefault(attacker.getUniqueID(), 0);
-                        if (number > 0) {
-                            evt.setAmount(evt.getAmount() + evt.getAmount() * number * bonusLevel * 0.01f);
-                            attacker.heal(attacker.getMaxHealth() * number * bonusLevel * 0.0005f);
-                        }
-                    }
-                }
-            }
+        // 死亡者计数减半
+        int deadCount = EnchantmentDataManager.getCounter(KILL_COUNT_KEY, dead.getUniqueID());
+        if (deadCount > 0) {
+            EnchantmentDataManager.setCounter(KILL_COUNT_KEY, dead.getUniqueID(), deadCount / 2, 6000);
         }
     }
 
@@ -89,21 +121,4 @@ public class EnchantmentCorpsePiler extends RaryBase {
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) ((35 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
     }
-
-
-    @Override
-    public boolean isTreasureEnchantment() {
-        return true;
-    }
-
-    @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return !CarianStyleEnchantments.COMBAT_SKILL.contains(ench) &&
-                !ench.equals(CarianStyleEnchantments.SCARLET_ROT) &&
-                !ench.equals(CarianStyleEnchantments.FIRE_GIVES_POWER) &&
-                !ench.equals(CarianStyleEnchantments.FIRE_DEVOURED) &&
-                !ench.equals(CarianStyleEnchantments.VIC_DRAGON_THUNDER) &&
-                !ench.equals(CarianStyleEnchantments.DARK_MOON);
-    }
-
 }

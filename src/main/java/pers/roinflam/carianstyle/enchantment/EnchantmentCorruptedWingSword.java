@@ -1,66 +1,75 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
+import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import java.util.HashMap;
-import java.util.UUID;
 
-@Mod.EventBusSubscriber
-public class EnchantmentCorruptedWingSword extends UncommonBase {
-    private static final HashMap<UUID, Integer> COMMB = new HashMap<>();
+/**
+ * 腐败翼剑附魔
+ *
+ * 武器附魔，连击系统
+ * 每次攻击增加连击数（最多20）
+ * 伤害加成 = 原伤害 × (连击数/4) × 3% × 等级
+ * 15秒后连击数开始逐个衰减
+ */
+@AutoRegisterEnchantment(
+        id = "corrupted_wing_sword",
+        category = EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.UNCOMMON
+)
+public class EnchantmentCorruptedWingSword extends EnchantmentBase {
 
-    public EnchantmentCorruptedWingSword(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "corrupted_wing_sword");
+    private static final String COMBO_COUNTER_KEY = "corrupted_wing_sword_combo";
+    private static final int MAX_COMBO = 20;
+    private static final int DECAY_DELAY = 300; // 15秒 (300 ticks)
+
+    public EnchantmentCorruptedWingSword() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.CORRUPTED_WING_SWORD;
-    }
+    /**
+     * 攻击时累积连击并增加伤害
+     */
+    @Override
+    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
+        // 检查是否为玩家且刚挥动武器
+        if (ctx.isHolderPlayer() && !isJustSwung(ctx.getHolderAsPlayer())) {
+            return;
+        }
 
-    @SubscribeEvent
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (ConfigLoader.levelLimit) {
-                        bonusLevel = Math.min(bonusLevel, 10);
-                    }
-                    if (bonusLevel > 0) {
-                        if (COMMB.getOrDefault(attacker.getUniqueID(), 0) < 20) {
-                            COMMB.put(attacker.getUniqueID(), COMMB.getOrDefault(attacker.getUniqueID(), 0) + 1);
-                            new SynchronizationTask(300) {
+        // 获取当前连击数
+        int currentCombo = EnchantmentDataManager.getCounter(COMBO_COUNTER_KEY, ctx.getHolder().getUniqueID());
 
-                                @Override
-                                public void run() {
-                                    if (COMMB.get(attacker.getUniqueID()) > 1) {
-                                        COMMB.put(attacker.getUniqueID(), COMMB.get(attacker.getUniqueID()) - 1);
-                                    } else {
-                                        COMMB.remove(attacker.getUniqueID());
-                                    }
-                                }
+        // 连击数未达到上限时增加
+        if (currentCombo < MAX_COMBO) {
+            // 递增连击数
+            int newCombo = EnchantmentDataManager.incrementCounter(COMBO_COUNTER_KEY, ctx.getHolder().getUniqueID());
 
-                            }.start();
-                            evt.setAmount(evt.getAmount() + evt.getAmount() * (COMMB.get(attacker.getUniqueID()) / 4) * 0.03f * bonusLevel);
-                        }
+            // 启动衰减任务
+            new SynchronizationTask(DECAY_DELAY) {
+                @Override
+                public void run() {
+                    int combo = EnchantmentDataManager.getCounter(COMBO_COUNTER_KEY, ctx.getHolder().getUniqueID());
+                    if (combo > 1) {
+                        EnchantmentDataManager.setCounter(COMBO_COUNTER_KEY, ctx.getHolder().getUniqueID(), combo - 1);
+                    } else {
+                        EnchantmentDataManager.resetCounter(COMBO_COUNTER_KEY, ctx.getHolder().getUniqueID());
                     }
                 }
-            }
+            }.start();
+
+            // 计算并增加伤害
+            float damageBonus = ctx.getDamage() * (newCombo / 4.0f) * 0.03f * level;
+            ctx.addDamage(damageBonus);
         }
     }
 
@@ -68,5 +77,4 @@ public class EnchantmentCorruptedWingSword extends UncommonBase {
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) ((15 + (enchantmentLevel - 1) * 5) * ConfigLoader.enchantingDifficulty);
     }
-
 }

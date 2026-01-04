@@ -10,56 +10,93 @@ import net.minecraft.item.ItemStack;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import javax.annotation.Nonnull;
 
+/**
+ * 回归法则附魔
+ *
+ * 护甲附魔，清除周围实体的药水效果
+ * 每tick有5%概率触发：
+ * - 清除周围（等级×3格）内所有有药水效果的实体的所有药水
+ */
+@AutoRegisterEnchantment(
+        id = "regressive_principle",
+        category = EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE
+)
 @Mod.EventBusSubscriber
-public class EnchantmentRegressivePrinciple extends RaryBase {
+public class EnchantmentRegressivePrinciple extends EnchantmentBase {
 
-    public EnchantmentRegressivePrinciple(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "regressive_principle");
+    public EnchantmentRegressivePrinciple() {
+        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
+                EntityEquipmentSlot.HEAD,
+                EntityEquipmentSlot.CHEST,
+                EntityEquipmentSlot.LEGS,
+                EntityEquipmentSlot.FEET
+        });
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.REGRESSIVE_PRINCIPLE;
-    }
-
+    /**
+     * 每tick概率清除周围实体的药水效果
+     * 由于需要累加护甲等级，保留静态监听器
+     */
     @SubscribeEvent
     public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
-        if (!evt.player.world.isRemote) {
-            if (evt.phase.equals(TickEvent.Phase.START)) {
-                if (RandomUtil.percentageChance(5)) {
-                    @Nonnull EntityPlayer entityPlayer = evt.player;
-                    if (entityPlayer.isEntityAlive()) {
-                        int bonusLevel = 0;
-                        for (@Nonnull ItemStack itemStack : entityPlayer.getArmorInventoryList()) {
-                            if (!itemStack.isEmpty()) {
-                                bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
-                            }
-                        }
-                        if (ConfigLoader.levelLimit) {
-                            bonusLevel = Math.min(bonusLevel, 10);
-                        }
-                        if (bonusLevel > 0) {
-                            EntityUtil.getNearbyEntities(
-                                            EntityLivingBase.class,
-                                            entityPlayer,
-                                            bonusLevel * 3,
-                                            entityLivingBase -> entityLivingBase.getActivePotionEffects().size() > 0)
-                                    .forEach((entityLivingBase) -> {
-                                        entityLivingBase.clearActivePotions();
-                                    });
-                        }
-                    }
-                }
+        if (evt.player.world.isRemote) {
+            return;
+        }
+
+        if (evt.phase != TickEvent.Phase.START) {
+            return;
+        }
+
+        // 5%概率触发
+        if (!RandomUtil.percentageChance(5)) {
+            return;
+        }
+
+        EntityPlayer player = evt.player;
+        if (!player.isEntityAlive()) {
+            return;
+        }
+
+        Enchantment regressivePrinciple = EnchantmentRegistry.getEnchantmentByClass(EnchantmentRegressivePrinciple.class);
+        if (regressivePrinciple == null) {
+            return;
+        }
+
+        // 从护甲累加附魔等级
+        int totalLevel = 0;
+        for (ItemStack armor : player.getArmorInventoryList()) {
+            if (!armor.isEmpty()) {
+                totalLevel += EnchantmentHelper.getEnchantmentLevel(regressivePrinciple, armor);
             }
         }
+
+        if (ConfigLoader.levelLimit) {
+            totalLevel = Math.min(totalLevel, 10);
+        }
+
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        // 清除周围有药水效果的实体的所有药水
+        EntityUtil.getNearbyEntities(
+                EntityLivingBase.class,
+                player,
+                totalLevel * 3,
+                entity -> !entity.getActivePotionEffects().isEmpty()
+        ).forEach(EntityLivingBase::clearActivePotions);
     }
 
     @Override

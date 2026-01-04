@@ -11,111 +11,155 @@ import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.UUID;
 
+/**
+ * 时间逆转附魔
+ *
+ * 死亡时触发：取消死亡，进入逆转状态100tick
+ * 逆转状态：免疫伤害并反弹，累积伤害值
+ * 逆转结束：治疗累积伤害×25%
+ * 冷却6000tick
+ */
+@AutoRegisterEnchantment(
+        id = "time_reversal",
+        category = EnchantmentCategory.RECOLLECT,
+        rarity = EnchantmentRarity.VERY_RARE
+)
 @Mod.EventBusSubscriber
-public class EnchantmentTimeReversal extends VeryRaryBase {
-    private static final HashMap<UUID, Float> REVERSAL = new HashMap<>();
-    private static final Set<UUID> REVERSAL_COOLDING = new HashSet<>();
+public class EnchantmentTimeReversal extends EnchantmentBase {
 
-    public EnchantmentTimeReversal(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "time_reversal");
+    private static final String REVERSAL_COOLDOWN_KEY = "time_reversal_cooldown";
+    private static final String REVERSAL_STATE_KEY = "time_reversal_state";
+    private static final String REVERSAL_DAMAGE_KEY = "time_reversal_damage";
+    private static final int RECOLLECT_ENCHANTABILITY = 35;
+
+    public EnchantmentTimeReversal() {
+        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.TIME_REVERSAL;
+    private static int getTotalLevel(EntityLivingBase entity) {
+        Enchantment timeReversal = EnchantmentRegistry.getEnchantmentByClass(EnchantmentTimeReversal.class);
+        if (timeReversal == null) {
+            return 0;
+        }
+
+        int totalLevel = 0;
+        for (ItemStack armor : entity.getArmorInventoryList()) {
+            if (!armor.isEmpty()) {
+                totalLevel += EnchantmentHelper.getEnchantmentLevel(timeReversal, armor);
+            }
+        }
+        return totalLevel;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            EntityLivingBase hurter = evt.getEntityLiving();
-            int bonusLevel = 0;
-            for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
-                if (!itemStack.isEmpty()) {
-                    bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
-                }
-            }
-            
-                if (bonusLevel > 0) {
-                if (!REVERSAL_COOLDING.contains(hurter.getUniqueID())) {
-                    if (!hurter.isDead) {
-                        evt.setCanceled(true);
-                        hurter.setHealth(1);
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
 
-                        REVERSAL_COOLDING.add(hurter.getUniqueID());
-                        REVERSAL.put(hurter.getUniqueID(), 0f);
+        EntityLivingBase holder = evt.getEntityLiving();
+        UUID uuid = holder.getUniqueID();
 
-                        new SynchronizationTask(100) {
+        int totalLevel = getTotalLevel(holder);
+        if (totalLevel <= 0) {
+            return;
+        }
 
-                            @Override
-                            public void run() {
-                                if (hurter.isEntityAlive()) {
-                                    hurter.heal(REVERSAL.get(hurter.getUniqueID()) * 0.25f);
-                                }
-                                REVERSAL.remove(hurter.getUniqueID());
-                            }
+        if (EnchantmentDataManager.isOnCooldown(REVERSAL_COOLDOWN_KEY, uuid)) {
+            return;
+        }
 
-                        }.start();
-                        new SynchronizationTask(6000) {
+        if (holder.isDead) {
+            return;
+        }
 
-                            @Override
-                            public void run() {
-                                REVERSAL_COOLDING.remove(hurter.getUniqueID());
-                            }
+        evt.setCanceled(true);
+        holder.setHealth(1);
 
-                        }.start();
+        EnchantmentDataManager.setCooldown(REVERSAL_COOLDOWN_KEY, uuid, 6000);
+        EnchantmentDataManager.setData(REVERSAL_STATE_KEY, uuid, true);
+        EnchantmentDataManager.setData(REVERSAL_DAMAGE_KEY, uuid, 0f);
+
+        new SynchronizationTask(100) {
+            @Override
+            public void run() {
+                if (holder.isEntityAlive()) {
+                    Float accumulated = EnchantmentDataManager.getData(REVERSAL_DAMAGE_KEY, uuid);
+                    if (accumulated != null) {
+                        holder.heal(accumulated * 0.25f);
                     }
                 }
+                EnchantmentDataManager.removeData(REVERSAL_STATE_KEY, uuid);
+                EnchantmentDataManager.removeData(REVERSAL_DAMAGE_KEY, uuid);
             }
-        }
+        }.start();
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            EntityLivingBase hurter = evt.getEntityLiving();
-            int bonusLevel = 0;
-            for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
-                if (!itemStack.isEmpty()) {
-                    bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
-                }
-            }
-            
-                if (bonusLevel > 0) {
-                if (REVERSAL.containsKey(hurter.getUniqueID())) {
-                    if (!evt.getEntity().equals(evt.getSource().getTrueSource())) {
-                        evt.setCanceled(true);
-                        REVERSAL.put(hurter.getUniqueID(), REVERSAL.get(hurter.getUniqueID()) + evt.getAmount());
-                        if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
-                            @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
-                            attacker.attackEntityFrom(evt.getSource(), evt.getAmount());
-                        }
-                    }
-                }
-            }
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        EntityLivingBase holder = evt.getEntityLiving();
+        UUID uuid = holder.getUniqueID();
+
+        int totalLevel = getTotalLevel(holder);
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        Boolean inReversal = EnchantmentDataManager.getData(REVERSAL_STATE_KEY, uuid);
+        if (inReversal == null || !inReversal) {
+            return;
+        }
+
+        if (evt.getEntity().equals(evt.getSource().getTrueSource())) {
+            return;
+        }
+
+        evt.setCanceled(true);
+
+        Float accumulated = EnchantmentDataManager.getData(REVERSAL_DAMAGE_KEY, uuid);
+        if (accumulated == null) {
+            accumulated = 0f;
+        }
+        EnchantmentDataManager.setData(REVERSAL_DAMAGE_KEY, uuid, accumulated + evt.getAmount());
+
+        if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
+            EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
+            attacker.attackEntityFrom(evt.getSource(), evt.getAmount());
         }
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
-        return (int) (CarianStyleEnchantments.RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
+    public boolean canApplyTogether(@Nonnull Enchantment ench) {
+        // 与死亡类附魔冲突
+        if (isDeadEnchantment(ench)) {
+            return false;
+        }
+        return super.canApplyTogether(ench);
+    }
+
+    private boolean isDeadEnchantment(Enchantment ench) {
+        return ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentFullMoon.class))
+                || ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentLivingCorpse.class));
     }
 
     @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return !CarianStyleEnchantments.RECOLLECT.contains(ench) &&
-                !CarianStyleEnchantments.DEAD.contains(ench);
+    public int getMinEnchantability(int enchantmentLevel) {
+        return (int) (RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
     }
 }

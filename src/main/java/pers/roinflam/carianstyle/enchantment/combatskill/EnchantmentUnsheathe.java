@@ -1,7 +1,5 @@
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.SharedMonsterAttributes;
@@ -10,103 +8,120 @@ import net.minecraft.entity.ai.attributes.IAttributeInstance;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.server.FMLServerHandler;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
+import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
-import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import java.util.HashMap;
 import java.util.UUID;
 
+/**
+ * 居合附魔
+ *
+ * 每次攻击有概率触发居合斩（概率 = 1% + 攻击次数 × 0.5%）
+ * 触发时：伤害 × 等级 × 3.3，但攻速降低75%持续等级×66tick
+ * 未触发时：攻击计数+1，继续蓄力
+ */
+@AutoRegisterEnchantment(
+        id = "unsheathe",
+        category = EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.RARE
+)
 @Mod.EventBusSubscriber
-public class EnchantmentUnsheathe extends RaryBase {
-    public static final UUID ID = UUID.fromString("a9f7b1c6-4c2d-4f0e-9f2c-3a8b3f7d0a5b");
-    public static final String NAME = "enchantment.unsheathe";
-    private static final HashMap<UUID, Integer> NUM_OF_ATTACKS = new HashMap<>();
+public class EnchantmentUnsheathe extends EnchantmentBase {
 
-    public EnchantmentUnsheathe(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "unsheathe");
-        new SynchronizationTask(12000, 12000) {
+    private static final UUID ATTACK_SPEED_MODIFIER_ID = UUID.fromString("a9f7b1c6-4c2d-4f0e-9f2c-3a8b3f7d0a5b");
+    private static final String ATTACK_SPEED_MODIFIER_NAME = "enchantment.unsheathe";
+    private static final String ATTACK_COUNT_KEY = "unsheathe_attack_count";
 
-            @Override
-            public void run() {
-                for (UUID uuid : NUM_OF_ATTACKS.keySet()) {
-                    EntityPlayer entityPlayer = FMLServerHandler.instance().getServer().getPlayerList().getPlayerByUUID(uuid);
-                    if (entityPlayer != null) {
-                        @Nonnull IAttributeInstance attributeInstance = entityPlayer.getEntityAttribute(SharedMonsterAttributes.ATTACK_SPEED);
-                        attributeInstance.removeModifier(ID);
-                    }
-                }
-                NUM_OF_ATTACKS.clear();
-            }
-
-        }.start();
+    public EnchantmentUnsheathe() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.UNSHEATHE;
-    }
+    @Override
+    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
+        // 排除水鸟乱舞伤害
+        if (ctx.getDamageSource() != null && "waterfowlDance".equals(ctx.getDamageSource().damageType)) {
+            return;
+        }
 
-    @SubscribeEvent
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (!evt.getSource().damageType.equals("waterfowlDance") && evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (attacker instanceof EntityPlayer) {
-                    if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
-                        return;
-                    } else {
-                        ((EntityPlayer) attacker).resetCooldown();
-                    }
-                    if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+        // 只有玩家能触发
+        if (!ctx.isHolderPlayer()) {
+            return;
+        }
 
-                if (bonusLevel > 0) {
-                            if (RandomUtil.percentageChance(1 + NUM_OF_ATTACKS.getOrDefault(attacker.getUniqueID(), 0) * 0.5)) {
-                                @Nonnull IAttributeInstance attributeInstance = attacker.getEntityAttribute(SharedMonsterAttributes.ATTACK_SPEED);
-                                evt.setAmount(evt.getAmount() * bonusLevel * 3.3f);
-                                NUM_OF_ATTACKS.remove(attacker.getUniqueID());
-                                if (attributeInstance.getModifier(ID) == null) {
-                                    attributeInstance.applyModifier(new AttributeModifier(ID, NAME, -0.75, 2));
-                                    new SynchronizationTask(bonusLevel * 66) {
+        EntityPlayer player = ctx.getHolderAsPlayer();
 
-                                        @Override
-                                        public void run() {
-                                            attributeInstance.removeModifier(ID);
-                                        }
+        // 检查刚挥剑
+        if (!isJustSwung(player)) {
+            return;
+        }
 
-                                    }.start();
-                                }
-                            } else {
-                                NUM_OF_ATTACKS.put(attacker.getUniqueID(), NUM_OF_ATTACKS.getOrDefault(attacker.getUniqueID(), 0) + 1);
-                            }
-                        }
-                    }
-                }
-            }
+        // 重置攻击冷却
+        player.resetCooldown();
+
+        // 获取攻击计数
+        int attackCount = EnchantmentDataManager.getCounter(ATTACK_COUNT_KEY, player.getUniqueID());
+
+        // 触发概率：1% + 攻击次数 × 0.5%
+        double triggerChance = 1.0 + attackCount * 0.5;
+
+        if (RandomUtil.percentageChance(triggerChance)) {
+            // 触发居合斩
+            EnchantmentDataManager.resetCounter(ATTACK_COUNT_KEY, player.getUniqueID());
+            ctx.multiplyDamage(level * 3.3f);
+            applyAttackSpeedPenalty(player, level);
+        } else {
+            // 未触发，累积计数（12000tick过期）
+            EnchantmentDataManager.incrementCounter(ATTACK_COUNT_KEY, player.getUniqueID(), 12000);
         }
     }
 
-    @SubscribeEvent
-    public static void onEntityJoinWorld(EntityJoinWorldEvent evt) {
-        if (!evt.getWorld().isRemote) {
-            if (evt.getEntity() instanceof EntityLivingBase) {
-                EntityLivingBase entityLivingBase = (EntityLivingBase) evt.getEntity();
-                @Nonnull IAttributeInstance attributeInstance = entityLivingBase.getEntityAttribute(SharedMonsterAttributes.ATTACK_SPEED);
-                if (attributeInstance != null) {
-                    attributeInstance.removeModifier(ID);
-                }
+    /**
+     * 施加攻速惩罚：降低75%，持续等级×66tick
+     */
+    private void applyAttackSpeedPenalty(@Nonnull EntityPlayer player, int level) {
+        IAttributeInstance attributeInstance = player.getEntityAttribute(SharedMonsterAttributes.ATTACK_SPEED);
+        if (attributeInstance == null || attributeInstance.getModifier(ATTACK_SPEED_MODIFIER_ID) != null) {
+            return;
+        }
+
+        attributeInstance.applyModifier(new AttributeModifier(
+                ATTACK_SPEED_MODIFIER_ID,
+                ATTACK_SPEED_MODIFIER_NAME,
+                -0.75,
+                2
+        ));
+
+        new SynchronizationTask(level * 66) {
+            @Override
+            public void run() {
+                attributeInstance.removeModifier(ATTACK_SPEED_MODIFIER_ID);
             }
+        }.start();
+    }
+
+    /**
+     * 实体加入世界时清理残留的攻速修正
+     */
+    @SubscribeEvent
+    public static void onEntityJoinWorld(@Nonnull EntityJoinWorldEvent evt) {
+        if (evt.getWorld().isRemote || !(evt.getEntity() instanceof EntityLivingBase)) {
+            return;
+        }
+
+        EntityLivingBase entity = (EntityLivingBase) evt.getEntity();
+        IAttributeInstance attributeInstance = entity.getEntityAttribute(SharedMonsterAttributes.ATTACK_SPEED);
+        if (attributeInstance != null) {
+            attributeInstance.removeModifier(ATTACK_SPEED_MODIFIER_ID);
         }
     }
 
@@ -114,10 +129,4 @@ public class EnchantmentUnsheathe extends RaryBase {
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) ((28 + (enchantmentLevel - 1) * 8) * ConfigLoader.enchantingDifficulty);
     }
-
-    @Override
-    public boolean canApplyTogether(@Nonnull Enchantment ench) {
-        return !CarianStyleEnchantments.COMBAT_SKILL.contains(ench);
-    }
-
 }

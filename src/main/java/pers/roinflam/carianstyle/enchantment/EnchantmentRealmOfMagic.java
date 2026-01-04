@@ -10,48 +10,82 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.util.List;
 
+/**
+ * 魔法领域附魔
+ *
+ * 护甲附魔，团队魔法增伤
+ * 当队友（同类实体）造成魔法伤害时：
+ * - 如果周围6格内有穿戴此附魔的同类实体，伤害增加50%
+ */
+@AutoRegisterEnchantment(
+        id = "realm_of_magic",
+        category = EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.VERY_RARE
+)
 @Mod.EventBusSubscriber
-public class EnchantmentRealmOfMagic extends VeryRaryBase {
+public class EnchantmentRealmOfMagic extends EnchantmentBase {
 
-    public EnchantmentRealmOfMagic(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "realm_of_magic");
+    public EnchantmentRealmOfMagic() {
+        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
+                EntityEquipmentSlot.HEAD,
+                EntityEquipmentSlot.CHEST,
+                EntityEquipmentSlot.LEGS,
+                EntityEquipmentSlot.FEET
+        });
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.REALM_OF_MAGIC;
-    }
-
+    /**
+     * 魔法伤害时检查周围是否有穿戴此附魔的同类
+     * 由于检查的是攻击者周围的其他实体，保留静态监听器
+     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
-                if (evt.getSource().isMagicDamage()) {
-                    @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
-                    @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
-                            EntityLivingBase.class,
-                            attacker,
-                            6,
-                            entityLivingBase -> entityLivingBase.getClass() == (attacker.getClass())
-                    );
-                    for (@Nonnull EntityLivingBase entityLivingBase : entities) {
-                        for (@Nonnull ItemStack itemStack : entityLivingBase.getArmorInventoryList()) {
-                            if (!itemStack.isEmpty()) {
-                                if (EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack) > 0) {
-                                    evt.setAmount(evt.getAmount() + evt.getAmount() * 0.5f);
-                                    break;
-                                }
-                            }
-                        }
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        // 必须有攻击者且是魔法伤害
+        if (!(evt.getSource().getTrueSource() instanceof EntityLivingBase)) {
+            return;
+        }
+        if (!evt.getSource().isMagicDamage()) {
+            return;
+        }
+
+        EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
+
+        Enchantment realmOfMagic = EnchantmentRegistry.getEnchantmentByClass(EnchantmentRealmOfMagic.class);
+        if (realmOfMagic == null) {
+            return;
+        }
+
+        // 获取攻击者周围6格内的同类实体
+        List<EntityLivingBase> allies = EntityUtil.getNearbyEntities(
+                EntityLivingBase.class,
+                attacker,
+                6,
+                entity -> entity.getClass() == attacker.getClass()
+        );
+
+        // 检查同类是否有穿戴此附魔
+        for (EntityLivingBase ally : allies) {
+            for (ItemStack armor : ally.getArmorInventoryList()) {
+                if (!armor.isEmpty()) {
+                    if (EnchantmentHelper.getEnchantmentLevel(realmOfMagic, armor) > 0) {
+                        // 找到一个即增伤50%
+                        evt.setAmount(evt.getAmount() + evt.getAmount() * 0.5f);
+                        return;
                     }
                 }
             }
@@ -70,6 +104,7 @@ public class EnchantmentRealmOfMagic extends VeryRaryBase {
 
     @Override
     public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) && !ench.equals(CarianStyleEnchantments.TOPPS_STAND);
+        return super.canApplyTogether(ench)
+                && !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentToppsStand.class));
     }
 }

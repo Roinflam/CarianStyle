@@ -12,63 +12,114 @@ import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
 
+/**
+ * 连射附魔
+ *
+ * 拉弓速度×5，但箭矢伤害-50%
+ */
+@AutoRegisterEnchantment(
+        id = "continuous_shooting",
+        category = EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.VERY_RARE
+)
 @Mod.EventBusSubscriber
-public class EnchantmentContinuousShooting extends VeryRaryBase {
+public class EnchantmentContinuousShooting extends EnchantmentBase {
 
-    public EnchantmentContinuousShooting(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "continuous_shooting");
+    public EnchantmentContinuousShooting() {
+        super(EnumEnchantmentType.BOW, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.CONTINUOUS_SHOOTING;
-    }
-
+    /**
+     * 箭矢命中时伤害-50%
+     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onProjectileImpact_Arrow(@Nonnull ProjectileImpactEvent.Arrow evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getArrow().shootingEntity != null && evt.getRayTraceResult().entityHit != null) {
-                EntityArrow entityArrow = evt.getArrow();
-                EntityLivingBase attacker = (EntityLivingBase) evt.getArrow().shootingEntity;
-                int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                
-                if (bonusLevel > 0) {
-                    entityArrow.setDamage(entityArrow.getDamage() - entityArrow.getDamage() * 0.5);
-                }
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        EntityArrow arrow = evt.getArrow();
+        if (arrow.shootingEntity == null || evt.getRayTraceResult().entityHit == null) {
+            return;
+        }
+
+        if (!(arrow.shootingEntity instanceof EntityLivingBase)) {
+            return;
+        }
+
+        EntityLivingBase shooter = (EntityLivingBase) arrow.shootingEntity;
+
+        if (shooter.getHeldItem(shooter.getActiveHand()).isEmpty()) {
+            return;
+        }
+
+        Enchantment continuousShooting = EnchantmentRegistry.getEnchantmentByClass(EnchantmentContinuousShooting.class);
+        if (continuousShooting == null) {
+            return;
+        }
+
+        int level = EnchantmentHelper.getEnchantmentLevel(
+                continuousShooting,
+                shooter.getHeldItem(shooter.getActiveHand()));
+
+        if (level > 0) {
+            arrow.setDamage(arrow.getDamage() * 0.5);
+        }
+    }
+
+    /**
+     * 加速拉弓：每tick额外更新4次
+     */
+    @SubscribeEvent
+    public static void onLivingUpdate(@Nonnull LivingEvent.LivingUpdateEvent evt) {
+        EntityLivingBase entity = evt.getEntityLiving();
+
+        if (!entity.isHandActive()) {
+            return;
+        }
+
+        if (entity.getHeldItem(entity.getActiveHand()).isEmpty()) {
+            return;
+        }
+
+        Enchantment continuousShooting = EnchantmentRegistry.getEnchantmentByClass(EnchantmentContinuousShooting.class);
+        if (continuousShooting == null) {
+            return;
+        }
+
+        int level = EnchantmentHelper.getEnchantmentLevel(
+                continuousShooting,
+                entity.getHeldItem(entity.getActiveHand()));
+
+        if (level > 0) {
+            // 额外更新4次使用进度
+            for (int i = 0; i < 4; i++) {
+                EntityLivingUtil.updateHeld(entity);
             }
         }
     }
 
-    @SubscribeEvent
-    public static void onLivingUpdate(@Nonnull LivingEvent.LivingUpdateEvent evt) {
-        EntityLivingBase entityLivingBase = evt.getEntityLiving();
-        if (entityLivingBase.isHandActive()) {
-            if (!entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()).isEmpty()) {
-                int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()));
-                
-                if (bonusLevel > 0) {
-                    for (int i = 0; i < 4; i++) {
-                        EntityLivingUtil.updateHeld(entityLivingBase);
-                    }
-                }
-            }
+    @Override
+    public boolean canApplyTogether(@Nonnull Enchantment ench) {
+        // 与无限冲突
+        if (ench == Enchantments.INFINITY) {
+            return false;
         }
+        return super.canApplyTogether(ench);
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) (35 * ConfigLoader.enchantingDifficulty);
-    }
-
-    @Override
-    public boolean canApplyTogether(@Nonnull Enchantment ench) {
-        return !CarianStyleEnchantments.COMBAT_SKILL.contains(ench) && !ench.equals(Enchantments.INFINITY);
     }
 }

@@ -4,83 +4,100 @@ import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.potion.PotionEffect;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
-import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
+/**
+ * 艾奥尼亚附魔
+ *
+ * 被动：每秒给自己施加猩红腐烂
+ * 攻击：目标有猩红腐烂时，治疗自身最大血量×10%
+ */
+@AutoRegisterEnchantment(
+        id = "aeonia",
+        category = EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.VERY_RARE,
+        conflictsWith = {
+                EnchantmentFireGivesPower.class,
+                EnchantmentFireDevoured.class
+        }
+)
 @Mod.EventBusSubscriber
-public class EnchantmentAeonia extends VeryRaryBase {
+public class EnchantmentAeonia extends EnchantmentBase {
 
-    public EnchantmentAeonia(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "aeonia");
+    private static final int RECOLLECT_ENCHANTABILITY = 35;
+
+    public EnchantmentAeonia() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.AEONIA;
-    }
+    @Override
+    protected void onDamageAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+        EntityLivingBase victim = ctx.getVictim();
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (hurter.getActivePotionEffect(CarianStylePotion.SCARLET_ROT) != null) {
-                    if (attacker instanceof EntityPlayer) {
-                        if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
-                            return;
-                        }
-                    }
-                    if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
+        if (victim == null) {
+            return;
+        }
 
-                if (bonusLevel > 0) {
-                            attacker.heal(attacker.getMaxHealth() * 0.1f);
-                        }
-                    }
-                }
+        if (victim.getActivePotionEffect(CarianStylePotion.SCARLET_ROT) == null) {
+            return;
+        }
+
+        if (ctx.isHolderPlayer()) {
+            if (!isJustSwung(ctx.getHolderAsPlayer())) {
+                return;
             }
         }
+
+        attacker.heal(attacker.getMaxHealth() * 0.1f);
     }
 
     @SubscribeEvent
     public static void onLivingUpdate(@Nonnull LivingEvent.LivingUpdateEvent evt) {
-        if (!evt.getEntity().world.isRemote && evt.getEntity().world.getTotalWorldTime() % 20 == 0) {
-            EntityLivingBase entityLivingBase = evt.getEntityLiving();
-            if (!entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()).isEmpty()) {
-                int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), entityLivingBase.getHeldItem(entityLivingBase.getActiveHand()));
-                
-                if (bonusLevel > 0) {
-                    entityLivingBase.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_ROT, 21, 0));
-                }
-            }
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        if (evt.getEntity().world.getTotalWorldTime() % 20 != 0) {
+            return;
+        }
+
+        EntityLivingBase holder = evt.getEntityLiving();
+
+        if (holder.getHeldItem(holder.getActiveHand()).isEmpty()) {
+            return;
+        }
+
+        Enchantment aeonia = EnchantmentRegistry.getEnchantmentByClass(EnchantmentAeonia.class);
+        if (aeonia == null) {
+            return;
+        }
+
+        int level = EnchantmentHelper.getEnchantmentLevel(
+                aeonia,
+                holder.getHeldItem(holder.getActiveHand()));
+
+        if (level > 0) {
+            holder.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_ROT, 21, 0));
         }
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return (int) (CarianStyleEnchantments.RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
+        return (int) (RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
     }
-
-    @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) &&
-                !ench.equals(CarianStyleEnchantments.FIRE_GIVES_POWER) &&
-                !ench.equals(CarianStyleEnchantments.FIRE_DEVOURED);
-    }
-
 }

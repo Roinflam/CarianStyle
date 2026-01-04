@@ -11,58 +11,84 @@ import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
+/**
+ * 亵渎附魔
+ *
+ * 击杀敌人时治疗自身（目标最大血量×10%）
+ * 玩家额外恢复2点饥饿值
+ */
+@AutoRegisterEnchantment(
+        id = "blasphemy",
+        category = EnchantmentCategory.RECOLLECT,
+        rarity = EnchantmentRarity.VERY_RARE
+)
 @Mod.EventBusSubscriber
-public class EnchantmentBlasphemy extends VeryRaryBase {
+public class EnchantmentBlasphemy extends EnchantmentBase {
 
-    public EnchantmentBlasphemy(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "blasphemy");
-    }
+    private static final int RECOLLECT_ENCHANTABILITY = 35;
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.BLASPHEMY;
+    public EnchantmentBlasphemy() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                @Nullable EntityLivingBase killer = (EntityLivingBase) evt.getSource().getImmediateSource();
-                EntityLivingBase deader = evt.getEntityLiving();
-                if (killer.isEntityAlive() && !evt.getEntityLiving().equals(killer)) {
-                    if (!killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
-                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), killer.getHeldItem(killer.getActiveHand()));
-                        if (ConfigLoader.levelLimit) {
-                            bonusLevel = Math.min(bonusLevel, 10);
-                        }
-                        if (bonusLevel > 0) {
-                            killer.heal(deader.getMaxHealth() * 0.1f);
-                            if (killer instanceof EntityPlayer) {
-                                @Nonnull EntityPlayer entityPlayer = (EntityPlayer) killer;
-                                @Nonnull FoodStats foodStats = entityPlayer.getFoodStats();
-                                foodStats.setFoodLevel(Math.min(foodStats.getFoodLevel() + 2, 20));
-                            }
-                        }
-                    }
-                }
-            }
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        if (!(evt.getSource().getImmediateSource() instanceof EntityLivingBase)) {
+            return;
+        }
+
+        EntityLivingBase killer = (EntityLivingBase) evt.getSource().getImmediateSource();
+        EntityLivingBase dead = evt.getEntityLiving();
+
+        if (!killer.isEntityAlive() || dead.equals(killer)) {
+            return;
+        }
+
+        if (killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
+            return;
+        }
+
+        Enchantment blasphemy = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBlasphemy.class);
+        if (blasphemy == null) {
+            return;
+        }
+
+        int level = EnchantmentHelper.getEnchantmentLevel(
+                blasphemy,
+                killer.getHeldItem(killer.getActiveHand()));
+
+        if (ConfigLoader.levelLimit) {
+            level = Math.min(level, 10);
+        }
+
+        if (level <= 0) {
+            return;
+        }
+
+        killer.heal(dead.getMaxHealth() * 0.1f);
+
+        if (killer instanceof EntityPlayer) {
+            EntityPlayer player = (EntityPlayer) killer;
+            FoodStats foodStats = player.getFoodStats();
+            foodStats.setFoodLevel(Math.min(foodStats.getFoodLevel() + 2, 20));
         }
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
-        return (int) (CarianStyleEnchantments.RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
-    }
-
-    @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return !CarianStyleEnchantments.RECOLLECT.contains(ench);
+        return (int) (RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
     }
 }

@@ -1,57 +1,75 @@
 package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemShield;
 import net.minecraft.item.ItemStack;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
-@Mod.EventBusSubscriber
-public class EnchantmentImmutableShield extends RaryBase {
+/**
+ * 不动之盾附魔
+ *
+ * 盾牌附魔，强化格挡效果
+ * 格挡时：
+ * - 若完全格挡伤害（amount <= 0）：清除攻击者所有药水效果，治疗自己（最大生命值 × 等级 × 1%）
+ * - 否则：减伤 10% × 等级
+ */
+@AutoRegisterEnchantment(
+        id = "immutable_shield",
+        category = EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE
+)
+public class EnchantmentImmutableShield extends EnchantmentBase {
 
-    public EnchantmentImmutableShield(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "immutable_shield");
+    public EnchantmentImmutableShield() {
+        // 盾牌使用BREAKABLE类型，槽位为副手和主手
+        super(EnumEnchantmentType.BREAKABLE, new EntityEquipmentSlot[]{
+                EntityEquipmentSlot.MAINHAND,
+                EntityEquipmentSlot.OFFHAND
+        });
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.IMMUTABLE_SHIELD;
-    }
+    /**
+     * 格挡时触发效果
+     */
+    @Override
+    protected void onHurtAsVictimLow(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase victim = ctx.getHolder();
 
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            EntityLivingBase hurter = evt.getEntityLiving();
-            if (hurter.isHandActive()) {
-                @Nonnull ItemStack itemStack = hurter.getHeldItem(hurter.getActiveHand());
-                if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
-                    if (ConfigLoader.levelLimit) {
-                        bonusLevel = Math.min(bonusLevel, 10);
-                    }
-                    if (bonusLevel > 0) {
-                        if (evt.getAmount() <= 0 && evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                            @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                            attacker.clearActivePotions();
-                            hurter.heal(hurter.getMaxHealth() * bonusLevel * 0.01f);
-                        } else {
-                            evt.setAmount(evt.getAmount() - evt.getAmount() * bonusLevel * 0.1f);
-                        }
-                    }
-                }
-            }
+        // 必须正在使用物品
+        if (!victim.isHandActive()) {
+            return;
+        }
+
+        // 必须是盾牌
+        ItemStack activeItem = victim.getHeldItem(victim.getActiveHand());
+        if (activeItem.isEmpty() || !(activeItem.getItem() instanceof ItemShield)) {
+            return;
+        }
+
+        // 检查附魔物品是否是当前使用的盾牌
+        if (!ctx.getEnchantedItem().equals(activeItem)) {
+            return;
+        }
+
+        if (ctx.getDamage() <= 0 && ctx.getAttacker() != null) {
+            // 完全格挡：清除攻击者药水效果，治疗自己
+            ctx.getAttacker().clearActivePotions();
+            victim.heal(victim.getMaxHealth() * level * 0.01f);
+        } else {
+            // 未完全格挡：减伤 10% × 等级
+            float reduction = ctx.getDamage() * level * 0.1f;
+            ctx.reduceDamage(reduction);
         }
     }
 
@@ -62,6 +80,7 @@ public class EnchantmentImmutableShield extends RaryBase {
 
     @Override
     public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) && !ench.equals(CarianStyleEnchantments.SCHOLAR_SHIELD);
+        return super.canApplyTogether(ench)
+                && !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentScholarShield.class));
     }
 }

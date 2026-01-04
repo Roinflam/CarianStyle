@@ -1,64 +1,68 @@
 package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.potion.PotionEffect;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
-@Mod.EventBusSubscriber
-public class EnchantmentHypnoticSmoke extends UncommonBase {
+/**
+ * 催眠烟雾附魔
+ *
+ * 武器附魔，概率使目标入睡
+ * 攻击时：
+ * - 2% × 等级的概率触发
+ * - 延迟5tick后施加睡眠效果（持续 = 等级 × 3秒，效果等级 = 附魔等级 - 1）
+ */
+@AutoRegisterEnchantment(
+        id = "hypnotic_smoke",
+        category = EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.UNCOMMON
+)
+public class EnchantmentHypnoticSmoke extends EnchantmentBase {
 
-    public EnchantmentHypnoticSmoke(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "hypnotic_smoke");
+    public EnchantmentHypnoticSmoke() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.HYPNOTIC_SMOKE;
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (ConfigLoader.levelLimit) {
-                        bonusLevel = Math.min(bonusLevel, 10);
-                    }
-                    if (bonusLevel > 0) {
-                        if (RandomUtil.percentageChance(bonusLevel * 2)) {
-                            int finalBonusLevel = bonusLevel;
-                            new SynchronizationTask(5) {
-
-                                @Override
-                                public void run() {
-                                    hurter.addPotionEffect(new PotionEffect(CarianStylePotion.SLEEP, finalBonusLevel * 3 * 20, finalBonusLevel - 1));
-                                }
-
-                            }.start();
-                        }
-                    }
-                }
-            }
+    /**
+     * 攻击时概率使目标入睡
+     */
+    @Override
+    protected void onDamageAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase victim = ctx.getVictim();
+        if (victim == null) {
+            return;
         }
+
+        // 2% × 等级的概率触发
+        if (!RandomUtil.percentageChance(level * 2)) {
+            return;
+        }
+
+        // 延迟5tick后施加睡眠效果
+        new SynchronizationTask(5) {
+            @Override
+            public void run() {
+                victim.addPotionEffect(new PotionEffect(
+                        CarianStylePotion.SLEEP,
+                        level * 3 * 20,
+                        level - 1
+                ));
+            }
+        }.start();
     }
 
     @Override
@@ -68,9 +72,8 @@ public class EnchantmentHypnoticSmoke extends UncommonBase {
 
     @Override
     public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) &&
-                !ench.equals(CarianStyleEnchantments.EPILEPSY_FIRE) &&
-                !ench.equals(CarianStyleEnchantments.EAT_SHIT);
+        return super.canApplyTogether(ench)
+                && !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentEpilepsyFire.class))
+                && !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentEatShit.class));
     }
-
 }

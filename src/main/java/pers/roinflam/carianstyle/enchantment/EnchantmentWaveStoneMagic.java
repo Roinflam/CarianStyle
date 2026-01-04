@@ -1,55 +1,65 @@
 package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
+import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentDoomedDeath;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
-@Mod.EventBusSubscriber
-public class EnchantmentWaveStoneMagic extends VeryRaryBase {
+/**
+ * 波石魔法附魔
+ *
+ * 武器附魔，魔法伤害增强
+ * 造成魔法伤害时：
+ * - 取消原伤害
+ * - 改为造成波石魔法伤害（原伤害 × 1.5）
+ */
+@AutoRegisterEnchantment(
+        id = "wave_stone_magic",
+        category = EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.VERY_RARE
+)
+public class EnchantmentWaveStoneMagic extends EnchantmentBase {
 
-    public EnchantmentWaveStoneMagic(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "wave_stone_magic");
+    public EnchantmentWaveStoneMagic() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.WAVE_STONE_MAGIC;
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (evt.getSource().isMagicDamage()) {
-                    if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                        if (ConfigLoader.levelLimit) {
-                            bonusLevel = Math.min(bonusLevel, 10);
-                        }
-                        if (bonusLevel > 0) {
-                            evt.setCanceled(true);
-                            hurter.hurtResistantTime = hurter.maxHurtResistantTime / 2;
-                            hurter.attackEntityFrom(NewDamageSource.WAVE_STONE_MAGIC, evt.getAmount() + evt.getAmount() * 0.5f);
-                        }
-                    }
-                }
-            }
+    /**
+     * 魔法伤害转为波石魔法伤害
+     */
+    @Override
+    protected void onHurtAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
+        // 必须是魔法伤害
+        if (ctx.getDamageSource() == null || !ctx.getDamageSource().isMagicDamage()) {
+            return;
         }
+
+        EntityLivingBase victim = ctx.getVictim();
+        if (victim == null) {
+            return;
+        }
+
+        float originalDamage = ctx.getDamage();
+
+        // 取消原伤害
+        ctx.cancelEvent();
+
+        // 重置无敌帧
+        victim.hurtResistantTime = victim.maxHurtResistantTime / 2;
+
+        // 造成波石魔法伤害（原伤害 × 1.5）
+        victim.attackEntityFrom(NewDamageSource.WAVE_STONE_MAGIC, originalDamage + originalDamage * 0.5f);
     }
 
     @Override
@@ -59,8 +69,8 @@ public class EnchantmentWaveStoneMagic extends VeryRaryBase {
 
     @Override
     public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) &&
-                !ench.equals(CarianStyleEnchantments.DOOMED_DEATH) &&
-                !ench.equals(CarianStyleEnchantments.DEATH_BLADE);
+        return super.canApplyTogether(ench)
+                && !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentDoomedDeath.class))
+                && !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentDeathBlade.class));
     }
 }

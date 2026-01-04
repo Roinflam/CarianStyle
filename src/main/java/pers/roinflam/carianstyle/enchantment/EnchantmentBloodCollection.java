@@ -4,71 +4,77 @@ import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
-@Mod.EventBusSubscriber
-public class EnchantmentBloodCollection extends RaryBase {
+/**
+ * 血的收藏附魔
+ *
+ * 血量越低增伤越高，同时治疗自身
+ * 与BloodSlash联动时治疗翻倍
+ */
+@AutoRegisterEnchantment(
+        id = "blood_collection",
+        category = EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        conflictsWith = {
+                EnchantmentScarletCorruption.class,
+                EnchantmentFireGivesPower.class,
+                EnchantmentFireDevoured.class,
+                EnchantmentVicDragonThunder.class,
+                EnchantmentDarkMoon.class
+        }
+)
+public class EnchantmentBloodCollection extends EnchantmentBase {
 
-    public EnchantmentBloodCollection(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "blood_collection");
+    public EnchantmentBloodCollection() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.BLOOD_COLLECTION;
-    }
+    @Override
+    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
 
-    @SubscribeEvent
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (ConfigLoader.levelLimit) {
-                        bonusLevel = Math.min(bonusLevel, 10);
-                    }
-                    if (bonusLevel > 0) {
-                        if (attacker instanceof EntityPlayer) {
-                            if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
-                                return;
-                            }
-                        }
-                        evt.setAmount(evt.getAmount() + evt.getAmount() * (1 - attacker.getHealth() / attacker.getMaxHealth()) * bonusLevel * 0.15f);
-                        if (EnchantmentHelper.getEnchantmentLevel(EnchantmentBloodSlash.getEnchantment(), attacker.getHeldItem(attacker.getActiveHand())) > 0) {
-                            attacker.heal(attacker.getMaxHealth() * (1 - attacker.getHealth() / attacker.getMaxHealth()) * bonusLevel * 0.04f);
-                        } else {
-                            attacker.heal(attacker.getMaxHealth() * (1 - attacker.getHealth() / attacker.getMaxHealth()) * bonusLevel * 0.02f);
-                        }
-                    }
-                }
+        int effectiveLevel = level;
+        if (ConfigLoader.levelLimit) {
+            effectiveLevel = Math.min(effectiveLevel, 10);
+        }
+
+        if (ctx.isHolderPlayer()) {
+            if (!isJustSwung(ctx.getHolderAsPlayer())) {
+                return;
             }
         }
+
+        float lostHealthRatio = 1 - attacker.getHealth() / attacker.getMaxHealth();
+
+        float bonusDamage = ctx.getDamage() * lostHealthRatio * effectiveLevel * 0.15f;
+        ctx.addDamage(bonusDamage);
+
+        // 检查是否有BloodSlash附魔
+        float healMultiplier = 0.02f;
+        Enchantment bloodSlash = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBloodSlash.class);
+        if (bloodSlash != null) {
+            if (EnchantmentHelper.getEnchantmentLevel(
+                    bloodSlash,
+                    attacker.getHeldItem(attacker.getActiveHand())) > 0) {
+                healMultiplier = 0.04f;
+            }
+        }
+
+        attacker.heal(attacker.getMaxHealth() * lostHealthRatio * effectiveLevel * healMultiplier);
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) ((25 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
-    }
-
-    @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) &&
-                !ench.equals(CarianStyleEnchantments.SCARLET_ROT) &&
-                !ench.equals(CarianStyleEnchantments.FIRE_GIVES_POWER) &&
-                !ench.equals(CarianStyleEnchantments.FIRE_DEVOURED) &&
-                !ench.equals(CarianStyleEnchantments.VIC_DRAGON_THUNDER) &&
-                !ench.equals(CarianStyleEnchantments.DARK_MOON);
     }
 }

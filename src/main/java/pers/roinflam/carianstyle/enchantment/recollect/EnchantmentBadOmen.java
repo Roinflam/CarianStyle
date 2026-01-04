@@ -1,73 +1,77 @@
 package pers.roinflam.carianstyle.enchantment.recollect;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.potion.PotionEffect;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
-@Mod.EventBusSubscriber
-public class EnchantmentBadOmen extends VeryRaryBase {
+/**
+ * 凶兆附魔
+ *
+ * 攻击时给敌人施加凶兆效果
+ * 敌人已有凶兆时，额外造成50%伤害（直接扣血），可触发斩杀
+ */
+@AutoRegisterEnchantment(
+        id = "bad_omen",
+        category = EnchantmentCategory.RECOLLECT,
+        rarity = EnchantmentRarity.VERY_RARE
+)
+public class EnchantmentBadOmen extends EnchantmentBase {
 
-    public EnchantmentBadOmen(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "bad_omen");
+    public EnchantmentBadOmen() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.BAD_OMEN;
-    }
+    @Override
+    protected void onHurtAsAttackerLow(@Nonnull EnchantmentContext ctx, int level) {
+        // 排除无视创造模式的伤害
+        if (ctx.getDamageSource() != null && ctx.getDamageSource().canHarmInCreative()) {
+            return;
+        }
 
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (!evt.getSource().canHarmInCreative()) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                    @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                    if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                        if (ConfigLoader.levelLimit) {
-                            bonusLevel = Math.min(bonusLevel, 10);
-                        }
-                        if (bonusLevel > 0) {
-                            if (hurter.isPotionActive(CarianStylePotion.BAD_OMEN)) {
-                                float damage = evt.getAmount();
-                                if (damage * 0.5 >= hurter.getHealth()) {
-                                    EntityLivingUtil.kill(hurter, evt.getSource().setDamageAllowedInCreativeMode());
-                                } else {
-                                    hurter.setHealth(hurter.getHealth() - damage * 0.5f);
-                                    evt.setAmount(damage * 0.5f);
-                                }
-                            }
-                            hurter.addPotionEffect(new PotionEffect(CarianStylePotion.BAD_OMEN, 200, 0));
-                        }
-                    }
-                }
+        EntityLivingBase victim = ctx.getVictim();
+        if (victim == null) {
+            return;
+        }
+
+        // 手动应用等级限制
+        int effectiveLevel = level;
+        if (ConfigLoader.levelLimit) {
+            effectiveLevel = Math.min(effectiveLevel, 10);
+        }
+
+        // 如果敌人已有凶兆效果，额外造成50%伤害
+        if (victim.isPotionActive(CarianStylePotion.BAD_OMEN)) {
+            float damage = ctx.getDamage();
+            float extraDamage = damage * 0.5f;
+
+            if (extraDamage >= victim.getHealth()) {
+                // 足以致死，直接击杀
+                EntityLivingUtil.kill(victim, ctx.getDamageSource().setDamageAllowedInCreativeMode());
+            } else {
+                // 直接扣血（无视护甲）
+                victim.setHealth(victim.getHealth() - extraDamage);
+                ctx.multiplyDamage(0.5f);
             }
         }
+
+        // 施加凶兆效果
+        victim.addPotionEffect(new PotionEffect(CarianStylePotion.BAD_OMEN, 200, 0));
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) (CarianStyleEnchantments.RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
-    }
-
-    @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return !CarianStyleEnchantments.RECOLLECT.contains(ench);
     }
 }

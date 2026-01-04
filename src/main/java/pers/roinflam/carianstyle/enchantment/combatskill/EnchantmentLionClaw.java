@@ -1,61 +1,51 @@
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
-@Mod.EventBusSubscriber
-public class EnchantmentLionClaw extends RaryBase {
+/**
+ * 狮子斩附魔
+ *
+ * 20%概率触发：伤害无视护甲 + 增伤+15%×等级
+ */
+@AutoRegisterEnchantment(
+        id = "lion_claw",
+        category = EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.RARE
+)
+public class EnchantmentLionClaw extends EnchantmentBase {
 
-    public EnchantmentLionClaw(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "lion_claw");
+    public EnchantmentLionClaw() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.LION_CLAW;
-    }
-
-    @SubscribeEvent
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    
-                if (bonusLevel > 0) {
-                        if (RandomUtil.percentageChance(20)) {
-                            evt.getSource().setDamageBypassesArmor();
-                            evt.setAmount(evt.getAmount() + evt.getAmount() * bonusLevel * 0.15f);
-                        }
-                    }
-                }
-            }
+    @Override
+    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
+        // 20%概率触发
+        if (!RandomUtil.percentageChance(20)) {
+            return;
         }
+
+        // 伤害无视护甲
+        if (ctx.getDamageSource() != null) {
+            ctx.getDamageSource().setDamageBypassesArmor();
+        }
+
+        // 增伤 +15% × 等级
+        ctx.addDamage(ctx.getDamage() * level * 0.15f);
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) ((15 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
     }
-
-    @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return !CarianStyleEnchantments.COMBAT_SKILL.contains(ench);
-    }
-
 }

@@ -1,51 +1,52 @@
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.VeryRaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
-@Mod.EventBusSubscriber
-public class EnchantmentSwordDance extends VeryRaryBase {
+/**
+ * 剑舞附魔
+ *
+ * 减少敌人无敌帧（减半），可快速连续造成伤害
+ * 如果是玩家攻击，伤害 × 攻击冷却进度（最低0.4倍）
+ */
+@AutoRegisterEnchantment(
+        id = "sword_dance",
+        category = EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.VERY_RARE,
+        forceTreasure = true
+)
+public class EnchantmentSwordDance extends EnchantmentBase {
 
-    public EnchantmentSwordDance(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "sword_dance");
+    public EnchantmentSwordDance() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.SWORD_DANCE;
-    }
+    @Override
+    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase victim = ctx.getVictim();
+        if (victim == null) {
+            return;
+        }
 
-    @SubscribeEvent
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    
-                if (bonusLevel > 0) {
-                        hurter.hurtResistantTime = hurter.maxHurtResistantTime / 2;
-                        if (attacker instanceof EntityPlayer) {
-                            evt.setAmount(evt.getAmount() * Math.max(EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker), 0.4f));
-                        }
-                    }
-                }
-            }
+        // 减少受害者无敌时间
+        victim.hurtResistantTime = victim.maxHurtResistantTime / 2;
+
+        // 如果是玩家攻击，伤害乘以攻击冷却进度（最低0.4）
+        if (ctx.isHolderPlayer()) {
+            EntityPlayer player = ctx.getHolderAsPlayer();
+            float cooldownProgress = Math.max(EntityLivingUtil.getTicksSinceLastSwing(player), 0.4f);
+            ctx.multiplyDamage(cooldownProgress);
         }
     }
 
@@ -53,15 +54,4 @@ public class EnchantmentSwordDance extends VeryRaryBase {
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) (35 * ConfigLoader.enchantingDifficulty);
     }
-
-    @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return !CarianStyleEnchantments.COMBAT_SKILL.contains(ench);
-    }
-
-    @Override
-    public boolean isTreasureEnchantment() {
-        return true;
-    }
-
 }

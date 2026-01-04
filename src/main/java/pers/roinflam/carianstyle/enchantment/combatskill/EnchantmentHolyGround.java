@@ -12,79 +12,147 @@ import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import javax.annotation.Nonnull;
 import java.util.List;
 
+/**
+ * 圣地附魔
+ *
+ * 光环效果：举盾时为16格内同类生物提供减伤、治疗和护盾
+ * 减伤：-5%×等级（叠加）
+ * 治疗：最大血量×1.5%×等级（每60tick）
+ * 护盾：吸收量+3%×等级，上限=最大血量/3×等级
+ */
+@AutoRegisterEnchantment(
+        id = "holy_ground",
+        category = EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.RARE
+)
 @Mod.EventBusSubscriber
-public class EnchantmentHolyGround extends RaryBase {
+public class EnchantmentHolyGround extends EnchantmentBase {
 
-    public EnchantmentHolyGround(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "holy_ground");
+    public EnchantmentHolyGround() {
+        super(EnumEnchantmentType.BREAKABLE, new EntityEquipmentSlot[]{
+                EntityEquipmentSlot.MAINHAND,
+                EntityEquipmentSlot.OFFHAND
+        });
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.HOLY_GROUND;
-    }
-
+    /**
+     * 减伤光环：附近有人举着此附魔盾牌时，受击者获得减伤
+     */
     @SubscribeEvent
     public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            EntityLivingBase hurter = evt.getEntityLiving();
-            @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(EntityLivingBase.class, hurter, 16, entityLivingBase -> entityLivingBase.getClass() == (hurter.getClass()));
-            for (@Nonnull EntityLivingBase entityLivingBase : entities) {
-                if (entityLivingBase.isHandActive()) {
-                    @Nonnull ItemStack itemStack = entityLivingBase.getHeldItem(entityLivingBase.getActiveHand());
-                    if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
-                        int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
 
-                if (bonusLevel > 0) {
-                            evt.setAmount(evt.getAmount() - evt.getAmount() * bonusLevel * 0.05f);
-                        }
-                    }
-                }
+        EntityLivingBase victim = evt.getEntityLiving();
+
+        Enchantment holyGround = EnchantmentRegistry.getEnchantmentByClass(EnchantmentHolyGround.class);
+        if (holyGround == null) {
+            return;
+        }
+
+        // 查找附近16格内的同类生物
+        List<EntityLivingBase> nearbyEntities = EntityUtil.getNearbyEntities(
+                EntityLivingBase.class,
+                victim,
+                16,
+                entity -> entity.getClass() == victim.getClass()
+        );
+
+        for (EntityLivingBase entity : nearbyEntities) {
+            // 检查是否正在举盾
+            if (!entity.isHandActive()) {
+                continue;
+            }
+
+            ItemStack activeItem = entity.getHeldItem(entity.getActiveHand());
+            if (activeItem.isEmpty() || !(activeItem.getItem() instanceof ItemShield)) {
+                continue;
+            }
+
+            int level = EnchantmentHelper.getEnchantmentLevel(holyGround, activeItem);
+
+            if (level > 0) {
+                // 减伤 -5% × 等级
+                evt.setAmount(evt.getAmount() - evt.getAmount() * level * 0.05f);
             }
         }
     }
 
+    /**
+     * 治疗/护盾光环：举盾时每60tick为附近同类生物提供治疗和护盾
+     */
     @SubscribeEvent
     public static void onLivingUpdate(@Nonnull LivingEvent.LivingUpdateEvent evt) {
-        if (evt.getEntity().ticksExisted % 60 == 0) {
-            EntityLivingBase entityLiving = evt.getEntityLiving();
-            if (entityLiving.isHandActive()) {
-                @Nonnull ItemStack itemStack = entityLiving.getHeldItem(entityLiving.getActiveHand());
-                if (!itemStack.isEmpty() && itemStack.getItem() instanceof ItemShield) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
-                    
-                if (bonusLevel > 0) {
-                        @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
-                                EntityLivingBase.class,
-                                entityLiving,
-                                16,
-                                entityLivingBase -> entityLivingBase.getClass() == (entityLiving.getClass())
-                        );
-                        for (@Nonnull EntityLivingBase entityLivingBase : entities) {
-                            boolean used = false;
-                            if (entityLivingBase.getHealth() < entityLivingBase.getMaxHealth()) {
-                                entityLivingBase.heal(entityLivingBase.getMaxHealth() * bonusLevel * 0.015f);
-                                used = true;
-                            }
-                            float maxAbsorption = entityLivingBase.getMaxHealth() / 3 * bonusLevel;
-                            if (entityLivingBase.getAbsorptionAmount() < maxAbsorption) {
-                                entityLivingBase.setAbsorptionAmount(Math.min(entityLivingBase.getAbsorptionAmount() + entityLivingBase.getMaxHealth() * bonusLevel * 0.03f, maxAbsorption));
-                                used = true;
-                            }
-                            if (used) {
-                                entityLivingBase.playSound(SoundEvents.ENTITY_PLAYER_LEVELUP, 1, 3);
-                            }
-                        }
-                    }
-                }
+        if (evt.getEntity().ticksExisted % 60 != 0) {
+            return;
+        }
+
+        EntityLivingBase holder = evt.getEntityLiving();
+
+        // 检查是否正在举盾
+        if (!holder.isHandActive()) {
+            return;
+        }
+
+        ItemStack activeItem = holder.getHeldItem(holder.getActiveHand());
+        if (activeItem.isEmpty() || !(activeItem.getItem() instanceof ItemShield)) {
+            return;
+        }
+
+        Enchantment holyGround = EnchantmentRegistry.getEnchantmentByClass(EnchantmentHolyGround.class);
+        if (holyGround == null) {
+            return;
+        }
+
+        int level = EnchantmentHelper.getEnchantmentLevel(holyGround, activeItem);
+
+        if (level <= 0) {
+            return;
+        }
+
+        // 查找附近16格内的同类生物
+        List<EntityLivingBase> nearbyEntities = EntityUtil.getNearbyEntities(
+                EntityLivingBase.class,
+                holder,
+                16,
+                entity -> entity.getClass() == holder.getClass()
+        );
+
+        for (EntityLivingBase entity : nearbyEntities) {
+            boolean effectApplied = false;
+
+            // 治疗：最大血量 × 等级 × 1.5%
+            if (entity.getHealth() < entity.getMaxHealth()) {
+                entity.heal(entity.getMaxHealth() * level * 0.015f);
+                effectApplied = true;
+            }
+
+            // 护盾：吸收量 +3% × 等级，上限 = 最大血量/3 × 等级
+            float maxAbsorption = entity.getMaxHealth() / 3 * level;
+            if (entity.getAbsorptionAmount() < maxAbsorption) {
+                float newAbsorption = Math.min(
+                        entity.getAbsorptionAmount() + entity.getMaxHealth() * level * 0.03f,
+                        maxAbsorption
+                );
+                entity.setAbsorptionAmount(newAbsorption);
+                effectApplied = true;
+            }
+
+            // 有效果时播放音效
+            if (effectApplied) {
+                entity.playSound(SoundEvents.ENTITY_PLAYER_LEVELUP, 1, 3);
             }
         }
     }
@@ -93,10 +161,4 @@ public class EnchantmentHolyGround extends RaryBase {
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) ((20 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
     }
-
-    @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return !CarianStyleEnchantments.COMBAT_SKILL.contains(ench);
-    }
-
 }

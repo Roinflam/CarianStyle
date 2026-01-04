@@ -15,114 +15,143 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import org.apache.commons.lang3.RandomUtils;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import javax.annotation.Nonnull;
 import java.util.List;
 
+/**
+ * 唤星附魔
+ *
+ * 箭矢落地时吸引周围敌人，延迟后召唤闪电造成伤害
+ * 夜晚伤害×3
+ */
+@AutoRegisterEnchantment(
+        id = "call_star",
+        category = EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        conflictsWith = {
+                EnchantmentLorettaBigBow.class,
+                EnchantmentLorettaTrick.class
+        }
+)
 @Mod.EventBusSubscriber
-public class EnchantmentCallStar extends RaryBase {
+public class EnchantmentCallStar extends EnchantmentBase {
 
-    public EnchantmentCallStar(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "call_star");
-    }
-
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.CALL_STAR;
+    public EnchantmentCallStar() {
+        super(EnumEnchantmentType.BOW, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onProjectileImpact_Arrow(@Nonnull ProjectileImpactEvent.Arrow evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getArrow().shootingEntity != null && evt.getRayTraceResult().entityHit == null) {
-                EntityArrow entityArrow = evt.getArrow();
-                EntityLivingBase attacker = (EntityLivingBase) evt.getArrow().shootingEntity;
-                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (ConfigLoader.levelLimit) {
-                        bonusLevel = Math.min(bonusLevel, 10);
-                    }
-                    if (bonusLevel > 0) {
-                        @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
-                                EntityLivingBase.class,
-                                entityArrow,
-                                bonusLevel * 2,
-                                entityLivingBase -> !entityLivingBase.equals(attacker)
-                        );
-                        for (@Nonnull EntityLivingBase entityLivingBase : entities) {
-                            double x = entityLivingBase.posX - entityArrow.posX;
-                            double z = entityLivingBase.posZ - entityArrow.posZ;
-                            float stronge = (float) (bonusLevel * 0.35f * Math.max(Math.abs(x), Math.abs(z)) / 7);
-                            entityLivingBase.knockBack(attacker, stronge, x, z);
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        if (evt.getArrow().shootingEntity == null || evt.getRayTraceResult().entityHit != null) {
+            return;
+        }
+
+        EntityArrow arrow = evt.getArrow();
+        EntityLivingBase attacker = (EntityLivingBase) arrow.shootingEntity;
+
+        if (attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+            return;
+        }
+
+        Enchantment callStar = EnchantmentRegistry.getEnchantmentByClass(EnchantmentCallStar.class);
+        if (callStar == null) {
+            return;
+        }
+
+        int level = EnchantmentHelper.getEnchantmentLevel(
+                callStar,
+                attacker.getHeldItem(attacker.getActiveHand()));
+
+        if (ConfigLoader.levelLimit) {
+            level = Math.min(level, 10);
+        }
+
+        if (level <= 0) {
+            return;
+        }
+
+        final int effectiveLevel = level;
+
+        List<EntityLivingBase> nearbyEntities = EntityUtil.getNearbyEntities(
+                EntityLivingBase.class,
+                arrow,
+                effectiveLevel * 2,
+                entity -> !entity.equals(attacker)
+        );
+
+        for (EntityLivingBase entity : nearbyEntities) {
+            double x = entity.posX - arrow.posX;
+            double z = entity.posZ - arrow.posZ;
+            float strength = (float) (effectiveLevel * 0.35f * Math.max(Math.abs(x), Math.abs(z)) / 7);
+            entity.knockBack(attacker, strength, x, z);
+        }
+
+        new SynchronizationTask(20) {
+            @Override
+            public void run() {
+                List<EntityLivingBase> targets = EntityUtil.getNearbyEntities(
+                        EntityLivingBase.class,
+                        arrow,
+                        effectiveLevel,
+                        entity -> !entity.equals(attacker)
+                );
+
+                if (!targets.isEmpty()) {
+                    for (EntityLivingBase target : targets) {
+                        World world = target.world;
+
+                        world.addWeatherEffect(new EntityLightningBolt(
+                                world,
+                                target.posX,
+                                target.posY,
+                                target.posZ,
+                                true
+                        ));
+
+                        int magnification = 1;
+                        if (!world.isDaytime()) {
+                            magnification = 3;
                         }
-                        int finalBonusLevel = bonusLevel;
-                        new SynchronizationTask(20) {
 
-                            @Override
-                            public void run() {
-                                @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
-                                        EntityLivingBase.class,
-                                        entityArrow,
-                                        finalBonusLevel,
-                                        entityLivingBase -> !entityLivingBase.equals(attacker)
-                                );
-                                if (!entities.isEmpty()) {
-                                    for (@Nonnull EntityLivingBase entityLivingBase : entities) {
-                                        World world = entityLivingBase.world;
-                                        world.addWeatherEffect(
-                                                new EntityLightningBolt(
-                                                        world,
-                                                        entityLivingBase.posX,
-                                                        entityLivingBase.posY,
-                                                        entityLivingBase.posZ,
-                                                        true
-                                                )
-                                        );
-                                        int magnification = 1;
-                                        if (!entityLivingBase.world.isDaytime()) {
-                                            magnification *= 3;
-                                        }
-                                        entityLivingBase.attackEntityFrom(DamageSource.LIGHTNING_BOLT, (float) (evt.getArrow().getDamage() * finalBonusLevel * 0.3 * magnification));
-                                        if (entityLivingBase.onGround) {
-                                            double x = RandomUtils.nextBoolean() ? entityArrow.posX - entityLivingBase.posX : entityLivingBase.posX - entityArrow.posX;
-                                            double z = RandomUtils.nextBoolean() ? entityArrow.posZ - entityLivingBase.posZ : entityLivingBase.posZ - entityArrow.posZ;
-                                            entityLivingBase.attackedAtYaw = (float) (MathHelper.atan2(z, x) * (180D / Math.PI) - (double) entityLivingBase.rotationYaw);
-                                            entityLivingBase.knockBack(attacker, 0.2f, x, z);
-                                        }
-                                    }
-                                } else {
-                                    World world = entityArrow.world;
-                                    world.addWeatherEffect(
-                                            new EntityLightningBolt(
-                                                    world,
-                                                    entityArrow.posX,
-                                                    entityArrow.posY,
-                                                    entityArrow.posZ,
-                                                    true
-                                            )
-                                    );
-                                }
-                            }
+                        float damage = (float) (arrow.getDamage() * effectiveLevel * 0.3 * magnification);
+                        target.attackEntityFrom(DamageSource.LIGHTNING_BOLT, damage);
 
-                        }.start();
+                        if (target.onGround) {
+                            double x = RandomUtils.nextBoolean() ? arrow.posX - target.posX : target.posX - arrow.posX;
+                            double z = RandomUtils.nextBoolean() ? arrow.posZ - target.posZ : target.posZ - arrow.posZ;
+                            target.attackedAtYaw = (float) (MathHelper.atan2(z, x) * (180D / Math.PI) - (double) target.rotationYaw);
+                            target.knockBack(attacker, 0.2f, x, z);
+                        }
                     }
+                } else {
+                    World world = arrow.world;
+                    world.addWeatherEffect(new EntityLightningBolt(
+                            world,
+                            arrow.posX,
+                            arrow.posY,
+                            arrow.posZ,
+                            true
+                    ));
                 }
             }
-        }
+        }.start();
     }
 
     @Override
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) ((30 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
-    }
-
-    @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) && !ench.equals(CarianStyleEnchantments.LORETTA_BIG_BOW) && !ench.equals(CarianStyleEnchantments.LORETTA_TRICK);
     }
 }

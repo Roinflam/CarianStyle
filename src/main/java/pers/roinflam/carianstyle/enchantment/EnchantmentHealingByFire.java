@@ -12,9 +12,12 @@ import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.UncommonBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
@@ -22,53 +25,103 @@ import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 火焰疗愈附魔
+ *
+ * 护甲附魔，着火时受击有概率净化负面效果
+ * 受到攻击时（需着火）：
+ * - 2.5% × 等级的概率触发
+ * - 随机移除一个负面效果
+ * - 获得10%最大生命值的吸收盾
+ */
+@AutoRegisterEnchantment(
+        id = "healing_by_fire",
+        category = EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.UNCOMMON
+)
 @Mod.EventBusSubscriber
-public class EnchantmentHealingByFire extends UncommonBase {
+public class EnchantmentHealingByFire extends EnchantmentBase {
 
-    public EnchantmentHealingByFire(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "healing_by_fire");
+    public EnchantmentHealingByFire() {
+        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
+                EntityEquipmentSlot.HEAD,
+                EntityEquipmentSlot.CHEST,
+                EntityEquipmentSlot.LEGS,
+                EntityEquipmentSlot.FEET
+        });
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.HEALING_BY_FIRE;
-    }
-
+    /**
+     * 着火时受击有概率净化负面效果并获得吸收盾
+     * 由于需要累加所有护甲的附魔等级，保留静态监听器
+     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                if (EntityUtil.getFire(hurter) > 0) {
-                    if (hurter.getActivePotionEffects().size() > 0) {
-                        int bonusLevel = 0;
-                        for (@Nonnull ItemStack itemStack : hurter.getArmorInventoryList()) {
-                            if (!itemStack.isEmpty()) {
-                                bonusLevel += EnchantmentHelper.getEnchantmentLevel(getEnchantment(), itemStack);
-                            }
-                        }
-                        if (ConfigLoader.levelLimit) {
-                            bonusLevel = Math.min(bonusLevel, 10);
-                        }
-                        if (bonusLevel > 0) {
-                            if (RandomUtil.percentageChance(bonusLevel * 2.5)) {
-                                @Nonnull List<PotionEffect> potionEffects = new ArrayList<>(hurter.getActivePotionEffects());
-                                potionEffects.removeIf(potionEffect ->
-                                        !potionEffect.getPotion().isBadEffect() ||
-                                                potionEffect.getPotion().isInstant() ||
-                                                !potionEffect.getPotion().shouldRender(potionEffect)
-                                );
-                                if (potionEffects.size() > 0) {
-                                    PotionEffect potionEffect = potionEffects.get(RandomUtil.getInt(0, potionEffects.size() - 1));
-                                    hurter.removePotionEffect(potionEffect.getPotion());
-                                    hurter.setAbsorptionAmount(hurter.getAbsorptionAmount() + hurter.getMaxHealth() * 0.1f);
-                                }
-                            }
-                        }
-                    }
-                }
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        // 必须有攻击来源
+        if (!(evt.getSource().getTrueSource() instanceof EntityLivingBase)) {
+            return;
+        }
+
+        EntityLivingBase victim = evt.getEntityLiving();
+
+        // 受击者必须着火
+        if (EntityUtil.getFire(victim) <= 0) {
+            return;
+        }
+
+        // 受击者必须有药水效果
+        if (victim.getActivePotionEffects().isEmpty()) {
+            return;
+        }
+
+        Enchantment healingByFire = EnchantmentRegistry.getEnchantmentByClass(EnchantmentHealingByFire.class);
+        if (healingByFire == null) {
+            return;
+        }
+
+        // 从所有护甲累加附魔等级
+        int totalLevel = 0;
+        for (ItemStack armor : victim.getArmorInventoryList()) {
+            if (!armor.isEmpty()) {
+                totalLevel += EnchantmentHelper.getEnchantmentLevel(healingByFire, armor);
             }
         }
+
+        if (ConfigLoader.levelLimit) {
+            totalLevel = Math.min(totalLevel, 10);
+        }
+
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        // 2.5% × 等级的概率触发
+        if (!RandomUtil.percentageChance(totalLevel * 2.5)) {
+            return;
+        }
+
+        // 筛选可移除的负面效果（负面、非瞬时、可渲染）
+        List<PotionEffect> badEffects = new ArrayList<>(victim.getActivePotionEffects());
+        badEffects.removeIf(effect ->
+                !effect.getPotion().isBadEffect() ||
+                        effect.getPotion().isInstant() ||
+                        !effect.getPotion().shouldRender(effect)
+        );
+
+        if (badEffects.isEmpty()) {
+            return;
+        }
+
+        // 随机移除一个负面效果
+        PotionEffect toRemove = badEffects.get(RandomUtil.getInt(0, badEffects.size() - 1));
+        victim.removePotionEffect(toRemove.getPotion());
+
+        // 获得10%最大生命值的吸收盾
+        victim.setAbsorptionAmount(victim.getAbsorptionAmount() + victim.getMaxHealth() * 0.1f);
     }
 
     @Override

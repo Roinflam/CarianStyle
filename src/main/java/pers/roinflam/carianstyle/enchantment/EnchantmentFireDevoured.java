@@ -1,65 +1,74 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.util.DamageSource;
-import net.minecraftforge.event.entity.living.LivingAttackEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import pers.roinflam.carianstyle.base.enchantment.rarity.RaryBase;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.util.List;
 
-@Mod.EventBusSubscriber
-public class EnchantmentFireDevoured extends RaryBase {
+/**
+ * 火焰吞噬附魔
+ *
+ * 攻击者着火时，对目标周围敌人造成火焰伤害并点燃
+ */
+@AutoRegisterEnchantment(
+        id = "fire_devoured",
+        category = EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE
+)
+public class EnchantmentFireDevoured extends EnchantmentBase {
 
-    public EnchantmentFireDevoured(EnumEnchantmentType typeIn, EntityEquipmentSlot[] slots) {
-        super(typeIn, slots, "fire_devoured");
+    public EnchantmentFireDevoured() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
-    @Nonnull
-    public static Enchantment getEnchantment() {
-        return CarianStyleEnchantments.FIRE_DEVOURED;
-    }
+    @Override
+    protected void onAttackLowest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+        EntityLivingBase victim = ctx.getVictim();
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-                DamageSource damageSource = evt.getSource();
-                EntityLivingBase hurter = evt.getEntityLiving();
-                @Nullable EntityLivingBase attacker = (EntityLivingBase) damageSource.getImmediateSource();
-                if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                    int bonusLevel = EnchantmentHelper.getEnchantmentLevel(getEnchantment(), attacker.getHeldItem(attacker.getActiveHand()));
-                    if (ConfigLoader.levelLimit) {
-                        bonusLevel = Math.min(bonusLevel, 10);
-                    }
-                    if (bonusLevel > 0) {
-                        if (EntityUtil.getFire(attacker) > 0) {
-                            @Nonnull List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
-                                    EntityLivingBase.class,
-                                    hurter,
-                                    bonusLevel,
-                                    entityLivingBase -> !entityLivingBase.equals(hurter) || entityLivingBase.equals(attacker)
-                            );
-                            for (@Nonnull EntityLivingBase entityLivingBase : entities) {
-                                entityLivingBase.attackEntityFrom(DamageSource.IN_FIRE, evt.getAmount() * bonusLevel * 0.15f);
-                                if (EntityUtil.getFire(entityLivingBase) < 200) {
-                                    entityLivingBase.setFire(10);
-                                }
-                            }
-                        }
-                    }
-                }
+        if (victim == null) {
+            return;
+        }
+
+        // 手动应用等级限制
+        int effectiveLevel = level;
+        if (ConfigLoader.levelLimit) {
+            effectiveLevel = Math.min(effectiveLevel, 10);
+        }
+
+        // 攻击者必须着火
+        if (EntityUtil.getFire(attacker) <= 0) {
+            return;
+        }
+
+        // 获取目标周围实体（范围=等级）
+        // 注意：原代码过滤条件会包含攻击者，保持原逻辑
+        List<EntityLivingBase> nearbyEntities = EntityUtil.getNearbyEntities(
+                EntityLivingBase.class,
+                victim,
+                effectiveLevel,
+                entity -> !entity.equals(victim) || entity.equals(attacker)
+        );
+
+        float damage = ctx.getDamage() * effectiveLevel * 0.15f;
+
+        for (EntityLivingBase entity : nearbyEntities) {
+            // 造成火焰伤害
+            entity.attackEntityFrom(DamageSource.IN_FIRE, damage);
+
+            // 如果燃烧时间<200tick，点燃10秒
+            if (EntityUtil.getFire(entity) < 200) {
+                entity.setFire(10);
             }
         }
     }
@@ -68,5 +77,4 @@ public class EnchantmentFireDevoured extends RaryBase {
     public int getMinEnchantability(int enchantmentLevel) {
         return (int) ((10 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
     }
-
 }
