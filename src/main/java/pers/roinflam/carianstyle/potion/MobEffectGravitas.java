@@ -11,17 +11,44 @@ import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
 
-
+/**
+ * 重力药水效果
+ * <p>
+ * 效果：
+ * - 攻击速度降低1%×等级
+ * - 移动速度降低1%×等级
+ * - 飞行速度降低1%×等级
+ * - 无法跳跃
+ * </p>
+ */
 public class MobEffectGravitas extends IconBase {
 
     public MobEffectGravitas(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn, liquidColorIn, "gravitas");
 
-        this.registerPotionAttributeModifier(SharedMonsterAttributes.ATTACK_SPEED, "64dd94d7-8d83-122b-82be-0c52223463ca", -0.01, 2);
-        this.registerPotionAttributeModifier(SharedMonsterAttributes.MOVEMENT_SPEED, "53878b9c-1134-c379-59c4-391599537f5e", -0.01, 2);
-        this.registerPotionAttributeModifier(SharedMonsterAttributes.FLYING_SPEED, "710bd865-953f-ed1a-facf-eba7de0ce330", -0.01, 2);
+        this.registerPotionAttributeModifier(
+                SharedMonsterAttributes.ATTACK_SPEED,
+                "64dd94d7-8d83-122b-82be-0c52223463ca",
+                -0.01,
+                2
+        );
+        this.registerPotionAttributeModifier(
+                SharedMonsterAttributes.MOVEMENT_SPEED,
+                "53878b9c-1134-c379-59c4-391599537f5e",
+                -0.01,
+                2
+        );
+        this.registerPotionAttributeModifier(
+                SharedMonsterAttributes.FLYING_SPEED,
+                "710bd865-953f-ed1a-facf-eba7de0ce330",
+                -0.01,
+                2
+        );
     }
 
+    /**
+     * 重力状态下无法跳跃
+     */
     @SubscribeEvent
     public void onLivingUpdate(@Nonnull LivingEvent.LivingUpdateEvent evt) {
         EntityLivingBase entityLiving = evt.getEntityLiving();

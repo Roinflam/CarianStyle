@@ -6,6 +6,12 @@ import net.minecraftforge.common.MinecraftForge;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.util.PotionUtil;
 
+/**
+ * 药水效果基类
+ * <p>
+ * 所有模组药水效果的基础类，自动注册到事件总线和药水列表
+ * </p>
+ */
 public abstract class PotionBase extends Potion {
 
     protected PotionBase(boolean isBadEffectIn, int liquidColorIn, String name) {
@@ -17,7 +23,7 @@ public abstract class PotionBase extends Potion {
 
     @Override
     public void performEffect(EntityLivingBase entityLivingBaseIn, int amplifier) {
-
+        // 子类重写
     }
 
     @Override

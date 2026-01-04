@@ -13,13 +13,23 @@ import pers.roinflam.carianstyle.base.potion.NetworkBase;
 
 import javax.annotation.Nonnull;
 
-
+/**
+ * 隐身药水效果（隐藏）
+ * <p>
+ * 效果：
+ * - 玩家模型不渲染（隐形）
+ * - 生物无法将此实体设为攻击目标
+ * </p>
+ */
 public class MobEffectStealth extends NetworkBase {
 
     public MobEffectStealth(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn, liquidColorIn, "stealth");
     }
 
+    /**
+     * 客户端：隐藏玩家渲染
+     */
     @SideOnly(Side.CLIENT)
     @SubscribeEvent
     public void onRenderPlayer(@Nonnull RenderPlayerEvent.Pre evt) {
@@ -29,18 +39,28 @@ public class MobEffectStealth extends NetworkBase {
         }
     }
 
+    /**
+     * 服务端：阻止生物将隐身实体设为目标
+     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onLivingSetAttackTarget(@Nonnull LivingSetAttackTargetEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            if (evt.getTarget() != null) {
-                if (evt.getEntityLiving() instanceof EntityLiving) {
-                    EntityLivingBase entityLivingBase = evt.getTarget();
-                    EntityLiving entityLiving = (EntityLiving) evt.getEntityLiving();
-                    if (entityLivingBase.isPotionActive(this)) {
-                        entityLiving.setAttackTarget(null);
-                    }
-                }
-            }
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        if (evt.getTarget() == null) {
+            return;
+        }
+
+        if (!(evt.getEntityLiving() instanceof EntityLiving)) {
+            return;
+        }
+
+        EntityLivingBase target = evt.getTarget();
+        EntityLiving attacker = (EntityLiving) evt.getEntityLiving();
+
+        if (target.isPotionActive(this)) {
+            attacker.setAttackTarget(null);
         }
     }
 
@@ -48,5 +68,4 @@ public class MobEffectStealth extends NetworkBase {
     public int getSerialNumber() {
         return 3;
     }
-
 }

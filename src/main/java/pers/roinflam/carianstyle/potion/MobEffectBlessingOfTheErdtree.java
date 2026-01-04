@@ -8,13 +8,25 @@ import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
 
-
+/**
+ * 黄金树祝福药水效果
+ * <p>
+ * 效果：
+ * - 最大生命值+15%×等级
+ * - 每3秒回复最大生命值×4%×(等级+1)
+ * </p>
+ */
 public class MobEffectBlessingOfTheErdtree extends IconBase {
 
     public MobEffectBlessingOfTheErdtree(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn, liquidColorIn, "blessing_of_the_erdtree");
 
-        this.registerPotionAttributeModifier(SharedMonsterAttributes.MAX_HEALTH, "c407bffa-97df-adf8-51db-5681fdef4b8c", 0.15, 2);
+        this.registerPotionAttributeModifier(
+                SharedMonsterAttributes.MAX_HEALTH,
+                "c407bffa-97df-adf8-51db-5681fdef4b8c",
+                0.15,
+                2
+        );
     }
 
     @Override
@@ -32,5 +44,4 @@ public class MobEffectBlessingOfTheErdtree extends IconBase {
     protected ResourceLocation getResourceLocation() {
         return new ResourceLocation(Reference.MOD_ID, "textures/effect/blessing_of_the_erdtree.png");
     }
-
 }

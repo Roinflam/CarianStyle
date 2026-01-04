@@ -9,20 +9,33 @@ import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
 
-
+/**
+ * 癫痫火焰燃烧药水效果（隐藏）
+ * <p>
+ * 效果：
+ * - 治疗量减少90%
+ * <p>
+ * 火焰外观：黄色火焰
+ * </p>
+ */
 public class MobEffectEpilepsyFireBurning extends FlameBase {
 
     public MobEffectEpilepsyFireBurning(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn, liquidColorIn, "epilepsy_fire_burning");
     }
 
+    /**
+     * 治疗量减少90%
+     */
     @SubscribeEvent(priority = EventPriority.LOW)
     public void onLivingHeal(@Nonnull LivingHealEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            EntityLivingBase healer = evt.getEntityLiving();
-            if (healer.isPotionActive(this)) {
-                evt.setAmount(evt.getAmount() * 0.1f);
-            }
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        EntityLivingBase healer = evt.getEntityLiving();
+        if (healer.isPotionActive(this)) {
+            evt.setAmount(evt.getAmount() * 0.1f);
         }
     }
 
@@ -42,5 +55,4 @@ public class MobEffectEpilepsyFireBurning extends FlameBase {
     protected String getLevelTwoName() {
         return Reference.MOD_ID + ":blocks/yellow_flame_layer_1";
     }
-
 }

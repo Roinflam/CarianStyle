@@ -9,9 +9,15 @@ import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
-
+/**
+ * 黄金誓约药水效果
+ * <p>
+ * 效果：
+ * - 受到伤害时减免10%×(等级+1)
+ * - 造成伤害时增加15%×(等级+1)
+ * </p>
+ */
 public class MobEffectGoldenVow extends IconBase {
 
     public MobEffectGoldenVow(boolean isBadEffectIn, int liquidColorIn) {
@@ -20,21 +26,29 @@ public class MobEffectGoldenVow extends IconBase {
 
     @SubscribeEvent
     public void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            DamageSource damageSource = evt.getSource();
-            if (!damageSource.canHarmInCreative()) {
-                EntityLivingBase hurter = evt.getEntityLiving();
-                if (hurter.isPotionActive(this)) {
-                    int amplifier = hurter.getActivePotionEffect(this).getAmplifier();
-                    evt.setAmount(evt.getAmount() - evt.getAmount() * (amplifier + 1) * 0.1f);
-                }
-                if (damageSource.getTrueSource() instanceof EntityLivingBase) {
-                    @Nullable EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
-                    if (attacker.isPotionActive(this)) {
-                        int amplifier = attacker.getActivePotionEffect(this).getAmplifier();
-                        evt.setAmount(evt.getAmount() + evt.getAmount() * (amplifier + 1) * 0.15f);
-                    }
-                }
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        DamageSource damageSource = evt.getSource();
+        if (damageSource.canHarmInCreative()) {
+            return;
+        }
+
+        EntityLivingBase victim = evt.getEntityLiving();
+
+        // 受击者减伤
+        if (victim.isPotionActive(this)) {
+            int amplifier = victim.getActivePotionEffect(this).getAmplifier();
+            evt.setAmount(evt.getAmount() * (1 - (amplifier + 1) * 0.1f));
+        }
+
+        // 攻击者增伤
+        if (damageSource.getTrueSource() instanceof EntityLivingBase) {
+            EntityLivingBase attacker = (EntityLivingBase) damageSource.getTrueSource();
+            if (attacker.isPotionActive(this)) {
+                int amplifier = attacker.getActivePotionEffect(this).getAmplifier();
+                evt.setAmount(evt.getAmount() * (1 + (amplifier + 1) * 0.15f));
             }
         }
     }

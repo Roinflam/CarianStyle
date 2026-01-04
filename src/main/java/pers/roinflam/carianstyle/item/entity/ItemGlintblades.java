@@ -8,14 +8,17 @@ import pers.roinflam.carianstyle.utils.util.ItemUtil;
 
 import javax.annotation.Nonnull;
 
+/**
+ * 魔法剑物品
+ * <p>
+ * 用于EntityGlintblades实体的渲染模型
+ * </p>
+ */
 public class ItemGlintblades extends ItemSword implements IHasModel {
 
     public ItemGlintblades(String name, CreativeTabs creativeTabs, @Nonnull ToolMaterial material) {
         super(material);
-
         ItemUtil.registerItem(this, name, creativeTabs);
         CarianStyleItem.ITEMS.add(this);
     }
-
 }
-

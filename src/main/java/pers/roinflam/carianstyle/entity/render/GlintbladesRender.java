@@ -1,6 +1,5 @@
 package pers.roinflam.carianstyle.entity.render;
 
-
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderItem;
 import net.minecraft.client.renderer.block.model.ItemCameraTransforms;
@@ -16,15 +15,22 @@ import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
 
 import javax.annotation.Nonnull;
 
+/**
+ * 魔法剑实体渲染器
+ * <p>
+ * 渲染悬浮旋转和飞行中的魔法剑
+ * </p>
+ */
 @SideOnly(Side.CLIENT)
 public class GlintbladesRender<T extends EntityGlintblades> extends Render<T> {
+
     protected final Item item;
     private final RenderItem itemRenderer;
 
-    public GlintbladesRender(@Nonnull RenderManager renderManagerIn, Item itemIn, RenderItem itemRendererIn) {
-        super(renderManagerIn);
-        this.item = itemIn;
-        this.itemRenderer = itemRendererIn;
+    public GlintbladesRender(@Nonnull RenderManager renderManager, Item item, RenderItem itemRenderer) {
+        super(renderManager);
+        this.item = item;
+        this.itemRenderer = itemRenderer;
     }
 
     @Override
@@ -32,14 +38,22 @@ public class GlintbladesRender<T extends EntityGlintblades> extends Render<T> {
         GlStateManager.pushMatrix();
         GlStateManager.translate((float) x, (float) y, (float) z);
         GlStateManager.enableRescaleNormal();
-        GlStateManager.scale(entity.getSize(), entity.getSize(), entity.getSize());
-        GlStateManager.rotate(entityYaw, 0.0f, 1.0f, 0);
+
+        // 应用实体大小
+        float size = entity.getSize();
+        GlStateManager.scale(size, size, size);
+        GlStateManager.rotate(entityYaw, 0.0f, 1.0f, 0.0f);
+
         if (entity.isShooted()) {
-            GlStateManager.rotate((float) Math.max(Math.min(80 - entity.rotationPitch * 1.25, 140), 0), 1.0f, 0.0f, 0);
-            GlStateManager.rotate(180.0f, 0.0F, 1.0F, 0.0F);
+            // 飞行状态：根据俯仰角旋转
+            float pitch = Math.max(Math.min(80 - entity.rotationPitch * 1.25f, 140), 0);
+            GlStateManager.rotate(pitch, 1.0f, 0.0f, 0.0f);
+            GlStateManager.rotate(180.0f, 0.0f, 1.0f, 0.0f);
         } else {
-            GlStateManager.rotate(entity.ticksExisted * 20, 0.0F, 1.0F, 0.0F);
+            // 悬浮状态：持续旋转
+            GlStateManager.rotate(entity.ticksExisted * 20, 0.0f, 1.0f, 0.0f);
         }
+
         this.bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
 
         if (this.renderOutlines) {
@@ -56,6 +70,7 @@ public class GlintbladesRender<T extends EntityGlintblades> extends Render<T> {
 
         GlStateManager.disableRescaleNormal();
         GlStateManager.popMatrix();
+
         super.doRender(entity, x, y, z, entityYaw, partialTicks);
     }
 
@@ -63,5 +78,4 @@ public class GlintbladesRender<T extends EntityGlintblades> extends Render<T> {
     protected ResourceLocation getEntityTexture(T entity) {
         return TextureMap.LOCATION_BLOCKS_TEXTURE;
     }
-
 }

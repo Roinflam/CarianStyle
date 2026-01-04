@@ -5,7 +5,12 @@ import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
 
-
+/**
+ * 毁灭火焰燃烧药水效果（隐藏）
+ * <p>
+ * 火焰外观：白色火焰
+ * </p>
+ */
 public class MobEffectDestructionFireBurning extends FlameBase {
 
     public MobEffectDestructionFireBurning(boolean isBadEffectIn, int liquidColorIn) {
@@ -28,5 +33,4 @@ public class MobEffectDestructionFireBurning extends FlameBase {
     protected String getLevelTwoName() {
         return Reference.MOD_ID + ":blocks/white_flame_layer_1";
     }
-
 }

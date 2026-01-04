@@ -11,7 +11,14 @@ import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
 
-
+/**
+ * 黄金树庇护药水效果
+ * <p>
+ * 效果：
+ * - 非生物来源的伤害（环境伤害）减免20%×(等级+1)
+ * - 不对绝对伤害生效
+ * </p>
+ */
 public class MobEffectProtectionOfTheErdtree extends IconBase {
 
     public MobEffectProtectionOfTheErdtree(boolean isBadEffectIn, int liquidColorIn) {
@@ -20,17 +27,24 @@ public class MobEffectProtectionOfTheErdtree extends IconBase {
 
     @SubscribeEvent(priority = EventPriority.LOW)
     public void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (!evt.getEntity().world.isRemote) {
-            DamageSource damageSource = evt.getSource();
-            if (!damageSource.canHarmInCreative() && !damageSource.isDamageAbsolute()) {
-                if (!(damageSource.getTrueSource() instanceof EntityLivingBase)) {
-                    EntityLivingBase hurter = evt.getEntityLiving();
-                    if (hurter.isPotionActive(this)) {
-                        int amplifier = hurter.getActivePotionEffect(this).getAmplifier();
-                        evt.setAmount(evt.getAmount() - evt.getAmount() * (amplifier + 1) * 0.2f);
-                    }
-                }
-            }
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        DamageSource damageSource = evt.getSource();
+
+        // 排除创造模式伤害、绝对伤害、生物来源伤害
+        if (damageSource.canHarmInCreative() || damageSource.isDamageAbsolute()) {
+            return;
+        }
+        if (damageSource.getTrueSource() instanceof EntityLivingBase) {
+            return;
+        }
+
+        EntityLivingBase victim = evt.getEntityLiving();
+        if (victim.isPotionActive(this)) {
+            int amplifier = victim.getActivePotionEffect(this).getAmplifier();
+            evt.setAmount(evt.getAmount() * (1 - (amplifier + 1) * 0.2f));
         }
     }
 

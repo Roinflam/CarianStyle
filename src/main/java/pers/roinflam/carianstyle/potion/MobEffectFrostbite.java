@@ -9,14 +9,25 @@ import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
 
-
-
+/**
+ * 冻伤药水效果
+ * <p>
+ * 效果：
+ * - 移动速度降低7.5%×等级
+ * - 每0.5秒造成最大生命值×0.25%×(等级+1)的冻伤伤害
+ * </p>
+ */
 public class MobEffectFrostbite extends IconBase {
 
     public MobEffectFrostbite(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn, liquidColorIn, "frostbite");
 
-        this.registerPotionAttributeModifier(SharedMonsterAttributes.MOVEMENT_SPEED, "5d59080b-eda9-f5b7-1b3c-51568e5b6682", -0.075, 2);
+        this.registerPotionAttributeModifier(
+                SharedMonsterAttributes.MOVEMENT_SPEED,
+                "5d59080b-eda9-f5b7-1b3c-51568e5b6682",
+                -0.075,
+                2
+        );
     }
 
     @Override

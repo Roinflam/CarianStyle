@@ -14,12 +14,18 @@ import javax.annotation.Nonnull;
 import java.util.Collections;
 import java.util.Set;
 
+/**
+ * 配置GUI工厂
+ * <p>
+ * 为模组提供游戏内配置界面
+ * </p>
+ */
 @SideOnly(Side.CLIENT)
 public class ConfigGuiFactory implements IModGuiFactory {
 
     @Override
     public void initialize(Minecraft minecraft) {
-
+        // 无需初始化
     }
 
     @Override
@@ -29,8 +35,16 @@ public class ConfigGuiFactory implements IModGuiFactory {
 
     @Nonnull
     @Override
-    public GuiScreen createConfigGui(GuiScreen guiScreen) {
-        return new GuiConfig(guiScreen, ConfigElement.from(ConfigLoader.class).getChildElements(), Reference.MOD_ID, false, true, "Carian Style", "For Carian!");
+    public GuiScreen createConfigGui(GuiScreen parentScreen) {
+        return new GuiConfig(
+                parentScreen,
+                ConfigElement.from(ConfigLoader.class).getChildElements(),
+                Reference.MOD_ID,
+                false,
+                true,
+                "Carian Style",
+                "For Carian!"
+        );
     }
 
     @Nonnull
