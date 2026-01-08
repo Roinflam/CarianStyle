@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚔️ CarianStyle | 卡利亚式
+# ⚔️ CarianStyle | 卡利亚式附魔
 
 [![CurseForge Downloads](https://cf.way2muchnoise.eu/full_carianstyle_downloads.svg?badge_style=for_the_badge)](https://www.curseforge.com/minecraft/mc-mods/carianstyle)
 [![MC Version](https://img.shields.io/badge/Minecraft-1.12.2-brightgreen?style=for-the-badge&logo=minecraft)](https://minecraft.net)
