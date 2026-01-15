@@ -1,0 +1,113 @@
+plugins {
+    // Shadow 插件：用于将 common 模块的代码合并到 forge jar 中
+    id 'com.github.johnrengelman.shadow'
+}
+
+// ========== 添加这个仓库配置块 ==========
+repositories {
+
+}
+
+// Loom 的 Forge 平台特有配置
+loom {
+    forge {
+        // 指定 Mixin 配置文件路径，文件名从 gradle.properties 读取
+        // GeckoLib 需要 Mixin 支持
+        mixinConfig "${rootProject.mod_id}.mixins.json"
+    }
+}
+
+// 声明这是 Forge 平台的子项目
+architectury {
+    platformSetupLoomIde()  // 配置 IDE 正确识别平台项目
+    forge()                  // 声明当前是 Forge 平台
+}
+
+// 自定义依赖配置组
+configurations {
+    // common 配置：用于引入 common 模块的代码
+    common {
+        canBeResolved = true   // 允许解析（下载）这个配置的依赖
+        canBeConsumed = false  // 不允许其他项目依赖这个配置
+    }
+
+    // 让编译类路径和运行时类路径都包含 common 配置的内容
+    compileClasspath.extendsFrom common
+    runtimeClasspath.extendsFrom common
+    developmentForge.extendsFrom common
+
+    // shadowBundle 配置：这里面的依赖会被打包进最终的 jar
+    shadowBundle {
+        canBeResolved = true
+        canBeConsumed = false
+    }
+}
+
+dependencies {
+    // ==================== 核心依赖（必需） ====================
+
+    // Forge 本体：提供 Forge 的所有 API 和运行环境
+    forge "net.minecraftforge:forge:$rootProject.forge_version"
+
+    // ==================== API 依赖（按需启用） ====================
+
+    //     Cloth Config：配置界面 API，用于创建游戏内配置菜单
+    modApi "me.shedaniel.cloth:cloth-config-forge:11.1.136"
+    include "me.shedaniel.cloth:cloth-config-forge:11.1.136"
+
+    // ==================== Common 模块（必需） ====================
+
+    // 引入 common 模块的代码，transitive false 表示不传递它的依赖
+    common(project(path: ':common', configuration: 'namedElements')) { transitive false }
+
+    // 将 common 模块的代码打包进最终 jar
+    shadowBundle project(path: ':common', configuration: 'transformProductionForge')
+
+    // ==================== 本地 jar 依赖（可选） ====================
+
+    // 加载 forge/dependencies/ 文件夹里的所有 jar 文件
+    // 适合放一些没有发布到 Maven 仓库的库
+    fileTree(dir: 'dependencies', include: '*.jar').each { File file ->
+        modApi(files(file))
+    }
+}
+
+// 处理资源文件：将占位符替换为实际值
+processResources {
+    // 声明输入属性，Gradle 用这些判断是否需要重新处理
+    inputs.property 'mod_id', rootProject.mod_id
+    inputs.property 'mod_name', rootProject.mod_name
+    inputs.property 'version', project.version
+    inputs.property 'mod_author', rootProject.mod_author
+    inputs.property 'mod_license', rootProject.mod_license
+    inputs.property 'minecraft_version', rootProject.minecraft_version
+    inputs.property 'forge_loader_version', rootProject.forge_loader_version
+
+    // 只对 mods.toml 文件进行占位符替换
+    filesMatching('META-INF/mods.toml') {
+        // expand 函数会把 ${变量名} 替换成对应的值
+        expand(
+                'mod_id': rootProject.mod_id,
+                'mod_name': rootProject.mod_name,
+                'version': project.version,
+                'mod_author': rootProject.mod_author,
+                'mod_license': rootProject.mod_license,
+                'minecraft_version': rootProject.minecraft_version,
+                'forge_loader_version': rootProject.forge_loader_version
+        )
+    }
+}
+
+// Shadow 打包任务配置
+shadowJar {
+    // 指定要合并哪些配置的依赖
+    configurations = [project.configurations.shadowBundle]
+    // 设置中间产物的后缀名
+    archiveClassifier = 'dev-shadow'
+}
+
+// Loom 的重映射任务：将开发时的反混淆名转换回运行时的混淆名
+remapJar {
+    // 使用 shadowJar 的输出作为输入
+    input.set shadowJar.archiveFile
+}
