@@ -22,7 +22,4 @@ public abstract class HideBase extends PotionBase {
     public boolean isDurationEffectTick(int duration, int amplifier) {
         return true;
     }
-
-    // 注意：1.20.1 中移除了 shouldRender 等方法
-    // 隐藏效果需要通过其他方式实现，例如在客户端事件中过滤
 }

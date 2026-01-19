@@ -108,13 +108,6 @@ public class CarianStyle {
 
         try {
             event.enqueueWork(() -> {
-                // 注册 EnchantmentBase 到事件总线
-                LogUtil.info("卡利亚式附魔 - 正在注册附魔事件处理器");
-                MinecraftForge.EVENT_BUS.register(
-                        pers.roinflam.carianstyle.base.enchantment.EnchantmentBase.class
-                );
-                LogUtil.debug("卡利亚式附魔 - 附魔事件处理器注册成功");
-
                 // 注册数据管理器到事件总线
                 LogUtil.info("卡利亚式附魔 - 正在注册数据管理器");
                 MinecraftForge.EVENT_BUS.register(EnchantmentDataManager.class);
@@ -160,6 +153,23 @@ public class CarianStyle {
                 );
 
                 LogUtil.debug("卡利亚式附魔 - 魔法剑实体渲染器已注册");
+
+                // ⭐ 设置火焰方块的渲染层
+                LogUtil.info("卡利亚式附魔 - 正在设置火焰方块渲染层");
+                net.minecraft.client.renderer.ItemBlockRenderTypes.setRenderLayer(
+                        CarianStyleBlocks.WHITE_FLAME.get(),
+                        net.minecraft.client.renderer.RenderType.cutout()
+                );
+                net.minecraft.client.renderer.ItemBlockRenderTypes.setRenderLayer(
+                        CarianStyleBlocks.YELLOW_FLAME.get(),
+                        net.minecraft.client.renderer.RenderType.cutout()
+                );
+                net.minecraft.client.renderer.ItemBlockRenderTypes.setRenderLayer(
+                        CarianStyleBlocks.CRIMSON_FLAME.get(),
+                        net.minecraft.client.renderer.RenderType.cutout()
+                );
+                LogUtil.info("卡利亚式附魔 - 火焰方块渲染层设置完成");
+
                 LogUtil.info("卡利亚式附魔 - 实体渲染器注册完成");
             });
 

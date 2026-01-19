@@ -9,15 +9,12 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.*;
-import net.minecraftforge.event.entity.player.CriticalHitEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.event.entity.living.*;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
@@ -28,6 +25,8 @@ import java.util.Map;
 /**
  * 附魔基类
  * 提供完整的事件优先级控制和攻击者受击者双视角支持
+ *
+ * 注意：所有静态事件监听器已移至 EnchantmentEventHandler
  */
 public abstract class EnchantmentBase extends Enchantment {
 
@@ -37,8 +36,6 @@ public abstract class EnchantmentBase extends Enchantment {
     protected final AutoRegisterEnchantment annotation;
 
     protected EnchantmentBase(@Nonnull EnchantmentCategory category, @Nonnull EquipmentSlot[] slots) {
-        // 1.20.1: Enchantment 构造函数参数变化
-        // Rarity 改为 EnchantmentCategory, EnumEnchantmentType 改为 EnchantmentCategory
         super(Enchantment.Rarity.COMMON, category, slots);
 
         this.annotation = this.getClass().getAnnotation(AutoRegisterEnchantment.class);
@@ -60,15 +57,13 @@ public abstract class EnchantmentBase extends Enchantment {
         this.annotation = null;
 
         switch (rarityIn) {
-            case UNCOMMON:
-                this.enchantmentRarity = EnchantmentRarity.UNCOMMON;
-                break;
             case RARE:
                 this.enchantmentRarity = EnchantmentRarity.RARE;
                 break;
             case VERY_RARE:
                 this.enchantmentRarity = EnchantmentRarity.VERY_RARE;
                 break;
+            case UNCOMMON:
             default:
                 this.enchantmentRarity = EnchantmentRarity.UNCOMMON;
         }
@@ -84,7 +79,6 @@ public abstract class EnchantmentBase extends Enchantment {
 
     @Override
     public int getMinCost(int enchantmentLevel) {
-        // 1.20.1: getMinEnchantability → getMinCost
         if (annotation != null && annotation.baseEnchantability() != -1) {
             return (int) ((annotation.baseEnchantability() +
                     (enchantmentLevel - 1) * annotation.levelMultiplier()) *
@@ -95,13 +89,11 @@ public abstract class EnchantmentBase extends Enchantment {
 
     @Override
     public int getMaxCost(int enchantmentLevel) {
-        // 1.20.1: getMaxEnchantability → getMaxCost
         return getMinCost(enchantmentLevel) * 2;
     }
 
     @Override
     public boolean isTreasureOnly() {
-        // 1.20.1: isTreasureEnchantment → isTreasureOnly
         if (annotation != null && annotation.forceTreasure()) {
             return true;
         }
@@ -128,7 +120,6 @@ public abstract class EnchantmentBase extends Enchantment {
 
     @Override
     protected boolean checkCompatibility(@Nonnull Enchantment other) {
-        // 1.20.1: canApplyTogether → checkCompatibility (逻辑相反)
         if (!super.checkCompatibility(other)) {
             return false;
         }
@@ -161,14 +152,12 @@ public abstract class EnchantmentBase extends Enchantment {
     }
 
     protected int getEnchantmentLevelFromWeapon(@Nonnull LivingEntity entity) {
-        // 1.20.1: getHeldItemMainhand/Offhand → getItemInHand
         ItemStack mainHand = entity.getItemInHand(InteractionHand.MAIN_HAND);
         ItemStack offHand = entity.getItemInHand(InteractionHand.OFF_HAND);
 
         int level = 0;
 
         if (!mainHand.isEmpty()) {
-            // 1.20.1: EnchantmentHelper.getEnchantmentLevel → getItemEnchantmentLevel
             level = Math.max(level, EnchantmentHelper.getItemEnchantmentLevel(this, mainHand));
         }
 
@@ -182,7 +171,6 @@ public abstract class EnchantmentBase extends Enchantment {
     protected int getEnchantmentLevelFromArmor(@Nonnull LivingEntity entity) {
         int totalLevel = 0;
 
-        // 1.20.1: getArmorInventoryList → getArmorSlots
         for (ItemStack armor : entity.getArmorSlots()) {
             if (!armor.isEmpty()) {
                 totalLevel += EnchantmentHelper.getItemEnchantmentLevel(this, armor);
@@ -313,83 +301,13 @@ public abstract class EnchantmentBase extends Enchantment {
     protected void onCriticalHit(@Nonnull EnchantmentContext ctx, int level) {
     }
 
-    // ==================== LivingAttackEvent 实际监听器 ====================
+    // ==================== 核心事件处理方法 (供 EnchantmentEventHandler 调用) ====================
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void handleLivingAttackHighest(@Nonnull LivingAttackEvent event) {
-        handleLivingAttack(event, EventPriority.HIGHEST);
-    }
-
-    @SubscribeEvent(priority = EventPriority.HIGH)
-    public static void handleLivingAttackHigh(@Nonnull LivingAttackEvent event) {
-        handleLivingAttack(event, EventPriority.HIGH);
-    }
-
-    @SubscribeEvent(priority = EventPriority.NORMAL)
-    public static void handleLivingAttackNormal(@Nonnull LivingAttackEvent event) {
-        handleLivingAttack(event, EventPriority.NORMAL);
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public static void handleLivingAttackLow(@Nonnull LivingAttackEvent event) {
-        handleLivingAttack(event, EventPriority.LOW);
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void handleLivingAttackLowest(@Nonnull LivingAttackEvent event) {
-        handleLivingAttack(event, EventPriority.LOWEST);
-    }
-
-    private static void handleLivingAttack(@Nonnull LivingAttackEvent event, @Nonnull EventPriority priority) {
-        // 1.20.1: world → level
-        if (event.getEntity().level().isClientSide) {
-            return;
-        }
-
-        DamageSource source = event.getSource();
-        // 1.20.1: getEntityLiving → getEntity
-        LivingEntity victim = event.getEntity();
-
-        // 1.20.1: getImmediateSource → getDirectEntity, getTrueSource → getEntity
-        if (source.getDirectEntity() instanceof LivingEntity) {
-            LivingEntity attacker = (LivingEntity) source.getDirectEntity();
-            processEntityEnchantments(attacker, victim, source, event, priority, true);
-        } else if (source.getEntity() instanceof LivingEntity) {
-            LivingEntity attacker = (LivingEntity) source.getEntity();
-            processEntityEnchantments(attacker, victim, source, event, priority, true);
-        }
-
-        processEntityEnchantments(victim, victim, source, event, priority, false);
-    }
-
-    // ==================== LivingHurtEvent 实际监听器 ====================
-
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void handleLivingHurtHighest(@Nonnull LivingHurtEvent event) {
-        handleLivingHurt(event, EventPriority.HIGHEST);
-    }
-
-    @SubscribeEvent(priority = EventPriority.HIGH)
-    public static void handleLivingHurtHigh(@Nonnull LivingHurtEvent event) {
-        handleLivingHurt(event, EventPriority.HIGH);
-    }
-
-    @SubscribeEvent(priority = EventPriority.NORMAL)
-    public static void handleLivingHurtNormal(@Nonnull LivingHurtEvent event) {
-        handleLivingHurt(event, EventPriority.NORMAL);
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public static void handleLivingHurtLow(@Nonnull LivingHurtEvent event) {
-        handleLivingHurt(event, EventPriority.LOW);
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void handleLivingHurtLowest(@Nonnull LivingHurtEvent event) {
-        handleLivingHurt(event, EventPriority.LOWEST);
-    }
-
-    private static void handleLivingHurt(@Nonnull LivingHurtEvent event, @Nonnull EventPriority priority) {
+    /**
+     * 处理 LivingAttackEvent
+     * 由 EnchantmentEventHandler 调用
+     */
+    public static void handleLivingAttack(@Nonnull LivingAttackEvent event, @Nonnull EventPriority priority) {
         if (event.getEntity().level().isClientSide) {
             return;
         }
@@ -408,34 +326,11 @@ public abstract class EnchantmentBase extends Enchantment {
         processEntityEnchantments(victim, victim, source, event, priority, false);
     }
 
-    // ==================== LivingDamageEvent 实际监听器 ====================
-
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void handleLivingDamageHighest(@Nonnull LivingDamageEvent event) {
-        handleLivingDamage(event, EventPriority.HIGHEST);
-    }
-
-    @SubscribeEvent(priority = EventPriority.HIGH)
-    public static void handleLivingDamageHigh(@Nonnull LivingDamageEvent event) {
-        handleLivingDamage(event, EventPriority.HIGH);
-    }
-
-    @SubscribeEvent(priority = EventPriority.NORMAL)
-    public static void handleLivingDamageNormal(@Nonnull LivingDamageEvent event) {
-        handleLivingDamage(event, EventPriority.NORMAL);
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public static void handleLivingDamageLow(@Nonnull LivingDamageEvent event) {
-        handleLivingDamage(event, EventPriority.LOW);
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void handleLivingDamageLowest(@Nonnull LivingDamageEvent event) {
-        handleLivingDamage(event, EventPriority.LOWEST);
-    }
-
-    private static void handleLivingDamage(@Nonnull LivingDamageEvent event, @Nonnull EventPriority priority) {
+    /**
+     * 处理 LivingHurtEvent
+     * 由 EnchantmentEventHandler 调用
+     */
+    public static void handleLivingHurt(@Nonnull LivingHurtEvent event, @Nonnull EventPriority priority) {
         if (event.getEntity().level().isClientSide) {
             return;
         }
@@ -454,145 +349,30 @@ public abstract class EnchantmentBase extends Enchantment {
         processEntityEnchantments(victim, victim, source, event, priority, false);
     }
 
-    // ==================== 其他事件监听器 ====================
-
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void handleLivingDeath(@Nonnull LivingDeathEvent event) {
+    /**
+     * 处理 LivingDamageEvent
+     * 由 EnchantmentEventHandler 调用
+     */
+    public static void handleLivingDamage(@Nonnull LivingDamageEvent event, @Nonnull EventPriority priority) {
         if (event.getEntity().level().isClientSide) {
             return;
         }
 
+        DamageSource source = event.getSource();
         LivingEntity victim = event.getEntity();
 
-        // 1.20.1: getEquipmentAndArmor → 需要手动组合
-        for (EquipmentSlot slot : EquipmentSlot.values()) {
-            ItemStack stack = victim.getItemBySlot(slot);
-            if (stack.isEmpty()) {
-                continue;
-            }
-
-            for (Enchantment enchantment : EnchantmentHelper.getEnchantments(stack).keySet()) {
-                if (!(enchantment instanceof EnchantmentBase)) {
-                    continue;
-                }
-
-                EnchantmentBase baseEnchantment = (EnchantmentBase) enchantment;
-                int level = EnchantmentHelper.getItemEnchantmentLevel(enchantment, stack);
-                level = baseEnchantment.applyLevelLimit(level);
-
-                if (level > 0) {
-                    EnchantmentContext ctx = new EnchantmentContext(
-                            event, victim, stack, level,
-                            null, victim, event.getSource()
-                    );
-                    baseEnchantment.onDeath(ctx, level);
-                }
-            }
+        if (source.getDirectEntity() instanceof LivingEntity) {
+            LivingEntity attacker = (LivingEntity) source.getDirectEntity();
+            processEntityEnchantments(attacker, victim, source, event, priority, true);
+        } else if (source.getEntity() instanceof LivingEntity) {
+            LivingEntity attacker = (LivingEntity) source.getEntity();
+            processEntityEnchantments(attacker, victim, source, event, priority, true);
         }
+
+        processEntityEnchantments(victim, victim, source, event, priority, false);
     }
 
-    @SubscribeEvent(priority = EventPriority.NORMAL)
-    public static void handleLivingHeal(@Nonnull LivingHealEvent event) {
-        if (event.getEntity().level().isClientSide) {
-            return;
-        }
-
-        LivingEntity healer = event.getEntity();
-
-        for (EquipmentSlot slot : EquipmentSlot.values()) {
-            ItemStack stack = healer.getItemBySlot(slot);
-            if (stack.isEmpty()) {
-                continue;
-            }
-
-            for (Enchantment enchantment : EnchantmentHelper.getEnchantments(stack).keySet()) {
-                if (!(enchantment instanceof EnchantmentBase)) {
-                    continue;
-                }
-
-                EnchantmentBase baseEnchantment = (EnchantmentBase) enchantment;
-                int level = EnchantmentHelper.getItemEnchantmentLevel(enchantment, stack);
-                level = baseEnchantment.applyLevelLimit(level);
-
-                if (level > 0) {
-                    EnchantmentContext ctx = new EnchantmentContext(
-                            event, healer, stack, level
-                    );
-                    baseEnchantment.onHeal(ctx, level);
-                }
-            }
-        }
-    }
-
-    @SubscribeEvent
-    public static void handlePlayerTick(@Nonnull TickEvent.PlayerTickEvent event) {
-        if (event.player.level().isClientSide) {
-            return;
-        }
-
-        if (event.phase != TickEvent.Phase.START) {
-            return;
-        }
-
-        Player player = event.player;
-
-        for (EquipmentSlot slot : EquipmentSlot.values()) {
-            ItemStack stack = player.getItemBySlot(slot);
-            if (stack.isEmpty()) {
-                continue;
-            }
-
-            for (Enchantment enchantment : EnchantmentHelper.getEnchantments(stack).keySet()) {
-                if (!(enchantment instanceof EnchantmentBase)) {
-                    continue;
-                }
-
-                EnchantmentBase baseEnchantment = (EnchantmentBase) enchantment;
-                int level = EnchantmentHelper.getItemEnchantmentLevel(enchantment, stack);
-                level = baseEnchantment.applyLevelLimit(level);
-
-                if (level > 0) {
-                    EnchantmentContext ctx = new EnchantmentContext(
-                            event, player, stack, level
-                    );
-                    baseEnchantment.onPlayerTick(ctx, level);
-                }
-            }
-        }
-    }
-
-    @SubscribeEvent(priority = EventPriority.NORMAL)
-    public static void handleCriticalHit(@Nonnull CriticalHitEvent event) {
-        if (event.getEntity().level().isClientSide) {
-            return;
-        }
-
-        Player player = event.getEntity();
-        ItemStack weapon = player.getItemInHand(InteractionHand.MAIN_HAND);
-
-        if (weapon.isEmpty()) {
-            return;
-        }
-
-        for (Enchantment enchantment : EnchantmentHelper.getEnchantments(weapon).keySet()) {
-            if (!(enchantment instanceof EnchantmentBase)) {
-                continue;
-            }
-
-            EnchantmentBase baseEnchantment = (EnchantmentBase) enchantment;
-            int level = EnchantmentHelper.getItemEnchantmentLevel(enchantment, weapon);
-            level = baseEnchantment.applyLevelLimit(level);
-
-            if (level > 0) {
-                EnchantmentContext ctx = new EnchantmentContext(
-                        event, player, weapon, level
-                );
-                baseEnchantment.onCriticalHit(ctx, level);
-            }
-        }
-    }
-
-    // ==================== 核心处理方法 ====================
+    // ==================== 实体附魔处理 ====================
 
     private static void processEntityEnchantments(
             @Nonnull LivingEntity holder,
@@ -631,20 +411,7 @@ public abstract class EnchantmentBase extends Enchantment {
             @Nonnull EventPriority priority,
             boolean isAttacker
     ) {
-        // ===== 诊断日志 START =====
         Map<Enchantment, Integer> enchantments = EnchantmentHelper.getEnchantments(stack);
-        System.out.println(">>> processItemEnchantments 被调用");
-        System.out.println(">>> 持有者: " + holder.getName().getString());
-        System.out.println(">>> 物品: " + stack.getDisplayName().getString());
-        System.out.println(">>> 事件类型: " + event.getClass().getSimpleName());
-        System.out.println(">>> 优先级: " + priority);
-        System.out.println(">>> 是攻击者: " + isAttacker);
-        System.out.println(">>> 附魔总数: " + enchantments.size());
-        System.out.println(">>> 附魔列表:");
-        for (Map.Entry<Enchantment, Integer> entry : enchantments.entrySet()) {
-            System.out.println(">>>   - " + entry.getKey().getClass().getSimpleName() + " Lv" + entry.getValue());
-        }
-        // ===== 诊断日志 END =====
 
         for (Enchantment enchantment : enchantments.keySet()) {
             if (!(enchantment instanceof EnchantmentBase)) {
@@ -658,10 +425,6 @@ public abstract class EnchantmentBase extends Enchantment {
             if (level <= 0) {
                 continue;
             }
-
-            // ===== 诊断日志 =====
-            System.out.println(">>> 准备触发附魔: " + baseEnchantment.getClass().getSimpleName() + " Lv" + level);
-            // ===== 诊断日志 =====
 
             LivingEntity attacker = isAttacker ? holder :
                     (source != null && source.getEntity() instanceof LivingEntity ?

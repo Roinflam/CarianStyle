@@ -47,6 +47,11 @@ public class EnchantmentDoomedDeath extends EnchantmentBase {
             return;
         }
 
+        // 只在服务端执行
+        if (victim.level().isClientSide) {
+            return;
+        }
+
         // 手动应用等级限制
         int effectiveLevel = level;
         if (ConfigLoader.levelLimit) {
@@ -60,9 +65,24 @@ public class EnchantmentDoomedDeath extends EnchantmentBase {
             }
         }
 
-        // 施加诅咒效果
-        victim.addEffect(new MobEffectInstance(CarianStylePotion.DOOMED_DEATH_BURNING.get(), 5 * 20 + 5, 0));
-        victim.addEffect(new MobEffectInstance(CarianStylePotion.DOOMED_DEATH.get(), 10 * 20 + 5, 0));
+        // 施加诅咒效果（自动同步）
+        victim.addEffect(new MobEffectInstance(
+                CarianStylePotion.DOOMED_DEATH_BURNING.get(),
+                5 * 20 + 5,
+                0,
+                false,
+                true,
+                true
+        ));
+
+        victim.addEffect(new MobEffectInstance(
+                CarianStylePotion.DOOMED_DEATH.get(),
+                10 * 20 + 5,
+                0,
+                false,
+                true,
+                true
+        ));
 
         // 记录原伤害用于持续伤害计算
         float originalDamage = ctx.getDamage();
@@ -82,7 +102,7 @@ public class EnchantmentDoomedDeath extends EnchantmentBase {
                 float actualDamage = baseDamage * 0.3f + baseDamage * tick / 50 * 0.7f;
 
                 if (victim.getHealth() - actualDamage > 0.01f) {
-                    // 使用真伤系统
+                    victim.setHealth(victim.getHealth());
                     EntityLivingUtil.damageHealthDirectly(victim, actualDamage);
                 } else {
                     EntityLivingUtil.kill(victim, ctx.getDamageSource());

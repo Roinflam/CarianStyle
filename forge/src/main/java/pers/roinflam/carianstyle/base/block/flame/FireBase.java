@@ -14,6 +14,7 @@ import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.BaseFireBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
@@ -25,33 +26,18 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 
 import javax.annotation.Nonnull;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * 自定义火焰方块基类
- * <p>
- * 用于创建不会自然蔓延的装饰性火焰方块
- * 支持多方向显示，点击即可熄灭
- * </p>
  */
 public abstract class FireBase extends BaseFireBlock {
 
-    /**
-     * 方向属性：北、东、南、西、上
-     * <p>
-     * 用于控制火焰在不同方向上的显示
-     * </p>
-     */
     public static final BooleanProperty NORTH = BlockStateProperties.NORTH;
     public static final BooleanProperty EAST = BlockStateProperties.EAST;
     public static final BooleanProperty SOUTH = BlockStateProperties.SOUTH;
     public static final BooleanProperty WEST = BlockStateProperties.WEST;
     public static final BooleanProperty UP = BlockStateProperties.UP;
 
-    /**
-     * 方向属性映射表
-     */
     private static final Map<Direction, BooleanProperty> PROPERTY_BY_DIRECTION =
             ImmutableMap.copyOf(
                     Util.make(new java.util.EnumMap<>(Direction.class), map -> {
@@ -63,20 +49,10 @@ public abstract class FireBase extends BaseFireBlock {
                     })
             );
 
-    /**
-     * 碰撞箱
-     */
     private static final VoxelShape DOWN_AABB = Block.box(0.0D, 0.0D, 0.0D, 16.0D, 1.0D, 16.0D);
 
-    /**
-     * 构造函数
-     *
-     * @param properties 方块属性
-     */
     public FireBase(BlockBehaviour.Properties properties) {
         super(properties, 1.0F);
-
-        // 注册默认状态：所有方向都为 false
         this.registerDefaultState(
                 this.stateDefinition.any()
                         .setValue(NORTH, false)
@@ -87,28 +63,11 @@ public abstract class FireBase extends BaseFireBlock {
         );
     }
 
-    /**
-     * 创建方块状态定义
-     * <p>
-     * 注册所有方向属性
-     * </p>
-     *
-     * @param builder 状态定义构建器
-     */
     @Override
     protected void createBlockStateDefinition(@Nonnull StateDefinition.Builder<Block, BlockState> builder) {
         builder.add(NORTH, EAST, SOUTH, WEST, UP);
     }
 
-    /**
-     * 获取方块的碰撞箱
-     *
-     * @param state 方块状态
-     * @param level 世界
-     * @param pos 位置
-     * @param context 碰撞上下文
-     * @return 碰撞箱形状
-     */
     @Override
     @Nonnull
     public VoxelShape getShape(@Nonnull BlockState state, @Nonnull BlockGetter level,
@@ -117,33 +76,35 @@ public abstract class FireBase extends BaseFireBlock {
     }
 
     /**
-     * 放置方块时获取方块状态
-     * <p>
-     * 根据周围方块设置方向属性
-     * </p>
-     *
-     * @param context 放置上下文
-     * @return 方块状态
+     * 关键修复：指定渲染形状为不可见，让自定义渲染器处理
      */
     @Override
-    public BlockState getStateForPlacement(@Nonnull BlockPlaceContext context) {
-        return getStateWithConnections(context.getLevel(), context.getClickedPos());
+    @Nonnull
+    public RenderShape getRenderShape(@Nonnull BlockState state) {
+        return RenderShape.MODEL; // 使用模型渲染
     }
 
     /**
-     * 根据周围方块更新连接状态
-     *
-     * @param level 世界
-     * @param pos 位置
-     * @return 更新后的方块状态
+     * 关键修复：设置方块为半透明以支持火焰效果
      */
+    @Override
+    public boolean propagatesSkylightDown(@Nonnull BlockState state, @Nonnull BlockGetter level, @Nonnull BlockPos pos) {
+        return true; // 允许天空光照穿透
+    }
+
+    @Override
+    public BlockState getStateForPlacement(@Nonnull BlockPlaceContext context) {
+        BlockState state = getStateWithConnections(context.getLevel(), context.getClickedPos());
+        System.out.println("[CarianStyle-调试] 放置火焰方块，位置: " + context.getClickedPos() + ", 状态: " + state);
+        return state;
+    }
+
     private BlockState getStateWithConnections(@Nonnull BlockGetter level, @Nonnull BlockPos pos) {
         BlockState state = this.defaultBlockState();
 
-        // 检查每个方向
         for (Direction direction : Direction.values()) {
             if (direction == Direction.DOWN) {
-                continue; // 火焰没有下方连接
+                continue;
             }
 
             BooleanProperty property = PROPERTY_BY_DIRECTION.get(direction);
@@ -151,9 +112,7 @@ public abstract class FireBase extends BaseFireBlock {
                 BlockPos adjacentPos = pos.relative(direction);
                 BlockState adjacentState = level.getBlockState(adjacentPos);
 
-                // 如果相邻方块不是空气，则显示该方向的火焰
-                boolean shouldConnect = !adjacentState.isAir() &&
-                        adjacentState.isSolid();
+                boolean shouldConnect = !adjacentState.isAir() && adjacentState.isSolid();
                 state = state.setValue(property, shouldConnect);
             }
         }
@@ -161,104 +120,46 @@ public abstract class FireBase extends BaseFireBlock {
         return state;
     }
 
-    /**
-     * 方块状态更新时调用
-     * <p>
-     * 当周围方块变化时，更新火焰的连接状态
-     * </p>
-     *
-     * @param state 当前方块状态
-     * @param direction 更新方向
-     * @param neighborState 邻居方块状态
-     * @param level 世界
-     * @param pos 当前位置
-     * @param neighborPos 邻居位置
-     * @return 更新后的方块状态
-     */
     @Override
     @Nonnull
     public BlockState updateShape(@Nonnull BlockState state, @Nonnull Direction direction,
                                   @Nonnull BlockState neighborState, @Nonnull LevelAccessor level,
                                   @Nonnull BlockPos pos, @Nonnull BlockPos neighborPos) {
-        // 如果下方没有支撑，移除火焰
         if (!this.canSurvive(state, level, pos)) {
+            System.out.println("[CarianStyle-调试] 火焰方块无法存活，移除: " + pos);
             return Blocks.AIR.defaultBlockState();
         }
 
-        // 更新连接状态
         return getStateWithConnections(level, pos);
     }
 
-    /**
-     * 检查火焰是否可以存活
-     *
-     * @param state 方块状态
-     * @param level 世界
-     * @param pos 位置
-     * @return 如果可以存活返回 true
-     */
     @Override
     public boolean canSurvive(@Nonnull BlockState state, @Nonnull LevelReader level, @Nonnull BlockPos pos) {
-        // 检查下方是否有支撑方块
         BlockPos below = pos.below();
         BlockState belowState = level.getBlockState(below);
         return belowState.isFaceSturdy(level, below, Direction.UP);
     }
 
-    /**
-     * 方块 tick 更新
-     * <p>
-     * 覆盖此方法以阻止火焰自然蔓延
-     * </p>
-     *
-     * @param state 方块状态
-     * @param level 服务端世界
-     * @param pos 方块位置
-     * @param random 随机源
-     */
     @Override
     public void tick(@Nonnull BlockState state, @Nonnull ServerLevel level,
                      @Nonnull BlockPos pos, @Nonnull RandomSource random) {
-        // 不执行火焰蔓延逻辑，火焰保持静态
+        // 不执行火焰蔓延逻辑
     }
 
-    /**
-     * 玩家攻击（左键点击）方块时调用
-     * <p>
-     * 实现点击熄灭火焰的功能
-     * </p>
-     *
-     * @param state 方块状态
-     * @param level 世界
-     * @param pos 方块位置
-     * @param player 玩家
-     */
     @Override
     public void attack(@Nonnull BlockState state, @Nonnull Level level,
                        @Nonnull BlockPos pos, @Nonnull Player player) {
-        // 点击熄灭火焰
         if (!level.isClientSide()) {
+            System.out.println("[CarianStyle-调试] 玩家点击熄灭火焰: " + pos);
             level.removeBlock(pos, false);
         }
     }
 
-    /**
-     * 判断方块状态是否可燃
-     * <p>
-     * 返回 false 使火焰不会燃烧其他方块
-     * </p>
-     *
-     * @param state 方块状态
-     * @return false
-     */
     @Override
     protected boolean canBurn(@Nonnull BlockState state) {
         return false;
     }
 
-    /**
-     * 工具类：创建不可变映射的辅助方法
-     */
     private static class Util {
         public static <T> T make(T object, java.util.function.Consumer<T> consumer) {
             consumer.accept(object);
