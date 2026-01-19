@@ -1,4 +1,4 @@
-package pers.roinflam.carianstyle.enchantment.context;
+package pers.roinflam.carianstyle.annotation.context;
 
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.damagesource.DamageSource;

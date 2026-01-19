@@ -43,12 +43,12 @@ public class MobEffectEpilepsyFireBurning extends FlameBase {
     @Nonnull
     @Override
     protected String getLevelOneName() {
-        return Reference.MOD_ID + ":blocks/yellow_flame_layer_0";
+        return Reference.MOD_ID + ":block/yellow_flame_layer_0";
     }
 
     @Nonnull
     @Override
     protected String getLevelTwoName() {
-        return Reference.MOD_ID + ":blocks/yellow_flame_layer_1";
+        return Reference.MOD_ID + ":block/yellow_flame_layer_1";
     }
 }

@@ -2,7 +2,6 @@
 // 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentDoubleSlash.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
-import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -12,7 +11,7 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 
 /**

@@ -1,4 +1,4 @@
-package pers.roinflam.carianstyle.enchantment.registry;
+package pers.roinflam.carianstyle.annotation.registry;
 
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraftforge.fml.ModList;

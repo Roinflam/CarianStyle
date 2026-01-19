@@ -17,7 +17,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.EnchantmentBlackFlameBlade;
 import pers.roinflam.carianstyle.enchantment.EnchantmentDeathBlade;
 import pers.roinflam.carianstyle.enchantment.EnchantmentScarletCorruption;
-import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 
 import java.util.UUID;
 

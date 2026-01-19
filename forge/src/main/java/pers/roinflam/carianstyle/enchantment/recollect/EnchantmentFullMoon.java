@@ -20,8 +20,8 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.EnchantmentDarkMoon;
 import pers.roinflam.carianstyle.enchantment.EnchantmentHealingByFire;
 import pers.roinflam.carianstyle.enchantment.EnchantmentShelterOfFire;
-import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
-import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
 import java.util.UUID;

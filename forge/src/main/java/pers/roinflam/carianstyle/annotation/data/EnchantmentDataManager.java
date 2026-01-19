@@ -1,4 +1,4 @@
-package pers.roinflam.carianstyle.enchantment.data;
+package pers.roinflam.carianstyle.annotation.data;
 
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;

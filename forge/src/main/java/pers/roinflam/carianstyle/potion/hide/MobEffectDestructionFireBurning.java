@@ -21,12 +21,12 @@ public class MobEffectDestructionFireBurning extends FlameBase {
     @Nonnull
     @Override
     protected String getLevelOneName() {
-        return Reference.MOD_ID + ":blocks/white_flame_layer_0";
+        return Reference.MOD_ID + ":block/white_flame_layer_0";
     }
 
     @Nonnull
     @Override
     protected String getLevelTwoName() {
-        return Reference.MOD_ID + ":blocks/white_flame_layer_1";
+        return Reference.MOD_ID + ":block/white_flame_layer_1";
     }
 }

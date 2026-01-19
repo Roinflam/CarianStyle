@@ -67,11 +67,12 @@ dependencies {
 
     // ==================== 本地 jar 依赖（可选） ====================
 
-    // 加载 forge/dependencies/ 文件夹里的所有 jar 文件
-    // 适合放一些没有发布到 Maven 仓库的库
+//     加载 forge/dependencies/ 文件夹里的所有 jar 文件
+//     适合放一些没有发布到 Maven 仓库的库
     fileTree(dir: 'libs', include: '*.jar').each { File file ->
         modApi(files(file))
     }
+
 }
 
 // 处理资源文件：将占位符替换为实际值

@@ -23,8 +23,8 @@ import pers.roinflam.carianstyle.enchantment.EnchantmentFireDevoured;
 import pers.roinflam.carianstyle.enchantment.EnchantmentFireGivesPower;
 import pers.roinflam.carianstyle.enchantment.EnchantmentScarletCorruption;
 import pers.roinflam.carianstyle.enchantment.EnchantmentVicDragonThunder;
-import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
-import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 
 /**

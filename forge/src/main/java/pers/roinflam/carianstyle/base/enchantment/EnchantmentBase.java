@@ -1,7 +1,5 @@
 package pers.roinflam.carianstyle.base.enchantment;
 
-import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.entity.layers.CustomHeadLayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -19,13 +17,13 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.Map;
 
 /**
  * 附魔基类
@@ -622,7 +620,6 @@ public abstract class EnchantmentBase extends Enchantment {
                 }
             }
         }
-        LevelRenderer
     }
 
     private static void processItemEnchantments(
@@ -634,7 +631,22 @@ public abstract class EnchantmentBase extends Enchantment {
             @Nonnull EventPriority priority,
             boolean isAttacker
     ) {
-        for (Enchantment enchantment : EnchantmentHelper.getEnchantments(stack).keySet()) {
+        // ===== 诊断日志 START =====
+        Map<Enchantment, Integer> enchantments = EnchantmentHelper.getEnchantments(stack);
+        System.out.println(">>> processItemEnchantments 被调用");
+        System.out.println(">>> 持有者: " + holder.getName().getString());
+        System.out.println(">>> 物品: " + stack.getDisplayName().getString());
+        System.out.println(">>> 事件类型: " + event.getClass().getSimpleName());
+        System.out.println(">>> 优先级: " + priority);
+        System.out.println(">>> 是攻击者: " + isAttacker);
+        System.out.println(">>> 附魔总数: " + enchantments.size());
+        System.out.println(">>> 附魔列表:");
+        for (Map.Entry<Enchantment, Integer> entry : enchantments.entrySet()) {
+            System.out.println(">>>   - " + entry.getKey().getClass().getSimpleName() + " Lv" + entry.getValue());
+        }
+        // ===== 诊断日志 END =====
+
+        for (Enchantment enchantment : enchantments.keySet()) {
             if (!(enchantment instanceof EnchantmentBase)) {
                 continue;
             }
@@ -646,6 +658,10 @@ public abstract class EnchantmentBase extends Enchantment {
             if (level <= 0) {
                 continue;
             }
+
+            // ===== 诊断日志 =====
+            System.out.println(">>> 准备触发附魔: " + baseEnchantment.getClass().getSimpleName() + " Lv" + level);
+            // ===== 诊断日志 =====
 
             LivingEntity attacker = isAttacker ? holder :
                     (source != null && source.getEntity() instanceof LivingEntity ?

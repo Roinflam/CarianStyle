@@ -21,12 +21,12 @@ public class MobEffectDoomedDeathBurning extends FlameBase {
     @Nonnull
     @Override
     protected String getLevelOneName() {
-        return Reference.MOD_ID + ":blocks/crimson_flame_layer_0";
+        return Reference.MOD_ID + ":block/crimson_flame_layer_0";
     }
 
     @Nonnull
     @Override
     protected String getLevelTwoName() {
-        return Reference.MOD_ID + ":blocks/crimson_flame_layer_1";
+        return Reference.MOD_ID + ":block/crimson_flame_layer_1";
     }
 }
