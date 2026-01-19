@@ -1,70 +1,74 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.state.IBlockState;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.init.Enchantments;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemPickaxe;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
-import net.minecraftforge.event.world.BlockEvent;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.PickaxeItem;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraftforge.event.level.BlockEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
-import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * 岩石爆破附魔
- *
+ * <p>
  * 镐子附魔，范围挖掘
  * 挖掘方块时：
  * - 范围内同类型方块一起挖掘
  * - 范围 = 1 + 等级/2（受配置上限限制）
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "rock_blaster",
-        category = EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantmentCategory.DIGGER,
+        slots = {EquipmentSlot.MAINHAND},
+        forceTreasure = true,
+        conflictsWith = {}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentRockBlaster extends EnchantmentBase {
 
     public EnchantmentRockBlaster() {
-        super(EnumEnchantmentType.DIGGER, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.DIGGER, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
-    /**
-     * 挖掘方块时范围挖掘同类型方块
-     * 由于 BlockEvent.BreakEvent 没有模板方法，保留静态监听器
-     */
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onBreak(@Nonnull BlockEvent.BreakEvent evt) {
-        if (evt.getPlayer().world.isRemote) {
+    public static void onBreak(@NotNull BlockEvent.BreakEvent evt) {
+        if (evt.getPlayer().level().isClientSide) {
             return;
         }
 
-        EntityPlayer player = evt.getPlayer();
-        if (player.swingingHand == null) {
+        Player player = evt.getPlayer();
+        if (player.getUsedItemHand() == null) {
             return;
         }
 
-        ItemStack tool = player.getHeldItem(player.swingingHand);
-        if (tool.isEmpty() || !(tool.getItem() instanceof ItemPickaxe)) {
+        ItemStack tool = player.getItemInHand(player.getUsedItemHand());
+        if (tool.isEmpty() || !(tool.getItem() instanceof PickaxeItem)) {
             return;
         }
 
@@ -73,7 +77,7 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(rockBlaster, tool);
+        int level = EnchantmentHelper.getItemEnchantmentLevel(rockBlaster, tool);
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
@@ -83,11 +87,9 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
             return;
         }
 
-        // 计算范围
         int radius = 1 + level / 2;
         radius = Math.min(radius, ConfigLoader.rockBlasterMaxRange);
 
-        // 收集范围内的方块位置
         List<BlockPos> blockPosList = new ArrayList<>();
         BlockPos center = evt.getPos();
         for (int x = -radius; x <= radius; x++) {
@@ -98,35 +100,37 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
             }
         }
 
-        World world = player.world;
+        Level world = player.level();
         Block targetBlock = evt.getState().getBlock();
 
         for (BlockPos pos : blockPosList) {
-            // 检查工具耐久
-            if (tool.isItemStackDamageable()) {
-                if (tool.getItemDamage() >= tool.getMaxDamage() - 1) {
+            if (tool.isDamageableItem()) {
+                if (tool.getDamageValue() >= tool.getMaxDamage() - 1) {
                     return;
                 }
             }
 
-            IBlockState blockState = world.getBlockState(pos);
+            BlockState blockState = world.getBlockState(pos);
             Block block = blockState.getBlock();
 
-            // 只挖掘同类型方块
             if (!block.equals(targetBlock)) {
                 continue;
             }
 
-            if (!player.capabilities.isCreativeMode) {
-                block.onBlockHarvested(world, pos, blockState, player);
-                if (block.removedByPlayer(blockState, world, pos, player, true)) {
-                    world.playEvent(2001, pos, Block.getStateId(blockState));
-                    block.harvestBlock(world, player, pos, blockState, world.getTileEntity(pos), tool);
-                    block.onBlockDestroyedByPlayer(world, pos, blockState);
-                    block.dropXpOnBlockBreak(world, pos,
-                            block.getExpDrop(blockState, world, pos, EnchantmentHelper.getEnchantmentLevel(Enchantments.FORTUNE, tool)) / 2);
-                    if (tool.isItemStackDamageable()) {
-                        tool.attemptDamageItem(1, world.rand, (EntityPlayerMP) player);
+            if (!player.getAbilities().instabuild) {
+                if (world instanceof ServerLevel serverLevel) {
+                    block.playerWillDestroy(world, pos, blockState, player);
+
+                    if (block.onDestroyedByPlayer(blockState, world, pos, player, true, world.getFluidState(pos))) {
+                        block.destroy(world, pos, blockState);
+                        block.playerDestroy(world, player, pos, blockState, world.getBlockEntity(pos), tool);
+
+                        int fortuneLevel = EnchantmentHelper.getItemEnchantmentLevel(Enchantments.BLOCK_FORTUNE, tool);
+                        block.popExperience(serverLevel, pos, block.getExpDrop(blockState, serverLevel, serverLevel.random, pos, fortuneLevel, 0) / 2);
+
+                        if (tool.isDamageableItem()) {
+                            tool.hurtAndBreak(1, player, (p) -> p.broadcastBreakEvent(player.getUsedItemHand()));
+                        }
                     }
                 }
             } else {
@@ -136,17 +140,17 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((30 + (enchantmentLevel - 1) * 35) * ConfigLoader.enchantingDifficulty);
     }
 
     @Override
-    public boolean isTreasureEnchantment() {
-        return true;
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 
     @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) && !ench.equals(Enchantments.UNBREAKING);
+    protected boolean checkCompatibility(@NotNull Enchantment ench) {
+        return super.checkCompatibility(ench) && !ench.equals(Enchantments.UNBREAKING);
     }
 }

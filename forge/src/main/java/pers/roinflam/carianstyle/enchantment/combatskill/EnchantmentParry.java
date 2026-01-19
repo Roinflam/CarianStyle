@@ -1,37 +1,44 @@
+// 文件：EnchantmentParry.java
+// 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentParry.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemShield;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ShieldItem;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
-import javax.annotation.Nonnull;
 import java.util.UUID;
 
 /**
  * 招架附魔
- *
+ * <p>
  * 用盾牌完全格挡攻击后，10tick内攻击可触发增伤（+25% × 等级）
  * 触发后进入40tick冷却
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "parry",
-        category = EnchantmentCategory.COMBAT_SKILL,
-        rarity = EnchantmentRarity.UNCOMMON
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantmentCategory.BREAKABLE,
+        slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentParry extends EnchantmentBase {
@@ -40,9 +47,9 @@ public class EnchantmentParry extends EnchantmentBase {
     private static final String PARRY_COOLDOWN_KEY = "parry_cooldown";
 
     public EnchantmentParry() {
-        super(EnumEnchantmentType.BREAKABLE, new EntityEquipmentSlot[]{
-                EntityEquipmentSlot.MAINHAND,
-                EntityEquipmentSlot.OFFHAND
+        super(EnchantmentCategory.BREAKABLE, new EquipmentSlot[]{
+                EquipmentSlot.MAINHAND,
+                EquipmentSlot.OFFHAND
         });
     }
 
@@ -51,8 +58,8 @@ public class EnchantmentParry extends EnchantmentBase {
      * 完全格挡后进入招架状态
      */
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingHurt_Shield(@Nonnull LivingHurtEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingHurt_Shield(@NotNull LivingHurtEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
@@ -61,20 +68,20 @@ public class EnchantmentParry extends EnchantmentBase {
             return;
         }
 
-        if (!(evt.getSource().getImmediateSource() instanceof EntityLivingBase)) {
+        if (!(evt.getSource().getDirectEntity() instanceof LivingEntity)) {
             return;
         }
 
-        EntityLivingBase holder = evt.getEntityLiving();
-        UUID uuid = holder.getUniqueID();
+        LivingEntity holder = evt.getEntity();
+        UUID uuid = holder.getUUID();
 
         // 检查是否正在举盾
-        if (!holder.isHandActive()) {
+        if (!holder.isUsingItem()) {
             return;
         }
 
-        ItemStack activeItem = holder.getHeldItem(holder.getActiveHand());
-        if (activeItem.isEmpty() || !(activeItem.getItem() instanceof ItemShield)) {
+        ItemStack activeItem = holder.getItemInHand(holder.getUsedItemHand());
+        if (activeItem.isEmpty() || !(activeItem.getItem() instanceof ShieldItem)) {
             return;
         }
 
@@ -83,7 +90,7 @@ public class EnchantmentParry extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(parry, activeItem);
+        int level = EnchantmentHelper.getItemEnchantmentLevel(parry, activeItem);
         if (level <= 0) {
             return;
         }
@@ -107,17 +114,17 @@ public class EnchantmentParry extends EnchantmentBase {
      * 攻击时检查招架状态并增伤（LOW优先级）
      */
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHurt_Attack(@Nonnull LivingHurtEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingHurt_Attack(@NotNull LivingHurtEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (!(evt.getSource().getImmediateSource() instanceof EntityLivingBase)) {
+        if (!(evt.getSource().getDirectEntity() instanceof LivingEntity)) {
             return;
         }
 
-        EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-        UUID uuid = attacker.getUniqueID();
+        LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
+        UUID uuid = attacker.getUUID();
 
         // 检查招架状态
         Integer parryLevel = EnchantmentDataManager.getData(PARRY_LEVEL_KEY, uuid);
@@ -141,7 +148,12 @@ public class EnchantmentParry extends EnchantmentBase {
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((10 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

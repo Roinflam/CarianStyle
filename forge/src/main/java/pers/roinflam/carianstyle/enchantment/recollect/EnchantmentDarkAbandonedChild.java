@@ -1,41 +1,50 @@
 package pers.roinflam.carianstyle.enchantment.recollect;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.potion.PotionEffect;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
+import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
-import javax.annotation.Nonnull;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
  * 暗弃子附魔
- *
+ * <p>
  * 攻击时：伤害变为魔法且无视护甲，偷取敌人一个正面效果
  * 受击时：夜晚减伤10%
  * 被动：夜晚持续回血
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "dark_abandoned_child",
-        category = EnchantmentCategory.RECOLLECT,
-        rarity = EnchantmentRarity.VERY_RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantmentCategory.WEAPON,
+        slots = {EquipmentSlot.MAINHAND}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
@@ -43,23 +52,24 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
     private static final int RECOLLECT_ENCHANTABILITY = 35;
 
     public EnchantmentDarkAbandonedChild() {
-        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingAttack(@NotNull LivingAttackEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (!(evt.getSource().getImmediateSource() instanceof EntityLivingBase)) {
+        if (!(evt.getSource().getDirectEntity() instanceof LivingEntity)) {
             return;
         }
 
-        EntityLivingBase victim = evt.getEntityLiving();
-        EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+        LivingEntity victim = evt.getEntity();
+        LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
 
-        if (attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+        ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
@@ -68,9 +78,7 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                darkAbandonedChild,
-                attacker.getHeldItem(attacker.getActiveHand()));
+        int level = EnchantmentHelper.getItemEnchantmentLevel(darkAbandonedChild, heldItem);
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
@@ -80,37 +88,41 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
             return;
         }
 
-        evt.getSource().setMagicDamage().setDamageBypassesArmor();
+        DamageSourceUtil.setBypassesArmor(evt.getSource());
+        DamageSourceUtil.setMagicDamage(evt.getSource());
 
-        if (!victim.getActivePotionEffects().isEmpty()) {
-            List<PotionEffect> positiveEffects = new ArrayList<>(victim.getActivePotionEffects());
-            positiveEffects.removeIf(effect ->
-                    effect.getPotion().isBadEffect() ||
-                            effect.getPotion().isInstant() ||
-                            !effect.getPotion().shouldRender(effect)
-            );
+        Collection<MobEffectInstance> activeEffects = victim.getActiveEffects();
+        if (!activeEffects.isEmpty()) {
+            List<MobEffectInstance> positiveEffects = new ArrayList<>(activeEffects);
+            positiveEffects.removeIf(effect -> {
+                MobEffect mobEffect = effect.getEffect();
+                return !mobEffect.isBeneficial() ||
+                        mobEffect.isInstantenous() ||
+                        !effect.isVisible();
+            });
 
             if (!positiveEffects.isEmpty()) {
-                PotionEffect stolen = positiveEffects.get(RandomUtil.getInt(0, positiveEffects.size() - 1));
-                attacker.addPotionEffect(stolen);
-                victim.removePotionEffect(stolen.getPotion());
+                MobEffectInstance stolen = positiveEffects.get(RandomUtil.getInt(0, positiveEffects.size() - 1));
+                attacker.addEffect(new MobEffectInstance(stolen));
+                victim.removeEffect(stolen.getEffect());
             }
         }
     }
 
     @SubscribeEvent(priority = EventPriority.HIGH)
-    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (evt.getSource().canHarmInCreative()) {
+        if (evt.getSource().isCreativePlayer()) {
             return;
         }
 
-        EntityLivingBase victim = evt.getEntityLiving();
+        LivingEntity victim = evt.getEntity();
 
-        if (victim.getHeldItem(victim.getActiveHand()).isEmpty()) {
+        ItemStack heldItem = victim.getItemInHand(victim.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
@@ -119,18 +131,16 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                darkAbandonedChild,
-                victim.getHeldItem(victim.getActiveHand()));
+        int level = EnchantmentHelper.getItemEnchantmentLevel(darkAbandonedChild, heldItem);
 
-        if (level > 0 && !victim.world.isDaytime()) {
+        if (level > 0 && !victim.level().isDay()) {
             evt.setAmount(evt.getAmount() * 0.9f);
         }
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
-        if (evt.player.world.isRemote || evt.player.world.isDaytime()) {
+    public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
+        if (evt.player.level().isClientSide || evt.player.level().isDay()) {
             return;
         }
 
@@ -138,12 +148,13 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
             return;
         }
 
-        EntityPlayer player = evt.player;
-        if (!player.isEntityAlive()) {
+        Player player = evt.player;
+        if (!player.isAlive()) {
             return;
         }
 
-        if (player.getHeldItem(player.getActiveHand()).isEmpty()) {
+        ItemStack heldItem = player.getItemInHand(player.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
@@ -152,9 +163,7 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                darkAbandonedChild,
-                player.getHeldItem(player.getActiveHand()));
+        int level = EnchantmentHelper.getItemEnchantmentLevel(darkAbandonedChild, heldItem);
 
         if (level > 0) {
             player.heal(player.getMaxHealth() * 0.015f / 20);
@@ -162,7 +171,12 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) (RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

@@ -1,41 +1,47 @@
 package pers.roinflam.carianstyle.enchantment.recollect;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.DamageSource;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
-import javax.annotation.Nonnull;
 import java.util.UUID;
 
 /**
  * 巨人火焰附魔
- *
+ * <p>
  * 着火时受击反弹50%伤害（火焰）
  * 减伤：伤害 × 血量比例 × 0.25
  * 免疫火焰伤害并转化为治疗（10tick冷却）
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "giant_flame",
-        category = EnchantmentCategory.RECOLLECT,
-        rarity = EnchantmentRarity.VERY_RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantmentCategory.ARMOR_CHEST,
+        slots = {EquipmentSlot.CHEST}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentGiantFlame extends EnchantmentBase {
@@ -44,19 +50,19 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
     private static final int RECOLLECT_ENCHANTABILITY = 35;
 
     public EnchantmentGiantFlame() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+        super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
 
-    private static int getTotalLevel(EntityLivingBase entity) {
+    private static int getTotalLevel(LivingEntity entity) {
         Enchantment giantFlame = EnchantmentRegistry.getEnchantmentByClass(EnchantmentGiantFlame.class);
         if (giantFlame == null) {
             return 0;
         }
 
         int totalLevel = 0;
-        for (ItemStack armor : entity.getArmorInventoryList()) {
+        for (ItemStack armor : entity.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(giantFlame, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(giantFlame, armor);
             }
         }
         if (ConfigLoader.levelLimit) {
@@ -66,21 +72,21 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (evt.getSource().canHarmInCreative()) {
+        if (evt.getSource().isCreativePlayer()) {
             return;
         }
 
-        if (!(evt.getSource().getImmediateSource() instanceof EntityLivingBase)) {
+        if (!(evt.getSource().getDirectEntity() instanceof LivingEntity)) {
             return;
         }
 
-        EntityLivingBase holder = evt.getEntityLiving();
-        EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+        LivingEntity holder = evt.getEntity();
+        LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
 
         if (EntityUtil.getFire(holder) <= 0) {
             return;
@@ -91,20 +97,20 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
             return;
         }
 
-        attacker.attackEntityFrom(DamageSource.IN_FIRE, evt.getAmount() * 0.5f);
+        attacker.hurt(holder.damageSources().inFire(), evt.getAmount() * 0.5f);
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (evt.getSource().canHarmInCreative()) {
+        if (evt.getSource().isCreativePlayer()) {
             return;
         }
 
-        EntityLivingBase holder = evt.getEntityLiving();
+        LivingEntity holder = evt.getEntity();
 
         int totalLevel = getTotalLevel(holder);
         if (totalLevel <= 0) {
@@ -116,28 +122,28 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGH)
-    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingAttack(@NotNull LivingAttackEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (!evt.getEntityLiving().isEntityAlive()) {
+        if (!evt.getEntity().isAlive()) {
             return;
         }
 
-        if (evt.getSource().canHarmInCreative()) {
+        if (evt.getSource().isCreativePlayer()) {
             return;
         }
 
-        EntityLivingBase holder = evt.getEntityLiving();
-        UUID uuid = holder.getUniqueID();
+        LivingEntity holder = evt.getEntity();
+        UUID uuid = holder.getUUID();
 
         int totalLevel = getTotalLevel(holder);
         if (totalLevel <= 0) {
             return;
         }
 
-        if (!evt.getSource().isFireDamage()) {
+        if (!DamageSourceUtil.isFireDamage(evt.getSource())) {
             return;
         }
 
@@ -150,7 +156,12 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) (RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

@@ -1,40 +1,45 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.init.MobEffects;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.potion.PotionEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
-import javax.annotation.Nonnull;
-
 /**
  * 吃屎附魔
- *
+ * <p>
  * 武器附魔，反胃诅咒
  * 攻击时：
  * - 给敌人施加反胃效果（等级 × 4秒）
  * - 给自己施加反胃效果（等级 × 1.5秒）
  * - 敌人在反胃期间治疗量减少75%
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "eat_shit",
-        category = EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.UNCOMMON
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantmentCategory.WEAPON,
+        slots = {EquipmentSlot.MAINHAND}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentEatShit extends EnchantmentBase {
@@ -42,39 +47,33 @@ public class EnchantmentEatShit extends EnchantmentBase {
     private static final String DEBUFF_KEY = "eat_shit_debuff";
 
     public EnchantmentEatShit() {
-        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
-    /**
-     * 攻击时给双方施加反胃效果
-     * 保留静态监听器，因为需要特殊的immediate source检查
-     */
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (!(evt.getSource().getImmediateSource() instanceof EntityLivingBase)) {
+        if (!(evt.getSource().getDirectEntity() instanceof LivingEntity)) {
             return;
         }
 
-        EntityLivingBase victim = evt.getEntityLiving();
-        EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+        LivingEntity victim = evt.getEntity();
+        LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
         Enchantment eatShit = EnchantmentRegistry.getEnchantmentByClass(EnchantmentEatShit.class);
 
         if (eatShit == null) {
             return;
         }
 
-        if (attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+        ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                eatShit,
-                attacker.getHeldItem(attacker.getActiveHand())
-        );
+        int level = EnchantmentHelper.getItemEnchantmentLevel(eatShit, heldItem);
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
@@ -84,36 +83,33 @@ public class EnchantmentEatShit extends EnchantmentBase {
             return;
         }
 
-        // 给敌人施加反胃效果（等级 × 4秒）
-        int victimDuration = level * 80;  // 等级 × 80 tick = 等级 × 4秒
-        victim.addPotionEffect(new PotionEffect(MobEffects.NAUSEA, victimDuration));
+        int victimDuration = level * 80;
+        victim.addEffect(new MobEffectInstance(MobEffects.CONFUSION, victimDuration));
 
-        // 给自己施加反胃效果（等级 × 1.5秒）
-        int attackerDuration = level * 30;  // 等级 × 30 tick = 等级 × 1.5秒
-        attacker.addPotionEffect(new PotionEffect(MobEffects.NAUSEA, attackerDuration));
+        int attackerDuration = level * 30;
+        attacker.addEffect(new MobEffectInstance(MobEffects.CONFUSION, attackerDuration));
 
-        // 标记敌人处于治疗减益状态
-        EnchantmentDataManager.setCooldown(DEBUFF_KEY, victim.getUniqueID(), victimDuration);
+        EnchantmentDataManager.setCooldown(DEBUFF_KEY, victim.getUUID(), victimDuration);
     }
 
-    /**
-     * 被标记的实体治疗量减少75%
-     */
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingHeal(@NotNull LivingHealEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        // 检查是否在治疗减益状态中
-        if (EnchantmentDataManager.isOnCooldown(DEBUFF_KEY, evt.getEntity().getUniqueID())) {
-            // 减少75%的治疗量
+        if (EnchantmentDataManager.isOnCooldown(DEBUFF_KEY, evt.getEntity().getUUID())) {
             evt.setAmount(evt.getAmount() * 0.25f);
         }
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((25 + (enchantmentLevel - 1) * 2) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

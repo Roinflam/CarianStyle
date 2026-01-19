@@ -1,56 +1,60 @@
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemShield;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ShieldItem;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 
-import javax.annotation.Nonnull;
-
 /**
  * 盾击附魔
- *
+ * <p>
  * 举盾格挡时被攻击，将攻击者击退（击退强度 = 等级 × 0.25）
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "shield_bash",
-        category = EnchantmentCategory.COMBAT_SKILL,
-        rarity = EnchantmentRarity.UNCOMMON
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.UNCOMMON,
+        type = net.minecraft.world.item.enchantment.EnchantmentCategory.BREAKABLE,
+        slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND}
 )
 public class EnchantmentShieldBash extends EnchantmentBase {
 
     public EnchantmentShieldBash() {
-        super(CarianStyleEnchantments.SHIELD, new EntityEquipmentSlot[]{
-                EntityEquipmentSlot.MAINHAND,
-                EntityEquipmentSlot.OFFHAND
+        super(net.minecraft.world.item.enchantment.EnchantmentCategory.BREAKABLE, new EquipmentSlot[]{
+                EquipmentSlot.MAINHAND,
+                EquipmentSlot.OFFHAND
         });
     }
 
     @Override
-    protected void onHurtAsVictimLowest(@Nonnull EnchantmentContext ctx, int level) {
+    protected void onHurtAsVictimLowest(@NotNull EnchantmentContext ctx, int level) {
         // 攻击者必须是生物实体（排除箭矢等投射物）
         if (ctx.getDamageSource() == null ||
-                !(ctx.getDamageSource().getImmediateSource() instanceof EntityLivingBase)) {
+                !(ctx.getDamageSource().getDirectEntity() instanceof LivingEntity)) {
             return;
         }
 
-        EntityLivingBase holder = ctx.getHolder();
-        EntityLivingBase attacker = (EntityLivingBase) ctx.getDamageSource().getImmediateSource();
+        LivingEntity holder = ctx.getHolder();
+        LivingEntity attacker = (LivingEntity) ctx.getDamageSource().getDirectEntity();
 
         // 检查是否正在举盾
-        if (!holder.isHandActive()) {
+        if (!holder.isUsingItem()) {
             return;
         }
 
-        ItemStack activeItem = holder.getHeldItem(holder.getActiveHand());
-        if (activeItem.isEmpty() || !(activeItem.getItem() instanceof ItemShield)) {
+        ItemStack activeItem = holder.getItemInHand(holder.getUsedItemHand());
+        if (activeItem.isEmpty() || !(activeItem.getItem() instanceof ShieldItem)) {
             return;
         }
 
@@ -60,13 +64,18 @@ public class EnchantmentShieldBash extends EnchantmentBase {
         }
 
         // 击退攻击者
-        double x = holder.posX - attacker.posX;
-        double z = holder.posZ - attacker.posZ;
-        attacker.knockBack(holder, level * 0.25f, x, z);
+        double x = holder.getX() - attacker.getX();
+        double z = holder.getZ() - attacker.getZ();
+        attacker.knockback(level * 0.25f, x, z);
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((5 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

@@ -1,65 +1,87 @@
+// 文件：EnchantmentContinuousShooting.java
+// 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentContinuousShooting.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.projectile.EntityArrow;
-import net.minecraft.init.Enchantments;
-import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraftforge.event.entity.ProjectileImpactEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
-import javax.annotation.Nonnull;
-
 /**
  * 连射附魔
- *
+ * <p>
  * 拉弓速度×5，但箭矢伤害-50%
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "continuous_shooting",
-        category = EnchantmentCategory.COMBAT_SKILL,
-        rarity = EnchantmentRarity.VERY_RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantmentCategory.BOW,
+        slots = {EquipmentSlot.MAINHAND}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentContinuousShooting extends EnchantmentBase {
 
     public EnchantmentContinuousShooting() {
-        super(EnumEnchantmentType.BOW, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
     /**
      * 箭矢命中时伤害-50%
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onProjectileImpact_Arrow(@Nonnull ProjectileImpactEvent.Arrow evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onProjectileImpact(@NotNull ProjectileImpactEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityArrow arrow = evt.getArrow();
-        if (arrow.shootingEntity == null || evt.getRayTraceResult().entityHit == null) {
+        if (!(evt.getProjectile() instanceof AbstractArrow)) {
             return;
         }
 
-        if (!(arrow.shootingEntity instanceof EntityLivingBase)) {
+        AbstractArrow arrow = (AbstractArrow) evt.getProjectile();
+
+        // 1.20.1: HitResult需要先检查类型
+        HitResult hitResult = evt.getRayTraceResult();
+        if (!(hitResult instanceof EntityHitResult entityHit)) {
             return;
         }
 
-        EntityLivingBase shooter = (EntityLivingBase) arrow.shootingEntity;
+        // 1.20.1: shootingEntity → getOwner()
+        if (arrow.getOwner() == null || entityHit.getEntity() == null) {
+            return;
+        }
 
-        if (shooter.getHeldItem(shooter.getActiveHand()).isEmpty()) {
+        if (!(arrow.getOwner() instanceof LivingEntity)) {
+            return;
+        }
+
+        LivingEntity shooter = (LivingEntity) arrow.getOwner();
+
+        ItemStack heldItem = shooter.getItemInHand(shooter.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
@@ -68,12 +90,11 @@ public class EnchantmentContinuousShooting extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                continuousShooting,
-                shooter.getHeldItem(shooter.getActiveHand()));
+        int level = EnchantmentHelper.getItemEnchantmentLevel(continuousShooting, heldItem);
 
         if (level > 0) {
-            arrow.setDamage(arrow.getDamage() * 0.5);
+            // 1.20.1: setDamage → setBaseDamage
+            arrow.setBaseDamage(arrow.getBaseDamage() * 0.5);
         }
     }
 
@@ -81,14 +102,15 @@ public class EnchantmentContinuousShooting extends EnchantmentBase {
      * 加速拉弓：每tick额外更新4次
      */
     @SubscribeEvent
-    public static void onLivingUpdate(@Nonnull LivingEvent.LivingUpdateEvent evt) {
-        EntityLivingBase entity = evt.getEntityLiving();
+    public static void onLivingUpdate(@NotNull LivingEvent.LivingTickEvent evt) {
+        LivingEntity entity = evt.getEntity();
 
-        if (!entity.isHandActive()) {
+        if (!entity.isUsingItem()) {
             return;
         }
 
-        if (entity.getHeldItem(entity.getActiveHand()).isEmpty()) {
+        ItemStack heldItem = entity.getItemInHand(entity.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
@@ -97,9 +119,7 @@ public class EnchantmentContinuousShooting extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                continuousShooting,
-                entity.getHeldItem(entity.getActiveHand()));
+        int level = EnchantmentHelper.getItemEnchantmentLevel(continuousShooting, heldItem);
 
         if (level > 0) {
             // 额外更新4次使用进度
@@ -110,16 +130,21 @@ public class EnchantmentContinuousShooting extends EnchantmentBase {
     }
 
     @Override
-    public boolean canApplyTogether(@Nonnull Enchantment ench) {
+    protected boolean checkCompatibility(@NotNull Enchantment ench) {
         // 与无限冲突
-        if (ench == Enchantments.INFINITY) {
+        if (ench == Enchantments.INFINITY_ARROWS) {
             return false;
         }
-        return super.canApplyTogether(ench);
+        return super.checkCompatibility(ench);
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) (35 * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

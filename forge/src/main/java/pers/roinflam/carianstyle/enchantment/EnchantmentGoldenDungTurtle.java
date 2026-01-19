@@ -1,57 +1,59 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.living.LivingExperienceDropEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
-import javax.annotation.Nonnull;
-
 /**
  * 黄金粪金龟附魔
- *
+ * <p>
  * 武器附魔，增加经验掉落
  * 击杀生物时：
  * - 经验掉落增加 30% × 等级
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "golden_dung_turtle",
-        category = EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.UNCOMMON
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantmentCategory.WEAPON,
+        slots = {EquipmentSlot.MAINHAND}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentGoldenDungTurtle extends EnchantmentBase {
 
     public EnchantmentGoldenDungTurtle() {
-        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
-    /**
-     * 击杀生物时增加经验掉落
-     * 由于 LivingExperienceDropEvent 没有模板方法，保留静态监听器
-     */
     @SubscribeEvent
-    public static void onLivingExperienceDrop(@Nonnull LivingExperienceDropEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingExperienceDrop(@NotNull LivingExperienceDropEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityPlayer player = evt.getAttackingPlayer();
+        Player player = evt.getAttackingPlayer();
         if (player == null) {
             return;
         }
 
-        if (player.getHeldItem(player.getActiveHand()).isEmpty()) {
+        ItemStack heldItem = player.getItemInHand(player.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
@@ -60,10 +62,7 @@ public class EnchantmentGoldenDungTurtle extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                goldenDungTurtle,
-                player.getHeldItem(player.getActiveHand())
-        );
+        int level = EnchantmentHelper.getItemEnchantmentLevel(goldenDungTurtle, heldItem);
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
@@ -73,13 +72,17 @@ public class EnchantmentGoldenDungTurtle extends EnchantmentBase {
             return;
         }
 
-        // 经验增加 30% × 等级
         int bonusExp = (int) (evt.getDroppedExperience() * level * 0.3);
         evt.setDroppedExperience(evt.getDroppedExperience() + bonusExp);
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((5 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

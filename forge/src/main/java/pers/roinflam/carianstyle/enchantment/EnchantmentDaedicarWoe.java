@@ -1,57 +1,62 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
-import javax.annotation.Nonnull;
-
 /**
  * 戴狄卡之祸附魔（诅咒）
- *
+ * <p>
  * 护甲诅咒附魔
  * 受到伤害时：
  * - 伤害 ×5（严重增伤）
  * - 无敌时间减少到75%（更容易连续受击）
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "daedicar_woe",
-        category = EnchantmentCategory.GENERAL,
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.VERY_RARE,
-        forceTreasure = true
+        type = EnchantmentCategory.ARMOR,
+        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET},
+        forceTreasure = true,
+        isCurse = true
 )
 @Mod.EventBusSubscriber
 public class EnchantmentDaedicarWoe extends EnchantmentBase {
 
     public EnchantmentDaedicarWoe() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
-                EntityEquipmentSlot.HEAD,
-                EntityEquipmentSlot.CHEST,
-                EntityEquipmentSlot.LEGS,
-                EntityEquipmentSlot.FEET
+        super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
+                EquipmentSlot.HEAD,
+                EquipmentSlot.CHEST,
+                EquipmentSlot.LEGS,
+                EquipmentSlot.FEET
         });
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase victim = evt.getEntityLiving();
+        LivingEntity victim = evt.getEntity();
 
         Enchantment daedicarWoe = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDaedicarWoe.class);
         if (daedicarWoe == null) {
@@ -59,9 +64,9 @@ public class EnchantmentDaedicarWoe extends EnchantmentBase {
         }
 
         int totalLevel = 0;
-        for (ItemStack armor : victim.getArmorInventoryList()) {
+        for (ItemStack armor : victim.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(daedicarWoe, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(daedicarWoe, armor);
             }
         }
 
@@ -73,17 +78,17 @@ public class EnchantmentDaedicarWoe extends EnchantmentBase {
             return;
         }
 
-        victim.hurtResistantTime = (int) (victim.maxHurtResistantTime * 0.75);
+        victim.invulnerableTime = (int) (victim.invulnerableDuration * 0.75);
         evt.setAmount(evt.getAmount() * 5);
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) (35 * ConfigLoader.enchantingDifficulty);
     }
 
     @Override
-    public boolean isCurse() {
-        return true;
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

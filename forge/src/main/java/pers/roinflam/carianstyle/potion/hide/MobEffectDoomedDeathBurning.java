@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.potion.hide;
 
+import net.minecraft.world.effect.MobEffectCategory;
 import pers.roinflam.carianstyle.base.potion.flame.FlameBase;
 import pers.roinflam.carianstyle.utils.Reference;
 
@@ -14,12 +15,7 @@ import javax.annotation.Nonnull;
 public class MobEffectDoomedDeathBurning extends FlameBase {
 
     public MobEffectDoomedDeathBurning(boolean isBadEffectIn, int liquidColorIn) {
-        super(isBadEffectIn, liquidColorIn, "doomed_death_burning");
-    }
-
-    @Override
-    public int getSerialNumber() {
-        return 0;
+        super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
     }
 
     @Nonnull

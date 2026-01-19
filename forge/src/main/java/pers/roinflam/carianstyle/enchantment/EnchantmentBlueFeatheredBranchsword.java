@@ -1,25 +1,29 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 
-import javax.annotation.Nonnull;
-
 /**
  * 蓝羽枝剑附魔
- *
+ * <p>
  * 血量<=20%时受击减伤（等级×10%）
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "blue_feathered_branchsword",
-        category = EnchantmentCategory.GENERAL,
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantmentCategory.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
         conflictsWith = {
                 EnchantmentCorruptedWingSword.class
         }
@@ -27,11 +31,11 @@ import javax.annotation.Nonnull;
 public class EnchantmentBlueFeatheredBranchsword extends EnchantmentBase {
 
     public EnchantmentBlueFeatheredBranchsword() {
-        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
     @Override
-    protected void onHurtAsVictim(@Nonnull EnchantmentContext ctx, int level) {
+    protected void onHurtAsVictim(@NotNull EnchantmentContext ctx, int level) {
         // 只处理有攻击者的伤害
         if (ctx.getAttacker() == null) {
             return;
@@ -51,7 +55,12 @@ public class EnchantmentBlueFeatheredBranchsword extends EnchantmentBase {
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((15 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

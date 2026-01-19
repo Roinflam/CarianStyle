@@ -1,10 +1,12 @@
+// 文件：EnchantmentBloodBlade.java
+// 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentBloodBlade.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -15,19 +17,23 @@ import pers.roinflam.carianstyle.enchantment.EnchantmentScarletCorruption;
 import pers.roinflam.carianstyle.enchantment.EnchantmentVicDragonThunder;
 import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 
-import javax.annotation.Nonnull;
-
 /**
  * 血刃附魔
- *
+ * <p>
  * 消耗10%当前血量，造成额外伤害
  * 额外伤害 = (伤害×等级×0.33 + 目标血量×等级×0.033) × 自身血量比例
  * 玩家需刚挥剑，非玩家可直接触发
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "blood_blade",
-        category = EnchantmentCategory.COMBAT_SKILL,
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
         rarity = EnchantmentRarity.RARE,
+        type = EnchantmentCategory.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
         conflictsWith = {
                 EnchantmentScarletCorruption.class,
                 EnchantmentFireGivesPower.class,
@@ -39,13 +45,13 @@ import javax.annotation.Nonnull;
 public class EnchantmentBloodBlade extends EnchantmentBase {
 
     public EnchantmentBloodBlade() {
-        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
     @Override
-    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
-        EntityLivingBase attacker = ctx.getHolder();
-        EntityLivingBase victim = ctx.getVictim();
+    protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
+        LivingEntity attacker = ctx.getHolder();
+        LivingEntity victim = ctx.getVictim();
 
         if (victim == null) {
             return;
@@ -70,7 +76,12 @@ public class EnchantmentBloodBlade extends EnchantmentBase {
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((10 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

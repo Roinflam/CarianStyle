@@ -1,19 +1,19 @@
 package pers.roinflam.carianstyle.enchantment.recollect;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -24,20 +24,25 @@ import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
-import javax.annotation.Nonnull;
 import java.util.UUID;
 
 /**
  * 满月附魔
- *
+ * <p>
  * 死亡时触发：取消死亡，恢复微量血量，持续回血（有DarkMoon时加倍）
  * 满月状态下减伤50%
  * 夜晚治疗量+25%
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "full_moon",
-        category = EnchantmentCategory.RECOLLECT,
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT,
         rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantmentCategory.ARMOR_CHEST,
+        slots = {EquipmentSlot.CHEST},
         conflictsWith = {
                 EnchantmentHealingByFire.class,
                 EnchantmentShelterOfFire.class
@@ -51,24 +56,21 @@ public class EnchantmentFullMoon extends EnchantmentBase {
     private static final int RECOLLECT_ENCHANTABILITY = 35;
 
     public EnchantmentFullMoon() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+        super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
 
-    /**
-     * 死亡时触发：取消死亡，持续回血
-     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingDeath(@NotNull LivingDeathEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (evt.getSource().canHarmInCreative()) {
+        if (evt.getSource().isCreativePlayer()) {
             return;
         }
 
-        EntityLivingBase holder = evt.getEntityLiving();
-        UUID uuid = holder.getUniqueID();
+        LivingEntity holder = evt.getEntity();
+        UUID uuid = holder.getUUID();
 
         Enchantment fullMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentFullMoon.class);
         if (fullMoon == null) {
@@ -76,9 +78,9 @@ public class EnchantmentFullMoon extends EnchantmentBase {
         }
 
         int totalLevel = 0;
-        for (ItemStack armor : holder.getArmorInventoryList()) {
+        for (ItemStack armor : holder.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(fullMoon, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(fullMoon, armor);
             }
         }
 
@@ -91,7 +93,7 @@ public class EnchantmentFullMoon extends EnchantmentBase {
         }
 
         if (!EnchantmentDataManager.isOnCooldown(FULL_MOON_COOLDOWN_KEY, uuid)) {
-            if (!holder.isDead) {
+            if (!holder.isDeadOrDying()) {
                 evt.setCanceled(true);
                 holder.setHealth(holder.getMaxHealth() * 0.0075f);
 
@@ -100,10 +102,9 @@ public class EnchantmentFullMoon extends EnchantmentBase {
                 // 检查是否有DarkMoon附魔
                 boolean hasDarkMoon = false;
                 Enchantment darkMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDarkMoon.class);
-                if (darkMoon != null && !holder.getHeldItem(holder.getActiveHand()).isEmpty()) {
-                    if (EnchantmentHelper.getEnchantmentLevel(
-                            darkMoon,
-                            holder.getHeldItem(holder.getActiveHand())) > 0) {
+                ItemStack heldItem = holder.getItemInHand(holder.getUsedItemHand());
+                if (darkMoon != null && !heldItem.isEmpty()) {
+                    if (EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem) > 0) {
                         hasDarkMoon = true;
                     }
                 }
@@ -114,7 +115,7 @@ public class EnchantmentFullMoon extends EnchantmentBase {
 
                     @Override
                     public void run() {
-                        if (++tick > duration || !holder.isEntityAlive()) {
+                        if (++tick > duration || !holder.isAlive()) {
                             this.cancel();
                             EnchantmentDataManager.clearCooldown(FULL_MOON_STATE_KEY, uuid);
                             return;
@@ -125,25 +126,22 @@ public class EnchantmentFullMoon extends EnchantmentBase {
             }
         }
 
-        int cooldownTime = holder.world.isDaytime() ? 3600 : 1800;
+        int cooldownTime = holder.level().isDay() ? 3600 : 1800;
         EnchantmentDataManager.setCooldown(FULL_MOON_COOLDOWN_KEY, uuid, cooldownTime);
     }
 
-    /**
-     * 满月状态下减伤50%
-     */
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (evt.getSource().canHarmInCreative()) {
+        if (evt.getSource().isCreativePlayer()) {
             return;
         }
 
-        EntityLivingBase holder = evt.getEntityLiving();
-        UUID uuid = holder.getUniqueID();
+        LivingEntity holder = evt.getEntity();
+        UUID uuid = holder.getUUID();
 
         Enchantment fullMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentFullMoon.class);
         if (fullMoon == null) {
@@ -151,9 +149,9 @@ public class EnchantmentFullMoon extends EnchantmentBase {
         }
 
         int totalLevel = 0;
-        for (ItemStack armor : holder.getArmorInventoryList()) {
+        for (ItemStack armor : holder.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(fullMoon, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(fullMoon, armor);
             }
         }
 
@@ -166,16 +164,13 @@ public class EnchantmentFullMoon extends EnchantmentBase {
         }
     }
 
-    /**
-     * 夜晚治疗量+25%
-     */
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
-        if (evt.getEntity().world.isRemote || evt.getEntity().world.isDaytime()) {
+    public static void onLivingHeal(@NotNull LivingHealEvent evt) {
+        if (evt.getEntity().level().isClientSide || evt.getEntity().level().isDay()) {
             return;
         }
 
-        EntityLivingBase holder = evt.getEntityLiving();
+        LivingEntity holder = evt.getEntity();
 
         Enchantment fullMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentFullMoon.class);
         if (fullMoon == null) {
@@ -183,9 +178,9 @@ public class EnchantmentFullMoon extends EnchantmentBase {
         }
 
         int totalLevel = 0;
-        for (ItemStack armor : holder.getArmorInventoryList()) {
+        for (ItemStack armor : holder.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(fullMoon, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(fullMoon, armor);
             }
         }
 
@@ -195,24 +190,24 @@ public class EnchantmentFullMoon extends EnchantmentBase {
     }
 
     @Override
-    public boolean canApplyTogether(@Nonnull Enchantment ench) {
-        // 与死亡类附魔冲突（通过包名判断）
+    protected boolean checkCompatibility(Enchantment ench) {
         if (isDeadEnchantment(ench)) {
             return false;
         }
-        return super.canApplyTogether(ench);
+        return super.checkCompatibility(ench);
     }
 
-    /**
-     * 判断是否是死亡类附魔
-     */
     private boolean isDeadEnchantment(Enchantment ench) {
-        // 死亡类附魔包括：FullMoon, TimeReversal 等
-        return ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentTimeReversal.class));
+        return ench instanceof EnchantmentTimeReversal;
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) (RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

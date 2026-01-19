@@ -1,63 +1,71 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.projectile.EntityArrow;
-import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.ProjectileImpactEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
-import javax.annotation.Nonnull;
-
 /**
  * 洛蕾塔大弓附魔
- *
+ * <p>
  * 弓箭附魔，箭矢命中时爆炸
  * 效果：
  * - 箭矢伤害增加50%
  * - 在箭矢位置创建爆炸（着火箭威力3，普通箭威力2）
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "loretta_big_bow",
-        category = EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.VERY_RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantmentCategory.BOW,
+        slots = {EquipmentSlot.MAINHAND}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentLorettaBigBow extends EnchantmentBase {
 
     public EnchantmentLorettaBigBow() {
-        super(EnumEnchantmentType.BOW, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
-    /**
-     * 箭矢命中时增伤并爆炸
-     * 由于 ProjectileImpactEvent.Arrow 没有模板方法，保留静态监听器
-     */
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onProjectileImpact_Arrow(@Nonnull ProjectileImpactEvent.Arrow evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onProjectileImpact_Arrow(@NotNull ProjectileImpactEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (evt.getArrow().shootingEntity == null) {
+        if (!(evt.getProjectile() instanceof AbstractArrow arrow)) {
             return;
         }
 
-        EntityArrow arrow = evt.getArrow();
-        EntityLivingBase attacker = (EntityLivingBase) arrow.shootingEntity;
+        if (arrow.getOwner() == null || evt.getRayTraceResult().getType() == net.minecraft.world.phys.HitResult.Type.ENTITY) {
+            return;
+        }
 
-        if (attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+        if (!(arrow.getOwner() instanceof LivingEntity attacker)) {
+            return;
+        }
+
+        ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
+
+        if (heldItem.isEmpty()) {
             return;
         }
 
@@ -66,10 +74,7 @@ public class EnchantmentLorettaBigBow extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                lorettaBigBow,
-                attacker.getHeldItem(attacker.getActiveHand())
-        );
+        int level = EnchantmentHelper.getItemEnchantmentLevel(lorettaBigBow, heldItem);
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
@@ -80,15 +85,20 @@ public class EnchantmentLorettaBigBow extends EnchantmentBase {
         }
 
         // 箭矢伤害增加50%
-        arrow.setDamage(arrow.getDamage() + arrow.getDamage() * 0.5);
+        arrow.setBaseDamage(arrow.getBaseDamage() + arrow.getBaseDamage() * 0.5);
 
         // 创建爆炸（着火箭威力3，普通箭威力2）
         float explosionStrength = EntityUtil.getFire(arrow) > 0 ? 3 : 2;
-        attacker.world.createExplosion(attacker, arrow.posX, arrow.posY, arrow.posZ, explosionStrength, false);
+        attacker.level().explode(attacker, arrow.getX(), arrow.getY(), arrow.getZ(), explosionStrength, false, net.minecraft.world.level.Level.ExplosionInteraction.NONE);
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) (25 * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

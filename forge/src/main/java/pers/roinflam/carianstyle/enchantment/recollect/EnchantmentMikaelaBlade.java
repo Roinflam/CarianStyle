@@ -1,35 +1,41 @@
 package pers.roinflam.carianstyle.enchantment.recollect;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
-import javax.annotation.Nonnull;
 import java.util.UUID;
 
 /**
  * 米凯拉之刃附魔
- *
+ * <p>
  * 攻击：伤害 = 原伤害×0.4 + 原伤害×连击数×0.2，然后连击+1
  * 受击：额外受到伤害 = 伤害×自己连击数×0.1（连击越多越脆弱）
  * 连击数每40tick衰减1
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "mikaela_blade",
-        category = EnchantmentCategory.RECOLLECT,
-        rarity = EnchantmentRarity.VERY_RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantmentCategory.WEAPON,
+        slots = {EquipmentSlot.MAINHAND}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentMikaelaBlade extends EnchantmentBase {
@@ -38,15 +44,12 @@ public class EnchantmentMikaelaBlade extends EnchantmentBase {
     private static final int RECOLLECT_ENCHANTABILITY = 35;
 
     public EnchantmentMikaelaBlade() {
-        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
-    /**
-     * 攻击增伤（连击机制）+ 受击增伤（连击惩罚）
-     */
     @SubscribeEvent
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
@@ -56,20 +59,19 @@ public class EnchantmentMikaelaBlade extends EnchantmentBase {
         }
 
         // 攻击者视角：连击增伤
-        if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-            EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+        if (evt.getSource().getDirectEntity() instanceof LivingEntity) {
+            LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
 
-            if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                int level = EnchantmentHelper.getEnchantmentLevel(
-                        mikaelaBlade,
-                        attacker.getHeldItem(attacker.getActiveHand()));
+            ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
+            if (!heldItem.isEmpty()) {
+                int level = EnchantmentHelper.getItemEnchantmentLevel(mikaelaBlade, heldItem);
 
                 if (ConfigLoader.levelLimit) {
                     level = Math.min(level, 10);
                 }
 
                 if (level > 0) {
-                    UUID uuid = attacker.getUniqueID();
+                    UUID uuid = attacker.getUUID();
                     int combo = EnchantmentDataManager.getCounter(COMBO_COUNT_KEY, uuid);
 
                     evt.setAmount(evt.getAmount() * 0.4f + evt.getAmount() * combo * 0.2f);
@@ -79,8 +81,8 @@ public class EnchantmentMikaelaBlade extends EnchantmentBase {
         }
 
         // 受击者视角：连击惩罚
-        EntityLivingBase victim = evt.getEntityLiving();
-        UUID victimUuid = victim.getUniqueID();
+        LivingEntity victim = evt.getEntity();
+        UUID victimUuid = victim.getUUID();
         int victimCombo = EnchantmentDataManager.getCounter(COMBO_COUNT_KEY, victimUuid);
 
         if (victimCombo > 0) {
@@ -89,7 +91,12 @@ public class EnchantmentMikaelaBlade extends EnchantmentBase {
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) (RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

@@ -1,14 +1,17 @@
 package pers.roinflam.carianstyle.potion;
 
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraft.entity.ai.attributes.AbstractAttributeMap;
-import net.minecraft.entity.ai.attributes.AttributeModifier;
-import net.minecraft.entity.ai.attributes.IAttributeInstance;
-import net.minecraft.util.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.effect.MobEffectCategory;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeMap;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
@@ -37,50 +40,50 @@ public class MobEffectIncision extends IconBase {
     public static final String NAME = "potion.incision";
 
     public MobEffectIncision(boolean isBadEffectIn, int liquidColorIn) {
-        super(isBadEffectIn, liquidColorIn, "incision");
+        super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
 
-        this.registerPotionAttributeModifier(
-                SharedMonsterAttributes.ATTACK_DAMAGE,
+        this.addAttributeModifier(
+                Attributes.ATTACK_DAMAGE,
                 "0788fd21-aade-d9dc-0daa-faee0f26e5ee",
                 0.4,
-                2
+                AttributeModifier.Operation.MULTIPLY_TOTAL
         );
-        this.registerPotionAttributeModifier(
-                SharedMonsterAttributes.ATTACK_SPEED,
+        this.addAttributeModifier(
+                Attributes.ATTACK_SPEED,
                 "07a1b38c-e245-d4c0-1e0e-6529582fbb6d",
                 0.8,
-                2
+                AttributeModifier.Operation.MULTIPLY_TOTAL
         );
-        this.registerPotionAttributeModifier(
-                SharedMonsterAttributes.ARMOR,
+        this.addAttributeModifier(
+                Attributes.ARMOR,
                 "53c9ebac-b292-2d82-993a-cb183e208411",
                 -0.75,
-                2
+                AttributeModifier.Operation.MULTIPLY_TOTAL
         );
-        this.registerPotionAttributeModifier(
-                SharedMonsterAttributes.ARMOR_TOUGHNESS,
+        this.addAttributeModifier(
+                Attributes.ARMOR_TOUGHNESS,
                 "68d0f463-1a46-6e25-2ed1-c0aec31b641e",
                 -0.75,
-                2
+                AttributeModifier.Operation.MULTIPLY_TOTAL
         );
     }
 
     @Override
-    public void removeAttributesModifiersFromEntity(@Nonnull EntityLivingBase entityLivingBaseIn,
-                                                    AbstractAttributeMap attributeMapIn,
-                                                    int amplifier) {
-        entityLivingBaseIn.getEntityAttribute(SharedMonsterAttributes.MOVEMENT_SPEED).removeModifier(ID);
-        super.removeAttributesModifiersFromEntity(entityLivingBaseIn, attributeMapIn, amplifier);
+    public void removeAttributeModifiers(@Nonnull LivingEntity entityLivingBaseIn,
+                                         @Nonnull AttributeMap attributeMapIn,
+                                         int amplifier) {
+        entityLivingBaseIn.getAttribute(Attributes.MOVEMENT_SPEED).removeModifier(ID);
+        super.removeAttributeModifiers(entityLivingBaseIn, attributeMapIn, amplifier);
     }
 
     @Override
-    public void applyAttributesModifiersToEntity(@Nonnull EntityLivingBase entityLivingBaseIn,
-                                                 AbstractAttributeMap attributeMapIn,
-                                                 int amplifier) {
+    public void addAttributeModifiers(@Nonnull LivingEntity entityLivingBaseIn,
+                                      @Nonnull AttributeMap attributeMapIn,
+                                      int amplifier) {
         // 初始移动速度+120%
-        entityLivingBaseIn.getEntityAttribute(SharedMonsterAttributes.MOVEMENT_SPEED)
-                .applyModifier(new AttributeModifier(ID, NAME, 1.2, 2));
-        super.applyAttributesModifiersToEntity(entityLivingBaseIn, attributeMapIn, amplifier);
+        entityLivingBaseIn.getAttribute(Attributes.MOVEMENT_SPEED)
+                .addTransientModifier(new AttributeModifier(ID, NAME, 1.2, AttributeModifier.Operation.MULTIPLY_TOTAL));
+        super.addAttributeModifiers(entityLivingBaseIn, attributeMapIn, amplifier);
     }
 
     /**
@@ -88,18 +91,18 @@ public class MobEffectIncision extends IconBase {
      */
     @SubscribeEvent(priority = EventPriority.LOW)
     public void onLivingHeal(@Nonnull LivingHealEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase healer = evt.getEntityLiving();
-        if (healer.isPotionActive(this)) {
+        LivingEntity healer = evt.getEntity();
+        if (healer.hasEffect(this)) {
             evt.setAmount(evt.getAmount() * 1.6f);
         }
     }
 
     @Override
-    public void performEffect(@Nonnull EntityLivingBase entityLivingBaseIn, int amplifier) {
+    public void applyEffectTick(@Nonnull LivingEntity entityLivingBaseIn, int amplifier) {
         // 每tick扣血（最大生命值×12.5%/20）
         float damage = entityLivingBaseIn.getMaxHealth() * 0.125f / 20;
 
@@ -109,13 +112,14 @@ public class MobEffectIncision extends IconBase {
                 if (entityLivingBaseIn.getHealth() - damage * 2 > 0) {
                     entityLivingBaseIn.setHealth(entityLivingBaseIn.getHealth() - damage);
                 } else {
-                    EntityLivingUtil.kill(entityLivingBaseIn, NewDamageSource.HEMORRHAGE);
+                    // 修正：使用 hemorrhage() 方法获取 DamageSource
+                    EntityLivingUtil.kill(entityLivingBaseIn, NewDamageSource.hemorrhage(entityLivingBaseIn.level()));
                 }
             }
         }.start();
 
         // 移动速度随时间衰减
-        IAttributeInstance attributeInstance = entityLivingBaseIn.getEntityAttribute(SharedMonsterAttributes.MOVEMENT_SPEED);
+        AttributeInstance attributeInstance = entityLivingBaseIn.getAttribute(Attributes.MOVEMENT_SPEED);
         AttributeModifier modifier = attributeInstance.getModifier(ID);
         if (modifier != null) {
             double currentBonus = modifier.getAmount();
@@ -123,19 +127,20 @@ public class MobEffectIncision extends IconBase {
             if (currentBonus > 0.3) {
                 attributeInstance.removeModifier(ID);
                 // 每tick衰减0.75%
-                attributeInstance.applyModifier(new AttributeModifier(ID, NAME, currentBonus - 0.15 / 20f, 2));
+                attributeInstance.addTransientModifier(new AttributeModifier(ID, NAME, currentBonus - 0.15 / 20f, AttributeModifier.Operation.MULTIPLY_TOTAL));
             }
         }
     }
 
     @Override
-    public boolean isReady(int duration, int amplifier) {
+    public boolean isDurationEffectTick(int duration, int amplifier) {
         return true;
     }
 
     @Nonnull
     @Override
-    protected ResourceLocation getResourceLocation() {
-        return new ResourceLocation(Reference.MOD_ID, "textures/effect/incision.png");
+    @OnlyIn(Dist.CLIENT)
+    protected ResourceLocation getIconTexture() {
+        return new ResourceLocation(Reference.MOD_ID, "textures/mob_effect/incision.png");
     }
 }

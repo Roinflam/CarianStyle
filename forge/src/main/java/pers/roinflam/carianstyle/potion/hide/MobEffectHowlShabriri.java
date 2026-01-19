@@ -1,10 +1,12 @@
 package pers.roinflam.carianstyle.potion.hide;
 
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.SharedMonsterAttributes;
+import net.minecraft.world.effect.MobEffectCategory;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import pers.roinflam.carianstyle.base.potion.hide.HideBase;
 
 import javax.annotation.Nonnull;
@@ -21,19 +23,19 @@ import javax.annotation.Nonnull;
 public class MobEffectHowlShabriri extends HideBase {
 
     public MobEffectHowlShabriri(boolean isBadEffectIn, int liquidColorIn) {
-        super(isBadEffectIn, liquidColorIn, "howl_shabriri");
+        super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
 
-        this.registerPotionAttributeModifier(
-                SharedMonsterAttributes.ARMOR,
+        this.addAttributeModifier(
+                Attributes.ARMOR,
                 "55fb160e-958d-4962-9dcf-086634ca0699",
                 -0.15,
-                2
+                AttributeModifier.Operation.MULTIPLY_TOTAL
         );
-        this.registerPotionAttributeModifier(
-                SharedMonsterAttributes.ARMOR_TOUGHNESS,
+        this.addAttributeModifier(
+                Attributes.ARMOR_TOUGHNESS,
                 "915e48f6-3049-a15e-e892-035e2d5a7ca1",
                 -0.15,
-                2
+                AttributeModifier.Operation.MULTIPLY_TOTAL
         );
     }
 
@@ -42,13 +44,13 @@ public class MobEffectHowlShabriri extends HideBase {
      */
     @SubscribeEvent(priority = EventPriority.LOW)
     public void onLivingHeal(@Nonnull LivingHealEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase healer = evt.getEntityLiving();
-        if (healer.isPotionActive(this)) {
-            int amplifier = healer.getActivePotionEffect(this).getAmplifier();
+        LivingEntity healer = evt.getEntity();
+        if (healer.hasEffect(this)) {
+            int amplifier = healer.getEffect(this).getAmplifier();
             evt.setAmount(evt.getAmount() * (1 - (amplifier + 1) * 0.1f));
         }
     }

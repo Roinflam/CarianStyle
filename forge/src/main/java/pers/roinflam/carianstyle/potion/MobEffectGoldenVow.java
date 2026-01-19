@@ -1,10 +1,13 @@
 package pers.roinflam.carianstyle.potion;
 
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.util.DamageSource;
-import net.minecraft.util.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectCategory;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.utils.Reference;
 
@@ -21,46 +24,47 @@ import javax.annotation.Nonnull;
 public class MobEffectGoldenVow extends IconBase {
 
     public MobEffectGoldenVow(boolean isBadEffectIn, int liquidColorIn) {
-        super(isBadEffectIn, liquidColorIn, "golden_vow");
+        super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
     }
 
     @SubscribeEvent
     public void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
         DamageSource damageSource = evt.getSource();
-        if (damageSource.canHarmInCreative()) {
+        if (damageSource.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) {
             return;
         }
 
-        EntityLivingBase victim = evt.getEntityLiving();
+        LivingEntity victim = evt.getEntity();
 
         // 受击者减伤
-        if (victim.isPotionActive(this)) {
-            int amplifier = victim.getActivePotionEffect(this).getAmplifier();
+        if (victim.hasEffect(this)) {
+            int amplifier = victim.getEffect(this).getAmplifier();
             evt.setAmount(evt.getAmount() * (1 - (amplifier + 1) * 0.1f));
         }
 
         // 攻击者增伤
-        if (damageSource.getTrueSource() instanceof EntityLivingBase) {
-            EntityLivingBase attacker = (EntityLivingBase) damageSource.getTrueSource();
-            if (attacker.isPotionActive(this)) {
-                int amplifier = attacker.getActivePotionEffect(this).getAmplifier();
+        if (damageSource.getEntity() instanceof LivingEntity) {
+            LivingEntity attacker = (LivingEntity) damageSource.getEntity();
+            if (attacker.hasEffect(this)) {
+                int amplifier = attacker.getEffect(this).getAmplifier();
                 evt.setAmount(evt.getAmount() * (1 + (amplifier + 1) * 0.15f));
             }
         }
     }
 
     @Override
-    public boolean isReady(int duration, int amplifier) {
+    public boolean isDurationEffectTick(int duration, int amplifier) {
         return true;
     }
 
     @Nonnull
     @Override
-    protected ResourceLocation getResourceLocation() {
-        return new ResourceLocation(Reference.MOD_ID, "textures/effect/golden_vow.png");
+    @OnlyIn(Dist.CLIENT)
+    protected ResourceLocation getIconTexture() {
+        return new ResourceLocation(Reference.MOD_ID, "textures/mob_effect/golden_vow.png");
     }
 }

@@ -1,14 +1,12 @@
-// 文件：EnchantmentStampSweep.java
-// 路径：src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentStampSweep.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.util.DamageSource;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -16,41 +14,41 @@ import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
-import javax.annotation.Nonnull;
 import java.util.List;
 
 /**
  * 箭步回旋斩附魔
+ * <p>
+ * 冲刺攻击时，玩家快速转一圈（360度旋转）
+ * 对自身周围3格的所有敌人（包括被直接攻击的目标）造成额外伤害
+ * 伤害 = 本次攻击伤害 + 10% × 等级
+ * 不会伤害队友
+ * </p>
  *
- * 效果：
- * - 冲刺攻击时，玩家快速转一圈（360度旋转）
- * - 对自身周围3格的所有敌人（包括被直接攻击的目标）造成额外伤害
- * - 伤害 = 本次攻击伤害 + 10% × 等级
- * - 不会伤害队友
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "stamp_sweep",
-        category = EnchantmentCategory.COMBAT_SKILL,
-        rarity = EnchantmentRarity.RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantmentCategory.WEAPON,
+        slots = {EquipmentSlot.MAINHAND}
 )
 public class EnchantmentStampSweep extends EnchantmentBase {
 
-        /**
-         * 构造函数
-         */
         public EnchantmentStampSweep() {
-                super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+                super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
         }
 
         /**
          * 攻击时触发：冲刺状态下对周围敌人造成范围伤害并旋转视角
          */
         @Override
-        protected void onDamageAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
-                EntityLivingBase attacker = ctx.getHolder();
-                EntityLivingBase directTarget = ctx.getVictim();
+        protected void onDamageAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
+                LivingEntity attacker = ctx.getHolder();
+                LivingEntity directTarget = ctx.getVictim();
 
-                // 被攻击的目标不能为空
                 if (directTarget == null) {
                         return;
                 }
@@ -67,8 +65,8 @@ public class EnchantmentStampSweep extends EnchantmentBase {
                 }
 
                 // 如果是玩家，执行旋转动画
-                if (attacker instanceof EntityPlayerMP) {
-                        performSpinAnimation((EntityPlayerMP) attacker);
+                if (attacker instanceof ServerPlayer) {
+                        performSpinAnimation((ServerPlayer) attacker);
                 }
 
                 // 计算额外伤害：原始伤害 × 10% × 等级
@@ -76,8 +74,8 @@ public class EnchantmentStampSweep extends EnchantmentBase {
                 float bonusDamage = baseDamage * effectiveLevel * 0.1f;
 
                 // 获取周围3格内的所有生物
-                List<EntityLivingBase> nearbyEntities = EntityUtil.getNearbyEntities(
-                        EntityLivingBase.class,
+                List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
+                        LivingEntity.class,
                         attacker,
                         3,
                         entity -> {
@@ -86,7 +84,7 @@ public class EnchantmentStampSweep extends EnchantmentBase {
                                         return false;
                                 }
                                 // 排除队友（同队的不攻击）
-                                if (entity.isOnSameTeam(attacker)) {
+                                if (entity.isAlliedTo(attacker)) {
                                         return false;
                                 }
                                 return true;
@@ -94,15 +92,15 @@ public class EnchantmentStampSweep extends EnchantmentBase {
                 );
 
                 // 对周围所有敌人造成伤害
-                for (EntityLivingBase target : nearbyEntities) {
+                for (LivingEntity target : nearbyEntities) {
                         // 如果是被直接攻击的目标，给它增加额外伤害
                         if (target.equals(directTarget)) {
                                 // 直接目标：在原有伤害基础上增加10%
                                 ctx.addDamage(bonusDamage);
                         } else {
                                 // 周围其他敌人：造成完整伤害（原始伤害 + 10%）
-                                DamageSource damageSource = DamageSource.causeMobDamage(attacker);
-                                target.attackEntityFrom(damageSource, baseDamage + bonusDamage);
+                                DamageSource damageSource = attacker.damageSources().mobAttack(attacker);
+                                target.hurt(damageSource, baseDamage + bonusDamage);
                         }
                 }
 
@@ -117,18 +115,18 @@ public class EnchantmentStampSweep extends EnchantmentBase {
          *
          * @param player 服务端玩家
          */
-        private void performSpinAnimation(@Nonnull EntityPlayerMP player) {
+        private void performSpinAnimation(@NotNull ServerPlayer player) {
                 // 记录初始位置和朝向
-                final double initialX = player.posX;
-                final double initialY = player.posY;
-                final double initialZ = player.posZ;
-                final float initialYaw = player.rotationYaw;
-                final float initialPitch = player.rotationPitch;
+                final double initialX = player.getX();
+                final double initialY = player.getY();
+                final double initialZ = player.getZ();
+                final float initialYaw = player.getYRot();
+                final float initialPitch = player.getXRot();
 
-                // 旋转持续时间：8 tick（0.4秒）
+                // 旋转持续时间：12 tick（0.6秒）
                 final int duration = 12;
 
-                // 每tick旋转角度：360度 / 8tick = 45度/tick
+                // 每tick旋转角度：360度 / 12tick = 30度/tick
                 final float degreePerTick = 360.0f / duration;
 
                 // 创建旋转任务
@@ -137,9 +135,9 @@ public class EnchantmentStampSweep extends EnchantmentBase {
 
                         @Override
                         public void run() {
-                                if (++tick > duration || !player.isEntityAlive()) {
+                                if (++tick > duration || !player.isAlive()) {
                                         // 旋转结束，恢复到初始朝向
-                                        player.connection.setPlayerLocation(initialX, initialY, initialZ, initialYaw, initialPitch);
+                                        player.connection.teleport(initialX, initialY, initialZ, initialYaw, initialPitch);
                                         this.cancel();
                                         return;
                                 }
@@ -155,15 +153,19 @@ public class EnchantmentStampSweep extends EnchantmentBase {
                                         currentYaw += 360.0f;
                                 }
 
-                                // 使用 setPlayerLocation 同步位置和朝向到客户端
-                                player.connection.setPlayerLocation(initialX, initialY, initialZ, currentYaw, initialPitch);
+                                // 使用 teleport 同步位置和朝向到客户端
+                                player.connection.teleport(initialX, initialY, initialZ, currentYaw, initialPitch);
                         }
                 }.start();
         }
 
         @Override
-        public int getMinEnchantability(int enchantmentLevel) {
-                // RARE 的默认公式：10 + (level - 1) * 15
+        public int getMinCost(int enchantmentLevel) {
                 return (int) ((10 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
+        }
+
+        @Override
+        public int getMaxCost(int enchantmentLevel) {
+                return getMinCost(enchantmentLevel) + 50;
         }
 }

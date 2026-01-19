@@ -1,80 +1,77 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.init.Enchantments;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.potion.PotionEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
-import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
-import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * 火焰疗愈附魔
- *
+ * <p>
  * 护甲附魔，着火时受击有概率净化负面效果
  * 受到攻击时（需着火）：
  * - 2.5% × 等级的概率触发
  * - 随机移除一个负面效果
  * - 获得10%最大生命值的吸收盾
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "healing_by_fire",
-        category = EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.UNCOMMON
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantmentCategory.ARMOR,
+        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentHealingByFire extends EnchantmentBase {
 
     public EnchantmentHealingByFire() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
-                EntityEquipmentSlot.HEAD,
-                EntityEquipmentSlot.CHEST,
-                EntityEquipmentSlot.LEGS,
-                EntityEquipmentSlot.FEET
+        super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
+                EquipmentSlot.HEAD,
+                EquipmentSlot.CHEST,
+                EquipmentSlot.LEGS,
+                EquipmentSlot.FEET
         });
     }
 
-    /**
-     * 着火时受击有概率净化负面效果并获得吸收盾
-     * 由于需要累加所有护甲的附魔等级，保留静态监听器
-     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingAttack(@NotNull LivingAttackEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        // 必须有攻击来源
-        if (!(evt.getSource().getTrueSource() instanceof EntityLivingBase)) {
+        if (!(evt.getSource().getEntity() instanceof LivingEntity)) {
             return;
         }
 
-        EntityLivingBase victim = evt.getEntityLiving();
+        LivingEntity victim = evt.getEntity();
 
-        // 受击者必须着火
-        if (EntityUtil.getFire(victim) <= 0) {
+        if (victim.getRemainingFireTicks() <= 0) {
             return;
         }
 
-        // 受击者必须有药水效果
-        if (victim.getActivePotionEffects().isEmpty()) {
+        if (victim.getActiveEffects().isEmpty()) {
             return;
         }
 
@@ -83,11 +80,10 @@ public class EnchantmentHealingByFire extends EnchantmentBase {
             return;
         }
 
-        // 从所有护甲累加附魔等级
         int totalLevel = 0;
-        for (ItemStack armor : victim.getArmorInventoryList()) {
+        for (ItemStack armor : victim.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(healingByFire, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(healingByFire, armor);
             }
         }
 
@@ -99,38 +95,39 @@ public class EnchantmentHealingByFire extends EnchantmentBase {
             return;
         }
 
-        // 2.5% × 等级的概率触发
         if (!RandomUtil.percentageChance(totalLevel * 2.5)) {
             return;
         }
 
-        // 筛选可移除的负面效果（负面、非瞬时、可渲染）
-        List<PotionEffect> badEffects = new ArrayList<>(victim.getActivePotionEffects());
+        List<MobEffectInstance> badEffects = new ArrayList<>(victim.getActiveEffects());
         badEffects.removeIf(effect ->
-                !effect.getPotion().isBadEffect() ||
-                        effect.getPotion().isInstant() ||
-                        !effect.getPotion().shouldRender(effect)
+                !effect.getEffect().isBeneficial() &&
+                        effect.getEffect().isInstantenous() &&
+                        effect.isVisible()
         );
 
         if (badEffects.isEmpty()) {
             return;
         }
 
-        // 随机移除一个负面效果
-        PotionEffect toRemove = badEffects.get(RandomUtil.getInt(0, badEffects.size() - 1));
-        victim.removePotionEffect(toRemove.getPotion());
+        MobEffectInstance toRemove = badEffects.get(RandomUtil.getInt(0, badEffects.size() - 1));
+        victim.removeEffect(toRemove.getEffect());
 
-        // 获得10%最大生命值的吸收盾
         victim.setAbsorptionAmount(victim.getAbsorptionAmount() + victim.getMaxHealth() * 0.1f);
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((20 + (enchantmentLevel - 1) * 5) * ConfigLoader.enchantingDifficulty);
     }
 
     @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) && !ench.equals(Enchantments.PROTECTION);
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
+    }
+
+    @Override
+    protected boolean checkCompatibility(@NotNull Enchantment ench) {
+        return super.checkCompatibility(ench) && !ench.equals(Enchantments.ALL_DAMAGE_PROTECTION);
     }
 }

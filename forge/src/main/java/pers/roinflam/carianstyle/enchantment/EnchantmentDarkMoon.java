@@ -1,36 +1,33 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLiving;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.MobEffects;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.potion.PotionEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentFullMoon;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
-import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 /**
  * 暗月附魔
- *
+ * <p>
  * 武器附魔，夜晚魔法伤害强化
  * 功能：
  * 1. 受到魔法伤害时减伤25%（有满月时37.5%）
@@ -38,11 +35,17 @@ import javax.annotation.Nullable;
  * 3. 对锁定自己为目标的敌人额外增伤并吸血
  * 4. 治疗增强25%（有满月时37.5%）
  * 5. 持续夜视效果
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "dark_moon",
-        category = EnchantmentCategory.RECOLLECT,
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT,
         rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantmentCategory.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
         conflictsWith = {
                 EnchantmentScarletCorruption.class,
                 EnchantmentFireGivesPower.class,
@@ -54,21 +57,18 @@ import javax.annotation.Nullable;
 public class EnchantmentDarkMoon extends EnchantmentBase {
 
     public EnchantmentDarkMoon() {
-        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
-    /**
-     * 检查是否装备了满月附魔
-     */
-    private static boolean hasFullMoonEnchantment(@Nonnull EntityLivingBase entity) {
+    private static boolean hasFullMoonEnchantment(@NotNull LivingEntity entity) {
         Enchantment fullMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentFullMoon.class);
         if (fullMoon == null) {
             return false;
         }
 
-        for (ItemStack armor : entity.getArmorInventoryList()) {
+        for (ItemStack armor : entity.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                if (EnchantmentHelper.getEnchantmentLevel(fullMoon, armor) > 0) {
+                if (EnchantmentHelper.getItemEnchantmentLevel(fullMoon, armor) > 0) {
                     return true;
                 }
             }
@@ -76,39 +76,33 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
         return false;
     }
 
-    /**
-     * 处理伤害事件
-     * 由于涉及复杂的双向逻辑和特殊检查，保留静态监听器
-     */
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (evt.getEntity().world.isDaytime()) {
+        if (evt.getEntity().level().isDay()) {
             return;
         }
 
-        if (!evt.getSource().isMagicDamage()) {
+        if (!DamageSourceUtil.isMagicDamage(evt.getSource())) {
             return;
         }
 
-        EntityLivingBase victim = evt.getEntityLiving();
+        LivingEntity victim = evt.getEntity();
         Enchantment darkMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDarkMoon.class);
         if (darkMoon == null) {
             return;
         }
 
         // 受击者视角（减伤）
-        if (victim instanceof EntityLiving) {
-            EntityLiving livingVictim = (EntityLiving) victim;
+        if (victim instanceof Mob) {
+            Mob livingVictim = (Mob) victim;
 
-            if (!livingVictim.getHeldItem(livingVictim.getActiveHand()).isEmpty()) {
-                int level = EnchantmentHelper.getEnchantmentLevel(
-                        darkMoon,
-                        livingVictim.getHeldItem(livingVictim.getActiveHand())
-                );
+            ItemStack heldItem = livingVictim.getItemInHand(livingVictim.getUsedItemHand());
+            if (!heldItem.isEmpty()) {
+                int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);
 
                 if (ConfigLoader.levelLimit) {
                     level = Math.min(level, 10);
@@ -123,20 +117,18 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
         }
 
         // 攻击者视角（增伤+吸血）
-        if (!(evt.getSource().getImmediateSource() instanceof EntityLivingBase)) {
+        if (!(evt.getSource().getDirectEntity() instanceof LivingEntity)) {
             return;
         }
 
-        EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+        LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
 
-        if (attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+        ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                darkMoon,
-                attacker.getHeldItem(attacker.getActiveHand())
-        );
+        int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
@@ -146,8 +138,8 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
             return;
         }
 
-        if (attacker instanceof EntityPlayer) {
-            if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
+        if (attacker instanceof Player) {
+            if (((Player) attacker).getAttackStrengthScale(0.5f) != 1) {
                 return;
             }
         }
@@ -157,9 +149,9 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
 
         evt.setAmount(evt.getAmount() * (1 + damageBonus));
 
-        if (victim instanceof EntityLiving) {
-            EntityLiving livingVictim = (EntityLiving) victim;
-            if (livingVictim.getAttackTarget() != null && livingVictim.getAttackTarget().equals(attacker)) {
+        if (victim instanceof Mob) {
+            Mob livingVictim = (Mob) victim;
+            if (livingVictim.getTarget() != null && livingVictim.getTarget().equals(attacker)) {
                 float extraDamage = hasFullMoon ? 0.075f : 0.05f;
 
                 evt.setAmount(evt.getAmount() + livingVictim.getHealth() * extraDamage);
@@ -170,33 +162,28 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
         }
     }
 
-    /**
-     * 治疗增强
-     */
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingHeal(@NotNull LivingHealEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (evt.getEntity().world.isDaytime()) {
+        if (evt.getEntity().level().isDay()) {
             return;
         }
 
-        EntityLivingBase healer = evt.getEntityLiving();
+        LivingEntity healer = evt.getEntity();
         Enchantment darkMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDarkMoon.class);
         if (darkMoon == null) {
             return;
         }
 
-        if (healer.getHeldItem(healer.getActiveHand()).isEmpty()) {
+        ItemStack heldItem = healer.getItemInHand(healer.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                darkMoon,
-                healer.getHeldItem(healer.getActiveHand())
-        );
+        int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
@@ -211,16 +198,13 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
         evt.setAmount(evt.getAmount() * (1 + healBonus));
     }
 
-    /**
-     * 持续夜视效果
-     */
     @SubscribeEvent
-    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
-        if (evt.player.world.isRemote) {
+    public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
+        if (evt.player.level().isClientSide) {
             return;
         }
 
-        if (evt.player.world.isDaytime()) {
+        if (evt.player.level().isDay()) {
             return;
         }
 
@@ -228,41 +212,39 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
             return;
         }
 
-        EntityPlayer player = evt.player;
+        Player player = evt.player;
         Enchantment darkMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDarkMoon.class);
         if (darkMoon == null) {
             return;
         }
 
-        if (!player.isEntityAlive()) {
+        if (!player.isAlive()) {
             return;
         }
 
-        if (player.getHeldItem(player.getActiveHand()).isEmpty()) {
+        ItemStack heldItem = player.getItemInHand(player.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                darkMoon,
-                player.getHeldItem(player.getActiveHand())
-        );
+        int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
         }
 
         if (level > 0) {
-            player.addPotionEffect(new PotionEffect(MobEffects.NIGHT_VISION, 210));
+            player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 210));
         }
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) (35 * ConfigLoader.enchantingDifficulty);
     }
 
     @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench);
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

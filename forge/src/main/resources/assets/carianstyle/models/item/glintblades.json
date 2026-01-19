@@ -1,7 +1,7 @@
 {
   "parent": "item/handheld",
   "textures": {
-    "layer0": "carianstyle:items/glintblades"
+    "layer0": "carianstyle:item/glintblades"
   },
   "display": {
     "ground": {

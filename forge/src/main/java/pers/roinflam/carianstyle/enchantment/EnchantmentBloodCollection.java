@@ -1,30 +1,34 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
-import javax.annotation.Nonnull;
-
 /**
  * 血的收藏附魔
- *
+ * <p>
  * 血量越低增伤越高，同时治疗自身
  * 与BloodSlash联动时治疗翻倍
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "blood_collection",
-        category = EnchantmentCategory.GENERAL,
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.RARE,
+        type = EnchantmentCategory.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
         conflictsWith = {
                 EnchantmentScarletCorruption.class,
                 EnchantmentFireGivesPower.class,
@@ -36,12 +40,12 @@ import javax.annotation.Nonnull;
 public class EnchantmentBloodCollection extends EnchantmentBase {
 
     public EnchantmentBloodCollection() {
-        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
     @Override
-    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
-        EntityLivingBase attacker = ctx.getHolder();
+    protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
+        LivingEntity attacker = ctx.getHolder();
 
         int effectiveLevel = level;
         if (ConfigLoader.levelLimit) {
@@ -49,7 +53,7 @@ public class EnchantmentBloodCollection extends EnchantmentBase {
         }
 
         if (ctx.isHolderPlayer()) {
-            if (!isJustSwung(ctx.getHolderAsPlayer())) {
+            if (ctx.getHolderAsPlayer().getAttackStrengthScale(0.5F) < 0.9F) {
                 return;
             }
         }
@@ -63,9 +67,9 @@ public class EnchantmentBloodCollection extends EnchantmentBase {
         float healMultiplier = 0.02f;
         Enchantment bloodSlash = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBloodSlash.class);
         if (bloodSlash != null) {
-            if (EnchantmentHelper.getEnchantmentLevel(
+            if (EnchantmentHelper.getItemEnchantmentLevel(
                     bloodSlash,
-                    attacker.getHeldItem(attacker.getActiveHand())) > 0) {
+                    attacker.getItemInHand(attacker.getUsedItemHand())) > 0) {
                 healMultiplier = 0.04f;
             }
         }
@@ -74,7 +78,12 @@ public class EnchantmentBloodCollection extends EnchantmentBase {
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((25 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

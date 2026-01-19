@@ -1,10 +1,7 @@
 package pers.roinflam.carianstyle.item.entity;
 
-import net.minecraft.creativetab.CreativeTabs;
-import net.minecraft.item.ItemSword;
-import pers.roinflam.carianstyle.init.CarianStyleItem;
-import pers.roinflam.carianstyle.utils.IHasModel;
-import pers.roinflam.carianstyle.utils.util.ItemUtil;
+import net.minecraft.world.item.SwordItem;
+import net.minecraft.world.item.Tier;
 
 import javax.annotation.Nonnull;
 
@@ -14,11 +11,17 @@ import javax.annotation.Nonnull;
  * 用于EntityGlintblades实体的渲染模型
  * </p>
  */
-public class ItemGlintblades extends ItemSword implements IHasModel {
+public class ItemGlintblades extends SwordItem {
 
-    public ItemGlintblades(String name, CreativeTabs creativeTabs, @Nonnull ToolMaterial material) {
-        super(material);
-        ItemUtil.registerItem(this, name, creativeTabs);
-        CarianStyleItem.ITEMS.add(this);
+    /**
+     * 构造函数
+     *
+     * @param tier 物品材质等级
+     * @param properties 物品属性
+     */
+    public ItemGlintblades(@Nonnull Tier tier, @Nonnull Properties properties) {
+        // 1.20.1: SwordItem 构造函数参数变化
+        // (Tier, int attackDamage, float attackSpeed, Properties)
+        super(tier, 3, -2.4F, properties);
     }
 }

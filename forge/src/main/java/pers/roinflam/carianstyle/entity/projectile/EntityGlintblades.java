@@ -1,16 +1,19 @@
 package pers.roinflam.carianstyle.entity.projectile;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.projectile.EntityThrowable;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.network.datasync.DataParameter;
-import net.minecraft.network.datasync.DataSerializers;
-import net.minecraft.network.datasync.EntityDataManager;
-import net.minecraft.util.DamageSource;
-import net.minecraft.util.math.RayTraceResult;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.projectile.ThrowableProjectile;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+import pers.roinflam.carianstyle.init.CarianStyleEntity;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -26,17 +29,18 @@ import javax.annotation.Nullable;
  * - 大型剑会产生爆炸
  * </p>
  */
-public class EntityGlintblades extends EntityThrowable {
+public class EntityGlintblades extends ThrowableProjectile {
 
-    public static final String ID = "glintblades";
-    public static final String NAME = "glintblades";
+    // ==================== 数据参数 ====================
 
-    private static final DataParameter<Boolean> SHOOTED = EntityDataManager.createKey(
-            EntityGlintblades.class, DataSerializers.BOOLEAN);
-    private static final DataParameter<Integer> DEAD_TICK = EntityDataManager.createKey(
-            EntityGlintblades.class, DataSerializers.VARINT);
-    private static final DataParameter<Float> SIZE = EntityDataManager.createKey(
-            EntityGlintblades.class, DataSerializers.FLOAT);
+    private static final EntityDataAccessor<Boolean> SHOOTED =
+            SynchedEntityData.defineId(EntityGlintblades.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Integer> DEAD_TICK =
+            SynchedEntityData.defineId(EntityGlintblades.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Float> SIZE =
+            SynchedEntityData.defineId(EntityGlintblades.class, EntityDataSerializers.FLOAT);
+
+    // ==================== 字段 ====================
 
     /** 伤害值 */
     private float damage = 0;
@@ -46,28 +50,46 @@ public class EntityGlintblades extends EntityThrowable {
     private Entity target;
 
     /** 伤害来源 */
-    private DamageSource damageSource = DamageSource.MAGIC;
+    private DamageSource damageSource;
 
-    public EntityGlintblades(@Nonnull World worldIn) {
-        super(worldIn);
+    // ==================== 构造函数 ====================
+
+    /**
+     * 用于注册的构造函数
+     */
+    public EntityGlintblades(@Nonnull EntityType<? extends EntityGlintblades> type, @Nonnull Level level) {
+        super(type, level);
         this.target = null;
         this.setNoGravity(true);
-        this.setSize(0.75f, 0.75f);
+        // 1.20.1: DamageSource需要通过DamageSource获取
+        this.damageSource = level.damageSources().magic();
     }
 
-    public EntityGlintblades(@Nonnull EntityLivingBase throwerIn, @Nullable Entity target) {
-        super(throwerIn.world, throwerIn);
+    /**
+     * 创建实例的便捷构造函数
+     */
+    public EntityGlintblades(@Nonnull Level level) {
+        this(CarianStyleEntity.GLINTBLADES.get(), level);
+    }
+
+    /**
+     * 从投掷者创建的构造函数
+     */
+    public EntityGlintblades(@Nonnull LivingEntity thrower, @Nullable Entity target) {
+        // 1.20.1: 调用父类构造函数传入EntityType和投掷者
+        super(CarianStyleEntity.GLINTBLADES.get(), thrower, thrower.level());
         this.target = target;
         this.setNoGravity(true);
-        this.setSize(0.75f, 0.75f);
+        this.damageSource = thrower.level().damageSources().magic();
     }
 
     @Override
-    protected void entityInit() {
-        super.entityInit();
-        dataManager.register(SHOOTED, false);
-        dataManager.register(DEAD_TICK, 0);
-        dataManager.register(SIZE, 1f);
+    protected void defineSynchedData() {
+        // 1.20.1: entityInit → defineSynchedData
+        // 注意：父类的defineSynchedData已经被调用，这里只注册自己的数据
+        this.entityData.define(SHOOTED, false);
+        this.entityData.define(DEAD_TICK, 0);
+        this.entityData.define(SIZE, 1f);
     }
 
     // ==================== Getter/Setter ====================
@@ -104,32 +126,32 @@ public class EntityGlintblades extends EntityThrowable {
     }
 
     public boolean isShooted() {
-        return dataManager.get(SHOOTED);
+        return this.entityData.get(SHOOTED);
     }
 
     @Nonnull
     private EntityGlintblades setShooted(boolean shooted) {
-        dataManager.set(SHOOTED, shooted);
+        this.entityData.set(SHOOTED, shooted);
         return this;
     }
 
     public int getDeadTick() {
-        return dataManager.get(DEAD_TICK);
+        return this.entityData.get(DEAD_TICK);
     }
 
     @Nonnull
     public EntityGlintblades setDeadTick(int tick) {
-        dataManager.set(DEAD_TICK, tick);
+        this.entityData.set(DEAD_TICK, tick);
         return this;
     }
 
     public float getSize() {
-        return dataManager.get(SIZE);
+        return this.entityData.get(SIZE);
     }
 
     @Nonnull
     public EntityGlintblades setSize(float size) {
-        dataManager.set(SIZE, size);
+        this.entityData.set(SIZE, size);
         return this;
     }
 
@@ -141,83 +163,113 @@ public class EntityGlintblades extends EntityThrowable {
      * @param velocity 速度倍率
      */
     public void shoot(float velocity) {
-        if (target == null || !target.isEntityAlive()) {
-            this.setDead();
+        if (target == null || !target.isAlive()) {
+            // 1.20.1: setDead → discard
+            this.discard();
             return;
         }
 
         setShooted(true);
 
         // 计算目标位置（瞄准目标眼睛高度）
-        double targetX = target.posX - this.posX;
-        double targetY = (target.posY + target.getEyeHeight()) - this.posY;
-        double targetZ = target.posZ - this.posZ;
+        // 1.20.1: posX/posY/posZ → getX()/getY()/getZ()
+        double targetX = target.getX() - this.getX();
+        double targetY = (target.getY() + target.getEyeHeight()) - this.getY();
+        double targetZ = target.getZ() - this.getZ();
 
         // 预判目标移动
-        Vec3d targetVec = new Vec3d(targetX, targetY, targetZ).scale(0.25);
-        Vec3d motionVec = new Vec3d(target.motionX, target.motionY, target.motionZ);
+        Vec3 targetVec = new Vec3(targetX, targetY, targetZ).scale(0.25);
+        // 1.20.1: motionX/motionY/motionZ → getDeltaMovement()
+        Vec3 motionVec = target.getDeltaMovement();
 
-        double motionLen = motionVec.lengthVector();
-        double targetLen = targetVec.lengthVector();
+        double motionLen = motionVec.length();
+        double targetLen = targetVec.length();
         double totalLen = Math.sqrt(motionLen * motionLen + targetLen * targetLen);
 
         if (totalLen > 0) {
-            Vec3d finalVec = motionVec.scale(motionLen / totalLen).add(targetVec.scale(targetLen / totalLen));
-            this.motionX = finalVec.x * velocity;
-            this.motionY = finalVec.y * 0.5 + (targetY / 2.5 * 0.25) * velocity;
-            this.motionZ = finalVec.z * velocity;
+            Vec3 finalVec = motionVec.scale(motionLen / totalLen)
+                    .add(targetVec.scale(targetLen / totalLen));
+            // 1.20.1: 设置速度使用 setDeltaMovement
+            this.setDeltaMovement(
+                    finalVec.x * velocity,
+                    finalVec.y * 0.5 + (targetY / 2.5 * 0.25) * velocity,
+                    finalVec.z * velocity
+            );
         }
     }
 
     @Override
-    protected void onImpact(RayTraceResult result) {
+    protected void onHit(@Nonnull HitResult result) {
+        // 1.20.1: onImpact → onHit
+        super.onHit(result);
+
         // 子类可重写的额外逻辑
         extraAction(result);
 
         // 大型剑产生爆炸
         if (getSize() > 5) {
-            this.world.createExplosion(thrower, this.posX, this.posY, this.posZ, getSize(), false);
+            // 1.20.1: 爆炸API变化
+            this.level().explode(
+                    this.getOwner(),
+                    this.getX(),
+                    this.getY(),
+                    this.getZ(),
+                    getSize(),
+                    Level.ExplosionInteraction.NONE
+            );
         }
 
+        this.discard();
+    }
+
+    @Override
+    protected void onHitEntity(@Nonnull EntityHitResult result) {
+        // 1.20.1: 新增专门的实体命中回调
+        super.onHitEntity(result);
+
+        Entity hitEntity = result.getEntity();
+
         // 命中生物造成伤害
-        if (result.entityHit instanceof EntityLivingBase) {
-            EntityLivingBase target = (EntityLivingBase) result.entityHit;
+        if (hitEntity instanceof LivingEntity) {
+            LivingEntity target = (LivingEntity) hitEntity;
 
             // 不伤害投掷者
-            if (target.equals(thrower)) {
+            // 1.20.1: thrower → getOwner()
+            if (target.equals(this.getOwner())) {
                 return;
             }
 
             // 重置无敌帧后造成伤害
-            target.hurtResistantTime = target.maxHurtResistantTime / 2;
-            target.attackEntityFrom(damageSource, damage);
-            target.hurtResistantTime = target.maxHurtResistantTime / 2;
+            // 1.20.1: hurtResistantTime → invulnerableTime
+            target.invulnerableTime = target.invulnerableDuration / 2;
+            target.hurt(damageSource, damage);
+            target.invulnerableTime = target.invulnerableDuration / 2;
         }
-
-        this.setDead();
     }
 
     /**
      * 命中时的额外逻辑（子类可重写）
      */
-    public void extraAction(RayTraceResult result) {
+    public void extraAction(HitResult result) {
         // 默认无额外逻辑
     }
 
     @Override
-    public void onUpdate() {
-        super.onUpdate();
+    public void tick() {
+        // 1.20.1: onUpdate → tick
+        super.tick();
 
-        if (!this.world.isRemote) {
+        // 1.20.1: world.isRemote → level().isClientSide
+        if (!this.level().isClientSide) {
             // 无目标时消失
             if (target == null) {
-                this.setDead();
+                this.discard();
                 return;
             }
 
             // 未发射状态下达到死亡时间时消失
-            if (!isShooted() && getDeadTick() > 0 && this.ticksExisted >= getDeadTick() - 1) {
-                this.setDead();
+            if (!isShooted() && getDeadTick() > 0 && this.tickCount >= getDeadTick() - 1) {
+                this.discard();
             }
         }
     }
@@ -225,18 +277,20 @@ public class EntityGlintblades extends EntityThrowable {
     // ==================== NBT ====================
 
     @Override
-    public void writeEntityToNBT(NBTTagCompound compound) {
-        super.writeEntityToNBT(compound);
-        compound.setBoolean("shooted", isShooted());
-        compound.setInteger("deadTick", getDeadTick());
-        compound.setFloat("size", getSize());
+    public void addAdditionalSaveData(@Nonnull CompoundTag compound) {
+        // 1.20.1: writeEntityToNBT → addAdditionalSaveData
+        super.addAdditionalSaveData(compound);
+        compound.putBoolean("shooted", isShooted());
+        compound.putInt("deadTick", getDeadTick());
+        compound.putFloat("size", getSize());
     }
 
     @Override
-    public void readEntityFromNBT(NBTTagCompound compound) {
-        super.readEntityFromNBT(compound);
+    public void readAdditionalSaveData(@Nonnull CompoundTag compound) {
+        // 1.20.1: readEntityFromNBT → readAdditionalSaveData
+        super.readAdditionalSaveData(compound);
         setShooted(compound.getBoolean("shooted"));
-        setDeadTick(compound.getInteger("deadTick"));
+        setDeadTick(compound.getInt("deadTick"));
         setSize(compound.getFloat("size"));
     }
 }

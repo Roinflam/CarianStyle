@@ -1,11 +1,14 @@
 package pers.roinflam.carianstyle.potion;
 
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.util.DamageSource;
-import net.minecraft.util.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectCategory;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.utils.Reference;
 
@@ -22,40 +25,41 @@ import javax.annotation.Nonnull;
 public class MobEffectProtectionOfTheErdtree extends IconBase {
 
     public MobEffectProtectionOfTheErdtree(boolean isBadEffectIn, int liquidColorIn) {
-        super(isBadEffectIn, liquidColorIn, "protection_of_the_erdtree");
+        super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
     public void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
         DamageSource damageSource = evt.getSource();
 
         // 排除创造模式伤害、绝对伤害、生物来源伤害
-        if (damageSource.canHarmInCreative() || damageSource.isDamageAbsolute()) {
+        if (damageSource.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) {
             return;
         }
-        if (damageSource.getTrueSource() instanceof EntityLivingBase) {
+        if (damageSource.getEntity() instanceof LivingEntity) {
             return;
         }
 
-        EntityLivingBase victim = evt.getEntityLiving();
-        if (victim.isPotionActive(this)) {
-            int amplifier = victim.getActivePotionEffect(this).getAmplifier();
+        LivingEntity victim = evt.getEntity();
+        if (victim.hasEffect(this)) {
+            int amplifier = victim.getEffect(this).getAmplifier();
             evt.setAmount(evt.getAmount() * (1 - (amplifier + 1) * 0.2f));
         }
     }
 
     @Override
-    public boolean isReady(int duration, int amplifier) {
+    public boolean isDurationEffectTick(int duration, int amplifier) {
         return true;
     }
 
     @Nonnull
     @Override
-    protected ResourceLocation getResourceLocation() {
-        return new ResourceLocation(Reference.MOD_ID, "textures/effect/protection_of_the_erdtree.png");
+    @OnlyIn(Dist.CLIENT)
+    protected ResourceLocation getIconTexture() {
+        return new ResourceLocation(Reference.MOD_ID, "textures/mob_effect/protection_of_the_erdtree.png");
     }
 }

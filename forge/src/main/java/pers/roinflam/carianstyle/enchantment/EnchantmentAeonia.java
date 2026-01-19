@@ -1,16 +1,17 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.potion.PotionEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.living.LivingEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -18,18 +19,22 @@ import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 
-import javax.annotation.Nonnull;
-
 /**
  * 艾奥尼亚附魔
- *
+ * <p>
  * 被动：每秒给自己施加猩红腐烂
  * 攻击：目标有猩红腐烂时，治疗自身最大血量×10%
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "aeonia",
-        category = EnchantmentCategory.GENERAL,
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantmentCategory.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
         conflictsWith = {
                 EnchantmentFireGivesPower.class,
                 EnchantmentFireDevoured.class
@@ -41,24 +46,24 @@ public class EnchantmentAeonia extends EnchantmentBase {
     private static final int RECOLLECT_ENCHANTABILITY = 35;
 
     public EnchantmentAeonia() {
-        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
     @Override
-    protected void onDamageAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
-        EntityLivingBase attacker = ctx.getHolder();
-        EntityLivingBase victim = ctx.getVictim();
+    protected void onDamageAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
+        LivingEntity attacker = ctx.getHolder();
+        LivingEntity victim = ctx.getVictim();
 
         if (victim == null) {
             return;
         }
 
-        if (victim.getActivePotionEffect(CarianStylePotion.SCARLET_ROT) == null) {
+        if (victim.getEffect(CarianStylePotion.SCARLET_ROT.get()) == null) {
             return;
         }
 
         if (ctx.isHolderPlayer()) {
-            if (!isJustSwung(ctx.getHolderAsPlayer())) {
+            if (ctx.getHolderAsPlayer().getAttackStrengthScale(0.5F) < 0.9F) {
                 return;
             }
         }
@@ -67,18 +72,19 @@ public class EnchantmentAeonia extends EnchantmentBase {
     }
 
     @SubscribeEvent
-    public static void onLivingUpdate(@Nonnull LivingEvent.LivingUpdateEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingTick(@NotNull LivingEvent.LivingTickEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (evt.getEntity().world.getTotalWorldTime() % 20 != 0) {
+        if (evt.getEntity().tickCount % 20 != 0) {
             return;
         }
 
-        EntityLivingBase holder = evt.getEntityLiving();
+        LivingEntity holder = evt.getEntity();
 
-        if (holder.getHeldItem(holder.getActiveHand()).isEmpty()) {
+        ItemStack heldItem = holder.getItemInHand(holder.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
@@ -87,17 +93,20 @@ public class EnchantmentAeonia extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                aeonia,
-                holder.getHeldItem(holder.getActiveHand()));
+        int level = EnchantmentHelper.getItemEnchantmentLevel(aeonia, heldItem);
 
         if (level > 0) {
-            holder.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_ROT, 21, 0));
+            holder.addEffect(new MobEffectInstance(CarianStylePotion.SCARLET_ROT.get(), 21, 0));
         }
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) (RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

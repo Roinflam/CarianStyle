@@ -1,16 +1,19 @@
+// 文件：EnchantmentCorpsePiler.java
+// 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentCorpsePiler.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -23,19 +26,24 @@ import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
-import javax.annotation.Nonnull;
 import java.util.UUID;
 
 /**
  * 尸山血海附魔
- *
+ * <p>
  * 击杀敌人50%概率增加击杀计数（上限50），自身死亡时计数减半
  * 攻击时：增伤+1%×计数×等级，治疗=最大血量×0.05%×计数×等级
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "corpse_piler",
-        category = EnchantmentCategory.COMBAT_SKILL,
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
         rarity = EnchantmentRarity.RARE,
+        type = EnchantmentCategory.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
         forceTreasure = true,
         conflictsWith = {
                 EnchantmentScarletCorruption.class,
@@ -51,16 +59,16 @@ public class EnchantmentCorpsePiler extends EnchantmentBase {
     private static final String KILL_COUNT_KEY = "corpse_piler_kills";
 
     public EnchantmentCorpsePiler() {
-        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
     /**
      * 攻击时根据击杀计数增伤和治疗（HIGHEST优先级）
      */
     @Override
-    protected void onDamageAsAttackerHighest(@Nonnull EnchantmentContext ctx, int level) {
-        EntityLivingBase attacker = ctx.getHolder();
-        UUID uuid = attacker.getUniqueID();
+    protected void onDamageAsAttackerHighest(@NotNull EnchantmentContext ctx, int level) {
+        LivingEntity attacker = ctx.getHolder();
+        UUID uuid = attacker.getUUID();
 
         int killCount = EnchantmentDataManager.getCounter(KILL_COUNT_KEY, uuid);
         if (killCount <= 0) {
@@ -78,12 +86,12 @@ public class EnchantmentCorpsePiler extends EnchantmentBase {
      * 击杀时增加计数，死亡时计数减半
      */
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingDeath(@NotNull LivingDeathEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase dead = evt.getEntityLiving();
+        LivingEntity dead = evt.getEntity();
 
         Enchantment corpsePiler = EnchantmentRegistry.getEnchantmentByClass(EnchantmentCorpsePiler.class);
         if (corpsePiler == null) {
@@ -91,34 +99,38 @@ public class EnchantmentCorpsePiler extends EnchantmentBase {
         }
 
         // 击杀者增加计数
-        if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-            EntityLivingBase killer = (EntityLivingBase) evt.getSource().getImmediateSource();
+        if (evt.getSource().getDirectEntity() instanceof LivingEntity) {
+            LivingEntity killer = (LivingEntity) evt.getSource().getDirectEntity();
 
-            if (!killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
-                int level = EnchantmentHelper.getEnchantmentLevel(
-                        corpsePiler,
-                        killer.getHeldItem(killer.getActiveHand()));
+            ItemStack heldItem = killer.getItemInHand(killer.getUsedItemHand());
+            if (!heldItem.isEmpty()) {
+                int level = EnchantmentHelper.getItemEnchantmentLevel(corpsePiler, heldItem);
 
                 if (level > 0) {
                     // 50%概率增加计数
-                    if (killer.world.rand.nextBoolean()) {
-                        int current = EnchantmentDataManager.getCounter(KILL_COUNT_KEY, killer.getUniqueID());
+                    if (killer.level().random.nextBoolean()) {
+                        int current = EnchantmentDataManager.getCounter(KILL_COUNT_KEY, killer.getUUID());
                         int newCount = Math.min(current + 1, 50);
-                        EnchantmentDataManager.setCounter(KILL_COUNT_KEY, killer.getUniqueID(), newCount, 6000);
+                        EnchantmentDataManager.setCounter(KILL_COUNT_KEY, killer.getUUID(), newCount, 6000);
                     }
                 }
             }
         }
 
         // 死亡者计数减半
-        int deadCount = EnchantmentDataManager.getCounter(KILL_COUNT_KEY, dead.getUniqueID());
+        int deadCount = EnchantmentDataManager.getCounter(KILL_COUNT_KEY, dead.getUUID());
         if (deadCount > 0) {
-            EnchantmentDataManager.setCounter(KILL_COUNT_KEY, dead.getUniqueID(), deadCount / 2, 6000);
+            EnchantmentDataManager.setCounter(KILL_COUNT_KEY, dead.getUUID(), deadCount / 2, 6000);
         }
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((35 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

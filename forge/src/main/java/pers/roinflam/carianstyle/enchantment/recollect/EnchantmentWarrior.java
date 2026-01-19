@@ -1,17 +1,18 @@
 package pers.roinflam.carianstyle.enchantment.recollect;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -19,19 +20,23 @@ import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
-import javax.annotation.Nonnull;
-
 /**
  * 战士附魔
- *
+ * <p>
  * 攻击：增伤25%
  * 受击：伤害减半，剩余伤害分60tick扣血
  * 击杀：治疗损失血量×25%
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "warrior",
-        category = EnchantmentCategory.RECOLLECT,
-        rarity = EnchantmentRarity.VERY_RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantmentCategory.WEAPON,
+        slots = {EquipmentSlot.MAINHAND}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentWarrior extends EnchantmentBase {
@@ -39,22 +44,23 @@ public class EnchantmentWarrior extends EnchantmentBase {
     private static final int RECOLLECT_ENCHANTABILITY = 35;
 
     public EnchantmentWarrior() {
-        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage_attack(@Nonnull LivingDamageEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingDamage_attack(@NotNull LivingDamageEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (!(evt.getSource().getImmediateSource() instanceof EntityLivingBase)) {
+        if (!(evt.getSource().getDirectEntity() instanceof LivingEntity)) {
             return;
         }
 
-        EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+        LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
 
-        if (attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+        ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
@@ -63,9 +69,7 @@ public class EnchantmentWarrior extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                warrior,
-                attacker.getHeldItem(attacker.getActiveHand()));
+        int level = EnchantmentHelper.getItemEnchantmentLevel(warrior, heldItem);
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
@@ -77,14 +81,15 @@ public class EnchantmentWarrior extends EnchantmentBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage_hurter(@Nonnull LivingDamageEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingDamage_hurter(@NotNull LivingDamageEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase victim = evt.getEntityLiving();
+        LivingEntity victim = evt.getEntity();
 
-        if (victim.getHeldItem(victim.getActiveHand()).isEmpty()) {
+        ItemStack heldItem = victim.getItemInHand(victim.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
@@ -93,9 +98,7 @@ public class EnchantmentWarrior extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                warrior,
-                victim.getHeldItem(victim.getActiveHand()));
+        int level = EnchantmentHelper.getItemEnchantmentLevel(warrior, heldItem);
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
@@ -114,13 +117,14 @@ public class EnchantmentWarrior extends EnchantmentBase {
 
             @Override
             public void run() {
-                if (++tick > 60 || !victim.isEntityAlive()) {
+                if (++tick > 60 || !victim.isAlive()) {
                     this.cancel();
                     return;
                 }
 
                 if (victim.getHealth() - damagePerTick * 2 > 0) {
-                    victim.setHealth(victim.getHealth() - damagePerTick);
+                    // 使用真伤系统
+                    EntityLivingUtil.damageHealthDirectly(victim, damagePerTick);
                 } else {
                     EntityLivingUtil.kill(victim, evt.getSource());
                     this.cancel();
@@ -130,18 +134,19 @@ public class EnchantmentWarrior extends EnchantmentBase {
     }
 
     @SubscribeEvent
-    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingDeath(@NotNull LivingDeathEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (!(evt.getSource().getImmediateSource() instanceof EntityLivingBase)) {
+        if (!(evt.getSource().getDirectEntity() instanceof LivingEntity)) {
             return;
         }
 
-        EntityLivingBase killer = (EntityLivingBase) evt.getSource().getImmediateSource();
+        LivingEntity killer = (LivingEntity) evt.getSource().getDirectEntity();
 
-        if (killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
+        ItemStack heldItem = killer.getItemInHand(killer.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
@@ -150,9 +155,7 @@ public class EnchantmentWarrior extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                warrior,
-                killer.getHeldItem(killer.getActiveHand()));
+        int level = EnchantmentHelper.getItemEnchantmentLevel(warrior, heldItem);
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
@@ -164,7 +167,12 @@ public class EnchantmentWarrior extends EnchantmentBase {
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) (RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

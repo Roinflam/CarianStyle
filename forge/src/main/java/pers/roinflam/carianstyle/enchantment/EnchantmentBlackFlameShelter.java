@@ -1,37 +1,43 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.init.Enchantments;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.DamageSource;
+import net.minecraft.tags.DamageTypeTags;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
-
-import javax.annotation.Nonnull;
+import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 /**
  * 黑焰庇护附魔
- *
+ * <p>
  * 受击：非魔法非无视防御伤害减少（等级×12.5%）
  * 代价：治疗量减少（等级×25%）
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "black_flame_shelter",
-        category = EnchantmentCategory.GENERAL,
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.RARE,
+        type = EnchantmentCategory.ARMOR_CHEST,
+        slots = {EquipmentSlot.CHEST},
         conflictsWith = {
                 EnchantmentShelterOfFire.class,
                 EnchantmentHealingByFire.class
@@ -41,19 +47,19 @@ import javax.annotation.Nonnull;
 public class EnchantmentBlackFlameShelter extends EnchantmentBase {
 
     public EnchantmentBlackFlameShelter() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+        super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
 
-    private static int getTotalLevel(EntityLivingBase entity) {
+    private static int getTotalLevel(LivingEntity entity) {
         Enchantment blackFlameShelter = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBlackFlameShelter.class);
         if (blackFlameShelter == null) {
             return 0;
         }
 
         int totalLevel = 0;
-        for (ItemStack armor : entity.getArmorInventoryList()) {
+        for (ItemStack armor : entity.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(blackFlameShelter, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(blackFlameShelter, armor);
             }
         }
         if (ConfigLoader.levelLimit) {
@@ -63,18 +69,20 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
         DamageSource damageSource = evt.getSource();
 
-        if (damageSource.isMagicDamage() || damageSource.isUnblockable()) {
+        // 1.20.1: isMagicDamage → DamageSourceUtil, isUnblockable → BYPASSES_ARMOR
+        if (DamageSourceUtil.isMagicDamage(damageSource) ||
+                damageSource.is(DamageTypeTags.BYPASSES_ARMOR)) {
             return;
         }
 
-        EntityLivingBase holder = evt.getEntityLiving();
+        LivingEntity holder = evt.getEntity();
 
         int totalLevel = getTotalLevel(holder);
         if (totalLevel <= 0) {
@@ -85,12 +93,12 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingHeal(@NotNull LivingHealEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase holder = evt.getEntityLiving();
+        LivingEntity holder = evt.getEntity();
 
         int totalLevel = getTotalLevel(holder);
         if (totalLevel <= 0) {
@@ -101,15 +109,20 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
     }
 
     @Override
-    public boolean canApplyTogether(@Nonnull Enchantment ench) {
-        if (ench == Enchantments.PROTECTION) {
+    protected boolean checkCompatibility(@NotNull Enchantment ench) {
+        if (ench == Enchantments.ALL_DAMAGE_PROTECTION) {
             return false;
         }
-        return super.canApplyTogether(ench);
+        return super.checkCompatibility(ench);
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((20 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

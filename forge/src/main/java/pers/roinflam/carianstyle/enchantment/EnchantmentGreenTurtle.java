@@ -1,86 +1,81 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.init.Enchantments;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
-import javax.annotation.Nonnull;
-
 /**
  * 绿龟附魔
- *
+ * <p>
  * 护甲附魔，增强治疗效果
  * 治疗时：
  * - 基础增益：治疗量 × 等级 × 7.5%
  * - 低血量加成：等级 × 15% × (1 - 当前血量百分比)
  * - 血量越低，加成越高
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "green_turtle",
-        category = EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.UNCOMMON
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantmentCategory.ARMOR,
+        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentGreenTurtle extends EnchantmentBase {
 
     public EnchantmentGreenTurtle() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
-                EntityEquipmentSlot.HEAD,
-                EntityEquipmentSlot.CHEST,
-                EntityEquipmentSlot.LEGS,
-                EntityEquipmentSlot.FEET
+        super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
+                EquipmentSlot.HEAD,
+                EquipmentSlot.CHEST,
+                EquipmentSlot.LEGS,
+                EquipmentSlot.FEET
         });
     }
 
-    /**
-     * 治疗时增加治疗量
-     * 由于需要累加所有护甲的附魔等级，保留静态监听器
-     */
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingHeal(@NotNull LivingHealEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase entity = evt.getEntityLiving();
+        LivingEntity entity = evt.getEntity();
 
         Enchantment greenTurtle = EnchantmentRegistry.getEnchantmentByClass(EnchantmentGreenTurtle.class);
         if (greenTurtle == null) {
             return;
         }
 
-        // 从所有护甲累加附魔等级
         int totalLevel = 0;
-        for (ItemStack armor : entity.getArmorInventoryList()) {
+        for (ItemStack armor : entity.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(greenTurtle, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(greenTurtle, armor);
             }
         }
 
-        // 注意：原代码没有等级上限检查，保持原逻辑
         if (totalLevel <= 0) {
             return;
         }
 
-        // 计算血量缺失百分比
         float missingHealthPercent = 1 - entity.getHealth() / entity.getMaxHealth();
 
-        // 基础增益：治疗量 × 等级 × 7.5%
-        // 低血量加成：等级 × 15% × 血量缺失百分比
         float bonusHeal = evt.getAmount() * totalLevel * 0.075f
                 + totalLevel * 0.15f * missingHealthPercent;
 
@@ -88,14 +83,19 @@ public class EnchantmentGreenTurtle extends EnchantmentBase {
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((20 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
     }
 
     @Override
-    public boolean canApplyTogether(@Nonnull Enchantment ench) {
-        return super.canApplyTogether(ench)
-                && !ench.equals(Enchantments.PROTECTION)
-                && !ench .equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentBlackFlameShelter.class));
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
+    }
+
+    @Override
+    protected boolean checkCompatibility(@NotNull Enchantment ench) {
+        return super.checkCompatibility(ench)
+                && !ench.equals(Enchantments.ALL_DAMAGE_PROTECTION)
+                && !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentBlackFlameShelter.class));
     }
 }

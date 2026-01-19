@@ -1,24 +1,26 @@
 package pers.roinflam.carianstyle.base.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.DamageSource;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.entity.layers.CustomHeadLayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.*;
 import net.minecraftforge.event.entity.player.CriticalHitEvent;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.util.EnchantmentUtil;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
@@ -36,14 +38,15 @@ public abstract class EnchantmentBase extends Enchantment {
     @Nullable
     protected final AutoRegisterEnchantment annotation;
 
-    protected EnchantmentBase(@Nonnull EnumEnchantmentType typeIn, @Nonnull EntityEquipmentSlot[] slots) {
-        super(Rarity.COMMON, typeIn, slots);
+    protected EnchantmentBase(@Nonnull EnchantmentCategory category, @Nonnull EquipmentSlot[] slots) {
+        // 1.20.1: Enchantment 构造函数参数变化
+        // Rarity 改为 EnchantmentCategory, EnumEnchantmentType 改为 EnchantmentCategory
+        super(Enchantment.Rarity.COMMON, category, slots);
 
         this.annotation = this.getClass().getAnnotation(AutoRegisterEnchantment.class);
 
         if (annotation != null) {
             this.enchantmentRarity = annotation.rarity();
-            EnchantmentUtil.registerEnchantment(this, annotation.id());
             CarianStyleEnchantments.ENCHANTMENTS.add(this);
             LogUtil.debug("卡利亚式附魔 - 通过注解注册附魔: %s", annotation.id());
         } else {
@@ -53,9 +56,9 @@ public abstract class EnchantmentBase extends Enchantment {
         }
     }
 
-    protected EnchantmentBase(@Nonnull Rarity rarityIn, @Nonnull EnumEnchantmentType typeIn,
-                              @Nonnull EntityEquipmentSlot[] slots, String name) {
-        super(rarityIn, typeIn, slots);
+    protected EnchantmentBase(@Nonnull Enchantment.Rarity rarityIn, @Nonnull EnchantmentCategory category,
+                              @Nonnull EquipmentSlot[] slots, String name) {
+        super(rarityIn, category, slots);
         this.annotation = null;
 
         switch (rarityIn) {
@@ -72,7 +75,6 @@ public abstract class EnchantmentBase extends Enchantment {
                 this.enchantmentRarity = EnchantmentRarity.UNCOMMON;
         }
 
-        EnchantmentUtil.registerEnchantment(this, name);
         CarianStyleEnchantments.ENCHANTMENTS.add(this);
         LogUtil.debug("卡利亚式附魔 - 通过传统方式注册附魔: %s", name);
     }
@@ -83,7 +85,8 @@ public abstract class EnchantmentBase extends Enchantment {
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
+        // 1.20.1: getMinEnchantability → getMinCost
         if (annotation != null && annotation.baseEnchantability() != -1) {
             return (int) ((annotation.baseEnchantability() +
                     (enchantmentLevel - 1) * annotation.levelMultiplier()) *
@@ -93,25 +96,27 @@ public abstract class EnchantmentBase extends Enchantment {
     }
 
     @Override
-    public int getMaxEnchantability(int enchantmentLevel) {
-        return getMinEnchantability(enchantmentLevel) * 2;
+    public int getMaxCost(int enchantmentLevel) {
+        // 1.20.1: getMaxEnchantability → getMaxCost
+        return getMinCost(enchantmentLevel) * 2;
     }
 
     @Override
-    public boolean isTreasureEnchantment() {
+    public boolean isTreasureOnly() {
+        // 1.20.1: isTreasureEnchantment → isTreasureOnly
         if (annotation != null && annotation.forceTreasure()) {
             return true;
         }
 
         switch (enchantmentRarity) {
             case VERY_RARE:
-                return ConfigLoader.isTreasureVeryRaryEnchantment || super.isTreasureEnchantment();
+                return ConfigLoader.isTreasureVeryRaryEnchantment || super.isTreasureOnly();
             case RARE:
-                return ConfigLoader.isTreasureRaryEnchantment || super.isTreasureEnchantment();
+                return ConfigLoader.isTreasureRaryEnchantment || super.isTreasureOnly();
             case UNCOMMON:
-                return ConfigLoader.isTreasureUncommonEnchantment || super.isTreasureEnchantment();
+                return ConfigLoader.isTreasureUncommonEnchantment || super.isTreasureOnly();
             default:
-                return super.isTreasureEnchantment();
+                return super.isTreasureOnly();
         }
     }
 
@@ -124,8 +129,9 @@ public abstract class EnchantmentBase extends Enchantment {
     }
 
     @Override
-    public boolean canApplyTogether(@Nonnull Enchantment other) {
-        if (!super.canApplyTogether(other)) {
+    protected boolean checkCompatibility(@Nonnull Enchantment other) {
+        // 1.20.1: canApplyTogether → checkCompatibility (逻辑相反)
+        if (!super.checkCompatibility(other)) {
             return false;
         }
 
@@ -156,29 +162,32 @@ public abstract class EnchantmentBase extends Enchantment {
         return true;
     }
 
-    protected int getEnchantmentLevelFromWeapon(@Nonnull EntityLivingBase entity) {
-        ItemStack mainHand = entity.getHeldItemMainhand();
-        ItemStack offHand = entity.getHeldItemOffhand();
+    protected int getEnchantmentLevelFromWeapon(@Nonnull LivingEntity entity) {
+        // 1.20.1: getHeldItemMainhand/Offhand → getItemInHand
+        ItemStack mainHand = entity.getItemInHand(InteractionHand.MAIN_HAND);
+        ItemStack offHand = entity.getItemInHand(InteractionHand.OFF_HAND);
 
         int level = 0;
 
         if (!mainHand.isEmpty()) {
-            level = Math.max(level, EnchantmentHelper.getEnchantmentLevel(this, mainHand));
+            // 1.20.1: EnchantmentHelper.getEnchantmentLevel → getItemEnchantmentLevel
+            level = Math.max(level, EnchantmentHelper.getItemEnchantmentLevel(this, mainHand));
         }
 
         if (!offHand.isEmpty()) {
-            level = Math.max(level, EnchantmentHelper.getEnchantmentLevel(this, offHand));
+            level = Math.max(level, EnchantmentHelper.getItemEnchantmentLevel(this, offHand));
         }
 
         return applyLevelLimit(level);
     }
 
-    protected int getEnchantmentLevelFromArmor(@Nonnull EntityLivingBase entity) {
+    protected int getEnchantmentLevelFromArmor(@Nonnull LivingEntity entity) {
         int totalLevel = 0;
 
-        for (ItemStack armor : entity.getArmorInventoryList()) {
+        // 1.20.1: getArmorInventoryList → getArmorSlots
+        for (ItemStack armor : entity.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(this, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(this, armor);
             }
         }
 
@@ -192,8 +201,8 @@ public abstract class EnchantmentBase extends Enchantment {
         return level;
     }
 
-    protected boolean isJustSwung(@Nonnull EntityPlayer player) {
-        return EntityLivingUtil.getTicksSinceLastSwing(player) == 1;
+    protected boolean isJustSwung(@Nonnull Player player) {
+        return player.getAttackStrengthScale(0.5f) == 1;
     }
 
     // ==================== LivingAttackEvent 模板方法 (10个) ====================
@@ -334,18 +343,21 @@ public abstract class EnchantmentBase extends Enchantment {
     }
 
     private static void handleLivingAttack(@Nonnull LivingAttackEvent event, @Nonnull EventPriority priority) {
-        if (event.getEntity().world.isRemote) {
+        // 1.20.1: world → level
+        if (event.getEntity().level().isClientSide) {
             return;
         }
 
         DamageSource source = event.getSource();
-        EntityLivingBase victim = event.getEntityLiving();
+        // 1.20.1: getEntityLiving → getEntity
+        LivingEntity victim = event.getEntity();
 
-        if (source.getImmediateSource() instanceof EntityLivingBase) {
-            EntityLivingBase attacker = (EntityLivingBase) source.getImmediateSource();
+        // 1.20.1: getImmediateSource → getDirectEntity, getTrueSource → getEntity
+        if (source.getDirectEntity() instanceof LivingEntity) {
+            LivingEntity attacker = (LivingEntity) source.getDirectEntity();
             processEntityEnchantments(attacker, victim, source, event, priority, true);
-        } else if (source.getTrueSource() instanceof EntityLivingBase) {
-            EntityLivingBase attacker = (EntityLivingBase) source.getTrueSource();
+        } else if (source.getEntity() instanceof LivingEntity) {
+            LivingEntity attacker = (LivingEntity) source.getEntity();
             processEntityEnchantments(attacker, victim, source, event, priority, true);
         }
 
@@ -380,18 +392,18 @@ public abstract class EnchantmentBase extends Enchantment {
     }
 
     private static void handleLivingHurt(@Nonnull LivingHurtEvent event, @Nonnull EventPriority priority) {
-        if (event.getEntity().world.isRemote) {
+        if (event.getEntity().level().isClientSide) {
             return;
         }
 
         DamageSource source = event.getSource();
-        EntityLivingBase victim = event.getEntityLiving();
+        LivingEntity victim = event.getEntity();
 
-        if (source.getImmediateSource() instanceof EntityLivingBase) {
-            EntityLivingBase attacker = (EntityLivingBase) source.getImmediateSource();
+        if (source.getDirectEntity() instanceof LivingEntity) {
+            LivingEntity attacker = (LivingEntity) source.getDirectEntity();
             processEntityEnchantments(attacker, victim, source, event, priority, true);
-        } else if (source.getTrueSource() instanceof EntityLivingBase) {
-            EntityLivingBase attacker = (EntityLivingBase) source.getTrueSource();
+        } else if (source.getEntity() instanceof LivingEntity) {
+            LivingEntity attacker = (LivingEntity) source.getEntity();
             processEntityEnchantments(attacker, victim, source, event, priority, true);
         }
 
@@ -426,18 +438,18 @@ public abstract class EnchantmentBase extends Enchantment {
     }
 
     private static void handleLivingDamage(@Nonnull LivingDamageEvent event, @Nonnull EventPriority priority) {
-        if (event.getEntity().world.isRemote) {
+        if (event.getEntity().level().isClientSide) {
             return;
         }
 
         DamageSource source = event.getSource();
-        EntityLivingBase victim = event.getEntityLiving();
+        LivingEntity victim = event.getEntity();
 
-        if (source.getImmediateSource() instanceof EntityLivingBase) {
-            EntityLivingBase attacker = (EntityLivingBase) source.getImmediateSource();
+        if (source.getDirectEntity() instanceof LivingEntity) {
+            LivingEntity attacker = (LivingEntity) source.getDirectEntity();
             processEntityEnchantments(attacker, victim, source, event, priority, true);
-        } else if (source.getTrueSource() instanceof EntityLivingBase) {
-            EntityLivingBase attacker = (EntityLivingBase) source.getTrueSource();
+        } else if (source.getEntity() instanceof LivingEntity) {
+            LivingEntity attacker = (LivingEntity) source.getEntity();
             processEntityEnchantments(attacker, victim, source, event, priority, true);
         }
 
@@ -448,13 +460,15 @@ public abstract class EnchantmentBase extends Enchantment {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void handleLivingDeath(@Nonnull LivingDeathEvent event) {
-        if (event.getEntity().world.isRemote) {
+        if (event.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase victim = event.getEntityLiving();
+        LivingEntity victim = event.getEntity();
 
-        for (ItemStack stack : victim.getEquipmentAndArmor()) {
+        // 1.20.1: getEquipmentAndArmor → 需要手动组合
+        for (EquipmentSlot slot : EquipmentSlot.values()) {
+            ItemStack stack = victim.getItemBySlot(slot);
             if (stack.isEmpty()) {
                 continue;
             }
@@ -465,7 +479,7 @@ public abstract class EnchantmentBase extends Enchantment {
                 }
 
                 EnchantmentBase baseEnchantment = (EnchantmentBase) enchantment;
-                int level = EnchantmentHelper.getEnchantmentLevel(enchantment, stack);
+                int level = EnchantmentHelper.getItemEnchantmentLevel(enchantment, stack);
                 level = baseEnchantment.applyLevelLimit(level);
 
                 if (level > 0) {
@@ -481,13 +495,14 @@ public abstract class EnchantmentBase extends Enchantment {
 
     @SubscribeEvent(priority = EventPriority.NORMAL)
     public static void handleLivingHeal(@Nonnull LivingHealEvent event) {
-        if (event.getEntity().world.isRemote) {
+        if (event.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase healer = event.getEntityLiving();
+        LivingEntity healer = event.getEntity();
 
-        for (ItemStack stack : healer.getEquipmentAndArmor()) {
+        for (EquipmentSlot slot : EquipmentSlot.values()) {
+            ItemStack stack = healer.getItemBySlot(slot);
             if (stack.isEmpty()) {
                 continue;
             }
@@ -498,7 +513,7 @@ public abstract class EnchantmentBase extends Enchantment {
                 }
 
                 EnchantmentBase baseEnchantment = (EnchantmentBase) enchantment;
-                int level = EnchantmentHelper.getEnchantmentLevel(enchantment, stack);
+                int level = EnchantmentHelper.getItemEnchantmentLevel(enchantment, stack);
                 level = baseEnchantment.applyLevelLimit(level);
 
                 if (level > 0) {
@@ -513,7 +528,7 @@ public abstract class EnchantmentBase extends Enchantment {
 
     @SubscribeEvent
     public static void handlePlayerTick(@Nonnull TickEvent.PlayerTickEvent event) {
-        if (event.player.world.isRemote) {
+        if (event.player.level().isClientSide) {
             return;
         }
 
@@ -521,9 +536,10 @@ public abstract class EnchantmentBase extends Enchantment {
             return;
         }
 
-        EntityPlayer player = event.player;
+        Player player = event.player;
 
-        for (ItemStack stack : player.getEquipmentAndArmor()) {
+        for (EquipmentSlot slot : EquipmentSlot.values()) {
+            ItemStack stack = player.getItemBySlot(slot);
             if (stack.isEmpty()) {
                 continue;
             }
@@ -534,7 +550,7 @@ public abstract class EnchantmentBase extends Enchantment {
                 }
 
                 EnchantmentBase baseEnchantment = (EnchantmentBase) enchantment;
-                int level = EnchantmentHelper.getEnchantmentLevel(enchantment, stack);
+                int level = EnchantmentHelper.getItemEnchantmentLevel(enchantment, stack);
                 level = baseEnchantment.applyLevelLimit(level);
 
                 if (level > 0) {
@@ -549,12 +565,12 @@ public abstract class EnchantmentBase extends Enchantment {
 
     @SubscribeEvent(priority = EventPriority.NORMAL)
     public static void handleCriticalHit(@Nonnull CriticalHitEvent event) {
-        if (event.getEntity().world.isRemote) {
+        if (event.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityPlayer player = event.getEntityPlayer();
-        ItemStack weapon = player.getHeldItemMainhand();
+        Player player = event.getEntity();
+        ItemStack weapon = player.getItemInHand(InteractionHand.MAIN_HAND);
 
         if (weapon.isEmpty()) {
             return;
@@ -566,7 +582,7 @@ public abstract class EnchantmentBase extends Enchantment {
             }
 
             EnchantmentBase baseEnchantment = (EnchantmentBase) enchantment;
-            int level = EnchantmentHelper.getEnchantmentLevel(enchantment, weapon);
+            int level = EnchantmentHelper.getItemEnchantmentLevel(enchantment, weapon);
             level = baseEnchantment.applyLevelLimit(level);
 
             if (level > 0) {
@@ -581,16 +597,16 @@ public abstract class EnchantmentBase extends Enchantment {
     // ==================== 核心处理方法 ====================
 
     private static void processEntityEnchantments(
-            @Nonnull EntityLivingBase holder,
-            @Nullable EntityLivingBase victim,
+            @Nonnull LivingEntity holder,
+            @Nullable LivingEntity victim,
             @Nullable DamageSource source,
             @Nonnull Object event,
             @Nonnull EventPriority priority,
             boolean isAttacker
     ) {
         if (isAttacker) {
-            ItemStack mainHand = holder.getHeldItemMainhand();
-            ItemStack offHand = holder.getHeldItemOffhand();
+            ItemStack mainHand = holder.getItemInHand(InteractionHand.MAIN_HAND);
+            ItemStack offHand = holder.getItemInHand(InteractionHand.OFF_HAND);
 
             if (!mainHand.isEmpty()) {
                 processItemEnchantments(mainHand, holder, victim, source, event, priority, true);
@@ -599,18 +615,20 @@ public abstract class EnchantmentBase extends Enchantment {
                 processItemEnchantments(offHand, holder, victim, source, event, priority, true);
             }
         } else {
-            for (ItemStack stack : holder.getEquipmentAndArmor()) {
+            for (EquipmentSlot slot : EquipmentSlot.values()) {
+                ItemStack stack = holder.getItemBySlot(slot);
                 if (!stack.isEmpty()) {
                     processItemEnchantments(stack, holder, victim, source, event, priority, false);
                 }
             }
         }
+        LevelRenderer
     }
 
     private static void processItemEnchantments(
             @Nonnull ItemStack stack,
-            @Nonnull EntityLivingBase holder,
-            @Nullable EntityLivingBase victim,
+            @Nonnull LivingEntity holder,
+            @Nullable LivingEntity victim,
             @Nullable DamageSource source,
             @Nonnull Object event,
             @Nonnull EventPriority priority,
@@ -622,14 +640,16 @@ public abstract class EnchantmentBase extends Enchantment {
             }
 
             EnchantmentBase baseEnchantment = (EnchantmentBase) enchantment;
-            int level = EnchantmentHelper.getEnchantmentLevel(enchantment, stack);
+            int level = EnchantmentHelper.getItemEnchantmentLevel(enchantment, stack);
             level = baseEnchantment.applyLevelLimit(level);
 
             if (level <= 0) {
                 continue;
             }
 
-            EntityLivingBase attacker = isAttacker ? holder : (source != null && source.getTrueSource() instanceof EntityLivingBase ? (EntityLivingBase) source.getTrueSource() : null);
+            LivingEntity attacker = isAttacker ? holder :
+                    (source != null && source.getEntity() instanceof LivingEntity ?
+                            (LivingEntity) source.getEntity() : null);
             EnchantmentContext ctx = new EnchantmentContext(
                     event, holder, stack, level,
                     attacker, victim, source

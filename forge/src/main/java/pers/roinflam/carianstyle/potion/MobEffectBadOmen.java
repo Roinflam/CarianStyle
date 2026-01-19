@@ -1,12 +1,16 @@
 package pers.roinflam.carianstyle.potion;
 
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraft.util.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.effect.MobEffectCategory;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.utils.Reference;
 
@@ -25,19 +29,19 @@ import javax.annotation.Nonnull;
 public class MobEffectBadOmen extends IconBase {
 
     public MobEffectBadOmen(boolean isBadEffectIn, int liquidColorIn) {
-        super(isBadEffectIn, liquidColorIn, "bad_omen");
+        super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
 
-        this.registerPotionAttributeModifier(
-                SharedMonsterAttributes.ATTACK_DAMAGE,
+        this.addAttributeModifier(
+                Attributes.ATTACK_DAMAGE,
                 "5154bf3b-743a-cee6-cf4f-2a62cf832d25",
                 -0.2,
-                2
+                AttributeModifier.Operation.MULTIPLY_TOTAL
         );
-        this.registerPotionAttributeModifier(
-                SharedMonsterAttributes.ATTACK_SPEED,
+        this.addAttributeModifier(
+                Attributes.ATTACK_SPEED,
                 "d545b2e6-98a0-c8c7-a7f3-345df7ec14dc",
                 -0.2,
-                2
+                AttributeModifier.Operation.MULTIPLY_TOTAL
         );
     }
 
@@ -46,12 +50,12 @@ public class MobEffectBadOmen extends IconBase {
      */
     @SubscribeEvent(priority = EventPriority.LOW)
     public void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase victim = evt.getEntityLiving();
-        if (victim.isPotionActive(this)) {
+        LivingEntity victim = evt.getEntity();
+        if (victim.hasEffect(this)) {
             evt.setAmount(evt.getAmount() * 1.25f);
         }
     }
@@ -61,24 +65,25 @@ public class MobEffectBadOmen extends IconBase {
      */
     @SubscribeEvent(priority = EventPriority.LOW)
     public void onLivingHeal(@Nonnull LivingHealEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase healer = evt.getEntityLiving();
-        if (healer.isPotionActive(this)) {
+        LivingEntity healer = evt.getEntity();
+        if (healer.hasEffect(this)) {
             evt.setAmount(evt.getAmount() * 0.5f);
         }
     }
 
     @Override
-    public boolean isReady(int duration, int amplifier) {
+    public boolean isDurationEffectTick(int duration, int amplifier) {
         return duration % 20 == 0;
     }
 
     @Nonnull
     @Override
-    protected ResourceLocation getResourceLocation() {
-        return new ResourceLocation(Reference.MOD_ID, "textures/effect/bad_omen.png");
+    @OnlyIn(Dist.CLIENT)
+    protected ResourceLocation getIconTexture() {
+        return new ResourceLocation(Reference.MOD_ID, "textures/mob_effect/bad_omen.png");
     }
 }

@@ -1,8 +1,12 @@
 package pers.roinflam.carianstyle.potion;
 
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraft.util.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.effect.MobEffectCategory;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.utils.Reference;
 
@@ -19,29 +23,30 @@ import javax.annotation.Nonnull;
 public class MobEffectBlessingOfTheErdtree extends IconBase {
 
     public MobEffectBlessingOfTheErdtree(boolean isBadEffectIn, int liquidColorIn) {
-        super(isBadEffectIn, liquidColorIn, "blessing_of_the_erdtree");
+        super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
 
-        this.registerPotionAttributeModifier(
-                SharedMonsterAttributes.MAX_HEALTH,
+        this.addAttributeModifier(
+                Attributes.MAX_HEALTH,
                 "c407bffa-97df-adf8-51db-5681fdef4b8c",
                 0.15,
-                2
+                AttributeModifier.Operation.MULTIPLY_TOTAL
         );
     }
 
     @Override
-    public boolean isReady(int duration, int amplifier) {
+    public boolean isDurationEffectTick(int duration, int amplifier) {
         return duration % 60 == 0;
     }
 
     @Override
-    public void performEffect(@Nonnull EntityLivingBase entityLivingBaseIn, int amplifier) {
+    public void applyEffectTick(@Nonnull LivingEntity entityLivingBaseIn, int amplifier) {
         entityLivingBaseIn.heal(entityLivingBaseIn.getMaxHealth() * (amplifier + 1) * 0.04f);
     }
 
     @Nonnull
     @Override
-    protected ResourceLocation getResourceLocation() {
-        return new ResourceLocation(Reference.MOD_ID, "textures/effect/blessing_of_the_erdtree.png");
+    @OnlyIn(Dist.CLIENT)
+    protected ResourceLocation getIconTexture() {
+        return new ResourceLocation(Reference.MOD_ID, "textures/mob_effect/blessing_of_the_erdtree.png");
     }
 }

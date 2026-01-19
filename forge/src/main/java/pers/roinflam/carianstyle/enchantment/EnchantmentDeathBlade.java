@@ -1,12 +1,10 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.potion.PotionEffect;
-import net.minecraft.util.DamageSource;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -15,56 +13,61 @@ import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
-import javax.annotation.Nonnull;
-
+/**
+ * 死亡之刃附魔
+ * <p>
+ * 武器附魔
+ * 初始伤害降为50%，但施加死亡烙印
+ * 持续5秒造成累计伤害（总伤害=原伤害×75%）
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
+ */
 @AutoRegisterEnchantment(
         id = "death_blade",
-        category = EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.VERY_RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantmentCategory.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        forceTreasure = true
 )
 public class EnchantmentDeathBlade extends EnchantmentBase {
 
     public EnchantmentDeathBlade() {
-        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
     @Override
-    protected void onHurtAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
+    protected void onHurtAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
         DamageSource damageSource = ctx.getDamageSource();
 
-        // 防止重复触发和创造模式检查
-        if (damageSource.damageType.equals("deathBlade") || damageSource.canHarmInCreative()) {
+        if (damageSource == null || "deathBlade".equals(damageSource.getMsgId()) ||
+                damageSource.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) {
             return;
         }
 
-        EntityLivingBase victim = ctx.getVictim();
         float damage = ctx.getDamage() * 0.75f / 100;
 
-        // 减少初始伤害到50%
         ctx.multiplyDamage(0.5f);
 
-        // 标记伤害来源
-        damageSource.damageType = "deathBlade";
+        ctx.addPotionToOpponent(CarianStylePotion.DOOMED_DEATH_BURNING.get(), 5 * 20 + 5, 0);
+        ctx.addPotionToOpponent(CarianStylePotion.DOOMED_DEATH.get(), 10 * 20 + 5, 0);
 
-        // 施加药水效果
-        ctx.addPotionToOpponent(CarianStylePotion.DOOMED_DEATH_BURNING, 5 * 20 + 5, 0);
-        ctx.addPotionToOpponent(CarianStylePotion.DOOMED_DEATH, 10 * 20 + 5, 0);
-
-        // 持续伤害效果
         new SynchronizationTask(1, 1) {
             private int tick = 0;
 
             @Override
             public void run() {
-                if (++tick > 100 || !victim.isEntityAlive()) {
+                if (++tick > 100 || !ctx.getVictim().isAlive()) {
                     this.cancel();
                     return;
                 }
 
-                if (victim.getHealth() - damage * 2 > 0) {
-                    victim.setHealth(victim.getHealth() - damage);
+                if (ctx.getVictim().getHealth() - damage * 2 > 0) {
+                    EntityLivingUtil.damageHealthDirectly(ctx.getVictim(), damage);
                 } else {
-                    EntityLivingUtil.kill(victim, damageSource);
+                    EntityLivingUtil.kill(ctx.getVictim(), damageSource);
                     this.cancel();
                 }
             }
@@ -72,12 +75,12 @@ public class EnchantmentDeathBlade extends EnchantmentBase {
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) (50 * ConfigLoader.enchantingDifficulty);
     }
 
     @Override
-    public boolean isTreasureEnchantment() {
-        return true;
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

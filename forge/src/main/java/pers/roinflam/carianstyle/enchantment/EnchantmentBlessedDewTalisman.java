@@ -1,45 +1,49 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Enchantments;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
-import javax.annotation.Nonnull;
-
 /**
  * 祝福露水护符附魔
- *
+ * <p>
  * 玩家饱食度满时持续回血
  * 回血量 = 最大血量 × 等级 × 0.002 / 20 每tick
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "blessed_dew_talisman",
-        category = EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.UNCOMMON
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantmentCategory.ARMOR_CHEST,
+        slots = {EquipmentSlot.CHEST}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
 
     public EnchantmentBlessedDewTalisman() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+        super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
-        if (evt.player.world.isRemote) {
+    public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
+        if (evt.player.level().isClientSide) {
             return;
         }
 
@@ -47,9 +51,10 @@ public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
             return;
         }
 
-        EntityPlayer player = evt.player;
+        Player player = evt.player;
 
-        if (player.getFoodStats().needFood()) {
+        // 1.20.1: getFoodStats().needFood() → getFoodData().needsFood()
+        if (player.getFoodData().needsFood()) {
             return;
         }
 
@@ -59,9 +64,9 @@ public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
         }
 
         int totalLevel = 0;
-        for (ItemStack armor : player.getArmorInventoryList()) {
+        for (ItemStack armor : player.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(blessedDewTalisman, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(blessedDewTalisman, armor);
             }
         }
 
@@ -75,15 +80,20 @@ public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
     }
 
     @Override
-    public boolean canApplyTogether(@Nonnull Enchantment ench) {
-        if (ench == Enchantments.PROTECTION) {
+    protected boolean checkCompatibility(@NotNull Enchantment ench) {
+        if (ench == Enchantments.ALL_DAMAGE_PROTECTION) {
             return false;
         }
-        return super.canApplyTogether(ench);
+        return super.checkCompatibility(ench);
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((5 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

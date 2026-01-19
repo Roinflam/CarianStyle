@@ -1,33 +1,43 @@
 package pers.roinflam.carianstyle.base.potion;
 
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.potion.Potion;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectCategory;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.common.MinecraftForge;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
-import pers.roinflam.carianstyle.utils.util.PotionUtil;
+
+import javax.annotation.Nonnull;
 
 /**
  * 药水效果基类
  * <p>
- * 所有模组药水效果的基础类，自动注册到事件总线和药水列表
+ * 所有模组药水效果的基础类，自动注册到事件总线
  * </p>
  */
-public abstract class PotionBase extends Potion {
+public abstract class PotionBase extends MobEffect {
 
-    protected PotionBase(boolean isBadEffectIn, int liquidColorIn, String name) {
-        super(isBadEffectIn, liquidColorIn);
+    /**
+     * 构造函数
+     *
+     * @param category 效果类型（有益/有害）
+     * @param liquidColor 液体颜色
+     */
+    protected PotionBase(@Nonnull MobEffectCategory category, int liquidColor) {
+        // 1.20.1: Potion → MobEffect, isBadEffectIn → MobEffectCategory
+        super(category, liquidColor);
         MinecraftForge.EVENT_BUS.register(this);
-        PotionUtil.registerPotion(this, name);
-        CarianStylePotion.POTIONS.add(this);
+        // 注意：实际注册通过 DeferredRegister 完成
     }
 
     @Override
-    public void performEffect(EntityLivingBase entityLivingBaseIn, int amplifier) {
+    public void applyEffectTick(@Nonnull LivingEntity entity, int amplifier) {
+        // 1.20.1: performEffect → applyEffectTick
         // 子类重写
     }
 
     @Override
-    public boolean isReady(int duration, int amplifier) {
+    public boolean isDurationEffectTick(int duration, int amplifier) {
+        // 1.20.1: isReady → isDurationEffectTick
         return duration % 20 == 0;
     }
 }

@@ -1,18 +1,18 @@
 package pers.roinflam.carianstyle.enchantment.recollect;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -20,21 +20,26 @@ import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
-import javax.annotation.Nonnull;
 import java.util.UUID;
 
 /**
  * 时间逆转附魔
- *
+ * <p>
  * 死亡时触发：取消死亡，进入逆转状态100tick
  * 逆转状态：免疫伤害并反弹，累积伤害值
  * 逆转结束：治疗累积伤害×25%
  * 冷却6000tick
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "time_reversal",
-        category = EnchantmentCategory.RECOLLECT,
-        rarity = EnchantmentRarity.VERY_RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantmentCategory.ARMOR_CHEST,
+        slots = {EquipmentSlot.CHEST}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentTimeReversal extends EnchantmentBase {
@@ -45,32 +50,32 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
     private static final int RECOLLECT_ENCHANTABILITY = 35;
 
     public EnchantmentTimeReversal() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+        super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
 
-    private static int getTotalLevel(EntityLivingBase entity) {
+    private static int getTotalLevel(LivingEntity entity) {
         Enchantment timeReversal = EnchantmentRegistry.getEnchantmentByClass(EnchantmentTimeReversal.class);
         if (timeReversal == null) {
             return 0;
         }
 
         int totalLevel = 0;
-        for (ItemStack armor : entity.getArmorInventoryList()) {
+        for (ItemStack armor : entity.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(timeReversal, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(timeReversal, armor);
             }
         }
         return totalLevel;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingDeath(@NotNull LivingDeathEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase holder = evt.getEntityLiving();
-        UUID uuid = holder.getUniqueID();
+        LivingEntity holder = evt.getEntity();
+        UUID uuid = holder.getUUID();
 
         int totalLevel = getTotalLevel(holder);
         if (totalLevel <= 0) {
@@ -81,7 +86,7 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
             return;
         }
 
-        if (holder.isDead) {
+        if (holder.isDeadOrDying()) {
             return;
         }
 
@@ -95,7 +100,7 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
         new SynchronizationTask(100) {
             @Override
             public void run() {
-                if (holder.isEntityAlive()) {
+                if (holder.isAlive()) {
                     Float accumulated = EnchantmentDataManager.getData(REVERSAL_DAMAGE_KEY, uuid);
                     if (accumulated != null) {
                         holder.heal(accumulated * 0.25f);
@@ -108,13 +113,13 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingAttack(@NotNull LivingAttackEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase holder = evt.getEntityLiving();
-        UUID uuid = holder.getUniqueID();
+        LivingEntity holder = evt.getEntity();
+        UUID uuid = holder.getUUID();
 
         int totalLevel = getTotalLevel(holder);
         if (totalLevel <= 0) {
@@ -126,7 +131,7 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
             return;
         }
 
-        if (evt.getEntity().equals(evt.getSource().getTrueSource())) {
+        if (evt.getEntity().equals(evt.getSource().getEntity())) {
             return;
         }
 
@@ -138,28 +143,31 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
         }
         EnchantmentDataManager.setData(REVERSAL_DAMAGE_KEY, uuid, accumulated + evt.getAmount());
 
-        if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
-            EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
-            attacker.attackEntityFrom(evt.getSource(), evt.getAmount());
+        if (evt.getSource().getEntity() instanceof LivingEntity) {
+            LivingEntity attacker = (LivingEntity) evt.getSource().getEntity();
+            attacker.hurt(evt.getSource(), evt.getAmount());
         }
     }
 
     @Override
-    public boolean canApplyTogether(@Nonnull Enchantment ench) {
-        // 与死亡类附魔冲突
+    protected boolean checkCompatibility(Enchantment ench) {
         if (isDeadEnchantment(ench)) {
             return false;
         }
-        return super.canApplyTogether(ench);
+        return super.checkCompatibility(ench);
     }
 
     private boolean isDeadEnchantment(Enchantment ench) {
-        return ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentFullMoon.class))
-                || ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentLivingCorpse.class));
+        return ench instanceof EnchantmentFullMoon || ench instanceof EnchantmentLivingCorpse;
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) (RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

@@ -1,16 +1,16 @@
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.EnumCreatureAttribute;
-import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraft.entity.ai.attributes.AttributeModifier;
-import net.minecraft.entity.ai.attributes.IAttributeInstance;
-import net.minecraft.init.Enchantments;
-import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.MobType;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.Enchantments;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -19,20 +19,25 @@ import pers.roinflam.carianstyle.enchantment.EnchantmentDeathBlade;
 import pers.roinflam.carianstyle.enchantment.EnchantmentScarletCorruption;
 import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 
-import javax.annotation.Nonnull;
 import java.util.UUID;
 
 /**
  * 神圣之刃附魔
- *
+ * <p>
  * 对亡灵生物：额外伤害 = 伤害 × 等级 × 0.25 × 目标血量比例，并治疗自身
  * 但会累积降低自身攻击力（等级 × -5%，最多-99%）
  * 对非亡灵生物：伤害降为20%
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "sacred_blade",
-        category = EnchantmentCategory.COMBAT_SKILL,
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
         rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantmentCategory.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
         conflictsWith = {
                 EnchantmentScarletCorruption.class,
                 EnchantmentDeathBlade.class,
@@ -45,20 +50,20 @@ public class EnchantmentSacredBlade extends EnchantmentBase {
     private static final String ATTACK_DAMAGE_MODIFIER_NAME = "enchantment.sacred_blade";
 
     public EnchantmentSacredBlade() {
-        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
     @Override
-    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
-        EntityLivingBase attacker = ctx.getHolder();
-        EntityLivingBase victim = ctx.getVictim();
+    protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
+        LivingEntity attacker = ctx.getHolder();
+        LivingEntity victim = ctx.getVictim();
 
         if (victim == null) {
             return;
         }
 
         // 判断是否为亡灵生物
-        if (victim.getCreatureAttribute() == EnumCreatureAttribute.UNDEAD) {
+        if (victim.getMobType() == MobType.UNDEAD) {
             // 对亡灵：额外伤害 = 当前伤害 × 等级 × 0.25 × 目标血量比例
             float healthRatio = victim.getHealth() / victim.getMaxHealth();
             float bonusDamage = ctx.getDamage() * level * 0.25f * healthRatio;
@@ -79,8 +84,8 @@ public class EnchantmentSacredBlade extends EnchantmentBase {
     /**
      * 应用攻击力惩罚（累积降低，最多-99%）
      */
-    private void applyAttackPenalty(@Nonnull EntityLivingBase attacker, int level) {
-        IAttributeInstance attributeInstance = attacker.getEntityAttribute(SharedMonsterAttributes.ATTACK_DAMAGE);
+    private void applyAttackPenalty(@NotNull LivingEntity attacker, int level) {
+        AttributeInstance attributeInstance = attacker.getAttribute(Attributes.ATTACK_DAMAGE);
         if (attributeInstance == null) {
             return;
         }
@@ -89,35 +94,40 @@ public class EnchantmentSacredBlade extends EnchantmentBase {
         AttributeModifier existing = attributeInstance.getModifier(ATTACK_DAMAGE_MODIFIER_ID);
 
         if (existing == null) {
-            attributeInstance.applyModifier(new AttributeModifier(
+            attributeInstance.addPermanentModifier(new AttributeModifier(
                     ATTACK_DAMAGE_MODIFIER_ID,
                     ATTACK_DAMAGE_MODIFIER_NAME,
                     newReduction,
-                    2
+                    AttributeModifier.Operation.MULTIPLY_TOTAL
             ));
         } else if (existing.getAmount() > newReduction) {
             // 累积更大的惩罚
             attributeInstance.removeModifier(ATTACK_DAMAGE_MODIFIER_ID);
-            attributeInstance.applyModifier(new AttributeModifier(
+            attributeInstance.addPermanentModifier(new AttributeModifier(
                     ATTACK_DAMAGE_MODIFIER_ID,
                     ATTACK_DAMAGE_MODIFIER_NAME,
                     newReduction,
-                    2
+                    AttributeModifier.Operation.MULTIPLY_TOTAL
             ));
         }
     }
 
     @Override
-    public boolean canApplyTogether(@Nonnull Enchantment ench) {
+    protected boolean checkCompatibility(@NotNull Enchantment ench) {
         // 与原版锋利冲突
         if (ench == Enchantments.SHARPNESS) {
             return false;
         }
-        return super.canApplyTogether(ench);
+        return super.checkCompatibility(ench);
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((10 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

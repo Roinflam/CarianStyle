@@ -1,20 +1,20 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.monster.EntityMob;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -22,38 +22,43 @@ import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
-import javax.annotation.Nonnull;
 import java.util.List;
 
 /**
  * 灾厄附魔（诅咒）
- *
+ * <p>
  * 受击伤害×2
  * 每tick 2%概率吸引32格内怪物
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "calamity",
-        category = EnchantmentCategory.GENERAL,
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantmentCategory.ARMOR_CHEST,
+        slots = {EquipmentSlot.CHEST},
         isCurse = true
 )
 @Mod.EventBusSubscriber
 public class EnchantmentCalamity extends EnchantmentBase {
 
     public EnchantmentCalamity() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+        super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
 
-    private static int getArmorLevel(EntityLivingBase entity) {
+    private static int getArmorLevel(LivingEntity entity) {
         Enchantment calamity = EnchantmentRegistry.getEnchantmentByClass(EnchantmentCalamity.class);
         if (calamity == null) {
             return 0;
         }
 
         int totalLevel = 0;
-        for (ItemStack armor : entity.getArmorInventoryList()) {
+        for (ItemStack armor : entity.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(calamity, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(calamity, armor);
             }
         }
         if (ConfigLoader.levelLimit) {
@@ -62,7 +67,7 @@ public class EnchantmentCalamity extends EnchantmentBase {
         return totalLevel;
     }
 
-    private static int getTotalLevel(EntityLivingBase entity) {
+    private static int getTotalLevel(LivingEntity entity) {
         Enchantment calamity = EnchantmentRegistry.getEnchantmentByClass(EnchantmentCalamity.class);
         if (calamity == null) {
             return 0;
@@ -70,15 +75,14 @@ public class EnchantmentCalamity extends EnchantmentBase {
 
         int totalLevel = 0;
 
-        if (!entity.getHeldItem(entity.getActiveHand()).isEmpty()) {
-            totalLevel += EnchantmentHelper.getEnchantmentLevel(
-                    calamity,
-                    entity.getHeldItem(entity.getActiveHand()));
+        ItemStack heldItem = entity.getItemInHand(entity.getUsedItemHand());
+        if (!heldItem.isEmpty()) {
+            totalLevel += EnchantmentHelper.getItemEnchantmentLevel(calamity, heldItem);
         }
 
-        for (ItemStack armor : entity.getArmorInventoryList()) {
+        for (ItemStack armor : entity.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(calamity, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(calamity, armor);
             }
         }
 
@@ -89,12 +93,12 @@ public class EnchantmentCalamity extends EnchantmentBase {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase victim = evt.getEntityLiving();
+        LivingEntity victim = evt.getEntity();
 
         int totalLevel = getArmorLevel(victim);
         if (totalLevel > 0) {
@@ -103,8 +107,8 @@ public class EnchantmentCalamity extends EnchantmentBase {
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
-        if (evt.player.world.isRemote) {
+    public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
+        if (evt.player.level().isClientSide) {
             return;
         }
 
@@ -116,8 +120,8 @@ public class EnchantmentCalamity extends EnchantmentBase {
             return;
         }
 
-        EntityPlayer player = evt.player;
-        if (!player.isEntityAlive()) {
+        Player player = evt.player;
+        if (!player.isAlive()) {
             return;
         }
 
@@ -126,29 +130,34 @@ public class EnchantmentCalamity extends EnchantmentBase {
             return;
         }
 
-        List<EntityMob> nearbyMobs = EntityUtil.getNearbyEntities(
-                EntityMob.class,
+        List<Mob> nearbyMobs = EntityUtil.getNearbyEntities(
+                Mob.class,
                 player,
                 32
         );
 
-        for (EntityMob mob : nearbyMobs) {
-            EntityLivingBase currentTarget = mob.getAttackTarget();
+        for (Mob mob : nearbyMobs) {
+            LivingEntity currentTarget = mob.getTarget();
 
-            if (currentTarget == null || !currentTarget.isEntityAlive()) {
+            if (currentTarget == null || !currentTarget.isAlive()) {
                 if (RandomUtil.percentageChance(25)) {
-                    mob.setAttackTarget(player);
+                    mob.setTarget(player);
                 }
             } else if (!currentTarget.equals(player)) {
                 if (RandomUtil.percentageChance(50)) {
-                    mob.setAttackTarget(player);
+                    mob.setTarget(player);
                 }
             }
         }
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) (35 * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

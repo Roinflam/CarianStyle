@@ -1,75 +1,71 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
-import javax.annotation.Nonnull;
 import java.util.List;
 
 /**
  * 排斥附魔
- *
+ * <p>
  * 护腿附魔，受击时范围击退
  * 受到攻击时击退周围所有敌人
  * 范围 = 5 + (等级 - 1) × 0.75格
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "exclude",
-        category = EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantmentCategory.ARMOR_LEGS,
+        slots = {EquipmentSlot.LEGS}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentExclude extends EnchantmentBase {
 
     public EnchantmentExclude() {
-        super(EnumEnchantmentType.ARMOR_LEGS, new EntityEquipmentSlot[]{EntityEquipmentSlot.LEGS});
+        super(EnchantmentCategory.ARMOR_LEGS, new EquipmentSlot[]{EquipmentSlot.LEGS});
     }
 
-    /**
-     * 受到攻击时击退周围敌人
-     * 由于需要检查受击者的护甲，保留静态监听器
-     * 使用HIGHEST优先级确保最早触发
-     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingAttack(@NotNull LivingAttackEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        // 必须有攻击来源
-        if (!(evt.getSource().getTrueSource() instanceof EntityLivingBase)) {
+        if (!(evt.getSource().getEntity() instanceof LivingEntity)) {
             return;
         }
 
-        EntityLivingBase victim = evt.getEntityLiving();
+        LivingEntity victim = evt.getEntity();
         Enchantment exclude = EnchantmentRegistry.getEnchantmentByClass(EnchantmentExclude.class);
 
         if (exclude == null) {
             return;
         }
 
-        // 从护甲获取附魔等级
         int totalLevel = 0;
-        for (ItemStack armor : victim.getArmorInventoryList()) {
+        for (ItemStack armor : victim.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(exclude, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(exclude, armor);
             }
         }
 
@@ -81,35 +77,29 @@ public class EnchantmentExclude extends EnchantmentBase {
             return;
         }
 
-        // 计算击退范围
         double range = 5 + (totalLevel - 1) * 0.75;
 
-        // 获取范围内的所有敌人
-        List<EntityLivingBase> targets = EntityUtil.getNearbyEntities(
-                EntityLivingBase.class,
+        List<LivingEntity> targets = EntityUtil.getNearbyEntities(
+                LivingEntity.class,
                 victim,
-                (int) range,
+                range,
                 entity -> !entity.equals(victim)
         );
 
-        // 击退所有敌人
-        for (Entity entity : targets) {
-            EntityLivingBase target = (EntityLivingBase) entity;
-
-            // 计算击退方向（从受击者指向目标）
-            double x = victim.posX - target.posX;
-            double z = victim.posZ - target.posZ;
-
-            // 设置攻击方向角度
-            target.attackedAtYaw = (float) (MathHelper.atan2(z, x) * (180D / Math.PI) - (double) target.rotationYaw);
-
-            // 击退目标
-            target.knockBack(entity, 0.5f, x, z);
+        for (LivingEntity target : targets) {
+            double x = victim.getX() - target.getX();
+            double z = victim.getZ() - target.getZ();
+            target.knockback(0.5f, x, z);
         }
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((25 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

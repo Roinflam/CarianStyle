@@ -1,37 +1,42 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.init.Enchantments;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.DamageSource;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-
-import javax.annotation.Nonnull;
+import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 /**
  * 先祖之角附魔
- *
+ * <p>
  * 受到魔法伤害时减伤25%
  * 受到魔法伤害后持续回血（伤害×等级×0.05/20 每10tick，持续200tick）
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "ancestral_spirit_horn",
-        category = EnchantmentCategory.GENERAL,
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.RARE,
+        type = EnchantmentCategory.ARMOR_CHEST,
+        slots = {EquipmentSlot.CHEST},
         conflictsWith = {
                 EnchantmentShelterOfFire.class,
                 EnchantmentHealingByFire.class,
@@ -42,19 +47,19 @@ import javax.annotation.Nonnull;
 public class EnchantmentAncestralSpiritHorn extends EnchantmentBase {
 
     public EnchantmentAncestralSpiritHorn() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+        super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
 
-    private static int getTotalLevel(EntityLivingBase entity) {
+    private static int getTotalLevel(LivingEntity entity) {
         Enchantment ancestralSpiritHorn = EnchantmentRegistry.getEnchantmentByClass(EnchantmentAncestralSpiritHorn.class);
         if (ancestralSpiritHorn == null) {
             return 0;
         }
 
         int totalLevel = 0;
-        for (ItemStack armor : entity.getArmorInventoryList()) {
+        for (ItemStack armor : entity.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(ancestralSpiritHorn, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(ancestralSpiritHorn, armor);
             }
         }
         if (ConfigLoader.levelLimit) {
@@ -64,18 +69,19 @@ public class EnchantmentAncestralSpiritHorn extends EnchantmentBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
         DamageSource damageSource = evt.getSource();
 
-        if (damageSource.canHarmInCreative() || !damageSource.isMagicDamage()) {
+        if (damageSource.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY) ||
+                !DamageSourceUtil.isMagicDamage(damageSource)) {
             return;
         }
 
-        EntityLivingBase holder = evt.getEntityLiving();
+        LivingEntity holder = evt.getEntity();
 
         int totalLevel = getTotalLevel(holder);
         if (totalLevel <= 0) {
@@ -92,7 +98,7 @@ public class EnchantmentAncestralSpiritHorn extends EnchantmentBase {
             @Override
             public void run() {
                 tick += 10;
-                if (tick > 200 || !holder.isEntityAlive()) {
+                if (tick > 200 || !holder.isAlive()) {
                     this.cancel();
                     return;
                 }
@@ -102,15 +108,20 @@ public class EnchantmentAncestralSpiritHorn extends EnchantmentBase {
     }
 
     @Override
-    public boolean canApplyTogether(@Nonnull Enchantment ench) {
-        if (ench == Enchantments.PROTECTION) {
+    protected boolean checkCompatibility(@NotNull Enchantment ench) {
+        if (ench == Enchantments.ALL_DAMAGE_PROTECTION) {
             return false;
         }
-        return super.canApplyTogether(ench);
+        return super.checkCompatibility(ench);
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((20 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

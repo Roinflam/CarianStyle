@@ -1,77 +1,77 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.init.Enchantments;
-import net.minecraft.init.MobEffects;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.potion.PotionEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
-import javax.annotation.Nonnull;
-
 /**
  * 熔炉之羽附魔
- *
+ * <p>
  * 护甲附魔，以受到更多伤害换取机动性增益
  * 受击时：
  * - 受到的伤害增加25%
- * - 大幅增加无敌帧（hurtResistantTime = max + max/2 × 等级 × 1.5）
+ * - 大幅增加无敌帧（invulnerableTime = max + max/2 × 等级 × 1.5）
  * - 获得速度效果（持续 = 等级 × 40tick，效果等级 = 附魔等级 - 1）
  * - 获得跳跃提升效果（持续 = 等级 × 40tick，效果等级 = 附魔等级 - 1）
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "furnace_feather",
-        category = EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantmentCategory.ARMOR,
+        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET},
+        forceTreasure = true
 )
 @Mod.EventBusSubscriber
 public class EnchantmentFurnaceFeather extends EnchantmentBase {
 
     public EnchantmentFurnaceFeather() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
-                EntityEquipmentSlot.HEAD,
-                EntityEquipmentSlot.CHEST,
-                EntityEquipmentSlot.LEGS,
-                EntityEquipmentSlot.FEET
+        super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
+                EquipmentSlot.HEAD,
+                EquipmentSlot.CHEST,
+                EquipmentSlot.LEGS,
+                EquipmentSlot.FEET
         });
     }
 
-    /**
-     * 受击时增加25%伤害（代价）
-     * 由于需要累加所有护甲的附魔等级，保留静态监听器
-     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase victim = evt.getEntityLiving();
+        LivingEntity victim = evt.getEntity();
         Enchantment furnaceFeather = EnchantmentRegistry.getEnchantmentByClass(EnchantmentFurnaceFeather.class);
 
         if (furnaceFeather == null) {
             return;
         }
 
-        // 从所有护甲累加附魔等级
         int totalLevel = 0;
-        for (ItemStack armor : victim.getArmorInventoryList()) {
+        for (ItemStack armor : victim.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(furnaceFeather, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(furnaceFeather, armor);
             }
         }
 
@@ -83,32 +83,26 @@ public class EnchantmentFurnaceFeather extends EnchantmentBase {
             return;
         }
 
-        // 受到伤害增加25%
         evt.setAmount(evt.getAmount() + evt.getAmount() * 0.25f);
     }
 
-    /**
-     * 受击后获得无敌帧和机动性增益
-     * 由于需要累加所有护甲的附魔等级，保留静态监听器
-     */
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase victim = evt.getEntityLiving();
+        LivingEntity victim = evt.getEntity();
         Enchantment furnaceFeather = EnchantmentRegistry.getEnchantmentByClass(EnchantmentFurnaceFeather.class);
 
         if (furnaceFeather == null) {
             return;
         }
 
-        // 从所有护甲累加附魔等级
         int totalLevel = 0;
-        for (ItemStack armor : victim.getArmorInventoryList()) {
+        for (ItemStack armor : victim.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(furnaceFeather, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(furnaceFeather, armor);
             }
         }
 
@@ -120,36 +114,33 @@ public class EnchantmentFurnaceFeather extends EnchantmentBase {
             return;
         }
 
-        // 增加无敌帧
-        victim.hurtResistantTime = (int) (victim.maxHurtResistantTime + victim.maxHurtResistantTime / 2 * totalLevel * 1.5);
+        victim.invulnerableTime = (int) (victim.invulnerableDuration + victim.invulnerableDuration / 2 * totalLevel * 1.5);
 
-        // 施加速度效果
-        victim.addPotionEffect(new PotionEffect(
-                MobEffects.SPEED,
+        victim.addEffect(new MobEffectInstance(
+                MobEffects.MOVEMENT_SPEED,
                 totalLevel * 40,
                 totalLevel - 1
         ));
 
-        // 施加跳跃提升效果
-        victim.addPotionEffect(new PotionEffect(
-                MobEffects.JUMP_BOOST,
+        victim.addEffect(new MobEffectInstance(
+                MobEffects.JUMP,
                 totalLevel * 40,
                 totalLevel - 1
         ));
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((10 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
     }
 
     @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) && !ench.equals(Enchantments.PROTECTION);
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 
     @Override
-    public boolean isTreasureEnchantment() {
-        return true;
+    protected boolean checkCompatibility(@NotNull Enchantment ench) {
+        return super.checkCompatibility(ench) && !ench.equals(Enchantments.ALL_DAMAGE_PROTECTION);
     }
 }

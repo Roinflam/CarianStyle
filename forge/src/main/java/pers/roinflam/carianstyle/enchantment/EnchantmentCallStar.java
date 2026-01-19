@@ -1,22 +1,25 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.effect.EntityLightningBolt;
-import net.minecraft.entity.projectile.EntityArrow;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.util.DamageSource;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LightningBolt;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.level.Level;
 import net.minecraftforge.event.entity.ProjectileImpactEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import org.apache.commons.lang3.RandomUtils;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -24,19 +27,24 @@ import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
-import javax.annotation.Nonnull;
 import java.util.List;
 
 /**
  * 唤星附魔
- *
+ * <p>
  * 箭矢落地时吸引周围敌人，延迟后召唤闪电造成伤害
  * 夜晚伤害×3
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "call_star",
-        category = EnchantmentCategory.GENERAL,
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.RARE,
+        type = EnchantmentCategory.BOW,
+        slots = {EquipmentSlot.MAINHAND},
         conflictsWith = {
                 EnchantmentLorettaBigBow.class,
                 EnchantmentLorettaTrick.class
@@ -46,23 +54,35 @@ import java.util.List;
 public class EnchantmentCallStar extends EnchantmentBase {
 
     public EnchantmentCallStar() {
-        super(EnumEnchantmentType.BOW, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onProjectileImpact_Arrow(@Nonnull ProjectileImpactEvent.Arrow evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onProjectileImpact_Arrow(@NotNull ProjectileImpactEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (evt.getArrow().shootingEntity == null || evt.getRayTraceResult().entityHit != null) {
+        // 必须是箭矢
+        if (!(evt.getProjectile() instanceof AbstractArrow)) {
             return;
         }
 
-        EntityArrow arrow = evt.getArrow();
-        EntityLivingBase attacker = (EntityLivingBase) arrow.shootingEntity;
+        AbstractArrow arrow = (AbstractArrow) evt.getProjectile();
 
-        if (attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+        // 必须有射击者且未击中实体（落地）
+        if (arrow.getOwner() == null || evt.getRayTraceResult().getType() == net.minecraft.world.phys.HitResult.Type.ENTITY) {
+            return;
+        }
+
+        if (!(arrow.getOwner() instanceof LivingEntity)) {
+            return;
+        }
+
+        LivingEntity attacker = (LivingEntity) arrow.getOwner();
+
+        ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
@@ -71,9 +91,7 @@ public class EnchantmentCallStar extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                callStar,
-                attacker.getHeldItem(attacker.getActiveHand()));
+        int level = EnchantmentHelper.getItemEnchantmentLevel(callStar, heldItem);
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
@@ -85,73 +103,79 @@ public class EnchantmentCallStar extends EnchantmentBase {
 
         final int effectiveLevel = level;
 
-        List<EntityLivingBase> nearbyEntities = EntityUtil.getNearbyEntities(
-                EntityLivingBase.class,
+        List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
+                LivingEntity.class,
                 arrow,
                 effectiveLevel * 2,
                 entity -> !entity.equals(attacker)
         );
 
-        for (EntityLivingBase entity : nearbyEntities) {
-            double x = entity.posX - arrow.posX;
-            double z = entity.posZ - arrow.posZ;
+        for (LivingEntity entity : nearbyEntities) {
+            double x = entity.getX() - arrow.getX();
+            double z = entity.getZ() - arrow.getZ();
             float strength = (float) (effectiveLevel * 0.35f * Math.max(Math.abs(x), Math.abs(z)) / 7);
-            entity.knockBack(attacker, strength, x, z);
+            entity.knockback(strength, x, z);
         }
 
         new SynchronizationTask(20) {
             @Override
             public void run() {
-                List<EntityLivingBase> targets = EntityUtil.getNearbyEntities(
-                        EntityLivingBase.class,
+                List<LivingEntity> targets = EntityUtil.getNearbyEntities(
+                        LivingEntity.class,
                         arrow,
                         effectiveLevel,
                         entity -> !entity.equals(attacker)
                 );
 
                 if (!targets.isEmpty()) {
-                    for (EntityLivingBase target : targets) {
-                        World world = target.world;
+                    for (LivingEntity target : targets) {
+                        Level world = target.level();
 
-                        world.addWeatherEffect(new EntityLightningBolt(
-                                world,
-                                target.posX,
-                                target.posY,
-                                target.posZ,
-                                true
-                        ));
+                        if (world instanceof ServerLevel serverLevel) {
+                            LightningBolt lightning = EntityType.LIGHTNING_BOLT.create(serverLevel);
+                            if (lightning != null) {
+                                lightning.moveTo(target.getX(), target.getY(), target.getZ());
+                                lightning.setVisualOnly(true);
+                                serverLevel.addFreshEntity(lightning);
+                            }
+                        }
 
                         int magnification = 1;
-                        if (!world.isDaytime()) {
+                        if (!world.isDay()) {
                             magnification = 3;
                         }
 
-                        float damage = (float) (arrow.getDamage() * effectiveLevel * 0.3 * magnification);
-                        target.attackEntityFrom(DamageSource.LIGHTNING_BOLT, damage);
+                        float damage = (float) (arrow.getBaseDamage() * effectiveLevel * 0.3 * magnification);
+                        target.hurt(target.damageSources().lightningBolt(), damage);
 
-                        if (target.onGround) {
-                            double x = RandomUtils.nextBoolean() ? arrow.posX - target.posX : target.posX - arrow.posX;
-                            double z = RandomUtils.nextBoolean() ? arrow.posZ - target.posZ : target.posZ - arrow.posZ;
-                            target.attackedAtYaw = (float) (MathHelper.atan2(z, x) * (180D / Math.PI) - (double) target.rotationYaw);
-                            target.knockBack(attacker, 0.2f, x, z);
+                        if (target.onGround()) {
+                            double x = RandomUtils.nextBoolean() ? arrow.getX() - target.getX() : target.getX() - arrow.getX();
+                            double z = RandomUtils.nextBoolean() ? arrow.getZ() - target.getZ() : target.getZ() - arrow.getZ();
+                            target.knockback(0.2f, x, z);
                         }
                     }
                 } else {
-                    World world = arrow.world;
-                    world.addWeatherEffect(new EntityLightningBolt(
-                            world,
-                            arrow.posX,
-                            arrow.posY,
-                            arrow.posZ,
-                            true
-                    ));
+                    Level world = arrow.level();
+                    if (world instanceof ServerLevel serverLevel) {
+                        LightningBolt lightning = EntityType.LIGHTNING_BOLT.create(serverLevel);
+                        if (lightning != null) {
+                            lightning.moveTo(arrow.getX(), arrow.getY(), arrow.getZ());
+                            lightning.setVisualOnly(true);
+                            serverLevel.addFreshEntity(lightning);
+                        }
+                    }
                 }
             }
         }.start();
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((30 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

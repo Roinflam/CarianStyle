@@ -1,13 +1,14 @@
 package pers.roinflam.carianstyle.enchantment.recollect;
 
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.potion.PotionEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -18,21 +19,26 @@ import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 
-import javax.annotation.Nonnull;
 import java.util.UUID;
 
 /**
  * 血附魔
- *
+ * <p>
  * 每3次攻击触发一次：
  * - 造成目标当前血量×12%的直接伤害
  * - 治疗自身（最多自身最大血量×18%）
  * - 施加出血效果
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "blood",
-        category = EnchantmentCategory.RECOLLECT,
-        rarity = EnchantmentRarity.VERY_RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantmentCategory.WEAPON,
+        slots = {EquipmentSlot.MAINHAND}
 )
 public class EnchantmentBlood extends EnchantmentBase {
 
@@ -40,13 +46,13 @@ public class EnchantmentBlood extends EnchantmentBase {
     private static final int RECOLLECT_ENCHANTABILITY = 35;
 
     public EnchantmentBlood() {
-        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
     @Override
-    protected void onHurtAsAttackerLow(@Nonnull EnchantmentContext ctx, int level) {
-        EntityLivingBase attacker = ctx.getHolder();
-        EntityLivingBase victim = ctx.getVictim();
+    protected void onHurtAsAttackerLow(@NotNull EnchantmentContext ctx, int level) {
+        LivingEntity attacker = ctx.getHolder();
+        LivingEntity victim = ctx.getVictim();
 
         if (victim == null) {
             return;
@@ -58,7 +64,7 @@ public class EnchantmentBlood extends EnchantmentBase {
             }
         }
 
-        UUID uuid = attacker.getUniqueID();
+        UUID uuid = attacker.getUUID();
         int attackCount = EnchantmentDataManager.getCounter(ATTACK_COUNT_KEY, uuid);
 
         if (attackCount >= 2) {
@@ -70,26 +76,31 @@ public class EnchantmentBlood extends EnchantmentBase {
 
             // 检查是否同时有血斩和血收附魔
             int hemorrhageLevel = 0;
-            ItemStack heldItem = attacker.getHeldItem(attacker.getActiveHand());
+            ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
 
-            net.minecraft.enchantment.Enchantment bloodSlash = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBloodSlash.class);
-            net.minecraft.enchantment.Enchantment bloodCollection = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBloodCollection.class);
+            Enchantment bloodSlash = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBloodSlash.class);
+            Enchantment bloodCollection = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBloodCollection.class);
 
             if (bloodSlash != null && bloodCollection != null) {
-                if (EnchantmentHelper.getEnchantmentLevel(bloodSlash, heldItem) > 0 &&
-                        EnchantmentHelper.getEnchantmentLevel(bloodCollection, heldItem) > 0) {
+                if (EnchantmentHelper.getItemEnchantmentLevel(bloodSlash, heldItem) > 0 &&
+                        EnchantmentHelper.getItemEnchantmentLevel(bloodCollection, heldItem) > 0) {
                     hemorrhageLevel = 7;
                 }
             }
 
-            victim.addPotionEffect(new PotionEffect(CarianStylePotion.HEMORRHAGE, 30, hemorrhageLevel));
+            victim.addEffect(new MobEffectInstance(CarianStylePotion.HEMORRHAGE.get(), 30, hemorrhageLevel));
         } else {
             EnchantmentDataManager.incrementCounter(ATTACK_COUNT_KEY, uuid, 6000);
         }
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) (RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

@@ -1,18 +1,17 @@
-// 文件：EnchantmentRepeatingThrust.java
-// 路径：src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentRepeatingThrust.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -20,24 +19,27 @@ import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
-import javax.annotation.Nonnull;
 import java.util.UUID;
 
 /**
  * 连击附魔
+ * <p>
+ * 对同一目标在10秒内重复攻击时，每次攻击伤害叠加 5% × 等级
+ * 攻击后刷新10秒持续时间
+ * 切换目标时清除之前的叠加
+ * 同时只能对一个目标保持叠加
+ * 目标死亡时清除叠加
+ * </p>
  *
- * 效果：
- * - 对同一目标在10秒内重复攻击时，每次攻击伤害叠加 5% × 等级
- * - 攻击后刷新10秒持续时间
- * - 切换目标时清除之前的叠加
- * - 同时只能对一个目标保持叠加
- * - 目标死亡时清除叠加
- * - 最大等级：5
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "repeating_thrust",
-        category = EnchantmentCategory.COMBAT_SKILL,
-        rarity = EnchantmentRarity.UNCOMMON
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantmentCategory.WEAPON,
+        slots = {EquipmentSlot.MAINHAND}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentRepeatingThrust extends EnchantmentBase {
@@ -57,22 +59,18 @@ public class EnchantmentRepeatingThrust extends EnchantmentBase {
      */
     private static final int STACK_DURATION = 200;
 
-    /**
-     * 构造函数
-     */
     public EnchantmentRepeatingThrust() {
-        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
     /**
      * 攻击时触发：叠加伤害并刷新计时
      */
     @Override
-    protected void onDamageAsAttackerHighest(@Nonnull EnchantmentContext ctx, int level) {
-        EntityLivingBase attacker = ctx.getHolder();
-        EntityLivingBase victim = ctx.getVictim();
+    protected void onDamageAsAttackerHighest(@NotNull EnchantmentContext ctx, int level) {
+        LivingEntity attacker = ctx.getHolder();
+        LivingEntity victim = ctx.getVictim();
 
-        // 被攻击者不能为空
         if (victim == null) {
             return;
         }
@@ -83,8 +81,8 @@ public class EnchantmentRepeatingThrust extends EnchantmentBase {
             effectiveLevel = Math.min(effectiveLevel, 10);
         }
 
-        UUID attackerUUID = attacker.getUniqueID();
-        UUID victimUUID = victim.getUniqueID();
+        UUID attackerUUID = attacker.getUUID();
+        UUID victimUUID = victim.getUUID();
 
         // 获取当前记录的目标UUID（如果存在）
         String currentTargetKey = CURRENT_TARGET_KEY + "_" + attackerUUID;
@@ -119,41 +117,36 @@ public class EnchantmentRepeatingThrust extends EnchantmentBase {
      * 目标死亡时清除叠加
      */
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingDeath(@NotNull LivingDeathEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase dead = evt.getEntityLiving();
-        UUID deadUUID = dead.getUniqueID();
+        LivingEntity dead = evt.getEntity();
+        UUID deadUUID = dead.getUUID();
 
-        // 获取附魔实例
         Enchantment repeatingThrust = EnchantmentRegistry.getEnchantmentByClass(EnchantmentRepeatingThrust.class);
         if (repeatingThrust == null) {
             return;
         }
 
-        // 检查是否有攻击者
-        if (!(evt.getSource().getTrueSource() instanceof EntityLivingBase)) {
+        if (!(evt.getSource().getEntity() instanceof LivingEntity)) {
             return;
         }
 
-        EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
+        LivingEntity attacker = (LivingEntity) evt.getSource().getEntity();
 
-        // 检查攻击者是否持有此附魔
-        if (attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+        ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                repeatingThrust,
-                attacker.getHeldItem(attacker.getActiveHand()));
-
+        int level = EnchantmentHelper.getItemEnchantmentLevel(repeatingThrust, heldItem);
         if (level <= 0) {
             return;
         }
 
-        UUID attackerUUID = attacker.getUniqueID();
+        UUID attackerUUID = attacker.getUUID();
 
         // 获取当前记录的目标UUID
         String currentTargetKey = CURRENT_TARGET_KEY + "_" + attackerUUID;
@@ -168,8 +161,12 @@ public class EnchantmentRepeatingThrust extends EnchantmentBase {
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
-        // UNCOMMON 的默认公式：5 + (level - 1) * 10
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((5 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

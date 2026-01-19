@@ -1,58 +1,72 @@
 package pers.roinflam.carianstyle.enchantment.dead;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.init.MobEffects;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.potion.PotionEffect;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraftforge.event.entity.living.LivingEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
-import javax.annotation.Nonnull;
 import java.util.List;
 
+/**
+ * 猩红罗妮亚附魔
+ * <p>
+ * 死亡时触发：
+ * - 取消死亡，保留1点生命
+ * - 击退周围敌人
+ * - 1.5秒后对范围内敌人造成猩红腐败伤害并击退
+ * - 最终自身死亡
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
+ */
 @AutoRegisterEnchantment(
         id = "scarlet_lonia",
-        category = EnchantmentCategory.DEAD,
-        rarity = EnchantmentRarity.RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.DEAD,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantmentCategory.ARMOR,
+        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}
 )
 public class EnchantmentScarletLonia extends EnchantmentBase {
 
     public EnchantmentScarletLonia() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
-                EntityEquipmentSlot.HEAD,
-                EntityEquipmentSlot.CHEST,
-                EntityEquipmentSlot.LEGS,
-                EntityEquipmentSlot.FEET
+        super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
+                EquipmentSlot.HEAD,
+                EquipmentSlot.CHEST,
+                EquipmentSlot.LEGS,
+                EquipmentSlot.FEET
         });
     }
 
     @Override
-    protected void onDeath(@Nonnull EnchantmentContext ctx, int level) {
+    protected void onDeath(@NotNull EnchantmentContext ctx, int level) {
         if (ctx.canHarmInCreative()) {
             return;
         }
 
-        EntityLivingBase hurter = ctx.getHolder();
+        LivingEntity hurter = ctx.getHolder();
 
-        if (EnchantmentDataManager.isOnCooldown("scarlet_lonia_cooldown", hurter.getUniqueID())) {
-            Boolean isActive = EnchantmentDataManager.getData("scarlet_lonia_active", hurter.getUniqueID());
+        if (EnchantmentDataManager.isOnCooldown("scarlet_lonia_cooldown", hurter.getUUID())) {
+            Boolean isActive = EnchantmentDataManager.getData("scarlet_lonia_active", hurter.getUUID());
             if (isActive != null && isActive) {
                 ctx.cancelEvent();
                 hurter.setHealth(1);
@@ -60,33 +74,33 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
             return;
         }
 
-        EnchantmentDataManager.setData("scarlet_lonia_active", hurter.getUniqueID(), true);
-        EnchantmentDataManager.setCooldown("scarlet_lonia_cooldown", hurter.getUniqueID(), 1800);
+        EnchantmentDataManager.setData("scarlet_lonia_active", hurter.getUUID(), true);
+        EnchantmentDataManager.setCooldown("scarlet_lonia_cooldown", hurter.getUUID(), 1800);
 
         ctx.cancelEvent();
         hurter.setHealth(1);
-        hurter.addPotionEffect(new PotionEffect(MobEffects.SLOWNESS, 30, 6));
+        hurter.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 30, 6));
 
-        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
-                EntityLivingBase.class,
+        List<LivingEntity> entities = EntityUtil.getNearbyEntities(
+                LivingEntity.class,
                 hurter,
                 level * 4,
                 entityLivingBase -> !entityLivingBase.equals(hurter)
         );
 
-        for (EntityLivingBase entityLivingBase : entities) {
-            double x = entityLivingBase.posX - hurter.posX;
-            double z = entityLivingBase.posZ - hurter.posZ;
+        for (LivingEntity entityLivingBase : entities) {
+            double x = entityLivingBase.getX() - hurter.getX();
+            double z = entityLivingBase.getZ() - hurter.getZ();
             float stronge = (float) (level * 0.7 * Math.max(Math.abs(x), Math.abs(z)) / 14);
-            entityLivingBase.knockBack(hurter, stronge, x, z);
+            entityLivingBase.knockback(stronge, x, z);
         }
 
         int finalLevel = level;
         new SynchronizationTask(30) {
             @Override
             public void run() {
-                List<EntityLivingBase> nearbyEntities = EntityUtil.getNearbyEntities(
-                        EntityLivingBase.class,
+                List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
+                        LivingEntity.class,
                         hurter,
                         finalLevel * 2,
                         entityLivingBase -> !entityLivingBase.equals(hurter)
@@ -94,26 +108,29 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
 
                 if (!nearbyEntities.isEmpty()) {
                     for (Entity entity : nearbyEntities) {
-                        EntityLivingBase entityLivingBase = (EntityLivingBase) entity;
-                        entityLivingBase.setHealth(entityLivingBase.getHealth() - entityLivingBase.getHealth() * finalLevel * 0.05f);
-                        entityLivingBase.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_ROT, finalLevel * 10 * 20, finalLevel - 1));
+                        LivingEntity entityLivingBase = (LivingEntity) entity;
+                        // 使用真伤系统
+                        float damage = entityLivingBase.getHealth() * finalLevel * 0.05f;
+                        EntityLivingUtil.damageHealthDirectly(entityLivingBase, damage);
 
-                        double x = hurter.posX - entityLivingBase.posX;
-                        double z = hurter.posZ - entityLivingBase.posZ;
-                        entityLivingBase.knockBack(hurter, finalLevel * 0.75f, x, z);
+                        entityLivingBase.addEffect(new MobEffectInstance(CarianStylePotion.SCARLET_ROT.get(), finalLevel * 10 * 20, finalLevel - 1));
+
+                        double x = hurter.getX() - entityLivingBase.getX();
+                        double z = hurter.getZ() - entityLivingBase.getZ();
+                        entityLivingBase.knockback(finalLevel * 0.75f, x, z);
                     }
                 }
 
-                EnchantmentDataManager.removeData("scarlet_lonia_active", hurter.getUniqueID());
-                EntityLivingUtil.kill(hurter, NewDamageSource.SCARLET_ROT);
+                EnchantmentDataManager.removeData("scarlet_lonia_active", hurter.getUUID());
+                EntityLivingUtil.kill(hurter, NewDamageSource.scarletRot(hurter.level()));
             }
         }.start();
     }
 
     @Override
-    protected void onDefendHighest(@Nonnull EnchantmentContext ctx, int level) {
-        EntityLivingBase hurter = ctx.getHolder();
-        Boolean isActive = EnchantmentDataManager.getData("scarlet_lonia_active", hurter.getUniqueID());
+    protected void onDefendHighest(@NotNull EnchantmentContext ctx, int level) {
+        LivingEntity hurter = ctx.getHolder();
+        Boolean isActive = EnchantmentDataManager.getData("scarlet_lonia_active", hurter.getUUID());
 
         if (isActive != null && isActive) {
             ctx.cancelEvent();
@@ -124,10 +141,10 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
     public static class ClientEventHandler {
 
         @SubscribeEvent
-        public static void onLivingUpdate(@Nonnull LivingEvent.LivingUpdateEvent evt) {
-            if (evt.getEntity().world.isRemote) {
-                EntityLivingBase entityLiving = evt.getEntityLiving();
-                Boolean isActive = EnchantmentDataManager.getData("scarlet_lonia_active", entityLiving.getUniqueID());
+        public static void onLivingUpdate(@NotNull LivingEvent.LivingTickEvent evt) {
+            if (evt.getEntity().level().isClientSide) {
+                LivingEntity entityLiving = evt.getEntity();
+                Boolean isActive = EnchantmentDataManager.getData("scarlet_lonia_active", entityLiving.getUUID());
 
                 if (isActive != null && isActive) {
                     EntityLivingUtil.setJumped(entityLiving);
@@ -137,7 +154,12 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((36 + (enchantmentLevel - 1) * 20) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

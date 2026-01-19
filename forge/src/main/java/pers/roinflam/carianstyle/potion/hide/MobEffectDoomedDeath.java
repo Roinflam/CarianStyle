@@ -1,6 +1,8 @@
 package pers.roinflam.carianstyle.potion.hide;
 
-import net.minecraft.entity.SharedMonsterAttributes;
+import net.minecraft.world.effect.MobEffectCategory;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import pers.roinflam.carianstyle.base.potion.hide.HideBase;
 
 /**
@@ -13,13 +15,13 @@ import pers.roinflam.carianstyle.base.potion.hide.HideBase;
 public class MobEffectDoomedDeath extends HideBase {
 
     public MobEffectDoomedDeath(boolean isBadEffectIn, int liquidColorIn) {
-        super(isBadEffectIn, liquidColorIn, "doomed_death");
+        super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
 
-        this.registerPotionAttributeModifier(
-                SharedMonsterAttributes.MAX_HEALTH,
+        this.addAttributeModifier(
+                Attributes.MAX_HEALTH,
                 "58993fe2-d11c-2b97-4958-6a8304ff8ad8",
                 -0.25,
-                2
+                AttributeModifier.Operation.MULTIPLY_TOTAL
         );
     }
 }

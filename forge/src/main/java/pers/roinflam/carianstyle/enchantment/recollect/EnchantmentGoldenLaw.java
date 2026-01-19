@@ -1,37 +1,43 @@
 package pers.roinflam.carianstyle.enchantment.recollect;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
-import javax.annotation.Nonnull;
 import java.util.UUID;
 
 /**
  * 黄金律法附魔
- *
+ * <p>
  * 攻击：增伤15%~60%（血量越低越高）
  * 受击：减伤15%
  * 免疫：伤害<=血量15%直接免疫，否则100tick冷却内免疫一次
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "golden_law",
-        category = EnchantmentCategory.RECOLLECT,
-        rarity = EnchantmentRarity.VERY_RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantmentCategory.WEAPON,
+        slots = {EquipmentSlot.MAINHAND}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentGoldenLaw extends EnchantmentBase {
@@ -40,16 +46,16 @@ public class EnchantmentGoldenLaw extends EnchantmentBase {
     private static final int RECOLLECT_ENCHANTABILITY = 35;
 
     public EnchantmentGoldenLaw() {
-        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (evt.getSource().canHarmInCreative()) {
+        if (evt.getSource().isCreativePlayer()) {
             return;
         }
 
@@ -59,13 +65,12 @@ public class EnchantmentGoldenLaw extends EnchantmentBase {
         }
 
         // 攻击者视角：增伤
-        if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
-            EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+        if (evt.getSource().getDirectEntity() instanceof LivingEntity) {
+            LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
 
-            if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                int level = EnchantmentHelper.getEnchantmentLevel(
-                        goldenLaw,
-                        attacker.getHeldItem(attacker.getActiveHand()));
+            ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
+            if (!heldItem.isEmpty()) {
+                int level = EnchantmentHelper.getItemEnchantmentLevel(goldenLaw, heldItem);
 
                 if (level > 0) {
                     float healthRatio = attacker.getHealth() / attacker.getMaxHealth();
@@ -76,12 +81,11 @@ public class EnchantmentGoldenLaw extends EnchantmentBase {
         }
 
         // 受击者视角：减伤15%
-        EntityLivingBase victim = evt.getEntityLiving();
+        LivingEntity victim = evt.getEntity();
 
-        if (!victim.getHeldItem(victim.getActiveHand()).isEmpty()) {
-            int level = EnchantmentHelper.getEnchantmentLevel(
-                    goldenLaw,
-                    victim.getHeldItem(victim.getActiveHand()));
+        ItemStack heldItem = victim.getItemInHand(victim.getUsedItemHand());
+        if (!heldItem.isEmpty()) {
+            int level = EnchantmentHelper.getItemEnchantmentLevel(goldenLaw, heldItem);
 
             if (level > 0) {
                 evt.setAmount(evt.getAmount() * 0.85f);
@@ -90,19 +94,20 @@ public class EnchantmentGoldenLaw extends EnchantmentBase {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingAttack(@NotNull LivingAttackEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (evt.getSource().canHarmInCreative()) {
+        if (evt.getSource().isCreativePlayer()) {
             return;
         }
 
-        EntityLivingBase holder = evt.getEntityLiving();
-        UUID uuid = holder.getUniqueID();
+        LivingEntity holder = evt.getEntity();
+        UUID uuid = holder.getUUID();
 
-        if (holder.getHeldItemMainhand().isEmpty()) {
+        ItemStack mainHand = holder.getMainHandItem();
+        if (mainHand.isEmpty()) {
             return;
         }
 
@@ -111,7 +116,7 @@ public class EnchantmentGoldenLaw extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(goldenLaw, holder.getHeldItemMainhand());
+        int level = EnchantmentHelper.getItemEnchantmentLevel(goldenLaw, mainHand);
 
         if (level <= 0) {
             return;
@@ -129,12 +134,11 @@ public class EnchantmentGoldenLaw extends EnchantmentBase {
     }
 
     @Override
-    public boolean canApplyTogether(@Nonnull Enchantment ench) {
-        // 与律法类附魔冲突（通过包名判断）
+    protected boolean checkCompatibility(Enchantment ench) {
         if (isLawEnchantment(ench) && !ench.equals(this)) {
             return false;
         }
-        return super.canApplyTogether(ench);
+        return super.checkCompatibility(ench);
     }
 
     private boolean isLawEnchantment(Enchantment ench) {
@@ -142,7 +146,12 @@ public class EnchantmentGoldenLaw extends EnchantmentBase {
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) (RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

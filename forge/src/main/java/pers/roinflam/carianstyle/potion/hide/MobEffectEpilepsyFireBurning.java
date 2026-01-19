@@ -1,9 +1,10 @@
 package pers.roinflam.carianstyle.potion.hide;
 
-import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.world.effect.MobEffectCategory;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import pers.roinflam.carianstyle.base.potion.flame.FlameBase;
 import pers.roinflam.carianstyle.utils.Reference;
 
@@ -21,7 +22,7 @@ import javax.annotation.Nonnull;
 public class MobEffectEpilepsyFireBurning extends FlameBase {
 
     public MobEffectEpilepsyFireBurning(boolean isBadEffectIn, int liquidColorIn) {
-        super(isBadEffectIn, liquidColorIn, "epilepsy_fire_burning");
+        super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
     }
 
     /**
@@ -29,19 +30,14 @@ public class MobEffectEpilepsyFireBurning extends FlameBase {
      */
     @SubscribeEvent(priority = EventPriority.LOW)
     public void onLivingHeal(@Nonnull LivingHealEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase healer = evt.getEntityLiving();
-        if (healer.isPotionActive(this)) {
+        LivingEntity healer = evt.getEntity();
+        if (healer.hasEffect(this)) {
             evt.setAmount(evt.getAmount() * 0.1f);
         }
-    }
-
-    @Override
-    public int getSerialNumber() {
-        return 1;
     }
 
     @Nonnull

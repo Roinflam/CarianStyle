@@ -1,40 +1,44 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemShield;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.DamageSource;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ShieldItem;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-
-import javax.annotation.Nonnull;
+import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 /**
  * 卡利亚报复附魔
- *
+ * <p>
  * 盾牌格挡远程/魔法攻击时生成魔法剑反击
  * 每把剑伤害 = 原伤害×等级×20%
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "carian_retaliation",
-        category = EnchantmentCategory.GENERAL,
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.RARE,
-        type = EnumEnchantmentType.BREAKABLE,
+        type = EnchantmentCategory.BREAKABLE,
+        slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND},
         conflictsWith = {
                 EnchantmentScholarShield.class,
                 EnchantmentImmutableShield.class
@@ -44,37 +48,37 @@ import javax.annotation.Nonnull;
 public class EnchantmentCarianRetaliation extends EnchantmentBase {
 
     public EnchantmentCarianRetaliation() {
-        super(EnumEnchantmentType.BREAKABLE, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND, EntityEquipmentSlot.OFFHAND});
+        super(EnchantmentCategory.BREAKABLE, new EquipmentSlot[]{EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND});
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingAttack(@NotNull LivingAttackEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
         DamageSource damageSource = evt.getSource();
 
-        if (damageSource.getTrueSource() == null) {
+        if (damageSource.getEntity() == null) {
             return;
         }
 
-        boolean isRanged = !damageSource.getTrueSource().equals(damageSource.getImmediateSource());
-        boolean isMagic = damageSource.isMagicDamage();
+        boolean isRanged = !damageSource.getEntity().equals(damageSource.getDirectEntity());
+        boolean isMagic = DamageSourceUtil.isMagicDamage(damageSource);
         if (!isRanged && !isMagic) {
             return;
         }
 
-        EntityLivingBase holder = evt.getEntityLiving();
-        Entity attacker = damageSource.getTrueSource();
+        LivingEntity holder = evt.getEntity();
+        Entity attacker = damageSource.getEntity();
 
-        if (!holder.isHandActive()) {
+        if (!holder.isUsingItem()) {
             return;
         }
 
-        ItemStack heldItem = holder.getHeldItem(holder.getActiveHand());
+        ItemStack heldItem = holder.getItemInHand(holder.getUsedItemHand());
 
-        if (heldItem.isEmpty() || !(heldItem.getItem() instanceof ItemShield)) {
+        if (heldItem.isEmpty() || !(heldItem.getItem() instanceof ShieldItem)) {
             return;
         }
 
@@ -83,7 +87,7 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(carianRetaliation, heldItem);
+        int level = EnchantmentHelper.getItemEnchantmentLevel(carianRetaliation, heldItem);
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
@@ -100,49 +104,57 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
             int delay = 40 + i * 5;
 
             EntityGlintblades showBlade = new EntityGlintblades(holder, attacker).setDeadTick(delay);
-            showBlade.posY += 0.5;
+            double posX = holder.getX();
+            double posY = holder.getY() + 0.5;
+            double posZ = holder.getZ();
 
             if (i == 0) {
-                showBlade.posX -= 1;
-                showBlade.posZ += 1;
+                posX -= 1;
+                posZ += 1;
             } else if (i == 1) {
-                showBlade.posX -= 1;
-                showBlade.posZ -= 1;
+                posX -= 1;
+                posZ -= 1;
             } else {
-                showBlade.posX += 1;
+                posX += 1;
             }
 
-            holder.world.spawnEntity(showBlade);
+            showBlade.setPos(posX, posY, posZ);
+            holder.level().addFreshEntity(showBlade);
+
+            final double finalPosX = posX;
+            final double finalPosY = posY;
+            final double finalPosZ = posZ;
 
             new SynchronizationTask(delay) {
                 @Override
                 public void run() {
-                    double posX = showBlade.posX;
-                    double posY = showBlade.posY;
-                    double posZ = showBlade.posZ;
-
                     EntityGlintblades attackBlade = new EntityGlintblades(holder, attacker);
-                    attackBlade.posX = posX;
-                    attackBlade.posY = posY;
-                    attackBlade.posZ = posZ;
+                    attackBlade.setPos(finalPosX, finalPosY, finalPosZ);
 
-                    attackBlade.setDamageSource(DamageSource.causeThrownDamage(attackBlade, holder).setMagicDamage());
+                    DamageSource magicDamage = holder.damageSources().thrown(attackBlade, holder);
+                    DamageSourceUtil.setMagicDamage(magicDamage);
+                    attackBlade.setDamageSource(magicDamage);
                     attackBlade.setDamage(baseDamage * effectiveLevel * 0.2f);
                     attackBlade.shoot(1);
-                    holder.world.spawnEntity(attackBlade);
+                    holder.level().addFreshEntity(attackBlade);
                 }
             }.start();
         }
     }
 
     @Override
-    public boolean canApplyTogether(@Nonnull Enchantment ench) {
+    protected boolean checkCompatibility(@NotNull Enchantment ench) {
         return !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentScholarShield.class)) &&
                 !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentImmutableShield.class));
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((20 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

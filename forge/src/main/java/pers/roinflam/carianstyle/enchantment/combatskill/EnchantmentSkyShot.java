@@ -1,42 +1,43 @@
-// 文件：EnchantmentSkyShot.java
-// 路径：src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentSkyShot.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.projectile.EntityArrow;
-import net.minecraft.init.MobEffects;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.potion.PotionEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.ProjectileImpactEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
-import javax.annotation.Nonnull;
-
 /**
  * 对空射击附魔
+ * <p>
+ * 射击比自己高至少5格的目标时触发
+ * 额外造成 100% × 等级 的伤害
+ * 额外造成目标当前生命值 × 10% 的伤害
+ * 触发后自身获得减速II效果，持续5秒
+ * </p>
  *
- * 效果：
- * - 射击比自己高至少5格的目标时触发
- * - 额外造成 100% × 等级 的伤害
- * - 额外造成目标当前生命值 × 10% 的伤害
- * - 触发后自身获得减速II效果，持续5秒
- * - 最大等级：3
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "sky_shot",
-        category = EnchantmentCategory.COMBAT_SKILL,
-        rarity = EnchantmentRarity.RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantmentCategory.BOW,
+        slots = {EquipmentSlot.MAINHAND}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentSkyShot extends EnchantmentBase {
@@ -46,64 +47,63 @@ public class EnchantmentSkyShot extends EnchantmentBase {
      */
     private static final double HEIGHT_THRESHOLD = 5.0;
 
-    /**
-     * 构造函数
-     */
     public EnchantmentSkyShot() {
-        // 弓附魔，主手装备
-        super(EnumEnchantmentType.BOW, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
     /**
      * 箭矢命中时触发：检查高度差并造成额外伤害
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onProjectileImpact_Arrow(@Nonnull ProjectileImpactEvent.Arrow evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onProjectileImpact_Arrow(@NotNull ProjectileImpactEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityArrow arrow = evt.getArrow();
+        // 必须是箭矢
+        if (!(evt.getProjectile() instanceof AbstractArrow)) {
+            return;
+        }
+
+        AbstractArrow arrow = (AbstractArrow) evt.getProjectile();
 
         // 必须命中实体
-        if (evt.getRayTraceResult().entityHit == null) {
+        if (evt.getRayTraceResult().getType() != net.minecraft.world.phys.HitResult.Type.ENTITY) {
             return;
         }
 
+        net.minecraft.world.phys.EntityHitResult entityHit = (net.minecraft.world.phys.EntityHitResult) evt.getRayTraceResult();
+
         // 必须有射手
-        if (arrow.shootingEntity == null) {
+        if (arrow.getOwner() == null) {
             return;
         }
 
         // 射手必须是生物
-        if (!(arrow.shootingEntity instanceof EntityLivingBase)) {
+        if (!(arrow.getOwner() instanceof LivingEntity)) {
             return;
         }
 
         // 被击中的必须是生物
-        if (!(evt.getRayTraceResult().entityHit instanceof EntityLivingBase)) {
+        if (!(entityHit.getEntity() instanceof LivingEntity)) {
             return;
         }
 
-        EntityLivingBase shooter = (EntityLivingBase) arrow.shootingEntity;
-        EntityLivingBase target = (EntityLivingBase) evt.getRayTraceResult().entityHit;
+        LivingEntity shooter = (LivingEntity) arrow.getOwner();
+        LivingEntity target = (LivingEntity) entityHit.getEntity();
 
         // 检查射手是否持有弓
-        if (shooter.getHeldItem(shooter.getActiveHand()).isEmpty()) {
+        ItemStack heldItem = shooter.getItemInHand(shooter.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
-        // 获取附魔实例
         Enchantment skyShot = EnchantmentRegistry.getEnchantmentByClass(EnchantmentSkyShot.class);
         if (skyShot == null) {
             return;
         }
 
-        // 获取附魔等级
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                skyShot,
-                shooter.getHeldItem(shooter.getActiveHand()));
-
+        int level = EnchantmentHelper.getItemEnchantmentLevel(skyShot, heldItem);
         if (level <= 0) {
             return;
         }
@@ -115,13 +115,13 @@ public class EnchantmentSkyShot extends EnchantmentBase {
         }
 
         // 检查高度差：目标必须比射手高至少5格
-        double heightDifference = target.posY - shooter.posY;
+        double heightDifference = target.getY() - shooter.getY();
         if (heightDifference < HEIGHT_THRESHOLD) {
             return;
         }
 
         // 计算原始箭矢伤害
-        double baseDamage = arrow.getDamage();
+        double baseDamage = arrow.getBaseDamage();
 
         // 额外伤害1：100% × 等级
         double bonusDamage1 = baseDamage * effectiveLevel;
@@ -130,15 +130,19 @@ public class EnchantmentSkyShot extends EnchantmentBase {
         double bonusDamage2 = target.getHealth() * 0.1;
 
         // 设置新的箭矢伤害
-        arrow.setDamage(baseDamage + bonusDamage1 + bonusDamage2);
+        arrow.setBaseDamage(baseDamage + bonusDamage1 + bonusDamage2);
 
         // 给射手施加减速II效果，持续5秒（100 tick）
-        shooter.addPotionEffect(new PotionEffect(MobEffects.SLOWNESS, 100, 1));
+        shooter.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 100, 1));
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
-        // RARE 的默认公式：10 + (level - 1) * 15
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((10 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

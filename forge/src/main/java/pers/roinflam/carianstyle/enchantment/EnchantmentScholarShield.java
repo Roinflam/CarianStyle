@@ -1,73 +1,72 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemShield;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.DamageSource;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ShieldItem;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
-import javax.annotation.Nonnull;
-
 /**
  * 学者盾附魔
- *
+ * <p>
  * 盾牌附魔，格挡时反伤和减伤
  * 格挡时：
  * - 对攻击者造成 10% × 等级 的魔法伤害（基于原伤害）
  * - 减少 7.5% × 等级 的伤害
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "scholar_shield",
-        category = EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.VERY_RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantmentCategory.BREAKABLE,
+        slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentScholarShield extends EnchantmentBase {
 
     public EnchantmentScholarShield() {
-        super(EnumEnchantmentType.BREAKABLE, new EntityEquipmentSlot[]{
-                EntityEquipmentSlot.MAINHAND,
-                EntityEquipmentSlot.OFFHAND
+        super(EnchantmentCategory.BREAKABLE, new EquipmentSlot[]{
+                EquipmentSlot.MAINHAND,
+                EquipmentSlot.OFFHAND
         });
     }
 
-    /**
-     * 格挡时反伤
-     */
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingAttack(@NotNull LivingAttackEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (!(evt.getSource().getImmediateSource() instanceof EntityLivingBase)) {
+        if (!(evt.getSource().getDirectEntity() instanceof LivingEntity)) {
             return;
         }
 
-        EntityLivingBase victim = evt.getEntityLiving();
-        EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+        LivingEntity victim = evt.getEntity();
+        LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
 
-        // 必须正在格挡
-        if (!victim.isHandActive()) {
+        if (!victim.isUsingItem()) {
             return;
         }
 
-        ItemStack activeItem = victim.getHeldItem(victim.getActiveHand());
-        if (activeItem.isEmpty() || !(activeItem.getItem() instanceof ItemShield)) {
+        ItemStack activeItem = victim.getUseItem();
+        if (activeItem.isEmpty() || !(activeItem.getItem() instanceof ShieldItem)) {
             return;
         }
 
@@ -76,7 +75,7 @@ public class EnchantmentScholarShield extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(scholarShield, activeItem);
+        int level = EnchantmentHelper.getItemEnchantmentLevel(scholarShield, activeItem);
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
@@ -86,35 +85,30 @@ public class EnchantmentScholarShield extends EnchantmentBase {
             return;
         }
 
-        // 对攻击者造成反伤
-        attacker.attackEntityFrom(
-                DamageSource.causeMobDamage(victim).setMagicDamage(),
+        attacker.hurt(
+                attacker.damageSources().mobAttack(victim),
                 evt.getAmount() * level * 0.1f
         );
     }
 
-    /**
-     * 格挡时减伤
-     */
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (evt.getSource().getImmediateSource() == null) {
+        if (evt.getSource().getDirectEntity() == null) {
             return;
         }
 
-        EntityLivingBase victim = evt.getEntityLiving();
+        LivingEntity victim = evt.getEntity();
 
-        // 必须正在格挡
-        if (!victim.isHandActive()) {
+        if (!victim.isUsingItem()) {
             return;
         }
 
-        ItemStack activeItem = victim.getHeldItem(victim.getActiveHand());
-        if (activeItem.isEmpty() || !(activeItem.getItem() instanceof ItemShield)) {
+        ItemStack activeItem = victim.getUseItem();
+        if (activeItem.isEmpty() || !(activeItem.getItem() instanceof ShieldItem)) {
             return;
         }
 
@@ -123,7 +117,7 @@ public class EnchantmentScholarShield extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(scholarShield, activeItem);
+        int level = EnchantmentHelper.getItemEnchantmentLevel(scholarShield, activeItem);
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
@@ -133,12 +127,16 @@ public class EnchantmentScholarShield extends EnchantmentBase {
             return;
         }
 
-        // 减伤 7.5% × 等级
         evt.setAmount(evt.getAmount() - evt.getAmount() * level * 0.075f);
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((5 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

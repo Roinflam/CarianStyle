@@ -1,40 +1,44 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.init.Enchantments;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.potion.Potion;
-import net.minecraft.potion.PotionEffect;
-import net.minecraft.util.DamageSource;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 
-import javax.annotation.Nonnull;
-
 /**
  * 黑焰仪式附魔
- *
+ * <p>
  * 攻击：根据自身药水效果数量增伤（正面+10%，负面+20%）
  * 被动：有药水效果时每秒扣血5%并施加灭绝火焰
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "black_flame_ritual",
-        category = EnchantmentCategory.GENERAL,
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantmentCategory.ARMOR_CHEST,
+        slots = {EquipmentSlot.CHEST},
         conflictsWith = {
                 EnchantmentShelterOfFire.class,
                 EnchantmentHealingByFire.class
@@ -44,34 +48,34 @@ import javax.annotation.Nonnull;
 public class EnchantmentBlackFlameRitual extends EnchantmentBase {
 
     public EnchantmentBlackFlameRitual() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+        super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
         DamageSource damageSource = evt.getSource();
-        if (!(damageSource.getTrueSource() instanceof EntityLivingBase)) {
+        if (!(damageSource.getEntity() instanceof LivingEntity)) {
             return;
         }
 
-        EntityLivingBase attacker = (EntityLivingBase) damageSource.getTrueSource();
+        LivingEntity attacker = (LivingEntity) damageSource.getEntity();
 
         Enchantment blackFlameRitual = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBlackFlameRitual.class);
         if (blackFlameRitual == null) {
             return;
         }
 
-        int totalLevel = EnchantmentHelper.getEnchantmentLevel(
+        int totalLevel = EnchantmentHelper.getItemEnchantmentLevel(
                 blackFlameRitual,
-                attacker.getHeldItem(attacker.getActiveHand()));
+                attacker.getItemInHand(attacker.getUsedItemHand()));
 
-        for (ItemStack armor : attacker.getArmorInventoryList()) {
+        for (ItemStack armor : attacker.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(blackFlameRitual, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(blackFlameRitual, armor);
             }
         }
 
@@ -80,10 +84,11 @@ public class EnchantmentBlackFlameRitual extends EnchantmentBase {
         }
 
         float damageMultiplier = 1;
-        for (PotionEffect effect : attacker.getActivePotionEffects()) {
-            Potion potion = effect.getPotion();
-            if (!potion.isInstant() && potion.shouldRender(effect)) {
-                damageMultiplier += potion.isBadEffect() ? 0.2f : 0.1f;
+        for (MobEffectInstance effect : attacker.getActiveEffects()) {
+            MobEffect potion = effect.getEffect();
+            if (!potion.isInstantenous() && effect.isVisible()) {
+                // 1.20.1: isBadEffect → !isBeneficial (逻辑反转)
+                damageMultiplier += (!potion.isBeneficial()) ? 0.2f : 0.1f;
             }
         }
 
@@ -91,16 +96,16 @@ public class EnchantmentBlackFlameRitual extends EnchantmentBase {
     }
 
     @SubscribeEvent
-    public static void onLivingUpdate(@Nonnull LivingEvent.LivingUpdateEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingTick(@NotNull LivingEvent.LivingTickEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (evt.getEntity().world.getTotalWorldTime() % 20 != 0) {
+        if (evt.getEntity().tickCount % 20 != 0) {
             return;
         }
 
-        EntityLivingBase holder = evt.getEntityLiving();
+        LivingEntity holder = evt.getEntity();
 
         Enchantment blackFlameRitual = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBlackFlameRitual.class);
         if (blackFlameRitual == null) {
@@ -108,9 +113,9 @@ public class EnchantmentBlackFlameRitual extends EnchantmentBase {
         }
 
         int totalLevel = 0;
-        for (ItemStack armor : holder.getArmorInventoryList()) {
+        for (ItemStack armor : holder.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(blackFlameRitual, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(blackFlameRitual, armor);
             }
         }
 
@@ -119,30 +124,35 @@ public class EnchantmentBlackFlameRitual extends EnchantmentBase {
         }
 
         boolean hasPotion = false;
-        for (PotionEffect effect : holder.getActivePotionEffects()) {
-            Potion potion = effect.getPotion();
-            if (!potion.isInstant() && potion.shouldRender(effect)) {
+        for (MobEffectInstance effect : holder.getActiveEffects()) {
+            MobEffect potion = effect.getEffect();
+            if (!potion.isInstantenous() && effect.isVisible()) {
                 hasPotion = true;
                 break;
             }
         }
 
         if (hasPotion) {
-            holder.addPotionEffect(new PotionEffect(CarianStylePotion.DESTRUCTION_FIRE_BURNING, 21, 0));
+            holder.addEffect(new MobEffectInstance(CarianStylePotion.DESTRUCTION_FIRE_BURNING.get(), 21, 0));
             holder.setHealth(holder.getHealth() * 0.95f);
         }
     }
 
     @Override
-    public boolean canApplyTogether(@Nonnull Enchantment ench) {
-        if (ench == Enchantments.PROTECTION) {
+    protected boolean checkCompatibility(@NotNull Enchantment ench) {
+        if (ench == Enchantments.ALL_DAMAGE_PROTECTION) {
             return false;
         }
-        return super.canApplyTogether(ench);
+        return super.checkCompatibility(ench);
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) (30 * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }

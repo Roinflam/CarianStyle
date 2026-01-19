@@ -1,19 +1,20 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.projectile.EntityArrow;
-import net.minecraft.init.Enchantments;
-import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraftforge.event.entity.ProjectileImpactEvent;
 import net.minecraftforge.event.entity.living.LivingKnockBackEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -21,48 +22,56 @@ import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
-import javax.annotation.Nonnull;
 import java.util.List;
 
 /**
  * 硬箭附魔
- *
+ * <p>
  * 弓箭附魔，高伤害但有代价
  * 正面效果：
  * - 箭矢伤害增加 80% × 等级
  * 负面效果（周围12格有敌人时）：
  * - 受到伤害增加 80% × 等级
  * - 受到击退增加 75% × 等级
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "hard_arrow",
-        category = EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.UNCOMMON
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantmentCategory.BOW,
+        slots = {EquipmentSlot.MAINHAND}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentHardArrow extends EnchantmentBase {
 
     public EnchantmentHardArrow() {
-        super(EnumEnchantmentType.BOW, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
-    /**
-     * 箭矢命中时增加伤害
-     * 由于 ProjectileImpactEvent.Arrow 没有模板方法，保留静态监听器
-     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onProjectileImpact_Arrow(@Nonnull ProjectileImpactEvent.Arrow evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onProjectileImpact_Arrow(@NotNull ProjectileImpactEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityArrow arrow = evt.getArrow();
-        if (!(arrow.shootingEntity instanceof EntityLivingBase)) {
+        if (!(evt.getProjectile() instanceof AbstractArrow)) {
             return;
         }
 
-        EntityLivingBase attacker = (EntityLivingBase) arrow.shootingEntity;
-        if (attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+        AbstractArrow arrow = (AbstractArrow) evt.getProjectile();
+
+        if (!(arrow.getOwner() instanceof LivingEntity)) {
+            return;
+        }
+
+        LivingEntity attacker = (LivingEntity) arrow.getOwner();
+
+        ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
@@ -71,10 +80,7 @@ public class EnchantmentHardArrow extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                hardArrow,
-                attacker.getHeldItem(attacker.getActiveHand())
-        );
+        int level = EnchantmentHelper.getItemEnchantmentLevel(hardArrow, heldItem);
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
@@ -84,25 +90,19 @@ public class EnchantmentHardArrow extends EnchantmentBase {
             return;
         }
 
-        // 箭矢伤害增加 80% × 等级
-        arrow.setDamage(arrow.getDamage() + arrow.getDamage() * level * 0.8);
+        arrow.setBaseDamage(arrow.getBaseDamage() + arrow.getBaseDamage() * level * 0.8);
     }
 
-    /**
-     * 受击时：周围有敌人则受到更多伤害（代价）
-     */
     @Override
-    protected void onHurtAsVictimHighest(@Nonnull EnchantmentContext ctx, int level) {
-        // 必须有攻击来源
+    protected void onHurtAsVictimHighest(@NotNull EnchantmentContext ctx, int level) {
         if (ctx.getAttacker() == null) {
             return;
         }
 
-        EntityLivingBase victim = ctx.getHolder();
+        LivingEntity victim = ctx.getHolder();
 
-        // 检查周围12格是否有其他实体
-        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
-                EntityLivingBase.class,
+        List<LivingEntity> entities = EntityUtil.getNearbyEntities(
+                LivingEntity.class,
                 victim,
                 12,
                 entity -> !entity.equals(victim)
@@ -112,23 +112,20 @@ public class EnchantmentHardArrow extends EnchantmentBase {
             return;
         }
 
-        // 受到伤害增加 80% × 等级
         float bonusDamage = ctx.getDamage() * level * 0.8f;
         ctx.addDamage(bonusDamage);
     }
 
-    /**
-     * 受击时：周围有敌人则受到更多击退（代价）
-     * 由于 LivingKnockBackEvent 没有模板方法，保留静态监听器
-     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingKnockBack(@Nonnull LivingKnockBackEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingKnockBack(@NotNull LivingKnockBackEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase victim = evt.getEntityLiving();
-        if (victim.getHeldItem(victim.getActiveHand()).isEmpty()) {
+        LivingEntity victim = evt.getEntity();
+
+        ItemStack heldItem = victim.getItemInHand(victim.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
@@ -137,10 +134,7 @@ public class EnchantmentHardArrow extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                hardArrow,
-                victim.getHeldItem(victim.getActiveHand())
-        );
+        int level = EnchantmentHelper.getItemEnchantmentLevel(hardArrow, heldItem);
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
@@ -150,9 +144,8 @@ public class EnchantmentHardArrow extends EnchantmentBase {
             return;
         }
 
-        // 检查周围12格是否有其他实体
-        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
-                EntityLivingBase.class,
+        List<LivingEntity> entities = EntityUtil.getNearbyEntities(
+                LivingEntity.class,
                 victim,
                 12,
                 entity -> !entity.equals(victim)
@@ -162,17 +155,21 @@ public class EnchantmentHardArrow extends EnchantmentBase {
             return;
         }
 
-        // 击退增加 75% × 等级
         evt.setStrength(evt.getStrength() + evt.getStrength() * level * 0.75f);
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((5 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
     }
 
     @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) && !ench.equals(Enchantments.POWER);
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
+    }
+
+    @Override
+    protected boolean checkCompatibility(@NotNull Enchantment ench) {
+        return super.checkCompatibility(ench) && !ench.equals(Enchantments.POWER_ARROWS);
     }
 }

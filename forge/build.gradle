@@ -5,7 +5,7 @@ plugins {
 
 // ========== 添加这个仓库配置块 ==========
 repositories {
-
+    maven { url 'https://maven.blamejared.com' }
 }
 
 // Loom 的 Forge 平台特有配置
@@ -55,6 +55,8 @@ dependencies {
     modApi "me.shedaniel.cloth:cloth-config-forge:11.1.136"
     include "me.shedaniel.cloth:cloth-config-forge:11.1.136"
 
+    modApi "net.darkhax.bookshelf:Bookshelf-Forge-1.20.1:20.2.13"
+
     // ==================== Common 模块（必需） ====================
 
     // 引入 common 模块的代码，transitive false 表示不传递它的依赖
@@ -67,7 +69,7 @@ dependencies {
 
     // 加载 forge/dependencies/ 文件夹里的所有 jar 文件
     // 适合放一些没有发布到 Maven 仓库的库
-    fileTree(dir: 'dependencies', include: '*.jar').each { File file ->
+    fileTree(dir: 'libs', include: '*.jar').each { File file ->
         modApi(files(file))
     }
 }

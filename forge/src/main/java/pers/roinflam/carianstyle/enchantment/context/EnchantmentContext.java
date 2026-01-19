@@ -1,15 +1,18 @@
 package pers.roinflam.carianstyle.enchantment.context;
 
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.item.ItemStack;
-import net.minecraft.potion.Potion;
-import net.minecraft.potion.PotionEffect;
-import net.minecraft.util.DamageSource;
-import net.minecraft.world.World;
+import net.minecraft.tags.DamageTypeTags;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ShieldItem;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.*;
 import net.minecraftforge.event.entity.player.CriticalHitEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -35,7 +38,7 @@ public class EnchantmentContext {
     /**
      * 附魔持有者（装备附魔的实体）
      */
-    private final EntityLivingBase enchantmentHolder;
+    private final LivingEntity enchantmentHolder;
 
     /**
      * 附魔所在的物品
@@ -50,7 +53,7 @@ public class EnchantmentContext {
     /**
      * 世界对象
      */
-    private final World world;
+    private final Level world;
 
     // ==================== 角色信息 ====================
 
@@ -58,13 +61,13 @@ public class EnchantmentContext {
      * 攻击者（如果当前上下文涉及攻击）
      */
     @Nullable
-    private final EntityLivingBase attacker;
+    private final LivingEntity attacker;
 
     /**
      * 受击者（如果当前上下文涉及受击）
      */
     @Nullable
-    private final EntityLivingBase victim;
+    private final LivingEntity victim;
 
     /**
      * 伤害来源
@@ -92,18 +95,18 @@ public class EnchantmentContext {
      */
     public EnchantmentContext(
             @Nonnull Object event,
-            @Nonnull EntityLivingBase holder,
+            @Nonnull LivingEntity holder,
             @Nonnull ItemStack item,
             int level,
-            @Nullable EntityLivingBase attacker,
-            @Nullable EntityLivingBase victim,
+            @Nullable LivingEntity attacker,
+            @Nullable LivingEntity victim,
             @Nullable DamageSource damageSource
     ) {
         this.originalEvent = event;
         this.enchantmentHolder = holder;
         this.enchantedItem = item;
         this.enchantmentLevel = level;
-        this.world = holder.world;
+        this.world = holder.level();
         this.attacker = attacker;
         this.victim = victim;
         this.damageSource = damageSource;
@@ -120,7 +123,7 @@ public class EnchantmentContext {
      */
     public EnchantmentContext(
             @Nonnull Object event,
-            @Nonnull EntityLivingBase holder,
+            @Nonnull LivingEntity holder,
             @Nonnull ItemStack item,
             int level
     ) {
@@ -146,7 +149,7 @@ public class EnchantmentContext {
      * @return 附魔持有者
      */
     @Nonnull
-    public EntityLivingBase getHolder() {
+    public LivingEntity getHolder() {
         return enchantmentHolder;
     }
 
@@ -175,7 +178,7 @@ public class EnchantmentContext {
      * @return 世界对象
      */
     @Nonnull
-    public World getWorld() {
+    public Level getWorld() {
         return world;
     }
 
@@ -185,7 +188,7 @@ public class EnchantmentContext {
      * @return 攻击者，如果不涉及攻击则为null
      */
     @Nullable
-    public EntityLivingBase getAttacker() {
+    public LivingEntity getAttacker() {
         return attacker;
     }
 
@@ -195,7 +198,7 @@ public class EnchantmentContext {
      * @return 受击者，如果不涉及受击则为null
      */
     @Nullable
-    public EntityLivingBase getVictim() {
+    public LivingEntity getVictim() {
         return victim;
     }
 
@@ -233,7 +236,7 @@ public class EnchantmentContext {
      * @return 对手实体，如果无法确定则为null
      */
     @Nullable
-    public EntityLivingBase getOpponent() {
+    public LivingEntity getOpponent() {
         if (isAttacker) {
             return victim;
         } else {
@@ -249,7 +252,9 @@ public class EnchantmentContext {
      * @return 如果正在格挡返回true
      */
     public boolean isHolderBlocking() {
-        return enchantmentHolder.isHandActive() && enchantmentHolder.getActiveItemStack().getItem() instanceof net.minecraft.item.ItemShield;
+        // 1.20.1: isHandActive → isUsingItem, getActiveItemStack → getUseItem
+        return enchantmentHolder.isUsingItem() &&
+                enchantmentHolder.getUseItem().getItem() instanceof ShieldItem;
     }
 
     /**
@@ -258,7 +263,8 @@ public class EnchantmentContext {
      * @return 如果受击者正在格挡返回true
      */
     public boolean isVictimBlocking() {
-        return victim != null && victim.isHandActive() && victim.getActiveItemStack().getItem() instanceof net.minecraft.item.ItemShield;
+        return victim != null && victim.isUsingItem() &&
+                victim.getUseItem().getItem() instanceof ShieldItem;
     }
 
     /**
@@ -267,7 +273,8 @@ public class EnchantmentContext {
      * @return 如果在燃烧返回true
      */
     public boolean isHolderBurning() {
-        return enchantmentHolder.isBurning();
+        // 1.20.1: isBurning → isOnFire
+        return enchantmentHolder.isOnFire();
     }
 
     /**
@@ -276,7 +283,8 @@ public class EnchantmentContext {
      * @return 如果是魔法伤害返回true
      */
     public boolean isMagicDamage() {
-        return damageSource != null && damageSource.isMagicDamage();
+        // 1.20.1: isMagicDamage → isMagic
+        return damageSource != null && (damageSource.getMsgId().contains("magic") || damageSource.is(DamageTypeTags.WITCH_RESISTANT_TO));
     }
 
     /**
@@ -285,7 +293,9 @@ public class EnchantmentContext {
      * @return 如果可以伤害创造模式玩家返回true
      */
     public boolean canHarmInCreative() {
-        return damageSource != null && damageSource.canHarmInCreative();
+        // 1.20.1: canHarmInCreative → 检查 BYPASSES_INVULNERABILITY 标签
+        return damageSource != null &&
+                damageSource.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY);
     }
 
     /**
@@ -294,7 +304,7 @@ public class EnchantmentContext {
      * @return 如果是白天返回true
      */
     public boolean isDaytime() {
-        return world.isDaytime();
+        return world.isDay();
     }
 
     /**
@@ -318,22 +328,23 @@ public class EnchantmentContext {
     /**
      * 判断持有者是否拥有指定药水效果
      *
-     * @param potion 药水效果
+     * @param effect 药水效果
      * @return 如果拥有该效果返回true
      */
-    public boolean holderHasPotion(@Nonnull Potion potion) {
-        return enchantmentHolder.isPotionActive(potion);
+    public boolean holderHasPotion(@Nonnull MobEffect effect) {
+        // 1.20.1: isPotionActive → hasEffect
+        return enchantmentHolder.hasEffect(effect);
     }
 
     /**
      * 判断对手是否拥有指定药水效果
      *
-     * @param potion 药水效果
+     * @param effect 药水效果
      * @return 如果拥有该效果返回true
      */
-    public boolean opponentHasPotion(@Nonnull Potion potion) {
-        EntityLivingBase opponent = getOpponent();
-        return opponent != null && opponent.isPotionActive(potion);
+    public boolean opponentHasPotion(@Nonnull MobEffect effect) {
+        LivingEntity opponent = getOpponent();
+        return opponent != null && opponent.hasEffect(effect);
     }
 
     // ==================== 伤害修改方法 ====================
@@ -421,15 +432,6 @@ public class EnchantmentContext {
         }
     }
 
-    /**
-     * 设置伤害来源为魔法伤害
-     */
-    public void setMagicDamage() {
-        if (damageSource != null) {
-            damageSource.setMagicDamage();
-        }
-    }
-
     // ==================== 击退方法 ====================
 
     /**
@@ -437,12 +439,13 @@ public class EnchantmentContext {
      *
      * @param strength 击退强度
      */
-    public void knockback(float strength) {
-        EntityLivingBase opponent = getOpponent();
+    public void knockback(double strength) {
+        LivingEntity opponent = getOpponent();
         if (opponent != null && enchantmentHolder != null) {
-            double x = opponent.posX - enchantmentHolder.posX;
-            double z = opponent.posZ - enchantmentHolder.posZ;
-            opponent.knockBack(enchantmentHolder, strength, x, z);
+            // 1.20.1: knockBack → knockback, 参数变化
+            double dx = opponent.getX() - enchantmentHolder.getX();
+            double dz = opponent.getZ() - enchantmentHolder.getZ();
+            opponent.knockback(strength, dx, dz);
         }
     }
 
@@ -452,11 +455,11 @@ public class EnchantmentContext {
      * @param target 目标实体
      * @param strength 击退强度
      */
-    public void knockback(@Nonnull EntityLivingBase target, float strength) {
+    public void knockback(@Nonnull LivingEntity target, double strength) {
         if (enchantmentHolder != null) {
-            double x = target.posX - enchantmentHolder.posX;
-            double z = target.posZ - enchantmentHolder.posZ;
-            target.knockBack(enchantmentHolder, strength, x, z);
+            double dx = target.getX() - enchantmentHolder.getX();
+            double dz = target.getZ() - enchantmentHolder.getZ();
+            target.knockback(strength, dx, dz);
         }
     }
 
@@ -479,7 +482,7 @@ public class EnchantmentContext {
      * @param amount 治疗量
      */
     public void healOpponent(float amount) {
-        EntityLivingBase opponent = getOpponent();
+        LivingEntity opponent = getOpponent();
         if (opponent != null) {
             opponent.heal(amount);
         }
@@ -513,51 +516,54 @@ public class EnchantmentContext {
     /**
      * 给持有者添加药水效果
      *
-     * @param potion 药水效果
+     * @param effect 药水效果
      * @param duration 持续时间（tick）
      * @param amplifier 效果等级
      */
-    public void addPotionToHolder(@Nonnull Potion potion, int duration, int amplifier) {
+    public void addPotionToHolder(@Nonnull MobEffect effect, int duration, int amplifier) {
         if (enchantmentHolder != null) {
-            enchantmentHolder.addPotionEffect(new PotionEffect(potion, duration, amplifier));
+            // 1.20.1: addPotionEffect → addEffect, PotionEffect → MobEffectInstance
+            enchantmentHolder.addEffect(new MobEffectInstance(effect, duration, amplifier));
         }
     }
 
     /**
      * 给对手添加药水效果
      *
-     * @param potion 药水效果
+     * @param effect 药水效果
      * @param duration 持续时间（tick）
      * @param amplifier 效果等级
      */
-    public void addPotionToOpponent(@Nonnull Potion potion, int duration, int amplifier) {
-        EntityLivingBase opponent = getOpponent();
+    public void addPotionToOpponent(@Nonnull MobEffect effect, int duration, int amplifier) {
+        LivingEntity opponent = getOpponent();
         if (opponent != null) {
-            opponent.addPotionEffect(new PotionEffect(potion, duration, amplifier));
+            opponent.addEffect(new MobEffectInstance(effect, duration, amplifier));
         }
     }
 
     /**
      * 移除持有者的药水效果
      *
-     * @param potion 要移除的药水效果
+     * @param effect 要移除的药水效果
      */
-    public void removePotionFromHolder(@Nonnull Potion potion) {
+    public void removePotionFromHolder(@Nonnull MobEffect effect) {
         if (enchantmentHolder != null) {
-            enchantmentHolder.removePotionEffect(potion);
+            // 1.20.1: removePotionEffect → removeEffect
+            enchantmentHolder.removeEffect(effect);
         }
     }
 
     /**
      * 获取持有者的药水效果
      *
-     * @param potion 药水效果
+     * @param effect 药水效果
      * @return 药水效果实例，如果没有则为null
      */
     @Nullable
-    public PotionEffect getHolderPotionEffect(@Nonnull Potion potion) {
+    public MobEffectInstance getHolderPotionEffect(@Nonnull MobEffect effect) {
         if (enchantmentHolder != null) {
-            return enchantmentHolder.getActivePotionEffect(potion);
+            // 1.20.1: getActivePotionEffect → getEffect
+            return enchantmentHolder.getEffect(effect);
         }
         return null;
     }
@@ -606,7 +612,7 @@ public class EnchantmentContext {
      * @return 当前生命值，如果没有对手则为0
      */
     public float getOpponentHealth() {
-        EntityLivingBase opponent = getOpponent();
+        LivingEntity opponent = getOpponent();
         return opponent != null ? opponent.getHealth() : 0.0f;
     }
 
@@ -616,7 +622,7 @@ public class EnchantmentContext {
      * @return 最大生命值，如果没有对手则为0
      */
     public float getOpponentMaxHealth() {
-        EntityLivingBase opponent = getOpponent();
+        LivingEntity opponent = getOpponent();
         return opponent != null ? opponent.getMaxHealth() : 0.0f;
     }
 
@@ -628,8 +634,8 @@ public class EnchantmentContext {
      * @return 玩家实例，如果不是玩家则为null
      */
     @Nullable
-    public EntityPlayer getHolderAsPlayer() {
-        return enchantmentHolder instanceof EntityPlayer ? (EntityPlayer) enchantmentHolder : null;
+    public Player getHolderAsPlayer() {
+        return enchantmentHolder instanceof Player ? (Player) enchantmentHolder : null;
     }
 
     /**
@@ -638,7 +644,7 @@ public class EnchantmentContext {
      * @return 如果是玩家返回true
      */
     public boolean isHolderPlayer() {
-        return enchantmentHolder instanceof EntityPlayer;
+        return enchantmentHolder instanceof Player;
     }
 
     // ==================== 暴击相关方法 ====================

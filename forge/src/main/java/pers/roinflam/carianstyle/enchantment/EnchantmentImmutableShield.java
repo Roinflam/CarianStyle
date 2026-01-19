@@ -1,59 +1,59 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemShield;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ShieldItem;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
-import javax.annotation.Nonnull;
-
 /**
  * 不动之盾附魔
- *
+ * <p>
  * 盾牌附魔，强化格挡效果
  * 格挡时：
  * - 若完全格挡伤害（amount <= 0）：清除攻击者所有药水效果，治疗自己（最大生命值 × 等级 × 1%）
  * - 否则：减伤 10% × 等级
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "immutable_shield",
-        category = EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantmentCategory.BREAKABLE,
+        slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND}
 )
 public class EnchantmentImmutableShield extends EnchantmentBase {
 
     public EnchantmentImmutableShield() {
-        // 盾牌使用BREAKABLE类型，槽位为副手和主手
-        super(EnumEnchantmentType.BREAKABLE, new EntityEquipmentSlot[]{
-                EntityEquipmentSlot.MAINHAND,
-                EntityEquipmentSlot.OFFHAND
+        super(EnchantmentCategory.BREAKABLE, new EquipmentSlot[]{
+                EquipmentSlot.MAINHAND,
+                EquipmentSlot.OFFHAND
         });
     }
 
-    /**
-     * 格挡时触发效果
-     */
     @Override
-    protected void onHurtAsVictimLow(@Nonnull EnchantmentContext ctx, int level) {
-        EntityLivingBase victim = ctx.getHolder();
+    protected void onHurtAsVictimLow(@NotNull EnchantmentContext ctx, int level) {
+        LivingEntity victim = ctx.getHolder();
 
         // 必须正在使用物品
-        if (!victim.isHandActive()) {
+        if (!victim.isUsingItem()) {
             return;
         }
 
         // 必须是盾牌
-        ItemStack activeItem = victim.getHeldItem(victim.getActiveHand());
-        if (activeItem.isEmpty() || !(activeItem.getItem() instanceof ItemShield)) {
+        ItemStack activeItem = victim.getItemInHand(victim.getUsedItemHand());
+        if (activeItem.isEmpty() || !(activeItem.getItem() instanceof ShieldItem)) {
             return;
         }
 
@@ -64,7 +64,7 @@ public class EnchantmentImmutableShield extends EnchantmentBase {
 
         if (ctx.getDamage() <= 0 && ctx.getAttacker() != null) {
             // 完全格挡：清除攻击者药水效果，治疗自己
-            ctx.getAttacker().clearActivePotions();
+            ctx.getAttacker().removeAllEffects();
             victim.heal(victim.getMaxHealth() * level * 0.01f);
         } else {
             // 未完全格挡：减伤 10% × 等级
@@ -74,13 +74,18 @@ public class EnchantmentImmutableShield extends EnchantmentBase {
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((5 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
     }
 
     @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench)
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
+    }
+
+    @Override
+    protected boolean checkCompatibility(@NotNull Enchantment ench) {
+        return super.checkCompatibility(ench)
                 && !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentScholarShield.class));
     }
 }

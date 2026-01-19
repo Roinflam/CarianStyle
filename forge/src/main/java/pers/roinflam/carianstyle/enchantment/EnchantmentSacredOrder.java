@@ -1,32 +1,30 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.init.Enchantments;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.DamageSource;
-import net.minecraftforge.event.entity.EntityJoinWorldEvent;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 
-import javax.annotation.Nonnull;
-
 /**
  * 神圣秩序附魔
- *
+ * <p>
  * 护甲附魔，吸收盾系统
  * 效果：
  * - 进入世界时获得100%最大生命值的吸收盾
@@ -34,38 +32,41 @@ import javax.annotation.Nonnull;
  * - 有吸收盾时受到伤害减少25%，并反弹5%吸收盾值的魔法伤害
  * - 有吸收盾时造成伤害增加50%
  * - 无法被治疗
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "sacred_order",
-        category = EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.VERY_RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantmentCategory.ARMOR,
+        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentSacredOrder extends EnchantmentBase {
 
     public EnchantmentSacredOrder() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
-                EntityEquipmentSlot.HEAD,
-                EntityEquipmentSlot.CHEST,
-                EntityEquipmentSlot.LEGS,
-                EntityEquipmentSlot.FEET
+        super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
+                EquipmentSlot.HEAD,
+                EquipmentSlot.CHEST,
+                EquipmentSlot.LEGS,
+                EquipmentSlot.FEET
         });
     }
 
-    /**
-     * 击杀敌人时获得吸收盾
-     */
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingDeath(@NotNull LivingDeathEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (!(evt.getSource().getTrueSource() instanceof EntityLivingBase)) {
+        if (!(evt.getSource().getEntity() instanceof LivingEntity)) {
             return;
         }
 
-        EntityLivingBase killer = (EntityLivingBase) evt.getSource().getTrueSource();
+        LivingEntity killer = (LivingEntity) evt.getSource().getEntity();
 
         Enchantment sacredOrder = EnchantmentRegistry.getEnchantmentByClass(EnchantmentSacredOrder.class);
         if (sacredOrder == null) {
@@ -73,18 +74,16 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
         }
 
         int totalLevel = 0;
-        for (ItemStack armor : killer.getArmorInventoryList()) {
+        for (ItemStack armor : killer.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(sacredOrder, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(sacredOrder, armor);
             }
         }
 
-        // 注意：原代码没有等级上限检查
         if (totalLevel <= 0) {
             return;
         }
 
-        // 吸收盾上限为300%最大生命值
         if (killer.getAbsorptionAmount() < killer.getMaxHealth() * 3) {
             float newAbsorption = Math.min(killer.getMaxHealth() * 3,
                     killer.getAbsorptionAmount() + killer.getMaxHealth() * 0.1f);
@@ -92,80 +91,68 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
         }
     }
 
-    /**
-     * 受伤时减伤并反弹，攻击时增伤
-     */
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
         DamageSource damageSource = evt.getSource();
-        EntityLivingBase victim = evt.getEntityLiving();
+        LivingEntity victim = evt.getEntity();
 
         Enchantment sacredOrder = EnchantmentRegistry.getEnchantmentByClass(EnchantmentSacredOrder.class);
         if (sacredOrder == null) {
             return;
         }
 
-        // 处理受击者（有吸收盾时减伤并反弹）
         if (victim.getAbsorptionAmount() > 0) {
             int victimLevel = 0;
-            for (ItemStack armor : victim.getArmorInventoryList()) {
+            for (ItemStack armor : victim.getArmorSlots()) {
                 if (!armor.isEmpty()) {
-                    victimLevel += EnchantmentHelper.getEnchantmentLevel(sacredOrder, armor);
+                    victimLevel += EnchantmentHelper.getItemEnchantmentLevel(sacredOrder, armor);
                 }
             }
 
             if (victimLevel > 0) {
-                // 减伤25%
                 evt.setAmount(evt.getAmount() * 0.75f);
 
-                // 反弹5%吸收盾值的魔法伤害
-                if (damageSource.getTrueSource() instanceof EntityLivingBase) {
-                    EntityLivingBase attacker = (EntityLivingBase) damageSource.getTrueSource();
-                    attacker.attackEntityFrom(DamageSource.MAGIC, victim.getAbsorptionAmount() * 0.05f);
+                if (damageSource.getEntity() instanceof LivingEntity) {
+                    LivingEntity attacker = (LivingEntity) damageSource.getEntity();
+                    attacker.hurt(attacker.damageSources().magic(), victim.getAbsorptionAmount() * 0.05f);
                 }
             }
         }
 
-        // 处理攻击者（有吸收盾时增伤）
-        if (damageSource.getTrueSource() instanceof EntityLivingBase) {
-            EntityLivingBase attacker = (EntityLivingBase) damageSource.getTrueSource();
+        if (damageSource.getEntity() instanceof LivingEntity) {
+            LivingEntity attacker = (LivingEntity) damageSource.getEntity();
 
             if (attacker.getAbsorptionAmount() > 0) {
                 int attackerLevel = 0;
-                for (ItemStack armor : attacker.getArmorInventoryList()) {
+                for (ItemStack armor : attacker.getArmorSlots()) {
                     if (!armor.isEmpty()) {
-                        attackerLevel += EnchantmentHelper.getEnchantmentLevel(sacredOrder, armor);
+                        attackerLevel += EnchantmentHelper.getItemEnchantmentLevel(sacredOrder, armor);
                     }
                 }
 
                 if (attackerLevel > 0) {
-                    // 增伤50%
                     evt.setAmount(evt.getAmount() * 1.5f);
                 }
             }
         }
     }
 
-    /**
-     * 进入世界时获得吸收盾
-     */
     @SubscribeEvent
-    public static void onEntityJoinWorld(EntityJoinWorldEvent evt) {
-        if (evt.getWorld().isRemote) {
+    public static void onEntityJoinWorld(@NotNull EntityJoinLevelEvent evt) {
+        if (evt.getLevel().isClientSide()) {
             return;
         }
 
-        if (!(evt.getEntity() instanceof EntityLivingBase)) {
+        if (!(evt.getEntity() instanceof LivingEntity)) {
             return;
         }
 
-        EntityLivingBase entity = (EntityLivingBase) evt.getEntity();
+        LivingEntity entity = (LivingEntity) evt.getEntity();
 
-        // 已有吸收盾则跳过
         if (entity.getAbsorptionAmount() > 0) {
             return;
         }
@@ -176,9 +163,9 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
         }
 
         int totalLevel = 0;
-        for (ItemStack armor : entity.getArmorInventoryList()) {
+        for (ItemStack armor : entity.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(sacredOrder, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(sacredOrder, armor);
             }
         }
 
@@ -187,16 +174,13 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
         }
     }
 
-    /**
-     * 禁止治疗
-     */
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingHeal(@NotNull LivingHealEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        EntityLivingBase entity = evt.getEntityLiving();
+        LivingEntity entity = evt.getEntity();
 
         Enchantment sacredOrder = EnchantmentRegistry.getEnchantmentByClass(EnchantmentSacredOrder.class);
         if (sacredOrder == null) {
@@ -204,9 +188,9 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
         }
 
         int totalLevel = 0;
-        for (ItemStack armor : entity.getArmorInventoryList()) {
+        for (ItemStack armor : entity.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(sacredOrder, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(sacredOrder, armor);
             }
         }
 
@@ -216,12 +200,17 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) (35 * ConfigLoader.enchantingDifficulty);
     }
 
     @Override
-    public boolean canApplyTogether(Enchantment ench) {
-        return super.canApplyTogether(ench) && !ench.equals(Enchantments.PROTECTION);
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
+    }
+
+    @Override
+    protected boolean checkCompatibility(@NotNull Enchantment ench) {
+        return super.checkCompatibility(ench) && !ench.equals(Enchantments.ALL_DAMAGE_PROTECTION);
     }
 }

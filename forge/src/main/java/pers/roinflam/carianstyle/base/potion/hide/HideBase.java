@@ -1,7 +1,9 @@
 package pers.roinflam.carianstyle.base.potion.hide;
 
-import net.minecraft.potion.PotionEffect;
+import net.minecraft.world.effect.MobEffectCategory;
 import pers.roinflam.carianstyle.base.potion.PotionBase;
+
+import javax.annotation.Nonnull;
 
 /**
  * 隐藏药水效果基类
@@ -12,27 +14,15 @@ import pers.roinflam.carianstyle.base.potion.PotionBase;
  */
 public abstract class HideBase extends PotionBase {
 
-    protected HideBase(boolean isBadEffectIn, int liquidColorIn, String name) {
-        super(isBadEffectIn, liquidColorIn, name);
+    protected HideBase(@Nonnull MobEffectCategory category, int liquidColor) {
+        super(category, liquidColor);
     }
 
     @Override
-    public boolean isReady(int duration, int amplifier) {
+    public boolean isDurationEffectTick(int duration, int amplifier) {
         return true;
     }
 
-    @Override
-    public boolean shouldRender(PotionEffect effect) {
-        return false;
-    }
-
-    @Override
-    public boolean shouldRenderInvText(PotionEffect effect) {
-        return false;
-    }
-
-    @Override
-    public boolean shouldRenderHUD(PotionEffect effect) {
-        return false;
-    }
+    // 注意：1.20.1 中移除了 shouldRender 等方法
+    // 隐藏效果需要通过其他方式实现，例如在客户端事件中过滤
 }

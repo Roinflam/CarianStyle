@@ -1,30 +1,29 @@
 // 文件：EnchantmentCragblade.java
-// 路径：src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentCragblade.java
+// 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentCragblade.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.potion.PotionEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 
-import javax.annotation.Nonnull;
-
 /**
  * 岩石剑附魔
- *
+ * <p>
  * 效果：
  * - 攻击时给自己施加持续10秒的增益效果
  * - 无法跳跃
@@ -32,38 +31,42 @@ import javax.annotation.Nonnull;
  * - 攻击力提高 10% × 等级
  * - 护甲提高 10% × 等级
  * - 韧性提高 10% × 等级
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
 @AutoRegisterEnchantment(
         id = "cragblade",
-        category = EnchantmentCategory.COMBAT_SKILL,
-        rarity = EnchantmentRarity.RARE
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantmentCategory.WEAPON,
+        slots = {EquipmentSlot.MAINHAND}
 )
 @Mod.EventBusSubscriber
 public class EnchantmentCragblade extends EnchantmentBase {
 
-    /**
-     * 构造函数
-     */
     public EnchantmentCragblade() {
-        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
     /**
      * 攻击时给攻击者自己施加岩石剑增益效果
      */
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (!(evt.getSource().getTrueSource() instanceof EntityLivingBase)) {
+        if (!(evt.getSource().getEntity() instanceof LivingEntity)) {
             return;
         }
 
-        EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
+        LivingEntity attacker = (LivingEntity) evt.getSource().getEntity();
 
-        if (attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+        ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
+        if (heldItem.isEmpty()) {
             return;
         }
 
@@ -72,9 +75,7 @@ public class EnchantmentCragblade extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                cragblade,
-                attacker.getHeldItem(attacker.getActiveHand()));
+        int level = EnchantmentHelper.getItemEnchantmentLevel(cragblade, heldItem);
 
         if (level <= 0) {
             return;
@@ -83,11 +84,20 @@ public class EnchantmentCragblade extends EnchantmentBase {
         // 给攻击者自己施加岩石剑增益效果
         int potionDuration = 200; // 10秒（200 tick）
         int potionLevel = level - 1;
-        attacker.addPotionEffect(new PotionEffect(CarianStylePotion.CRAGBLADE, potionDuration, potionLevel));
+        attacker.addEffect(new MobEffectInstance(
+                CarianStylePotion.CRAGBLADE.get(),
+                potionDuration,
+                potionLevel
+        ));
     }
 
     @Override
-    public int getMinEnchantability(int enchantmentLevel) {
+    public int getMinCost(int enchantmentLevel) {
         return (int) ((10 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int enchantmentLevel) {
+        return getMinCost(enchantmentLevel) + 50;
     }
 }
