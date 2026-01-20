@@ -34,7 +34,7 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 @AutoRegisterEnchantment(
         id = "scholar_shield",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.VERY_RARE,
+        rarity = EnchantmentRarity.UNCOMMON,
         type = EnchantmentCategory.BREAKABLE,
         slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND}
 )

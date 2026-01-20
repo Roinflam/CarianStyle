@@ -45,7 +45,6 @@ public class ClientSyncEffectManager {
             // 服务端环境
             CLIENT_PROXY = new ServerCacheProxyImpl();
         }
-        LOGGER.info("[ClientSyncEffectManager] 初始化完成，环境: {}", FMLEnvironment.dist);
     }
 
     /**
@@ -62,9 +61,6 @@ public class ClientSyncEffectManager {
         ResourceKey<Level> dimension = entity.level().dimension();
         int entityId = entity.getId();
 
-        LOGGER.debug("[服务端] 添加客户端同步效果 - 实体ID: {}, 实体类型: {}, 序列号: {}, 维度: {}",
-                entityId, entity.getType().getDescription().getString(), serialNumber, dimension.location());
-
         Map<Integer, Set<Integer>> dimensionMap = SERVER_ACTIVATED_ENTITIES
                 .computeIfAbsent(dimension, k -> new ConcurrentHashMap<>());
 
@@ -73,11 +69,7 @@ public class ClientSyncEffectManager {
 
         // 如果是新添加的实体，广播给该维度的所有玩家
         if (entitySet.add(entityId)) {
-            LOGGER.info("[服务端] 新实体添加成功，开始广播 - 实体ID: {}, 序列号: {}, 当前集合大小: {}",
-                    entityId, serialNumber, entitySet.size());
             broadcastToDimension((ServerLevel) entity.level(), serialNumber, entitySet);
-        } else {
-            LOGGER.warn("[服务端] 实体已存在于集合中 - 实体ID: {}, 序列号: {}", entityId, serialNumber);
         }
     }
 
@@ -95,26 +87,19 @@ public class ClientSyncEffectManager {
         ResourceKey<Level> dimension = entity.level().dimension();
         int entityId = entity.getId();
 
-        LOGGER.debug("[服务端] 移除客户端同步效果 - 实体ID: {}, 序列号: {}", entityId, serialNumber);
-
         Map<Integer, Set<Integer>> dimensionMap = SERVER_ACTIVATED_ENTITIES.get(dimension);
         if (dimensionMap == null) {
-            LOGGER.warn("[服务端] 维度映射不存在 - 维度: {}", dimension.location());
             return;
         }
 
         Set<Integer> entitySet = dimensionMap.get(serialNumber);
         if (entitySet == null) {
-            LOGGER.warn("[服务端] 序列号集合不存在 - 序列号: {}", serialNumber);
             return;
         }
 
         // 如果成功移除，广播给该维度的所有玩家
         if (entitySet.remove(entityId)) {
-            LOGGER.info("[服务端] 实体移除成功，开始广播 - 实体ID: {}, 序列号: {}", entityId, serialNumber);
             broadcastToDimension((ServerLevel) entity.level(), serialNumber, entitySet);
-        } else {
-            LOGGER.warn("[服务端] 实体不在集合中 - 实体ID: {}, 序列号: {}", entityId, serialNumber);
         }
     }
 
@@ -126,20 +111,13 @@ public class ClientSyncEffectManager {
         List<Integer> idList = new ArrayList<>(entityIds);
         ClientSyncEffectPacket packet = new ClientSyncEffectPacket(serialNumber, idList);
 
-        int playerCount = 0;
         // 发送给该维度的所有玩家
         for (ServerPlayer player : level.players()) {
-            LOGGER.debug("[服务端] 发送网络包给玩家 - 玩家: {}, 序列号: {}, 实体列表: {}",
-                    player.getName().getString(), serialNumber, idList);
             NetworkHandler.CHANNEL.send(
                     PacketDistributor.PLAYER.with(() -> player),
                     packet
             );
-            playerCount++;
         }
-
-        LOGGER.info("[服务端] 广播完成 - 序列号: {}, 实体数: {}, 玩家数: {}",
-                serialNumber, idList.size(), playerCount);
     }
 
     /**
@@ -152,11 +130,7 @@ public class ClientSyncEffectManager {
         ResourceKey<Level> dimension = player.level().dimension();
         Map<Integer, Set<Integer>> dimensionMap = SERVER_ACTIVATED_ENTITIES.get(dimension);
 
-        LOGGER.info("[服务端] 同步维度状态给玩家 - 玩家: {}, 维度: {}",
-                player.getName().getString(), dimension.location());
-
         if (dimensionMap == null) {
-            LOGGER.debug("[服务端] 该维度没有客户端同步效果数据");
             return;
         }
 
@@ -179,8 +153,6 @@ public class ClientSyncEffectManager {
                         PacketDistributor.PLAYER.with(() -> player),
                         packet
                 );
-                LOGGER.info("[服务端] 同步序列号 {} 给玩家 {}, 实体数: {}",
-                        serialNumber, player.getName().getString(), idList.size());
             }
         }
     }
@@ -215,7 +187,6 @@ public class ClientSyncEffectManager {
      * 客户端：更新缓存
      */
     public static void updateClientCache(int serialNumber, @Nonnull List<Integer> entityIds) {
-        LOGGER.info("[ClientSyncEffectManager] 更新客户端缓存 - 序列号: {}, 实体列表: {}", serialNumber, entityIds);
         CLIENT_PROXY.updateClientCache(serialNumber, entityIds);
     }
 
@@ -231,7 +202,6 @@ public class ClientSyncEffectManager {
      * 客户端：清理缓存
      */
     public static void clearClientCache() {
-        LOGGER.info("[ClientSyncEffectManager] 清理客户端缓存");
         CLIENT_PROXY.clearClientCache();
     }
 
@@ -239,7 +209,6 @@ public class ClientSyncEffectManager {
      * 服务端：清理所有缓存
      */
     public static void clearServerCache() {
-        LOGGER.info("[服务端] 清理所有缓存");
         SERVER_ACTIVATED_ENTITIES.clear();
     }
 
@@ -264,37 +233,17 @@ public class ClientSyncEffectManager {
 
         @Override
         public void updateClientCache(int serialNumber, @Nonnull List<Integer> entityIds) {
-            LOGGER.info("[客户端代理] 更新缓存 - 序列号: {}, 实体列表: {}", serialNumber, entityIds);
-
-            List<Integer> oldList = CLIENT_ENTITY_CACHE.get(serialNumber);
-            if (oldList != null) {
-                LOGGER.debug("[客户端代理] 替换旧缓存 - 旧列表: {}, 新列表: {}", oldList, entityIds);
-            }
-
             CLIENT_ENTITY_CACHE.put(serialNumber, new ArrayList<>(entityIds));
-
-            LOGGER.info("[客户端代理] 缓存更新完成 - 序列号: {}, 当前缓存大小: {}",
-                    serialNumber, CLIENT_ENTITY_CACHE.size());
         }
 
         @Override
         public boolean shouldRenderEffect(int serialNumber, int entityId) {
             List<Integer> entityIds = CLIENT_ENTITY_CACHE.get(serialNumber);
-            boolean shouldRender = entityIds != null && entityIds.contains(entityId);
-
-            if (entityIds == null) {
-                LOGGER.debug("[客户端代理] 渲染检查失败：缓存中没有序列号 {} 的数据", serialNumber);
-            } else if (!shouldRender) {
-                LOGGER.debug("[客户端代理] 渲染检查失败：实体ID {} 不在列表中 - 当前列表: {}",
-                        entityId, entityIds);
-            }
-
-            return shouldRender;
+            return entityIds != null && entityIds.contains(entityId);
         }
 
         @Override
         public void clearClientCache() {
-            LOGGER.info("[客户端代理] 清理所有缓存");
             CLIENT_ENTITY_CACHE.clear();
         }
     }
@@ -306,7 +255,6 @@ public class ClientSyncEffectManager {
         @Override
         public void updateClientCache(int serialNumber, @Nonnull List<Integer> entityIds) {
             // 服务端不执行任何操作
-            LOGGER.debug("[服务端代理] 客户端缓存更新被调用但被忽略 - 序列号: {}, 实体数: {}", serialNumber, entityIds.size());
         }
 
         @Override
@@ -318,7 +266,6 @@ public class ClientSyncEffectManager {
         @Override
         public void clearClientCache() {
             // 服务端不执行任何操作
-            LOGGER.debug("[服务端代理] 客户端缓存清理被调用但被忽略");
         }
     }
 }

@@ -8,17 +8,18 @@ import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
-import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
@@ -56,7 +57,7 @@ public class EnchantmentEpilepsyFire extends EnchantmentBase {
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
+    public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;
         }
@@ -98,32 +99,30 @@ public class EnchantmentEpilepsyFire extends EnchantmentBase {
         final int effectiveLevel = level;
 
         // 对攻击者造成癫火伤害（创造模式玩家免疫）
-        if (!(attacker instanceof Player) || !((Player) attacker).isCreative()) {
-            // 应用火焰燃烧效果（需要同步网络）
-            DynamicAttributeManager.apply(attacker,
-                    DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(BURN_DURATION, 0));
-            ClientSyncEffectHelper.onAttributeApplied(attacker, DynamicAttributes.EPILEPSY_FIRE_BURNING);
+        // 应用火焰燃烧效果（需要同步网络）
+        DynamicAttributeManager.apply(attacker,
+                DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(BURN_DURATION, 0));
+        ClientSyncEffectHelper.onAttributeApplied(attacker, DynamicAttributes.EPILEPSY_FIRE_BURNING);
 
-            new SynchronizationTask(5, 1) {
-                private int tick = 0;
+        new SynchronizationTask(5, 1) {
+            private int tick = 0;
 
-                @Override
-                public void run() {
-                    if (++tick > DAMAGE_TICKS || !attacker.isAlive()) {
-                        this.cancel();
-                        return;
-                    }
-
-                    float damage = attacker.getMaxHealth() * 0.3f / 60;
-                    if (attacker.getHealth() - damage * 2 > 0) {
-                        EntityLivingUtil.damageHealthDirectly(attacker, damage);
-                    } else {
-                        EntityLivingUtil.kill(attacker, NewDamageSource.epilepsyFire(attacker.level()));
-                        this.cancel();
-                    }
+            @Override
+            public void run() {
+                if (++tick > DAMAGE_TICKS || !attacker.isAlive()) {
+                    this.cancel();
+                    return;
                 }
-            }.start();
-        }
+
+                float damage = attacker.getMaxHealth() * 0.2f / 60;
+                if (attacker.getHealth() - damage * 2 > 0) {
+                    EntityLivingUtil.damageHealthDirectly(attacker, damage);
+                } else {
+                    EntityLivingUtil.kill(attacker, NewDamageSource.epilepsyFire(attacker.level()));
+                    this.cancel();
+                }
+            }
+        }.start();
 
         // 对受击者造成癫火伤害
         DynamicAttributeManager.apply(victim,
@@ -140,7 +139,7 @@ public class EnchantmentEpilepsyFire extends EnchantmentBase {
                     return;
                 }
 
-                float damage = attacker.getMaxHealth() * 0.3f * effectiveLevel * 0.5f / 60;
+                float damage = attacker.getMaxHealth() * 0.2f * effectiveLevel * 0.1f / 60;
                 if (victim.getHealth() - damage * 2 > 0) {
                     EntityLivingUtil.damageHealthDirectly(victim, damage);
                 } else {

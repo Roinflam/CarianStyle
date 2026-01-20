@@ -2,7 +2,6 @@ package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
@@ -14,11 +13,11 @@ import net.minecraftforge.fml.common.Mod;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
-import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
@@ -107,33 +106,31 @@ public class EnchantmentEmptyEpilepsyFire extends EnchantmentBase {
 
         final int effectiveLevel = level;
 
-        // 对攻击者造成癫火伤害（创造模式玩家免疫）
-        if (!(attacker instanceof Player) || !((Player) attacker).isCreative()) {
-            // 应用火焰燃烧效果（需要同步网络）
-            DynamicAttributeManager.apply(attacker,
-                    DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(BURN_DURATION, 0));
-            ClientSyncEffectHelper.onAttributeApplied(attacker, DynamicAttributes.EPILEPSY_FIRE_BURNING);
 
-            new SynchronizationTask(5, 1) {
-                private int tick = 0;
+        // 应用火焰燃烧效果（需要同步网络）
+        DynamicAttributeManager.apply(attacker,
+                DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(BURN_DURATION, 0));
+        ClientSyncEffectHelper.onAttributeApplied(attacker, DynamicAttributes.EPILEPSY_FIRE_BURNING);
 
-                @Override
-                public void run() {
-                    if (++tick > DAMAGE_TICKS || !attacker.isAlive()) {
-                        this.cancel();
-                        return;
-                    }
+        new SynchronizationTask(5, 1) {
+            private int tick = 0;
 
-                    float damage = attacker.getMaxHealth() * 0.15f / 60;
-                    if (attacker.getHealth() - damage * 2 > 0) {
-                        EntityLivingUtil.damageHealthDirectly(attacker, damage);
-                    } else {
-                        EntityLivingUtil.kill(attacker, NewDamageSource.epilepsyFire(attacker.level()));
-                        this.cancel();
-                    }
+            @Override
+            public void run() {
+                if (++tick > DAMAGE_TICKS || !attacker.isAlive()) {
+                    this.cancel();
+                    return;
                 }
-            }.start();
-        }
+
+                float damage = attacker.getMaxHealth() * 0.1f / 60;
+                if (attacker.getHealth() - damage * 2 > 0) {
+                    EntityLivingUtil.damageHealthDirectly(attacker, damage);
+                } else {
+                    EntityLivingUtil.kill(attacker, NewDamageSource.epilepsyFire(attacker.level()));
+                    this.cancel();
+                }
+            }
+        }.start();
 
         // 对受击者造成癫火伤害
         DynamicAttributeManager.apply(victim,
@@ -150,7 +147,7 @@ public class EnchantmentEmptyEpilepsyFire extends EnchantmentBase {
                     return;
                 }
 
-                float damage = attacker.getMaxHealth() * 0.15f * effectiveLevel / 60;
+                float damage = attacker.getMaxHealth() * 0.1f * effectiveLevel * 0.2f / 60;
                 if (victim.getHealth() - damage * 2 > 0) {
                     EntityLivingUtil.damageHealthDirectly(victim, damage);
                 } else {
