@@ -1,18 +1,17 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 
 /**
  * 米莉森义肢附魔
@@ -62,25 +61,21 @@ public class EnchantmentMillicentProsthesis extends EnchantmentBase {
             }
         }
 
-        @Nullable MobEffectInstance currentEffect = attacker.getEffect(CarianStylePotion.ATTACK_BOOST.get());
+        // 获取当前攻击提升等级
+        int currentAmplifier = DynamicAttributeManager.getAmplifier(attacker, DynamicAttributes.ATTACK_BOOST);
 
-        if (currentEffect == null) {
+        if (currentAmplifier < 0) {
             // 没有效果，初始化
-            attacker.addEffect(new MobEffectInstance(CarianStylePotion.ATTACK_BOOST.get(), 30, level - 1));
-        } else if (currentEffect.getAmplifier() < level * 7 - 1) {
+            DynamicAttributeManager.apply(attacker,
+                    DynamicAttributes.ATTACK_BOOST.createInstance(30, level - 1));
+        } else if (currentAmplifier < level * 7 - 1) {
             // 未满层，叠加
-            attacker.addEffect(new MobEffectInstance(
-                    CarianStylePotion.ATTACK_BOOST.get(),
-                    30,
-                    currentEffect.getAmplifier() + level
-            ));
+            DynamicAttributeManager.apply(attacker,
+                    DynamicAttributes.ATTACK_BOOST.createInstance(30, currentAmplifier + level));
         } else {
             // 满层，刷新为更高层
-            attacker.addEffect(new MobEffectInstance(
-                    CarianStylePotion.ATTACK_BOOST.get(),
-                    60,
-                    level * 16 - 1
-            ));
+            DynamicAttributeManager.apply(attacker,
+                    DynamicAttributes.ATTACK_BOOST.createInstance(60, level * 16 - 1));
         }
     }
 
@@ -88,12 +83,13 @@ public class EnchantmentMillicentProsthesis extends EnchantmentBase {
     protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
         LivingEntity attacker = ctx.getHolder();
 
-        @Nullable MobEffectInstance currentEffect = attacker.getEffect(CarianStylePotion.ATTACK_BOOST.get());
+        // 获取当前攻击提升等级
+        int currentAmplifier = DynamicAttributeManager.getAmplifier(attacker, DynamicAttributes.ATTACK_BOOST);
 
-        if (currentEffect != null && currentEffect.getAmplifier() >= level * 7 - 1) {
+        if (currentAmplifier >= level * 7 - 1) {
             // 满层：增伤10%×等级
             ctx.addDamage(ctx.getDamage() * level * 0.1f);
-        } else {
+        } else if (currentAmplifier >= 0) {
             // 未满层：增伤5%×等级
             ctx.addDamage(ctx.getDamage() * level * 0.05f);
         }

@@ -92,7 +92,7 @@ public class EnchantmentLorettaTrick extends EnchantmentBase {
         arrow.setBaseDamage(arrow.getBaseDamage() - arrow.getBaseDamage() * 0.25);
 
         // 爆炸威力（着火箭威力4，普通箭威力3）
-        float explosionStrength = EntityUtil.getFire(arrow) > 0 ? 4 : 3;
+        float explosionStrength = arrow.getRemainingFireTicks() > 0 ? 4 : 3;
 
         // 延迟创建4次随机位置爆炸
         new SynchronizationTask(1, 5) {

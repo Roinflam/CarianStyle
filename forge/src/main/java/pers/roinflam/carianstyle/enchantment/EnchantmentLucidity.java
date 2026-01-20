@@ -1,23 +1,20 @@
 package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.event.entity.living.MobEffectEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.api.IEffectModifier;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 
 /**
  * 清醒附魔
@@ -29,7 +26,7 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
  * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 3.0
  */
 @AutoRegisterEnchantment(
         id = "lucidity",
@@ -39,8 +36,7 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
         slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET},
         forceTreasure = true
 )
-@Mod.EventBusSubscriber
-public class EnchantmentLucidity extends EnchantmentBase {
+public class EnchantmentLucidity extends EnchantmentBase implements IEffectModifier {
 
     public EnchantmentLucidity() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
@@ -51,59 +47,59 @@ public class EnchantmentLucidity extends EnchantmentBase {
         });
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onPotionAdded(@NotNull MobEffectEvent.Added evt) {
-        if (evt.getEntity().level().isClientSide) {
-            return;
-        }
-
-        LivingEntity entity = evt.getEntity();
-
-        Enchantment lucidity = EnchantmentRegistry.getEnchantmentByClass(EnchantmentLucidity.class);
-        if (lucidity == null) {
-            return;
-        }
-
-        // 从所有护甲累加附魔等级
+    @Override
+    public int getEnchantmentLevel(@NotNull LivingEntity entity) {
+        // 从所有护甲槽位累加附魔等级
         int totalLevel = 0;
         for (ItemStack armor : entity.getArmorSlots()) {
             if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(lucidity, armor);
+                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(this, armor);
             }
         }
 
+        // 应用等级限制
         if (ConfigLoader.levelLimit) {
             totalLevel = Math.min(totalLevel, 10);
         }
 
-        if (totalLevel <= 0) {
-            return;
+        return totalLevel;
+    }
+
+    @Nullable
+    @Override
+    public MobEffectInstance modifyEffect(@NotNull LivingEntity entity,
+                                          @NotNull MobEffectInstance effectInstance,
+                                          int enchantmentLevel) {
+        // 没有附魔等级，不处理
+        if (enchantmentLevel <= 0) {
+            return null;
         }
 
-        MobEffectInstance potionEffect = evt.getEffectInstance();
-        MobEffect potion = potionEffect.getEffect();
+        MobEffect effect = effectInstance.getEffect();
 
-        // 只对非瞬时、可渲染的负面效果生效
-        if (potion.isInstantenous() || !potionEffect.isVisible() || !potion.getCategory().equals(net.minecraft.world.effect.MobEffectCategory.HARMFUL)) {
-            return;
+        // 只对非瞬时、可见的负面效果生效
+        if (effect.isInstantenous()
+                || !effectInstance.isVisible()
+                || !effect.getCategory().equals(MobEffectCategory.HARMFUL)) {
+            return null;
         }
 
-        // 修改效果：持续时间减少，等级+1
-        int newDuration = (int) (potionEffect.getDuration() - potionEffect.getDuration() * totalLevel * 0.15);
+        // 计算新的持续时间（减少 15% × 等级）
+        int originalDuration = effectInstance.getDuration();
+        int newDuration = (int) (originalDuration * (1.0 - enchantmentLevel * 0.15));
 
-        // 创建新的效果实例（1.20.1不能直接combine）
-        MobEffectInstance newEffect = new MobEffectInstance(
-                potion,
+        // 确保持续时间至少为 1 tick
+        newDuration = Math.max(newDuration, 1);
+
+        // 创建修改后的效果实例（持续时间减少，等级+1）
+        return new MobEffectInstance(
+                effect,
                 newDuration,
-                potionEffect.getAmplifier() + 1,
-                potionEffect.isAmbient(),
-                potionEffect.isVisible(),
-                potionEffect.showIcon()
+                effectInstance.getAmplifier() + 1,  // 等级+1，效果更强
+                effectInstance.isAmbient(),
+                effectInstance.isVisible(),
+                effectInstance.showIcon()
         );
-
-        // 移除旧效果并添加新效果
-        entity.removeEffect(potion);
-        entity.addEffect(newEffect);
     }
 
     @Override

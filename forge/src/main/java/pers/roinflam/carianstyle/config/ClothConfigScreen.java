@@ -88,6 +88,20 @@ public class ClothConfigScreen {
                 .build());
 
         // ═══════════════════════════════════════════════════════════════
+        // 真伤系统 / True Damage System
+        // ═══════════════════════════════════════════════════════════════
+        ConfigCategory trueDamageCategory = builder.getOrCreateCategory(
+                Component.translatable("config.carianstyle.category.trueDamage"));
+
+        trueDamageCategory.addEntry(entryBuilder.startBooleanToggle(
+                        Component.translatable("config.carianstyle.enableTrueDamage"),
+                        ConfigLoader.COMMON.enableTrueDamage.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.translatable("config.carianstyle.enableTrueDamage.tooltip"))
+                .setSaveConsumer(ConfigLoader.COMMON.enableTrueDamage::set)
+                .build());
+
+        // ═══════════════════════════════════════════════════════════════
         // 宝藏附魔配置 / Treasure Enchantment Configuration
         // ═══════════════════════════════════════════════════════════════
         ConfigCategory treasureCategory = builder.getOrCreateCategory(

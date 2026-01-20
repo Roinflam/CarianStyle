@@ -5,6 +5,7 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.utils.ReflectionCache;
 
 import javax.annotation.Nonnull;
@@ -130,14 +131,14 @@ public class EntityLivingUtil {
     }
 
     /**
-     * 真伤扣血 - 三步优化策略
-     * True damage - Three-step optimization strategy
+     * 真伤扣血 - 根据配置选择处理方式
+     * True damage - Choose handling method based on config
      *
-     * 步骤1：优先尝试setHealth，检查是否生效
-     * Step 1: Try setHealth first, check if effective
+     * 如果启用高级真伤系统：使用三步优化策略
+     * If advanced true damage enabled: Use three-step optimization strategy
      *
-     * 步骤2：如果原版字段也无效，暴力查找所有字段
-     * Step 2: If vanilla field fails, brute-force search all fields
+     * 如果禁用高级真伤系统：直接使用setHealth
+     * If advanced true damage disabled: Use setHealth directly
      *
      * @param entity 目标实体 / Target entity
      * @param damage 伤害值 / Damage amount
@@ -148,17 +149,18 @@ public class EntityLivingUtil {
             return;
         }
 
-//        // 检查配置开关 / Check config toggle
-//        if (!ModConfig.KUVA_LICH.enableTrueDamage.get()) {
-//            float newHealth = Math.max(0.0F, entity.getHealth() - damage);
-//            entity.setHealth(newHealth);
-//            return;
-//        }
-
         // 计算目标血量 / Calculate target health
         float currentHealth = entity.getHealth();
         float targetHealth = Math.max(0.0F, currentHealth - damage);
 
+        // 检查配置开关 / Check config toggle
+        if (!ConfigLoader.enableTrueDamage) {
+            // 使用简单的setHealth方式 / Use simple setHealth method
+            entity.setHealth(targetHealth);
+            return;
+        }
+
+        // 使用高级真伤系统 / Use advanced true damage system
         // 检查缓存 / Check cache
         HealthFieldInfo cachedInfo = HEALTH_FIELD_CACHE.get(entity.getClass());
 

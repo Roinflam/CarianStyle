@@ -35,6 +35,10 @@ public class CarianStyle {
         LogUtil.info("卡利亚式附魔 - 开始加载模组");
 
         try {
+            LogUtil.info("卡利亚式附魔 - 正在注册网络通信处理器");
+            pers.roinflam.carianstyle.network.NetworkHandler.register();
+            LogUtil.info("卡利亚式附魔 - 网络通信处理器注册成功");
+
             // 获取模组事件总线
             IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
@@ -143,36 +147,8 @@ public class CarianStyle {
         LogUtil.info("卡利亚式附魔 - 开始客户端设置阶段");
 
         try {
-            event.enqueueWork(() -> {
-                // 注册实体渲染器
-                LogUtil.info("卡利亚式附魔 - 正在注册实体渲染器");
-
-                EntityRenderers.register(
-                        CarianStyleEntity.GLINTBLADES.get(),
-                        context -> new GlintbladesRender(context, CarianStyleItem.GLINTBLADES.get())
-                );
-
-                LogUtil.debug("卡利亚式附魔 - 魔法剑实体渲染器已注册");
-
-                // ⭐ 设置火焰方块的渲染层
-                LogUtil.info("卡利亚式附魔 - 正在设置火焰方块渲染层");
-                net.minecraft.client.renderer.ItemBlockRenderTypes.setRenderLayer(
-                        CarianStyleBlocks.WHITE_FLAME.get(),
-                        net.minecraft.client.renderer.RenderType.cutout()
-                );
-                net.minecraft.client.renderer.ItemBlockRenderTypes.setRenderLayer(
-                        CarianStyleBlocks.YELLOW_FLAME.get(),
-                        net.minecraft.client.renderer.RenderType.cutout()
-                );
-                net.minecraft.client.renderer.ItemBlockRenderTypes.setRenderLayer(
-                        CarianStyleBlocks.CRIMSON_FLAME.get(),
-                        net.minecraft.client.renderer.RenderType.cutout()
-                );
-                LogUtil.info("卡利亚式附魔 - 火焰方块渲染层设置完成");
-
-                LogUtil.info("卡利亚式附魔 - 实体渲染器注册完成");
-            });
-
+            // 使用客户端处理器处理客户端设置
+            ClientSetupHandler.onClientSetup(event);
             LogUtil.info("卡利亚式附魔 - 客户端设置阶段完成");
             LogUtil.separator();
 

@@ -13,12 +13,14 @@ import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.EnchantmentAeonia;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
@@ -37,6 +39,7 @@ import java.util.List;
  * - 每秒造成持续伤害
  * - 与艾奥尼亚附魔联动：伤害增强、传播效果
  */
+@Mod.EventBusSubscriber
 public class MobEffectScarletRot extends IconBase {
 
     public MobEffectScarletRot(boolean isBadEffectIn, int liquidColorIn) {
@@ -67,10 +70,10 @@ public class MobEffectScarletRot extends IconBase {
      * 治疗量减少25%
      */
     @SubscribeEvent(priority = EventPriority.LOW)
-    public void onLivingHeal(@Nonnull LivingHealEvent evt) {
+    public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
         if (!evt.getEntity().level().isClientSide) {
             LivingEntity healer = evt.getEntity();
-            if (healer.hasEffect(this)) {
+            if (healer.hasEffect(CarianStylePotion.SCARLET_ROT.get())) {
                 evt.setAmount(evt.getAmount() * 0.75f);
             }
         }
@@ -80,11 +83,11 @@ public class MobEffectScarletRot extends IconBase {
      * 攻击时25%概率传播猩红腐烂（需要周围有艾奥尼亚附魔持有者）
      */
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public void onLivingDamage(@Nonnull LivingDamageEvent evt) {
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (!evt.getEntity().level().isClientSide) {
             if (evt.getSource().getDirectEntity() instanceof LivingEntity) {
                 LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
-                MobEffectInstance potionEffect = attacker.getEffect(this);
+                MobEffectInstance potionEffect = attacker.getEffect(CarianStylePotion.SCARLET_ROT.get());
                 if (potionEffect != null) {
                     if (RandomUtil.percentageChance(25)) {
                         Enchantment aeonia = getAeoniaEnchantment();
@@ -105,7 +108,11 @@ public class MobEffectScarletRot extends IconBase {
                                 }
                                 if (bonusLevel > 0) {
                                     LivingEntity hurter = evt.getEntity();
-                                    hurter.addEffect(new MobEffectInstance(this, potionEffect.getDuration(), potionEffect.getAmplifier()));
+                                    hurter.addEffect(new MobEffectInstance(
+                                            CarianStylePotion.SCARLET_ROT.get(),
+                                            potionEffect.getDuration(),
+                                            potionEffect.getAmplifier()
+                                    ));
                                     return;
                                 }
                             }
@@ -120,10 +127,10 @@ public class MobEffectScarletRot extends IconBase {
      * 死亡时传播猩红腐烂（需要周围有艾奥尼亚附魔持有者）
      */
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public void onLivingDeath(@Nonnull LivingDeathEvent evt) {
+    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
         if (!evt.getEntity().level().isClientSide) {
             LivingEntity dead = evt.getEntity();
-            MobEffectInstance potionEffect = dead.getEffect(this);
+            MobEffectInstance potionEffect = dead.getEffect(CarianStylePotion.SCARLET_ROT.get());
             if (potionEffect != null) {
                 Enchantment aeonia = getAeoniaEnchantment();
                 if (aeonia == null) {
@@ -149,7 +156,11 @@ public class MobEffectScarletRot extends IconBase {
                             );
                             for (LivingEntity target : new ArrayList<>(entities)) {
                                 if (RandomUtil.percentageChance(50)) {
-                                    target.addEffect(new MobEffectInstance(this, potionEffect.getDuration(), potionEffect.getAmplifier()));
+                                    target.addEffect(new MobEffectInstance(
+                                            CarianStylePotion.SCARLET_ROT.get(),
+                                            200,
+                                            potionEffect.getAmplifier()
+                                    ));
                                 }
                             }
                             return;
@@ -185,14 +196,12 @@ public class MobEffectScarletRot extends IconBase {
                                 bonusLevel = Math.min(bonusLevel, 10);
                             }
                             if (bonusLevel > 0) {
-                                // 修正：使用 scarletRot() 方法获取 DamageSource
                                 entityLivingBaseIn.hurt(NewDamageSource.scarletRot(entityLivingBaseIn.level()), damage * 2.5f);
                                 return;
                             }
                         }
                     }
                 }
-                // 修正：使用 scarletRot() 方法获取 DamageSource
                 entityLivingBaseIn.hurt(NewDamageSource.scarletRot(entityLivingBaseIn.level()), damage);
             }
         }

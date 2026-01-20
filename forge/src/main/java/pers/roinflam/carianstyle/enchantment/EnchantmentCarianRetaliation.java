@@ -31,7 +31,7 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
  * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "carian_retaliation",
@@ -63,6 +63,7 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
             return;
         }
 
+        // 检查是否为远程或魔法伤害
         boolean isRanged = !damageSource.getEntity().equals(damageSource.getDirectEntity());
         boolean isMagic = DamageSourceUtil.isMagicDamage(damageSource);
         if (!isRanged && !isMagic) {
@@ -72,6 +73,7 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
         LivingEntity holder = evt.getEntity();
         Entity attacker = damageSource.getEntity();
 
+        // 检查是否正在格挡
         if (!holder.isUsingItem()) {
             return;
         }
@@ -82,6 +84,7 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
             return;
         }
 
+        // 获取附魔
         Enchantment carianRetaliation = EnchantmentRegistry.getEnchantmentByClass(EnchantmentCarianRetaliation.class);
         if (carianRetaliation == null) {
             return;
@@ -100,42 +103,45 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
         final int effectiveLevel = level;
         final float baseDamage = evt.getAmount();
 
+        // 生成3把魔法剑反击
         for (int i = 0; i < 3; i++) {
             int delay = 40 + i * 5;
 
-            EntityGlintblades showBlade = new EntityGlintblades(holder, attacker).setDeadTick(delay);
-            double posX = holder.getX();
+            // 计算初始位置（120度间隔环绕持有者）
+            double angle = (i * 120) * Math.PI / 180.0;
+            double radius = 1.5;
+            double posX = holder.getX() + Math.cos(angle) * radius;
             double posY = holder.getY() + 0.5;
-            double posZ = holder.getZ();
+            double posZ = holder.getZ() + Math.sin(angle) * radius;
 
-            if (i == 0) {
-                posX -= 1;
-                posZ += 1;
-            } else if (i == 1) {
-                posX -= 1;
-                posZ -= 1;
-            } else {
-                posX += 1;
-            }
-
+            // 显示用的剑（悬浮效果）
+            EntityGlintblades showBlade = new EntityGlintblades(holder, attacker)
+                    .setDeadTick(delay)
+                    .setSize(1.0f);
             showBlade.setPos(posX, posY, posZ);
             holder.level().addFreshEntity(showBlade);
 
-            final double finalPosX = posX;
-            final double finalPosY = posY;
-            final double finalPosZ = posZ;
-
+            // 延迟发射
             new SynchronizationTask(delay) {
                 @Override
                 public void run() {
-                    EntityGlintblades attackBlade = new EntityGlintblades(holder, attacker);
-                    attackBlade.setPos(finalPosX, finalPosY, finalPosZ);
+                    // 检查目标有效性
+                    if (!attacker.isAlive() || attacker.isRemoved()) {
+                        return;
+                    }
 
-                    DamageSource magicDamage = holder.damageSources().thrown(attackBlade, holder);
-                    DamageSourceUtil.setMagicDamage(magicDamage);
-                    attackBlade.setDamageSource(magicDamage);
-                    attackBlade.setDamage(baseDamage * effectiveLevel * 0.2f);
-                    attackBlade.shoot(1);
+                    // 创建攻击剑
+                    EntityGlintblades attackBlade = new EntityGlintblades(holder, attacker)
+                            .setSize(1.0f)
+                            .setDamage(baseDamage * effectiveLevel * 0.2f)
+                            .setDamageSource(holder.damageSources().thrown(null, holder))
+                            .setTrackingStrength(0.15f)  // 中等追踪强度
+                            .setMaxLifetime(100);         // 5秒存活时间
+
+                    DamageSourceUtil.setMagicDamage(attackBlade.getDamageSource());
+
+                    attackBlade.setPos(posX, posY, posZ);
+                    attackBlade.shoot(1.2f);
                     holder.level().addFreshEntity(attackBlade);
                 }
             }.start();

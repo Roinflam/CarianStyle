@@ -1,5 +1,3 @@
-// 文件：EnchantmentParry.java
-// 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentParry.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
 import net.minecraft.world.entity.EquipmentSlot;
@@ -9,6 +7,7 @@ import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -54,20 +53,16 @@ public class EnchantmentParry extends EnchantmentBase {
     }
 
     /**
-     * 检测盾牌格挡（LOWEST优先级）
-     * 完全格挡后进入招架状态
+     * 检测盾牌格挡（使用LivingAttackEvent更可靠）
+     * 当玩家举盾受击时进入招架状态
      */
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingHurt_Shield(@NotNull LivingHurtEvent evt) {
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public static void onLivingAttack(@NotNull LivingAttackEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        // 只有完全格挡（伤害<=0）才触发
-        if (evt.getAmount() > 0) {
-            return;
-        }
-
+        // 必须是近战攻击
         if (!(evt.getSource().getDirectEntity() instanceof LivingEntity)) {
             return;
         }
@@ -80,11 +75,12 @@ public class EnchantmentParry extends EnchantmentBase {
             return;
         }
 
-        ItemStack activeItem = holder.getItemInHand(holder.getUsedItemHand());
+        ItemStack activeItem = holder.getUseItem();
         if (activeItem.isEmpty() || !(activeItem.getItem() instanceof ShieldItem)) {
             return;
         }
 
+        // 检查盾牌是否有招架附魔
         Enchantment parry = EnchantmentRegistry.getEnchantmentByClass(EnchantmentParry.class);
         if (parry == null) {
             return;
@@ -95,26 +91,31 @@ public class EnchantmentParry extends EnchantmentBase {
             return;
         }
 
-        // 检查是否在冷却中或已有招架状态
+        // 检查是否在冷却中
         if (EnchantmentDataManager.isOnCooldown(PARRY_COOLDOWN_KEY, uuid)) {
             return;
         }
 
-        Integer existingLevel = EnchantmentDataManager.getData(PARRY_LEVEL_KEY, uuid);
-        if (existingLevel != null) {
+        // 检查是否已有招架状态（避免重复触发）
+        if (EnchantmentDataManager.isOnCooldown(PARRY_LEVEL_KEY, uuid)) {
             return;
         }
 
-        // 进入招架状态（10tick窗口）
-        EnchantmentDataManager.setData(PARRY_LEVEL_KEY, uuid, level);
-        EnchantmentDataManager.setCooldown(PARRY_LEVEL_KEY, uuid, 10);
+        // 检查伤害是否来自正前方（盾牌只能格挡前方攻击）
+        LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
+        if (!isAttackFromFront(holder, attacker)) {
+            return;
+        }
+
+        // 进入招架状态（10tick窗口 = 0.5秒）
+        EnchantmentDataManager.setData(PARRY_LEVEL_KEY, uuid, level, 10);
     }
 
     /**
-     * 攻击时检查招架状态并增伤（LOW优先级）
+     * 攻击时检查招架状态并增伤
      */
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHurt_Attack(@NotNull LivingHurtEvent evt) {
+    public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;
         }
@@ -132,19 +133,38 @@ public class EnchantmentParry extends EnchantmentBase {
             return;
         }
 
-        // 检查是否还在招架窗口内
-        if (!EnchantmentDataManager.isOnCooldown(PARRY_LEVEL_KEY, uuid)) {
-            EnchantmentDataManager.removeData(PARRY_LEVEL_KEY, uuid);
-            return;
-        }
-
         // 增伤：+25% × 等级
-        evt.setAmount(evt.getAmount() + evt.getAmount() * parryLevel * 0.25f);
+        float bonusDamage = evt.getAmount() * parryLevel * 0.25f;
+        evt.setAmount(evt.getAmount() + bonusDamage);
 
-        // 清除招架状态，进入冷却
+        // 清除招架状态，进入冷却（40tick = 2秒）
         EnchantmentDataManager.removeData(PARRY_LEVEL_KEY, uuid);
-        EnchantmentDataManager.clearCooldown(PARRY_LEVEL_KEY, uuid);
         EnchantmentDataManager.setCooldown(PARRY_COOLDOWN_KEY, uuid, 40);
+    }
+
+    /**
+     * 判断攻击是否来自正前方
+     * （盾牌只能格挡前方的攻击）
+     *
+     * @param defender 防御者
+     * @param attacker 攻击者
+     * @return 是否来自前方
+     */
+    private static boolean isAttackFromFront(LivingEntity defender, LivingEntity attacker) {
+        // 计算攻击者相对于防御者的方向
+        double dx = attacker.getX() - defender.getX();
+        double dz = attacker.getZ() - defender.getZ();
+
+        // 计算防御者的朝向
+        float yaw = defender.getYRot();
+        double defenderDirX = -Math.sin(Math.toRadians(yaw));
+        double defenderDirZ = Math.cos(Math.toRadians(yaw));
+
+        // 计算点积（判断是否在前方120度范围内）
+        double dot = dx * defenderDirX + dz * defenderDirZ;
+
+        // dot > 0 表示在前方
+        return dot > 0;
     }
 
     @Override

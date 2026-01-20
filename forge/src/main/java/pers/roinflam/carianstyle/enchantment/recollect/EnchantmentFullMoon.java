@@ -15,13 +15,13 @@ import net.minecraftforge.fml.common.Mod;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.EnchantmentDarkMoon;
 import pers.roinflam.carianstyle.enchantment.EnchantmentHealingByFire;
 import pers.roinflam.carianstyle.enchantment.EnchantmentShelterOfFire;
-import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
-import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
 import java.util.UUID;
@@ -93,37 +93,35 @@ public class EnchantmentFullMoon extends EnchantmentBase {
         }
 
         if (!EnchantmentDataManager.isOnCooldown(FULL_MOON_COOLDOWN_KEY, uuid)) {
-            if (!holder.isDeadOrDying()) {
-                evt.setCanceled(true);
-                holder.setHealth(holder.getMaxHealth() * 0.0075f);
+            evt.setCanceled(true);
+            holder.setHealth(holder.getMaxHealth() * 0.0075f);
 
-                EnchantmentDataManager.setCooldown(FULL_MOON_STATE_KEY, uuid, 400);
+            EnchantmentDataManager.setCooldown(FULL_MOON_STATE_KEY, uuid, 400);
 
-                // 检查是否有DarkMoon附魔
-                boolean hasDarkMoon = false;
-                Enchantment darkMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDarkMoon.class);
-                ItemStack heldItem = holder.getItemInHand(holder.getUsedItemHand());
-                if (darkMoon != null && !heldItem.isEmpty()) {
-                    if (EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem) > 0) {
-                        hasDarkMoon = true;
-                    }
+            // 检查是否有DarkMoon附魔
+            boolean hasDarkMoon = false;
+            Enchantment darkMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDarkMoon.class);
+            ItemStack heldItem = holder.getItemInHand(holder.getUsedItemHand());
+            if (darkMoon != null && !heldItem.isEmpty()) {
+                if (EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem) > 0) {
+                    hasDarkMoon = true;
                 }
-
-                int duration = hasDarkMoon ? 400 : 200;
-                new SynchronizationTask(1, 1) {
-                    private int tick = 1;
-
-                    @Override
-                    public void run() {
-                        if (++tick > duration || !holder.isAlive()) {
-                            this.cancel();
-                            EnchantmentDataManager.clearCooldown(FULL_MOON_STATE_KEY, uuid);
-                            return;
-                        }
-                        holder.heal(holder.getMaxHealth() / 200);
-                    }
-                }.start();
             }
+
+            int duration = hasDarkMoon ? 400 : 200;
+            new SynchronizationTask(1, 1) {
+                private int tick = 1;
+
+                @Override
+                public void run() {
+                    if (++tick > duration || !holder.isAlive()) {
+                        this.cancel();
+                        EnchantmentDataManager.clearCooldown(FULL_MOON_STATE_KEY, uuid);
+                        return;
+                    }
+                    holder.heal(holder.getMaxHealth() / 200);
+                }
+            }.start();
         }
 
         int cooldownTime = holder.level().isDay() ? 3600 : 1800;

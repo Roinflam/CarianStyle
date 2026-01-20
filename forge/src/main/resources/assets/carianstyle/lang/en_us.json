@@ -291,5 +291,9 @@
   "config.carianstyle.levelLimit.tooltip": "Set limits for some enchantments beyond level cap\nTo prevent being overpowered\n§7false§r = No limit (default)\n§7true§r = Enable level limits\nWhen enabled, enchantment effects will be limited even at higher levels",
 
   "config.carianstyle.enchantingDifficulty": "Enchanting Difficulty Multiplier",
-  "config.carianstyle.enchantingDifficulty.tooltip": "Set enchanting difficulty multiplier\n§71.0§r = Default difficulty (default)\nHigher values increase enchanting cost\nMaking enchantments harder to obtain\n§7Example:§r\n• 2.0 = Double difficulty\n• 0.5 = Half difficulty"
+  "config.carianstyle.enchantingDifficulty.tooltip": "Set enchanting difficulty multiplier\n§71.0§r = Default difficulty (default)\nHigher values increase enchanting cost\nMaking enchantments harder to obtain\n§7Example:§r\n• 2.0 = Double difficulty\n• 0.5 = Half difficulty",
+
+  "config.carianstyle.category.trueDamage": "True Damage System",
+  "config.carianstyle.enableTrueDamage": "Enable Advanced True Damage",
+  "config.carianstyle.enableTrueDamage.tooltip": "When enabled, use complex field detection to bypass armor and protection\nThis makes true damage work on all creatures (including modded ones)\n§7true§r = Use advanced detection (Recommended, default)\n§7false§r = Use simple setHealth method\n\n§cNote:§r When disabled, some modded creatures may not take true damage\nBut performance will be slightly better"
 }

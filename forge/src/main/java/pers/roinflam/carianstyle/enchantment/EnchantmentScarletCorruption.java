@@ -37,16 +37,20 @@ public class EnchantmentScarletCorruption extends EnchantmentBase {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
+    /**
+     * 修复：改为 onDamageAsAttackerLowest（作为攻击者时触发）
+     */
     @Override
-    protected void onDamageAsVictimLowest(@NotNull EnchantmentContext ctx, int level) {
+    protected void onDamageAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
         LivingEntity victim = ctx.getVictim();
         if (victim == null) {
             return;
         }
 
+        // 给被攻击的目标施加猩红腐败
         victim.addEffect(new MobEffectInstance(
                 CarianStylePotion.SCARLET_ROT.get(),
-                level * 20 * 20,
+                level * 20 * 20,  // 等级 × 20秒 × 20tick
                 0
         ));
     }

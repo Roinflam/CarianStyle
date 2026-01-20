@@ -4,29 +4,22 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
-import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 
 /**
  * 熔炉之羽附魔
  * <p>
  * 护甲附魔，以受到更多伤害换取机动性增益
  * 受击时：
- * - 受到的伤害增加25%
+ * - 受到的伤害增加50% * 附魔等级
  * - 大幅增加无敌帧（invulnerableTime = max + max/2 × 等级 × 1.5）
  * - 获得速度效果（持续 = 等级 × 40tick，效果等级 = 附魔等级 - 1）
  * - 获得跳跃提升效果（持续 = 等级 × 40tick，效果等级 = 附魔等级 - 1）
@@ -43,7 +36,6 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
         slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET},
         forceTreasure = true
 )
-@Mod.EventBusSubscriber
 public class EnchantmentFurnaceFeather extends EnchantmentBase {
 
     public EnchantmentFurnaceFeather() {
@@ -55,78 +47,39 @@ public class EnchantmentFurnaceFeather extends EnchantmentBase {
         });
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
-        if (evt.getEntity().level().isClientSide) {
-            return;
-        }
+    /**
+     * 受击后获得增益效果（最低优先级）
+     * 注意：这里使用受害者视角的 onDamageAsVictimLowest
+     */
+    @Override
+    protected void onDamageAsVictimLowest(@NotNull EnchantmentContext ctx, int level) {
+        LivingEntity victim = ctx.getHolder();
 
-        LivingEntity victim = evt.getEntity();
-        Enchantment furnaceFeather = EnchantmentRegistry.getEnchantmentByClass(EnchantmentFurnaceFeather.class);
-
-        if (furnaceFeather == null) {
-            return;
-        }
-
-        int totalLevel = 0;
-        for (ItemStack armor : victim.getArmorSlots()) {
-            if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(furnaceFeather, armor);
-            }
-        }
-
+        // 手动应用等级限制（虽然 EnchantmentBase 已经限制过了，但为了保险再限制一次）
+        int effectiveLevel = level;
         if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
+            effectiveLevel = Math.min(effectiveLevel, 10);
         }
 
-        if (totalLevel <= 0) {
-            return;
-        }
+        // 增加无敌帧
+        victim.invulnerableTime = (int) (victim.invulnerableDuration +
+                victim.invulnerableDuration / 2.0 * effectiveLevel * 1.5);
 
-        evt.setAmount(evt.getAmount() + evt.getAmount() * 0.25f);
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
-        if (evt.getEntity().level().isClientSide) {
-            return;
-        }
-
-        LivingEntity victim = evt.getEntity();
-        Enchantment furnaceFeather = EnchantmentRegistry.getEnchantmentByClass(EnchantmentFurnaceFeather.class);
-
-        if (furnaceFeather == null) {
-            return;
-        }
-
-        int totalLevel = 0;
-        for (ItemStack armor : victim.getArmorSlots()) {
-            if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(furnaceFeather, armor);
-            }
-        }
-
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
-        }
-
-        if (totalLevel <= 0) {
-            return;
-        }
-
-        victim.invulnerableTime = (int) (victim.invulnerableDuration + victim.invulnerableDuration / 2 * totalLevel * 1.5);
-
+        // 添加速度效果
         victim.addEffect(new MobEffectInstance(
                 MobEffects.MOVEMENT_SPEED,
-                totalLevel * 40,
-                totalLevel - 1
+                effectiveLevel * 40,
+                effectiveLevel - 1
         ));
 
+        // 添加跳跃提升效果
         victim.addEffect(new MobEffectInstance(
                 MobEffects.JUMP,
-                totalLevel * 40,
-                totalLevel - 1
+                effectiveLevel * 40,
+                effectiveLevel - 1
         ));
+
+        ctx.multiplyDamage(1 + 0.5f * level);
     }
 
     @Override

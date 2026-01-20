@@ -23,7 +23,7 @@ import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
  * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "greatblade_phalanx",
@@ -52,20 +52,20 @@ public class EnchantmentGreatbladePhalanx extends EnchantmentBase {
         LivingEntity hurter = ctx.getHolder();
         LivingEntity attacker = (LivingEntity) ctx.getDamageSource().getEntity();
 
+        // 检查冷却
         if (EnchantmentDataManager.isOnCooldown("greatblade_phalanx", hurter.getUUID())) {
             return;
         }
 
+        // 设置冷却（6000tick = 5分钟）
         EnchantmentDataManager.setCooldown("greatblade_phalanx", hurter.getUUID(), 6000);
 
+        // 生成3把巨剑
         for (int i = 0; i < 3; i++) {
-            EntityGlintblades entityGlintbladesShow = new EntityGlintblades(hurter, attacker)
-                    .setDeadTick(75 + i * 25)
-                    .setSize(7.5f);
-
-            double posY = entityGlintbladesShow.getY() + 5;
-            double posX = entityGlintbladesShow.getX();
-            double posZ = entityGlintbladesShow.getZ();
+            // 计算悬浮位置（在死亡位置上方形成三角阵型）
+            double posY = hurter.getY() + 5;
+            double posX = hurter.getX();
+            double posZ = hurter.getZ();
 
             if (i == 0) {
                 posX -= 10;
@@ -77,31 +77,42 @@ public class EnchantmentGreatbladePhalanx extends EnchantmentBase {
                 posX += 10;
             }
 
-            entityGlintbladesShow.setPos(posX, posY, posZ);
-            hurter.level().addFreshEntity(entityGlintbladesShow);
+            // 延迟时间递增（形成连击效果）
+            int delayTicks = 75 + i * 25;
 
+            // 显示用的剑（悬浮效果）
+            EntityGlintblades showBlade = new EntityGlintblades(hurter, attacker)
+                    .setDeadTick(delayTicks)
+                    .setSize(7.5f);
+            showBlade.setPos(posX, posY, posZ);
+            hurter.level().addFreshEntity(showBlade);
+
+            // 保存位置到final变量供延迟任务使用
             int finalLevel = level;
             double finalPosX = posX;
             double finalPosY = posY;
             double finalPosZ = posZ;
 
-            new SynchronizationTask(75 + i * 25) {
+            // 延迟发射攻击剑
+            new SynchronizationTask(delayTicks) {
                 @Override
                 public void run() {
-                    EntityGlintblades entityGlintblades = new EntityGlintblades(hurter, attacker);
-                    entityGlintblades.setSize(7.5f);
-                    entityGlintblades.setPos(finalPosX, finalPosY, finalPosZ);
+                    // 再次检查目标是否存在
+                    if (!attacker.isAlive() || attacker.isRemoved()) {
+                        return;
+                    }
 
-                    // 使用原版的间接魔法伤害（投射物魔法伤害）
-                    entityGlintblades.setDamageSource(
-                            hurter.damageSources().indirectMagic(entityGlintblades, hurter)
-                    );
-                    entityGlintblades.setDamage(
-                            (attacker.getMaxHealth() - attacker.getHealth()) * finalLevel * 0.1f
-                    );
-                    entityGlintblades.shoot(1);
+                    // 创建攻击剑
+                    EntityGlintblades attackBlade = new EntityGlintblades(hurter, attacker)
+                            .setSize(7.5f)
+                            .setDamage((attacker.getMaxHealth() - attacker.getHealth()) * finalLevel * 0.1f)
+                            .setDamageSource(hurter.damageSources().indirectMagic(null, hurter))
+                            .setTrackingStrength(0.08f)  // 巨剑追踪较慢（更有重量感）
+                            .setMaxLifetime(120);         // 6秒存活时间
 
-                    hurter.level().addFreshEntity(entityGlintblades);
+                    attackBlade.setPos(finalPosX, finalPosY, finalPosZ);
+                    attackBlade.shoot(1.0f);  // 降低初始速度，依靠追踪
+                    hurter.level().addFreshEntity(attackBlade);
                 }
             }.start();
         }

@@ -102,7 +102,7 @@ public class EnchantmentCalamity extends EnchantmentBase {
 
         int totalLevel = getArmorLevel(victim);
         if (totalLevel > 0) {
-            evt.setAmount(evt.getAmount() * 2);
+            evt.setAmount(evt.getAmount() * 1.5f);
         }
     }
 

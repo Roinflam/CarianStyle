@@ -5,28 +5,27 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.event.entity.living.MobEffectEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.api.IEffectModifier;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 
 /**
  * 野兽强健附魔
  * <p>
- * 获得药水效果时增强：持续时间×0.4，等级×2+1
+ * 胸甲附魔，缩短药水效果时间但大幅增强等级
+ * 获得药水效果时：
+ * - 持续时间变为 40%（不受附魔等级影响）
+ * - 效果等级变为 原等级 × 2 + 1（不受附魔等级影响）
  * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 3.0
  */
 @AutoRegisterEnchantment(
         id = "beast_robust",
@@ -36,67 +35,60 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
         slots = {EquipmentSlot.CHEST},
         forceTreasure = true
 )
-@Mod.EventBusSubscriber
-public class EnchantmentBeastRobust extends EnchantmentBase {
+public class EnchantmentBeastRobust extends EnchantmentBase implements IEffectModifier {
 
     public EnchantmentBeastRobust() {
         super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
 
-    private static int getTotalLevel(LivingEntity entity) {
-        Enchantment beastRobust = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBeastRobust.class);
-        if (beastRobust == null) {
+    @Override
+    public int getEnchantmentLevel(@NotNull LivingEntity entity) {
+        // 只从胸甲获取附魔等级
+        ItemStack chest = entity.getItemBySlot(EquipmentSlot.CHEST);
+        if (chest.isEmpty()) {
             return 0;
         }
 
-        int totalLevel = 0;
-        for (ItemStack armor : entity.getArmorSlots()) {
-            if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(beastRobust, armor);
-            }
-        }
+        int level = EnchantmentHelper.getItemEnchantmentLevel(this, chest);
+
+        // 应用等级限制
         if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
+            level = Math.min(level, 10);
         }
-        return totalLevel;
+
+        return level;
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onPotionAdded(@NotNull MobEffectEvent.Added evt) {
-        if (evt.getEntity().level().isClientSide) {
-            return;
+    @Nullable
+    @Override
+    public MobEffectInstance modifyEffect(@NotNull LivingEntity entity,
+                                          @NotNull MobEffectInstance effectInstance,
+                                          int enchantmentLevel) {
+        // 只要有附魔就生效（等级不影响效果强度）
+        if (enchantmentLevel <= 0) {
+            return null;
         }
 
-        LivingEntity holder = evt.getEntity();
+        MobEffect effect = effectInstance.getEffect();
 
-        int totalLevel = getTotalLevel(holder);
-        if (totalLevel <= 0) {
-            return;
+        // 只对非瞬时、可见的效果生效
+        if (effect.isInstantenous() || !effectInstance.isVisible()) {
+            return null;
         }
 
-        MobEffectInstance potionEffect = evt.getEffectInstance();
-        MobEffect potion = potionEffect.getEffect();
+        // 计算新属性
+        int newDuration = (int) (effectInstance.getDuration() * 0.4);  // 时间缩短到 40%
+        int newAmplifier = effectInstance.getAmplifier() * 2 + 1;      // 等级翻倍+1
 
-        if (potion.isInstantenous() || !potionEffect.isVisible()) {
-            return;
-        }
-
-        // 计算新的持续时间和等级
-        int newDuration = (int) (potionEffect.getDuration() * 0.4);
-        int newAmplifier = potionEffect.getAmplifier() * 2 + 1;
-
-        // 取消原事件
-        evt.setCanceled(true);
-
-        // 手动添加修改后的效果
-        holder.addEffect(new MobEffectInstance(
-                potion,
+        // 创建修改后的效果实例
+        return new MobEffectInstance(
+                effect,
                 newDuration,
                 newAmplifier,
-                potionEffect.isAmbient(),
-                potionEffect.isVisible(),
-                potionEffect.showIcon()
-        ));
+                effectInstance.isAmbient(),
+                effectInstance.isVisible(),
+                effectInstance.showIcon()
+        );
     }
 
     @Override

@@ -6,6 +6,7 @@ import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
@@ -21,14 +22,20 @@ import javax.annotation.Nonnull;
  * - 造成伤害时增加15%×(等级+1)
  * </p>
  */
+@Mod.EventBusSubscriber  // ⭐ 添加这个注解！
 public class MobEffectGoldenVow extends IconBase {
 
     public MobEffectGoldenVow(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
     }
 
+    /**
+     * 处理伤害增减效果
+     *
+     * @param evt 受伤事件
+     */
     @SubscribeEvent
-    public void onLivingHurt(@Nonnull LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {  // ⭐ 改为static方法
         if (evt.getEntity().level().isClientSide) {
             return;
         }
@@ -41,16 +48,16 @@ public class MobEffectGoldenVow extends IconBase {
         LivingEntity victim = evt.getEntity();
 
         // 受击者减伤
-        if (victim.hasEffect(this)) {
-            int amplifier = victim.getEffect(this).getAmplifier();
+        if (victim.hasEffect(pers.roinflam.carianstyle.init.CarianStylePotion.GOLDEN_VOW.get())) {
+            int amplifier = victim.getEffect(pers.roinflam.carianstyle.init.CarianStylePotion.GOLDEN_VOW.get()).getAmplifier();
             evt.setAmount(evt.getAmount() * (1 - (amplifier + 1) * 0.1f));
         }
 
         // 攻击者增伤
         if (damageSource.getEntity() instanceof LivingEntity) {
             LivingEntity attacker = (LivingEntity) damageSource.getEntity();
-            if (attacker.hasEffect(this)) {
-                int amplifier = attacker.getEffect(this).getAmplifier();
+            if (attacker.hasEffect(pers.roinflam.carianstyle.init.CarianStylePotion.GOLDEN_VOW.get())) {
+                int amplifier = attacker.getEffect(pers.roinflam.carianstyle.init.CarianStylePotion.GOLDEN_VOW.get()).getAmplifier();
                 evt.setAmount(evt.getAmount() * (1 + (amplifier + 1) * 0.15f));
             }
         }

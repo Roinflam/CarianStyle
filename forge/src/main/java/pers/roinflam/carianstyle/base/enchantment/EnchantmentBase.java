@@ -374,6 +374,20 @@ public abstract class EnchantmentBase extends Enchantment {
 
     // ==================== 实体附魔处理 ====================
 
+    /**
+     * 处理实体的附魔
+     * <p>
+     * 关键修复：攻击者和受害者都检查所有装备槽位
+     * 这确保了护甲附魔（如魔力蝎符）在攻击时也能正确触发
+     * </p>
+     *
+     * @param holder 附魔持有者
+     * @param victim 受害者
+     * @param source 伤害源
+     * @param event 事件对象
+     * @param priority 事件优先级
+     * @param isAttacker 是否为攻击者
+     */
     private static void processEntityEnchantments(
             @Nonnull LivingEntity holder,
             @Nullable LivingEntity victim,
@@ -383,6 +397,7 @@ public abstract class EnchantmentBase extends Enchantment {
             boolean isAttacker
     ) {
         if (isAttacker) {
+            // 攻击者：先检查主手和副手武器
             ItemStack mainHand = holder.getItemInHand(InteractionHand.MAIN_HAND);
             ItemStack offHand = holder.getItemInHand(InteractionHand.OFF_HAND);
 
@@ -392,7 +407,21 @@ public abstract class EnchantmentBase extends Enchantment {
             if (!offHand.isEmpty()) {
                 processItemEnchantments(offHand, holder, victim, source, event, priority, true);
             }
+
+            // 关键修复：攻击者也检查护甲槽位（头盔、胸甲、护腿、靴子）
+            for (EquipmentSlot slot : EquipmentSlot.values()) {
+                // 跳过已经检查过的主手和副手，避免重复处理
+                if (slot == EquipmentSlot.MAINHAND || slot == EquipmentSlot.OFFHAND) {
+                    continue;
+                }
+
+                ItemStack stack = holder.getItemBySlot(slot);
+                if (!stack.isEmpty()) {
+                    processItemEnchantments(stack, holder, victim, source, event, priority, true);
+                }
+            }
         } else {
+            // 受害者：检查所有装备槽位
             for (EquipmentSlot slot : EquipmentSlot.values()) {
                 ItemStack stack = holder.getItemBySlot(slot);
                 if (!stack.isEmpty()) {
@@ -429,6 +458,7 @@ public abstract class EnchantmentBase extends Enchantment {
             LivingEntity attacker = isAttacker ? holder :
                     (source != null && source.getEntity() instanceof LivingEntity ?
                             (LivingEntity) source.getEntity() : null);
+
             EnchantmentContext ctx = new EnchantmentContext(
                     event, holder, stack, level,
                     attacker, victim, source

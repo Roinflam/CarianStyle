@@ -1,6 +1,5 @@
 package pers.roinflam.carianstyle.enchantment.recollect;
 
-import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
@@ -11,9 +10,10 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 
 /**
  * 注定死亡附魔
@@ -39,16 +39,11 @@ public class EnchantmentDoomedDeath extends EnchantmentBase {
     }
 
     @Override
-    protected void onDamageAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
+    protected void onHurtAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
         LivingEntity attacker = ctx.getHolder();
         LivingEntity victim = ctx.getVictim();
 
-        if (victim == null) {
-            return;
-        }
-
-        // 只在服务端执行
-        if (victim.level().isClientSide) {
+        if (victim == null || victim.level().isClientSide) {
             return;
         }
 
@@ -58,36 +53,25 @@ public class EnchantmentDoomedDeath extends EnchantmentBase {
             effectiveLevel = Math.min(effectiveLevel, 10);
         }
 
-        // 玩家需要刚挥剑，非玩家直接触发
-        if (ctx.isHolderPlayer()) {
-            if (!isJustSwung(ctx.getHolderAsPlayer())) {
-                return;
-            }
+        // 玩家需要刚挥剑
+        if (ctx.isHolderPlayer() && !isJustSwung(ctx.getHolderAsPlayer())) {
+            return;
         }
 
-        // 施加诅咒效果（自动同步）
-        victim.addEffect(new MobEffectInstance(
-                CarianStylePotion.DOOMED_DEATH_BURNING.get(),
-                5 * 20 + 5,
-                0,
-                false,
-                true,
-                true
-        ));
+        // 应用注定死亡燃烧效果（5秒 + 5tick，会自动同步客户端渲染猩红色火焰）
+        DynamicAttributeManager.apply(
+                victim,
+                DynamicAttributes.DOOMED_DEATH_BURNING.createInstance(5 * 20 + 5, 0)
+        );
 
-        victim.addEffect(new MobEffectInstance(
-                CarianStylePotion.DOOMED_DEATH.get(),
-                10 * 20 + 5,
-                0,
-                false,
-                true,
-                true
-        ));
-
-        // 记录原伤害用于持续伤害计算
-        float originalDamage = ctx.getDamage();
+        // 应用注定死亡效果（10秒 + 5tick，最大生命值-25%）
+        DynamicAttributeManager.apply(
+                victim,
+                DynamicAttributes.DOOMED_DEATH.createInstance(10 * 20 + 5, 0)
+        );
 
         // 持续伤害任务
+        float originalDamage = ctx.getDamage();
         new SynchronizationTask(5, 1) {
             private int tick = 0;
 

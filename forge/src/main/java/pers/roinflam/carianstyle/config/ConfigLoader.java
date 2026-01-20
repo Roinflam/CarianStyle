@@ -53,6 +53,10 @@ public final class ConfigLoader {
         public final ForgeConfigSpec.IntValue rockBlasterMaxRange;
         public final ForgeConfigSpec.IntValue prayerfulStrikeMaxHealth;
 
+        // ==================== 真伤系统配置 ====================
+
+        public final ForgeConfigSpec.BooleanValue enableTrueDamage;
+
         // ==================== 宝藏附魔配置 ====================
 
         public final ForgeConfigSpec.BooleanValue isTreasureVeryRareEnchantment;
@@ -117,6 +121,27 @@ public final class ConfigLoader {
                     .comment("Set the maximum stackable life limit for the Prayer Strike Enchantment.")
                     .comment("设置祈祷打击附魔的最大可叠加生命值上限。")
                     .defineInRange("prayerfulStrikeMaxHealth", 1000, 0, 1000000);
+
+            builder.pop();
+
+            // ========== 真伤系统 ==========
+            builder.comment("")
+                    .comment("═══════════════════════════════════════════════════════════════")
+                    .comment("True Damage System Configuration")
+                    .comment("真伤系统配置")
+                    .comment("═══════════════════════════════════════════════════════════════")
+                    .push("trueDamage");
+
+            enableTrueDamage = builder
+                    .comment("Enable the advanced true damage system.")
+                    .comment("启用高级真伤系统。")
+                    .comment("When enabled, the mod will use complex field detection to bypass armor and protection.")
+                    .comment("启用后，模组会使用复杂的字段检测来绕过护甲和保护。")
+                    .comment("When disabled, the mod will use simple setHealth method (may not work on some modded entities).")
+                    .comment("禁用后，模组会使用简单的setHealth方法（可能对某些模组生物无效）。")
+                    .comment("Recommended: true (default)")
+                    .comment("推荐: true（默认）")
+                    .define("enableTrueDamage", true);
 
             builder.pop();
 
@@ -194,6 +219,11 @@ public final class ConfigLoader {
     public static int prayerfulStrikeMaxHealth = 1000;
 
     /**
+     * 是否启用高级真伤系统
+     */
+    public static boolean enableTrueDamage = true;
+
+    /**
      * 超稀有附魔是否为宝藏
      */
     public static boolean isTreasureVeryRaryEnchantment = false;
@@ -232,6 +262,8 @@ public final class ConfigLoader {
 
         rockBlasterMaxRange = COMMON.rockBlasterMaxRange.get();
         prayerfulStrikeMaxHealth = COMMON.prayerfulStrikeMaxHealth.get();
+
+        enableTrueDamage = COMMON.enableTrueDamage.get();
 
         isTreasureVeryRaryEnchantment = COMMON.isTreasureVeryRareEnchantment.get();
         isTreasureRaryEnchantment = COMMON.isTreasureRareEnchantment.get();

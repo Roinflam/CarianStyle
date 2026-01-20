@@ -1,7 +1,6 @@
 package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
@@ -19,7 +18,8 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 /**
@@ -86,26 +86,21 @@ public class EnchantmentDragoncrestGreatshield extends EnchantmentBase {
             return;
         }
 
-        MobEffectInstance currentShield = victim.getEffect(CarianStylePotion.DRAGONCREST_GREATSHIELD.get());
+        // 获取当前护盾等级
+        int currentAmplifier = DynamicAttributeManager.getAmplifier(victim, DynamicAttributes.DRAGONCREST_GREATSHIELD);
 
-        if (currentShield == null) {
-            victim.addEffect(new MobEffectInstance(
-                    CarianStylePotion.DRAGONCREST_GREATSHIELD.get(),
-                    SHIELD_DURATION,
-                    0
-            ));
-        } else if (currentShield.getAmplifier() < MAX_SHIELD_LEVEL) {
-            victim.addEffect(new MobEffectInstance(
-                    CarianStylePotion.DRAGONCREST_GREATSHIELD.get(),
-                    SHIELD_DURATION,
-                    currentShield.getAmplifier() + 1
-            ));
+        if (currentAmplifier < 0) {
+            // 没有护盾，添加0级
+            DynamicAttributeManager.apply(victim,
+                    DynamicAttributes.DRAGONCREST_GREATSHIELD.createInstance(SHIELD_DURATION, 0));
+        } else if (currentAmplifier < MAX_SHIELD_LEVEL) {
+            // 提升护盾等级
+            DynamicAttributeManager.apply(victim,
+                    DynamicAttributes.DRAGONCREST_GREATSHIELD.createInstance(SHIELD_DURATION, currentAmplifier + 1));
         } else {
-            victim.addEffect(new MobEffectInstance(
-                    CarianStylePotion.DRAGONCREST_GREATSHIELD.get(),
-                    SHIELD_DURATION,
-                    MAX_SHIELD_LEVEL
-            ));
+            // 满层，刷新时间并减伤
+            DynamicAttributeManager.apply(victim,
+                    DynamicAttributes.DRAGONCREST_GREATSHIELD.createInstance(SHIELD_DURATION, MAX_SHIELD_LEVEL));
             evt.setAmount(evt.getAmount() * 0.75f);
         }
     }

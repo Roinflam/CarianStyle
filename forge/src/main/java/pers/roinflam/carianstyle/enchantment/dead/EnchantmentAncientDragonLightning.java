@@ -54,10 +54,6 @@ public class EnchantmentAncientDragonLightning extends EnchantmentBase {
             return;
         }
 
-        if (hurter.isDeadOrDying()) {
-            return;
-        }
-
         EnchantmentDataManager.setCooldown("ancient_dragon_lightning", hurter.getUUID(), 1800);
 
         List<LivingEntity> entities = EntityUtil.getNearbyEntities(

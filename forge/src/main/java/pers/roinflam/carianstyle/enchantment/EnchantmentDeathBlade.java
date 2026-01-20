@@ -9,7 +9,9 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
@@ -51,8 +53,14 @@ public class EnchantmentDeathBlade extends EnchantmentBase {
 
         ctx.multiplyDamage(0.5f);
 
-        ctx.addPotionToOpponent(CarianStylePotion.DOOMED_DEATH_BURNING.get(), 5 * 20 + 5, 0);
-        ctx.addPotionToOpponent(CarianStylePotion.DOOMED_DEATH.get(), 10 * 20 + 5, 0);
+        // 应用火焰燃烧效果（需要同步网络）
+        DynamicAttributeManager.apply(ctx.getVictim(),
+                DynamicAttributes.DOOMED_DEATH_BURNING.createInstance(5 * 20 + 5, 0));
+        ClientSyncEffectHelper.onAttributeApplied(ctx.getVictim(), DynamicAttributes.DOOMED_DEATH_BURNING);
+
+        // 应用注定死亡效果
+        DynamicAttributeManager.apply(ctx.getVictim(),
+                DynamicAttributes.DOOMED_DEATH.createInstance(10 * 20 + 5, 0));
 
         new SynchronizationTask(1, 1) {
             private int tick = 0;

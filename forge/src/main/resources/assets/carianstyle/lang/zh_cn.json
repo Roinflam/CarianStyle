@@ -217,7 +217,7 @@
   "enchantment.carianstyle.cragblade.desc": "攻击后10秒内：无法跳跃，获得[附魔等级]*10%击退抗性，攻击力提高[附魔等级]*10%，护甲提高[附魔等级]*10%",
   "enchantment.carianstyle.crucible_knot_talisman": "熔炉瘤",
   "enchantment.carianstyle.crucible_knot_talisman.desc": "当攻击来源的高度大于自身高度时,受到的伤害降低[附魔等级]*25%",
-  "enchantment.carianstyle.magic_scorpion_charm": "魔力蝎符",
+  "enchantment.carianstyle.magic_scorpion_charm": "魔力对蝎",
   "enchantment.carianstyle.magic_scorpion_charm.desc": "造成的魔法伤害增加[附魔等级]*10%,造成魔法伤害时恢复自身已损失生命值[附魔等级]*1%,受到物理伤害时伤害增加[附魔等级]*10%",
   "enchantment.carianstyle.stamp_sweep": "箭步回旋斩",
   "enchantment.carianstyle.stamp_sweep.desc": "冲刺攻击时对自身周围3格的所有敌人造成本次伤害+[附魔等级]*10%的额外伤害",
@@ -291,5 +291,9 @@
   "config.carianstyle.levelLimit.tooltip": "为某些附魔在超过等级上限后设置限制\n以防止过于无敌\n§7false§r = 无限制(默认)\n§7true§r = 启用等级限制\n启用后，即使等级更高，附魔效果也会被限制",
 
   "config.carianstyle.enchantingDifficulty": "附魔难度倍率",
-  "config.carianstyle.enchantingDifficulty.tooltip": "设置附魔的难度倍率\n§71.0§r = 默认难度(默认)\n更高的值会增加附魔能力消耗\n使附魔更难获得\n§7示例:§r\n• 2.0 = 双倍难度\n• 0.5 = 一半难度"
+  "config.carianstyle.enchantingDifficulty.tooltip": "设置附魔的难度倍率\n§71.0§r = 默认难度(默认)\n更高的值会增加附魔能力消耗\n使附魔更难获得\n§7示例:§r\n• 2.0 = 双倍难度\n• 0.5 = 一半难度",
+
+  "config.carianstyle.category.trueDamage": "真伤系统",
+  "config.carianstyle.enableTrueDamage": "启用高级真伤系统",
+  "config.carianstyle.enableTrueDamage.tooltip": "启用后使用复杂的字段检测来绕过护甲和保护\n这可以让真伤对所有生物（包括模组生物）都有效\n§7true§r = 使用高级检测（推荐，默认）\n§7false§r = 使用简单的setHealth方法\n\n§c注意：§r禁用后某些模组生物可能无法受到真伤\n但性能会稍微提升一些"
 }

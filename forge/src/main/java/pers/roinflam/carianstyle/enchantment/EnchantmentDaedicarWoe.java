@@ -22,7 +22,7 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
  * <p>
  * 护甲诅咒附魔
  * 受到伤害时：
- * - 伤害 ×5（严重增伤）
+ * - 伤害 ×3（严重增伤）
  * - 无敌时间减少到75%（更容易连续受击）
  * </p>
  *
@@ -79,7 +79,7 @@ public class EnchantmentDaedicarWoe extends EnchantmentBase {
         }
 
         victim.invulnerableTime = (int) (victim.invulnerableDuration * 0.75);
-        evt.setAmount(evt.getAmount() * 5);
+        evt.setAmount(evt.getAmount() * 3);
     }
 
     @Override

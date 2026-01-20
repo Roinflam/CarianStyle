@@ -1,7 +1,6 @@
 package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.AbstractArrow;
@@ -14,7 +13,8 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 
 /**
  * 隐形武器附魔
@@ -54,10 +54,8 @@ public class EnchantmentInvisibleWeapon extends EnchantmentBase {
         }
 
         // 施加隐身效果
-        attacker.addEffect(new MobEffectInstance(
-                CarianStylePotion.STEALTH.get(),
-                level * 10 * magnification
-        ));
+        DynamicAttributeManager.apply(attacker,
+                DynamicAttributes.STEALTH.createInstance(level * 20 * magnification));
     }
 
     @Override

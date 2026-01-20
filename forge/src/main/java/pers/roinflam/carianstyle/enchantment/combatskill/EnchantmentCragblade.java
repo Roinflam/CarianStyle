@@ -1,8 +1,5 @@
-// 文件：EnchantmentCragblade.java
-// 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentCragblade.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
-import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
@@ -19,7 +16,8 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 
 /**
  * 岩石剑附魔
@@ -82,13 +80,10 @@ public class EnchantmentCragblade extends EnchantmentBase {
         }
 
         // 给攻击者自己施加岩石剑增益效果
-        int potionDuration = 200; // 10秒（200 tick）
-        int potionLevel = level - 1;
-        attacker.addEffect(new MobEffectInstance(
-                CarianStylePotion.CRAGBLADE.get(),
-                potionDuration,
-                potionLevel
-        ));
+        int duration = 200; // 10秒（200 tick）
+        int amplifier = level - 1;
+        DynamicAttributeManager.apply(attacker,
+                DynamicAttributes.CRAGBLADE.createInstance(duration, amplifier));
     }
 
     @Override

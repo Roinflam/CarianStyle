@@ -1,8 +1,5 @@
-// 文件：EnchantmentQuickstep.java
-// 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentQuickstep.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
-import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -18,7 +15,8 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 
 /**
  * 快步附魔
@@ -75,11 +73,8 @@ public class EnchantmentQuickstep extends EnchantmentBase {
         int speedLevel = (int) (missingHealthPercent * 100 / 5 * totalLevel);
 
         if (speedLevel > 0) {
-            player.addEffect(new MobEffectInstance(
-                    CarianStylePotion.SPEED_BOOST.get(),
-                    2,
-                    speedLevel - 1
-            ));
+            DynamicAttributeManager.apply(player,
+                    DynamicAttributes.SPEED_BOOST.createInstance(2, speedLevel - 1));
         }
     }
 

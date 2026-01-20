@@ -14,9 +14,11 @@ import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
+import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
@@ -34,6 +36,7 @@ import javax.annotation.Nonnull;
  * - 持续施加失明效果
  * </p>
  */
+@Mod.EventBusSubscriber
 public class MobEffectSleep extends IconBase {
 
     public MobEffectSleep(boolean isBadEffectIn, int liquidColorIn) {
@@ -51,7 +54,7 @@ public class MobEffectSleep extends IconBase {
      * 睡眠状态下无法被设为攻击目标
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public void onLivingChangeTarget(@Nonnull LivingChangeTargetEvent evt) {
+    public static void onLivingChangeTarget(@Nonnull LivingChangeTargetEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;
         }
@@ -65,7 +68,7 @@ public class MobEffectSleep extends IconBase {
         }
 
         Mob entityLiving = (Mob) evt.getEntity();
-        if (entityLiving.hasEffect(this)) {
+        if (entityLiving.hasEffect(CarianStylePotion.SLEEP.get())) {
             evt.setCanceled(true);
         }
     }
@@ -74,7 +77,7 @@ public class MobEffectSleep extends IconBase {
      * 睡眠状态下无法攻击
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public void onLivingAttack(@Nonnull LivingAttackEvent evt) {
+    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;
         }
@@ -84,7 +87,7 @@ public class MobEffectSleep extends IconBase {
         }
 
         LivingEntity attacker = (LivingEntity) evt.getSource().getEntity();
-        if (attacker.hasEffect(this)) {
+        if (attacker.hasEffect(CarianStylePotion.SLEEP.get())) {
             evt.setCanceled(true);
         }
     }
@@ -93,7 +96,7 @@ public class MobEffectSleep extends IconBase {
      * 睡眠状态下受击：伤害加倍并解除睡眠
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public void onLivingDamage(@Nonnull LivingDamageEvent evt) {
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;
         }
@@ -103,11 +106,11 @@ public class MobEffectSleep extends IconBase {
         }
 
         LivingEntity victim = evt.getEntity();
-        if (victim.hasEffect(this)) {
-            int amplifier = victim.getEffect(this).getAmplifier();
+        if (victim.hasEffect(CarianStylePotion.SLEEP.get())) {
+            int amplifier = victim.getEffect(CarianStylePotion.SLEEP.get()).getAmplifier();
             // 伤害 = 原伤害×2 + 原伤害×等级×25%
             evt.setAmount(evt.getAmount() * 2 + evt.getAmount() * amplifier * 0.25f);
-            victim.removeEffect(this);
+            victim.removeEffect(CarianStylePotion.SLEEP.get());
         }
     }
 
@@ -115,9 +118,9 @@ public class MobEffectSleep extends IconBase {
      * 睡眠状态下无法跳跃
      */
     @SubscribeEvent
-    public void onLivingUpdate(@Nonnull LivingEvent.LivingTickEvent evt) {
+    public static void onLivingUpdate(@Nonnull LivingEvent.LivingTickEvent evt) {
         LivingEntity entityLiving = evt.getEntity();
-        if (entityLiving.hasEffect(this)) {
+        if (entityLiving.hasEffect(CarianStylePotion.SLEEP.get())) {
             EntityLivingUtil.setJumped(entityLiving);
         }
     }

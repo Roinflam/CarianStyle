@@ -10,9 +10,11 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
+import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
@@ -34,6 +36,7 @@ import java.util.UUID;
  * - 每tick扣除最大生命值×12.5%/20的血量（可致死）
  * </p>
  */
+@Mod.EventBusSubscriber
 public class MobEffectIncision extends IconBase {
 
     public static final UUID ID = UUID.fromString("0a6b62ca-ead9-3641-c4dd-a4d33daf5cc1");
@@ -90,13 +93,13 @@ public class MobEffectIncision extends IconBase {
      * 治疗量+60%
      */
     @SubscribeEvent(priority = EventPriority.LOW)
-    public void onLivingHeal(@Nonnull LivingHealEvent evt) {
+    public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;
         }
 
         LivingEntity healer = evt.getEntity();
-        if (healer.hasEffect(this)) {
+        if (healer.hasEffect(CarianStylePotion.INCISION.get())) {
             evt.setAmount(evt.getAmount() * 1.6f);
         }
     }
@@ -112,7 +115,6 @@ public class MobEffectIncision extends IconBase {
                 if (entityLivingBaseIn.getHealth() - damage * 2 > 0) {
                     entityLivingBaseIn.setHealth(entityLivingBaseIn.getHealth() - damage);
                 } else {
-                    // 修正：使用 hemorrhage() 方法获取 DamageSource
                     EntityLivingUtil.kill(entityLivingBaseIn, NewDamageSource.hemorrhage(entityLivingBaseIn.level()));
                 }
             }

@@ -10,7 +10,6 @@ import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -20,6 +19,7 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
@@ -55,42 +55,38 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingAttack(@NotNull LivingAttackEvent evt) {
-        if (evt.getEntity().level().isClientSide) {
+    /**
+     * 修复：改用 Normal 优先级
+     */
+    @Override
+    protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
+        LivingEntity attacker = ctx.getHolder();
+        LivingEntity victim = ctx.getVictim();
+
+        if (victim == null) {
             return;
         }
 
-        if (!(evt.getSource().getDirectEntity() instanceof LivingEntity)) {
-            return;
-        }
-
-        LivingEntity victim = evt.getEntity();
-        LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
-
-        ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
-        if (heldItem.isEmpty()) {
-            return;
-        }
-
-        Enchantment darkAbandonedChild = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDarkAbandonedChild.class);
-        if (darkAbandonedChild == null) {
-            return;
-        }
-
-        int level = EnchantmentHelper.getItemEnchantmentLevel(darkAbandonedChild, heldItem);
-
+        // 手动应用等级限制
+        int effectiveLevel = level;
         if (ConfigLoader.levelLimit) {
-            level = Math.min(level, 10);
+            effectiveLevel = Math.min(effectiveLevel, 10);
         }
 
-        if (level <= 0) {
-            return;
+        // 玩家需要刚挥剑
+        if (ctx.isHolderPlayer()) {
+            if (ctx.getHolderAsPlayer().getAttackStrengthScale(0.5F) < 0.9F) {
+                return;
+            }
         }
 
-        DamageSourceUtil.setBypassesArmor(evt.getSource());
-        DamageSourceUtil.setMagicDamage(evt.getSource());
+        // 设置为魔法伤害且无视护甲
+        if (ctx.getDamageSource() != null) {
+            DamageSourceUtil.setBypassesArmor(ctx.getDamageSource());
+            DamageSourceUtil.setMagicDamage(ctx.getDamageSource());
+        }
 
+        // 偷取一个正面效果
         Collection<MobEffectInstance> activeEffects = victim.getActiveEffects();
         if (!activeEffects.isEmpty()) {
             List<MobEffectInstance> positiveEffects = new ArrayList<>(activeEffects);
@@ -109,19 +105,22 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
         }
     }
 
+    /**
+     * 受击减伤（夜晚10%）
+     */
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (evt.getSource().isCreativePlayer()) {
+        if (evt.getSource().is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) {
             return;
         }
 
         LivingEntity victim = evt.getEntity();
 
-        ItemStack heldItem = victim.getItemInHand(victim.getUsedItemHand());
+        ItemStack heldItem = victim.getMainHandItem();
         if (heldItem.isEmpty()) {
             return;
         }
@@ -138,6 +137,9 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
         }
     }
 
+    /**
+     * 夜晚持续回血
+     */
     @SubscribeEvent
     public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
         if (evt.player.level().isClientSide || evt.player.level().isDay()) {
@@ -153,7 +155,7 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
             return;
         }
 
-        ItemStack heldItem = player.getItemInHand(player.getUsedItemHand());
+        ItemStack heldItem = player.getMainHandItem();
         if (heldItem.isEmpty()) {
             return;
         }

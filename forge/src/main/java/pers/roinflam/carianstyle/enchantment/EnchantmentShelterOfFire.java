@@ -2,24 +2,15 @@ package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
-import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
-import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 /**
  * 火焰庇护附魔
@@ -40,7 +31,6 @@ import pers.roinflam.carianstyle.utils.util.EntityUtil;
         type = EnchantmentCategory.ARMOR,
         slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}
 )
-@Mod.EventBusSubscriber
 public class EnchantmentShelterOfFire extends EnchantmentBase {
 
     public EnchantmentShelterOfFire() {
@@ -52,86 +42,63 @@ public class EnchantmentShelterOfFire extends EnchantmentBase {
         });
     }
 
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
-        if (evt.getEntity().level().isClientSide) {
+    /**
+     * 着火时减伤（受害者视角，低优先级）
+     */
+    @Override
+    protected void onDamageAsVictimLow(@NotNull EnchantmentContext ctx, int level) {
+        LivingEntity victim = ctx.getHolder();
+
+        // 必须处于着火状态
+        if (victim.getRemainingFireTicks() <= 0) {
             return;
         }
 
-        LivingEntity victim = evt.getEntity();
-
-        if (EntityUtil.getFire(victim) <= 0) {
-            return;
-        }
-
-        Enchantment shelterOfFire = EnchantmentRegistry.getEnchantmentByClass(EnchantmentShelterOfFire.class);
-        if (shelterOfFire == null) {
-            return;
-        }
-
-        int totalLevel = 0;
-        for (ItemStack armor : victim.getArmorSlots()) {
-            if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(shelterOfFire, armor);
-            }
-        }
-
+        // 手动应用等级限制
+        int effectiveLevel = level;
         if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
+            effectiveLevel = Math.min(effectiveLevel, 10);
         }
 
-        if (totalLevel <= 0) {
-            return;
-        }
+        // 计算减伤比例：2% × 等级
+        float damageReduction = effectiveLevel * 0.02f;
 
-        if (totalLevel * 0.02 >= 1) {
-            evt.setCanceled(true);
+        // 如果减伤 >= 100%，则完全免疫
+        if (damageReduction >= 1.0f) {
+            ctx.cancelEvent();
         } else {
-            evt.setAmount(evt.getAmount() - evt.getAmount() * totalLevel * 0.02f);
+            // 否则按比例减伤
+            ctx.multiplyDamage(1.0f - damageReduction);
         }
     }
 
-    @SubscribeEvent
-    public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
-        if (evt.player.level().isClientSide) {
+    /**
+     * 着火时每tick回血（玩家Tick事件）
+     */
+    @Override
+    protected void onPlayerTick(@NotNull EnchantmentContext ctx, int level) {
+        LivingEntity entity = ctx.getHolder();
+
+        // 必须处于着火状态
+        if (entity.getRemainingFireTicks() <= 0) {
             return;
         }
 
-        if (evt.phase != TickEvent.Phase.START) {
+        // 必须存活
+        if (!entity.isAlive()) {
             return;
         }
 
-        Player player = evt.player;
-
-        if (EntityUtil.getFire(player) <= 0) {
-            return;
-        }
-
-        if (!player.isAlive()) {
-            return;
-        }
-
-        Enchantment shelterOfFire = EnchantmentRegistry.getEnchantmentByClass(EnchantmentShelterOfFire.class);
-        if (shelterOfFire == null) {
-            return;
-        }
-
-        int totalLevel = 0;
-        for (ItemStack armor : player.getArmorSlots()) {
-            if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(shelterOfFire, armor);
-            }
-        }
-
+        // 手动应用等级限制
+        int effectiveLevel = level;
         if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
+            effectiveLevel = Math.min(effectiveLevel, 10);
         }
 
-        if (totalLevel <= 0) {
-            return;
-        }
-
-        player.heal(player.getMaxHealth() * totalLevel * 0.001f / 20);
+        // 每秒恢复 0.1% × 等级 最大生命值
+        // 每tick恢复 = (maxHealth × 0.001 × level) / 20
+        float healAmount = entity.getMaxHealth() * effectiveLevel * 0.001f / 20.0f;
+        entity.heal(healAmount);
     }
 
     @Override

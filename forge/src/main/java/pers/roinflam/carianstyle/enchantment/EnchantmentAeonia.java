@@ -83,7 +83,8 @@ public class EnchantmentAeonia extends EnchantmentBase {
 
         LivingEntity holder = evt.getEntity();
 
-        ItemStack heldItem = holder.getItemInHand(holder.getUsedItemHand());
+        // 修复：检查主手物品
+        ItemStack heldItem = holder.getMainHandItem();
         if (heldItem.isEmpty()) {
             return;
         }

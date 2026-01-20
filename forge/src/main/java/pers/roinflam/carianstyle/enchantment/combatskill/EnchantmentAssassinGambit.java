@@ -1,5 +1,3 @@
-// 文件：EnchantmentAssassinGambit.java
-// 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentAssassinGambit.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
 import net.minecraft.world.entity.EquipmentSlot;
@@ -19,7 +17,8 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 
 /**
  * 刺客赌局附魔
@@ -71,7 +70,7 @@ public class EnchantmentAssassinGambit extends EnchantmentBase {
         }
 
         // 攻击者视角：隐身状态下增伤
-        if (attacker.hasEffect(CarianStylePotion.STEALTH.get())) {
+        if (DynamicAttributeManager.has(attacker, DynamicAttributes.STEALTH)) {
             ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
             if (!heldItem.isEmpty()) {
                 int level = EnchantmentHelper.getItemEnchantmentLevel(assassinGambit, heldItem);
@@ -81,7 +80,9 @@ public class EnchantmentAssassinGambit extends EnchantmentBase {
                 }
 
                 if (level > 0) {
-                    attacker.removeEffect(CarianStylePotion.STEALTH.get());
+                    // 移除隐身效果
+                    DynamicAttributeManager.remove(attacker, DynamicAttributes.STEALTH);
+                    // 增加伤害
                     evt.setAmount(evt.getAmount() + evt.getAmount() * level * 0.25f);
                 }
             }
@@ -93,10 +94,9 @@ public class EnchantmentAssassinGambit extends EnchantmentBase {
             int level = EnchantmentHelper.getItemEnchantmentLevel(assassinGambit, victimHeldItem);
 
             if (level > 0) {
-                victim.addEffect(new net.minecraft.world.effect.MobEffectInstance(
-                        CarianStylePotion.STEALTH.get(),
-                        level * 20
-                ));
+                // 应用隐身效果
+                DynamicAttributeManager.apply(victim,
+                        DynamicAttributes.STEALTH.createInstance(level * 20));
             }
         }
     }
@@ -120,7 +120,8 @@ public class EnchantmentAssassinGambit extends EnchantmentBase {
 
         Player attacker = evt.getEntity();
 
-        if (!attacker.hasEffect(CarianStylePotion.STEALTH.get())) {
+        // 检查是否拥有隐身效果
+        if (!DynamicAttributeManager.has(attacker, DynamicAttributes.STEALTH)) {
             return;
         }
 
@@ -137,7 +138,9 @@ public class EnchantmentAssassinGambit extends EnchantmentBase {
         int level = EnchantmentHelper.getItemEnchantmentLevel(assassinGambit, heldItem);
 
         if (level > 0) {
-            attacker.removeEffect(CarianStylePotion.STEALTH.get());
+            // 移除隐身效果
+            DynamicAttributeManager.remove(attacker, DynamicAttributes.STEALTH);
+            // 暴击倍率×2
             evt.setDamageModifier(evt.getDamageModifier() * 2);
         }
     }

@@ -51,7 +51,8 @@ public class EnchantmentAncestralSpirits extends EnchantmentBase {
             return;
         }
 
-        if (evt.getSource().isCreativePlayer()) {
+        // 修复：1.20.1 应该检查 BYPASSES_INVULNERABILITY 标签
+        if (evt.getSource().is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) {
             return;
         }
 
@@ -78,10 +79,8 @@ public class EnchantmentAncestralSpirits extends EnchantmentBase {
             evt.setAmount(evt.getAmount() * 0.5f);
         }
 
-        // 持续回血
+        // 持续回血（任何伤害都会触发）
         if (holder.isAlive()) {
-            float healPerTick = (holder.getMaxHealth() - holder.getHealth()) * 0.05f / 20;
-
             new SynchronizationTask(10, 10) {
                 private int tick = 0;
 
@@ -92,13 +91,13 @@ public class EnchantmentAncestralSpirits extends EnchantmentBase {
                         this.cancel();
                         return;
                     }
+                    // 每次 tick 重新计算回血量
+                    float healPerTick = (holder.getMaxHealth() - holder.getHealth()) * 0.05f / 20;
                     holder.heal(healPerTick);
                 }
             }.start();
         }
     }
-
-
 
     @Override
     public int getMinCost(int enchantmentLevel) {

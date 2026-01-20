@@ -101,11 +101,10 @@ public class EnchantmentRepeatingThrust extends EnchantmentBase {
         } else {
             // 新目标：重置叠加层数
             currentStacks = 1;
-            // 更新目标UUID
-            EnchantmentDataManager.setData(currentTargetKey, attackerUUID, victimUUID.toString(), STACK_DURATION);
         }
 
-        // 更新叠加层数并刷新持续时间
+        // ⭐ 修复：统一刷新目标UUID和叠加层数的过期时间
+        EnchantmentDataManager.setData(currentTargetKey, attackerUUID, victimUUID.toString(), STACK_DURATION);
         EnchantmentDataManager.setCounter(stackCountKey, attackerUUID, currentStacks, STACK_DURATION);
 
         // 计算伤害加成：每层 5% × 等级

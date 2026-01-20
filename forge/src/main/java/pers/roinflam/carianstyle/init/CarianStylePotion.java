@@ -5,7 +5,6 @@ import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 import pers.roinflam.carianstyle.potion.*;
-import pers.roinflam.carianstyle.potion.hide.*;
 import pers.roinflam.carianstyle.utils.Reference;
 
 /**
@@ -50,38 +49,4 @@ public class CarianStylePotion {
 
     public static final RegistryObject<MobEffectIncision> INCISION =
             MOB_EFFECTS.register("incision", () -> new MobEffectIncision(false, 0xff2a00));
-
-    // ==================== 隐藏的药水效果 ====================
-
-    public static final RegistryObject<MobEffectDoomedDeath> DOOMED_DEATH =
-            MOB_EFFECTS.register("doomed_death", () -> new MobEffectDoomedDeath(true, 0));
-
-    public static final RegistryObject<MobEffectStealth> STEALTH =
-            MOB_EFFECTS.register("stealth", () -> new MobEffectStealth(false, 0));
-
-    public static final RegistryObject<MobEffectSpeedBoost> SPEED_BOOST =
-            MOB_EFFECTS.register("speed_boost", () -> new MobEffectSpeedBoost(false, 0));
-
-    public static final RegistryObject<MobEffectAttackBoost> ATTACK_BOOST =
-            MOB_EFFECTS.register("attack_boost", () -> new MobEffectAttackBoost(false, 0));
-
-    public static final RegistryObject<MobEffectHowlShabriri> HOWL_SHABRIRI =
-            MOB_EFFECTS.register("howl_shabriri", () -> new MobEffectHowlShabriri(true, 0xe3c600));
-
-    public static final RegistryObject<MobEffectDragoncrestGreatshield> DRAGONCREST_GREATSHIELD =
-            MOB_EFFECTS.register("dragoncrest_greatshield", () -> new MobEffectDragoncrestGreatshield(false, 0));
-
-    public static final RegistryObject<MobEffectCragblade> CRAGBLADE =
-            MOB_EFFECTS.register("cragblade", () -> new MobEffectCragblade(true, 0));
-
-    // ==================== 火焰燃烧效果 ====================
-
-    public static final RegistryObject<MobEffectDoomedDeathBurning> DOOMED_DEATH_BURNING =
-            MOB_EFFECTS.register("doomed_death_burning", () -> new MobEffectDoomedDeathBurning(true, 0));
-
-    public static final RegistryObject<MobEffectDestructionFireBurning> DESTRUCTION_FIRE_BURNING =
-            MOB_EFFECTS.register("destruction_fire_burning", () -> new MobEffectDestructionFireBurning(true, 0));
-
-    public static final RegistryObject<MobEffectEpilepsyFireBurning> EPILEPSY_FIRE_BURNING =
-            MOB_EFFECTS.register("epilepsy_fire_burning", () -> new MobEffectEpilepsyFireBurning(true, 0));
 }

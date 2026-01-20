@@ -87,7 +87,7 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
         LivingEntity holder = evt.getEntity();
         LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
 
-        if (EntityUtil.getFire(holder) <= 0) {
+        if (holder.getRemainingFireTicks() <= 0) {
             return;
         }
 

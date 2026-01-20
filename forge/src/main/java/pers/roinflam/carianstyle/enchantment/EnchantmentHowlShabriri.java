@@ -1,6 +1,5 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -11,7 +10,9 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
@@ -57,31 +58,26 @@ public class EnchantmentHowlShabriri extends EnchantmentBase {
             }
         }
 
-        int currentAmplifier = 0;
-        if (victim.hasEffect(CarianStylePotion.HOWL_SHABRIRI.get())) {
-            MobEffectInstance effect = victim.getEffect(CarianStylePotion.HOWL_SHABRIRI.get());
-            if (effect != null) {
-                currentAmplifier = effect.getAmplifier();
-            }
-        }
+        // 获取当前沙布里里嚎叫等级
+        int currentAmplifier = DynamicAttributeManager.getAmplifier(victim, DynamicAttributes.HOWL_SHABRIRI);
 
         if (currentAmplifier >= 5) {
+            // 满5层，增加伤害
             float bonusDamage = ctx.getDamage() * level * 0.15f;
             ctx.addDamage(bonusDamage);
         }
 
-        victim.addEffect(new MobEffectInstance(
-                CarianStylePotion.HOWL_SHABRIRI.get(),
-                level * 3 * 20,
-                Math.min(currentAmplifier + 1, 5)
-        ));
+        // 叠加沙布里里嚎叫效果（最高5层，amplifier=5）
+        int newAmplifier = currentAmplifier < 0 ? 0 : Math.min(currentAmplifier + 1, 5);
+        DynamicAttributeManager.apply(victim,
+                DynamicAttributes.HOWL_SHABRIRI.createInstance(level * 3 * 20, newAmplifier));
 
+        // 对攻击者造成癫火伤害（创造模式玩家免疫）
         if (!(attacker instanceof Player) || !((Player) attacker).isCreative()) {
-            attacker.addEffect(new MobEffectInstance(
-                    CarianStylePotion.EPILEPSY_FIRE_BURNING.get(),
-                    3 * 20 + 5,
-                    0
-            ));
+            // 应用火焰燃烧效果（需要同步网络）
+            DynamicAttributeManager.apply(attacker,
+                    DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(3 * 20 + 5, 0));
+            ClientSyncEffectHelper.onAttributeApplied(attacker, DynamicAttributes.EPILEPSY_FIRE_BURNING);
 
             new SynchronizationTask(5, 1) {
                 private int tick = 0;

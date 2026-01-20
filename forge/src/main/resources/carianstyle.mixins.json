@@ -4,6 +4,7 @@
   "compatibilityLevel": "JAVA_17",
   "refmap": "carianstyle.refmap.json",
   "mixins": [
+    "MixinEffectModifier",
     "helper.DamageSourceMixin"
   ],
   "client": [

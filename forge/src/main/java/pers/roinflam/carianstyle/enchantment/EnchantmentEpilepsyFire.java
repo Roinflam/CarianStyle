@@ -17,7 +17,9 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
@@ -97,11 +99,10 @@ public class EnchantmentEpilepsyFire extends EnchantmentBase {
 
         // 对攻击者造成癫火伤害（创造模式玩家免疫）
         if (!(attacker instanceof Player) || !((Player) attacker).isCreative()) {
-            attacker.addEffect(new net.minecraft.world.effect.MobEffectInstance(
-                    CarianStylePotion.EPILEPSY_FIRE_BURNING.get(),
-                    BURN_DURATION,
-                    0
-            ));
+            // 应用火焰燃烧效果（需要同步网络）
+            DynamicAttributeManager.apply(attacker,
+                    DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(BURN_DURATION, 0));
+            ClientSyncEffectHelper.onAttributeApplied(attacker, DynamicAttributes.EPILEPSY_FIRE_BURNING);
 
             new SynchronizationTask(5, 1) {
                 private int tick = 0;
@@ -125,11 +126,9 @@ public class EnchantmentEpilepsyFire extends EnchantmentBase {
         }
 
         // 对受击者造成癫火伤害
-        victim.addEffect(new net.minecraft.world.effect.MobEffectInstance(
-                CarianStylePotion.EPILEPSY_FIRE_BURNING.get(),
-                BURN_DURATION,
-                0
-        ));
+        DynamicAttributeManager.apply(victim,
+                DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(BURN_DURATION, 0));
+        ClientSyncEffectHelper.onAttributeApplied(victim, DynamicAttributes.EPILEPSY_FIRE_BURNING);
 
         new SynchronizationTask(5, 1) {
             private int tick = 0;

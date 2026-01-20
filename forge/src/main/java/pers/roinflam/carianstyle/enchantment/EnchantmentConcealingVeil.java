@@ -11,13 +11,14 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 
 /**
  * 隐匿面纱附魔
  * <p>
  * 护甲附魔，潜行时获得隐身效果
- * 攻击后3秒内无法隐身（战斗冷却）
+ * 攻击或受到攻击后3秒内无法隐身（战斗冷却）
  * </p>
  *
  * @author RoinFlam
@@ -59,19 +60,37 @@ public class EnchantmentConcealingVeil extends EnchantmentBase {
     }
 
     /**
+     * 受到攻击时也标记战斗状态（修复受击后立刻隐身的bug）
+     */
+    @Override
+    protected void onHurtAsVictimLowest(@NotNull EnchantmentContext ctx, int level) {
+        if (ctx.isHolderPlayer()) {
+            EnchantmentDataManager.setCooldown(
+                    BATTLE_COOLDOWN_KEY,
+                    ctx.getHolder().getUUID(),
+                    BATTLE_DURATION
+            );
+        }
+    }
+
+    /**
      * 每tick检查潜行状态
      */
     @Override
     protected void onPlayerTick(@NotNull EnchantmentContext ctx, int level) {
+        // 检查是否在潜行
         if (!ctx.getHolderAsPlayer().isShiftKeyDown()) {
             return;
         }
 
+        // 检查是否在战斗冷却中
         if (EnchantmentDataManager.isOnCooldown(BATTLE_COOLDOWN_KEY, ctx.getHolder().getUUID())) {
             return;
         }
 
-        ctx.addPotionToHolder(CarianStylePotion.STEALTH.get(), 2, 0);
+        // 应用隐身效果（持续2 tick）
+        DynamicAttributeManager.apply(ctx.getHolder(),
+                DynamicAttributes.STEALTH.createInstance(2, 0));
     }
 
     @Override

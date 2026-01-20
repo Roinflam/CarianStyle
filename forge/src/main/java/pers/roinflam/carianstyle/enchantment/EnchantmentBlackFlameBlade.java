@@ -10,6 +10,8 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
@@ -42,7 +44,7 @@ public class EnchantmentBlackFlameBlade extends EnchantmentBase {
     }
 
     @Override
-    protected void onDamageAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
+    protected void onHurtAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
         LivingEntity victim = ctx.getVictim();
 
         if (victim == null) {
@@ -55,8 +57,11 @@ public class EnchantmentBlackFlameBlade extends EnchantmentBase {
             effectiveLevel = Math.min(effectiveLevel, 10);
         }
 
-        // 施加灭绝火焰燃烧效果
-        victim.addEffect(new MobEffectInstance(CarianStylePotion.DESTRUCTION_FIRE_BURNING.get(), 5 * 20 + 5, 0));
+        // 使用动态属性系统施加灭绝火焰效果（21tick，会自动同步客户端渲染白色火焰）
+        DynamicAttributeManager.apply(
+                victim,
+                DynamicAttributes.DESTRUCTION_FIRE_BURNING.createInstance( 5 * 20 + 5, 0)
+        );
 
         // 每tick伤害 = 原伤害×等级×0.15/100
         float damagePerTick = ctx.getDamage() * effectiveLevel * 0.15f / 100;

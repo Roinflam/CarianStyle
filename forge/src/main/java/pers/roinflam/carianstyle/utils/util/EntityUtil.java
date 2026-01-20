@@ -131,27 +131,13 @@ public class EntityUtil {
                 blockPos.getX() + x, blockPos.getY() + y, blockPos.getZ() + z
         );
 
-        // 1.20.1使用getEntitiesOfClass方法
-        return level.getEntitiesOfClass(clazz, aabb, predicate);
-    }
-
-    /**
-     * 获取实体的燃烧时间
-     * Get entity's remaining fire ticks
-     *
-     * 使用缓存的反射字段，避免重复查找
-     * Uses cached reflection field to avoid repeated lookups
-     *
-     * @param entity 实体 / entity
-     * @return 燃烧时间（tick），-999表示获取失败 / fire ticks, -999 if failed
-     */
-    public static int getFire(@Nonnull Entity entity) {
-        try {
-            // 1.20.1中Entity类有公开的getRemainingFireTicks()方法
-            return entity.getRemainingFireTicks();
-        } catch (Exception e) {
-            LogUtil.error("无法获取Entity燃烧时间", e);
-            return -999;
+        // 修复：正确处理 null predicate
+        if (predicate == null) {
+            // 使用不带 predicate 的方法
+            return level.getEntitiesOfClass(clazz, aabb);
+        } else {
+            // 使用带 predicate 的方法
+            return level.getEntitiesOfClass(clazz, aabb, predicate);
         }
     }
 }

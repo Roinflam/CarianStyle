@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.enchantment;
 
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
@@ -11,7 +12,6 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
-import net.minecraft.world.effect.MobEffectInstance;
 
 import java.util.List;
 
@@ -45,8 +45,11 @@ public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
+    /**
+     * 修复：改用 Normal 优先级
+     */
     @Override
-    protected void onHurtAsAttackerHighest(@NotNull EnchantmentContext ctx, int level) {
+    protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
         LivingEntity attacker = ctx.getHolder();
         LivingEntity victim = ctx.getVictim();
 

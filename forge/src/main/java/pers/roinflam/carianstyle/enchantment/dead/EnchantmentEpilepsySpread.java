@@ -17,7 +17,9 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
@@ -100,7 +102,11 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
                         for (Entity entity : entities) {
                             LivingEntity entityLivingBase = (LivingEntity) entity;
                             entityLivingBase.playSound(SoundEvents.GHAST_HURT, 1, 1);
-                            entityLivingBase.addEffect(new MobEffectInstance(CarianStylePotion.EPILEPSY_FIRE_BURNING.get(), 3 * 20 + 5, 0));
+
+                            // 应用火焰燃烧效果（需要同步网络）
+                            DynamicAttributeManager.apply(entityLivingBase,
+                                    DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(3 * 20 + 5, 0));
+                            ClientSyncEffectHelper.onAttributeApplied(entityLivingBase, DynamicAttributes.EPILEPSY_FIRE_BURNING);
 
                             new SynchronizationTask(5, 1) {
                                 private int tick = 0;
@@ -115,7 +121,6 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
                                     if (entityLivingBase.equals(hurter)) {
                                         float damage = hurter.getMaxHealth() * 0.3f / 60;
                                         if (hurter.getHealth() - damage * 2 > 0) {
-                                            // 使用真伤系统
                                             EntityLivingUtil.damageHealthDirectly(hurter, damage);
                                         } else {
                                             EnchantmentDataManager.removeData("epilepsy_spread_active", hurter.getUUID());
@@ -125,7 +130,6 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
                                     } else {
                                         float damage = hurter.getMaxHealth() * finalLevel * 0.3f * 2 / 60;
                                         if (entityLivingBase.getHealth() - damage * 2 > 0) {
-                                            // 使用真伤系统
                                             EntityLivingUtil.damageHealthDirectly(entityLivingBase, damage);
                                         } else {
                                             EntityLivingUtil.kill(entityLivingBase, NewDamageSource.epilepsyFire(entityLivingBase.level()));

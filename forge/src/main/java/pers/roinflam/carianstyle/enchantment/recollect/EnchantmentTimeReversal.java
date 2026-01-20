@@ -53,6 +53,12 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
         super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
 
+    /**
+     * 获取实体装备的时间逆转附魔总等级
+     *
+     * @param entity 实体
+     * @return 附魔总等级
+     */
     private static int getTotalLevel(LivingEntity entity) {
         Enchantment timeReversal = EnchantmentRegistry.getEnchantmentByClass(EnchantmentTimeReversal.class);
         if (timeReversal == null) {
@@ -68,6 +74,11 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
         return totalLevel;
     }
 
+    /**
+     * 监听生物死亡事件 - 触发时间逆转
+     *
+     * @param evt 死亡事件
+     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingDeath(@NotNull LivingDeathEvent evt) {
         if (evt.getEntity().level().isClientSide) {
@@ -86,23 +97,26 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
             return;
         }
 
-        if (holder.isDeadOrDying()) {
-            return;
-        }
-
+        // 取消死亡事件
         evt.setCanceled(true);
-        holder.setHealth(1);
 
+        // 保留1点生命值
+        holder.setHealth(1);
+        holder.invulnerableTime = 20;
+
+        // 设置冷却和逆转状态
         EnchantmentDataManager.setCooldown(REVERSAL_COOLDOWN_KEY, uuid, 6000);
         EnchantmentDataManager.setData(REVERSAL_STATE_KEY, uuid, true);
         EnchantmentDataManager.setData(REVERSAL_DAMAGE_KEY, uuid, 0f);
 
+        // 100tick后结束逆转状态
         new SynchronizationTask(100) {
             @Override
             public void run() {
                 if (holder.isAlive()) {
                     Float accumulated = EnchantmentDataManager.getData(REVERSAL_DAMAGE_KEY, uuid);
                     if (accumulated != null) {
+                        // 治疗累积伤害的25%
                         holder.heal(accumulated * 0.25f);
                     }
                 }
@@ -112,6 +126,11 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
         }.start();
     }
 
+    /**
+     * 监听生物受击事件 - 逆转状态下反弹伤害
+     *
+     * @param evt 受击事件
+     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingAttack(@NotNull LivingAttackEvent evt) {
         if (evt.getEntity().level().isClientSide) {
@@ -131,18 +150,22 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
             return;
         }
 
+        // 防止自伤循环
         if (evt.getEntity().equals(evt.getSource().getEntity())) {
             return;
         }
 
+        // 取消伤害
         evt.setCanceled(true);
 
+        // 累积伤害值
         Float accumulated = EnchantmentDataManager.getData(REVERSAL_DAMAGE_KEY, uuid);
         if (accumulated == null) {
             accumulated = 0f;
         }
         EnchantmentDataManager.setData(REVERSAL_DAMAGE_KEY, uuid, accumulated + evt.getAmount());
 
+        // 反弹伤害
         if (evt.getSource().getEntity() instanceof LivingEntity) {
             LivingEntity attacker = (LivingEntity) evt.getSource().getEntity();
             attacker.hurt(evt.getSource(), evt.getAmount());
@@ -157,6 +180,12 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
         return super.checkCompatibility(ench);
     }
 
+    /**
+     * 判断是否为死亡类附魔（互斥）
+     *
+     * @param ench 待检查的附魔
+     * @return 是否为死亡类附魔
+     */
     private boolean isDeadEnchantment(Enchantment ench) {
         return ench instanceof EnchantmentFullMoon || ench instanceof EnchantmentLivingCorpse;
     }

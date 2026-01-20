@@ -21,7 +21,8 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 
 /**
  * 黑焰仪式附魔
@@ -133,7 +134,11 @@ public class EnchantmentBlackFlameRitual extends EnchantmentBase {
         }
 
         if (hasPotion) {
-            holder.addEffect(new MobEffectInstance(CarianStylePotion.DESTRUCTION_FIRE_BURNING.get(), 21, 0));
+            // 使用动态属性系统施加灭绝火焰效果（21tick，会自动同步客户端渲染白色火焰）
+            DynamicAttributeManager.apply(
+                    holder,
+                    DynamicAttributes.DESTRUCTION_FIRE_BURNING.createInstance(21, 0)
+            );
             holder.setHealth(holder.getHealth() * 0.95f);
         }
     }

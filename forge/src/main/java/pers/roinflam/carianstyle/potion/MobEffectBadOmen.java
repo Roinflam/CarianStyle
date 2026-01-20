@@ -9,9 +9,11 @@ import net.minecraftforge.event.entity.living.LivingHealEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
+import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
@@ -26,6 +28,7 @@ import javax.annotation.Nonnull;
  * - 治疗量减少50%
  * </p>
  */
+@Mod.EventBusSubscriber
 public class MobEffectBadOmen extends IconBase {
 
     public MobEffectBadOmen(boolean isBadEffectIn, int liquidColorIn) {
@@ -49,13 +52,13 @@ public class MobEffectBadOmen extends IconBase {
      * 受到伤害增加25%
      */
     @SubscribeEvent(priority = EventPriority.LOW)
-    public void onLivingHurt(@Nonnull LivingHurtEvent evt) {
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;
         }
 
         LivingEntity victim = evt.getEntity();
-        if (victim.hasEffect(this)) {
+        if (victim.hasEffect(CarianStylePotion.BAD_OMEN.get())) {
             evt.setAmount(evt.getAmount() * 1.25f);
         }
     }
@@ -64,13 +67,13 @@ public class MobEffectBadOmen extends IconBase {
      * 治疗量减少50%
      */
     @SubscribeEvent(priority = EventPriority.LOW)
-    public void onLivingHeal(@Nonnull LivingHealEvent evt) {
+    public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;
         }
 
         LivingEntity healer = evt.getEntity();
-        if (healer.hasEffect(this)) {
+        if (healer.hasEffect(CarianStylePotion.BAD_OMEN.get())) {
             evt.setAmount(evt.getAmount() * 0.5f);
         }
     }

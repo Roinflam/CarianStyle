@@ -10,7 +10,6 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentDoomedDeath;
-import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 /**
@@ -18,8 +17,8 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
  * <p>
  * 武器附魔，魔法伤害增强
  * 造成魔法伤害时：
- * - 取消原伤害
- * - 改为造成波石魔法伤害（原伤害 × 1.5）
+ * - 伤害增加50%
+ * - 移除魔法标签（变为波石魔法）
  * </p>
  *
  * @author RoinFlam
@@ -39,8 +38,11 @@ public class EnchantmentWaveStoneMagic extends EnchantmentBase {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
+    /**
+     * 修复：改用 High 优先级，在 Normal 之后执行
+     */
     @Override
-    protected void onHurtAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
+    protected void onHurtAsAttackerHigh(@NotNull EnchantmentContext ctx, int level) {
         if (ctx.getDamageSource() == null || !DamageSourceUtil.isMagicDamage(ctx.getDamageSource())) {
             return;
         }
@@ -50,14 +52,11 @@ public class EnchantmentWaveStoneMagic extends EnchantmentBase {
             return;
         }
 
-        float originalDamage = ctx.getDamage();
+        // 伤害提升50%
+        ctx.multiplyDamage(1.5f);
 
-        ctx.cancelEvent();
-
-        victim.invulnerableTime = 10;
-
-        victim.hurt(NewDamageSource.waveStoneMagic(victim.level(), ctx.getHolder()),
-                originalDamage + originalDamage * 0.5f);
+        // 移除魔法标签（改为波石魔法，不再是普通魔法）
+        DamageSourceUtil.removeTag(ctx.getDamageSource(), net.minecraft.tags.DamageTypeTags.WITCH_RESISTANT_TO);
     }
 
     @Override

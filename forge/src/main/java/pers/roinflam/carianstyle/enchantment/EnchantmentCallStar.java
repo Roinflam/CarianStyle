@@ -55,6 +55,22 @@ public class EnchantmentCallStar extends EnchantmentBase {
         super(EnchantmentCategory.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
+    /**
+     * 判断是否为夜晚
+     *
+     * @param level 世界
+     * @return 如果是夜晚返回true
+     */
+    private static boolean isNightTime(@NotNull Level level) {
+        // 获取世界时间（0-24000循环）
+        long dayTime = level.getDayTime() % 24000;
+
+        // 夜晚时间：13000-23000
+        // 12000是日落开始，13000完全黑暗
+        // 23000是日出开始，0是完全白天
+        return dayTime >= 13000 && dayTime < 23000;
+    }
+
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onProjectileImpact_Arrow(@NotNull ProjectileImpactEvent evt) {
         if (evt.getEntity().level().isClientSide) {
@@ -101,6 +117,7 @@ public class EnchantmentCallStar extends EnchantmentBase {
 
         final int effectiveLevel = level;
 
+        // 第一阶段：吸引周围敌人（击退）
         List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 arrow,
@@ -115,9 +132,11 @@ public class EnchantmentCallStar extends EnchantmentBase {
             entity.knockback(strength, x, z);
         }
 
+        // 第二阶段：延迟后召唤闪电
         new SynchronizationTask(20) {
             @Override
             public void run() {
+                // 重新获取目标列表（因为延迟了20tick，目标可能已移动）
                 List<LivingEntity> targets = EntityUtil.getNearbyEntities(
                         LivingEntity.class,
                         arrow,
@@ -129,6 +148,7 @@ public class EnchantmentCallStar extends EnchantmentBase {
                     for (LivingEntity target : targets) {
                         Level world = target.level();
 
+                        // 召唤视觉闪电效果
                         if (world instanceof ServerLevel serverLevel) {
                             LightningBolt lightning = EntityType.LIGHTNING_BOLT.create(serverLevel);
                             if (lightning != null) {
@@ -138,14 +158,16 @@ public class EnchantmentCallStar extends EnchantmentBase {
                             }
                         }
 
-                        int magnification = 1;
-                        if (!world.isDay()) {
-                            magnification = 3;
-                        }
+                        // 计算伤害倍率（夜晚×3）
+                        int magnification = isNightTime(world) ? 3 : 1;
 
-                        float damage = (float) (arrow.getBaseDamage() * effectiveLevel * 0.3 * magnification);
+                        // 计算伤害：箭基础伤害 × 等级 × 0.3 × 倍率
+                        float baseDamage = (float) arrow.getBaseDamage();
+                        float damage = baseDamage * effectiveLevel * 0.3f * magnification;
+
                         target.hurt(target.damageSources().lightningBolt(), damage);
 
+                        // 如果目标在地面上，施加小幅击退
                         if (target.onGround()) {
                             double x = RandomUtils.nextBoolean() ? arrow.getX() - target.getX() : target.getX() - arrow.getX();
                             double z = RandomUtils.nextBoolean() ? arrow.getZ() - target.getZ() : target.getZ() - arrow.getZ();
@@ -153,6 +175,7 @@ public class EnchantmentCallStar extends EnchantmentBase {
                         }
                     }
                 } else {
+                    // 如果没有目标，在箭矢位置召唤闪电效果
                     Level world = arrow.level();
                     if (world instanceof ServerLevel serverLevel) {
                         LightningBolt lightning = EntityType.LIGHTNING_BOLT.create(serverLevel);
