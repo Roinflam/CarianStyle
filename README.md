@@ -3,11 +3,12 @@
 # ⚔️ CarianStyle | 卡利亚式
 
 [![CurseForge Downloads](https://cf.way2muchnoise.eu/full_carianstyle_downloads.svg?badge_style=for_the_badge)](https://www.curseforge.com/minecraft/mc-mods/carianstyle)
-[![MC Version](https://img.shields.io/badge/Minecraft-1.20.1-brightgreen?style=for_the_badge&logo=minecraft)](https://minecraft.net)
-[![Forge](https://img.shields.io/badge/Forge-Latest-orange?style=for_the_badge)](https://files.minecraftforge.net/)
+[![MC Version](https://img.shields.io/badge/Minecraft-1.20.1-brightgreen?style=for-the-badge&logo=minecraft)](https://minecraft.net)
+[![MC Version](https://img.shields.io/badge/Minecraft-1.20.1-brightgreen?style=for-the-badge&logo=minecraft)](https://minecraft.net)
+[![Forge](https://img.shields.io/badge/Forge-Latest-orange?style=for-the-badge)](https://files.minecraftforge.net/)
 
-[![GitHub](https://img.shields.io/badge/GitHub-Roinflam-181717?style=for_the_badge&logo=github)](https://github.com/Roinflam)
-[![Bilibili](https://img.shields.io/badge/Bilibili-@Roinflam-00A1D6?style=for_the_badge&logo=bilibili)](https://space.bilibili.com/285030707/)
+[![GitHub](https://img.shields.io/badge/GitHub-Roinflam-181717?style=for-the-badge&logo=github)](https://github.com/Roinflam)
+[![Bilibili](https://img.shields.io/badge/Bilibili-@Roinflam-00A1D6?style=for-the-badge&logo=bilibili)](https://space.bilibili.com/285030707/)
 
 ---
 
