@@ -65,7 +65,7 @@ public class CarianStyle {
 
             // 扫描并注册所有带注解的附魔
             LogUtil.info("卡利亚式附魔 - 正在扫描并注册附魔");
-            EnchantmentRegistry.scanAndRegister("pers.roinflam.carianstyle.enchantment");
+            EnchantmentRegistry.scanAndRegister(evt.getAsmData());
             LogUtil.debug("卡利亚式附魔 - 附魔扫描注册完成");
 
             // 注册网络通信处理器
