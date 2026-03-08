@@ -40,13 +40,46 @@ public @interface AutoRegisterEnchantment {
 
     /**
      * 附魔可应用的附魔类型（原版）
+     * <p>
      * 1.20.1使用原版的EnchantmentCategory
+     * 默认值为 BREAKABLE，适用于大多数可损坏物品
+     * </p>
+     * <p>
+     * ⚠️ 如果需要使用自定义类型（如SHIELD、ARMS、PICKAXE等），
+     * 请使用 customType() 参数，不要使用此参数
+     * </p>
      */
-    EnchantmentCategory type() default EnchantmentCategory.WEAPON;
+    EnchantmentCategory type() default EnchantmentCategory.BREAKABLE;
+
+    /**
+     * 自定义附魔类型的字符串标识符
+     * <p>
+     * 用于指定在 CarianStyleEnchantments 中定义的自定义附魔类型
+     * </p>
+     * <p>
+     * 可选值：
+     * <ul>
+     *   <li>"SHIELD" - 盾牌类型（对应 CarianStyleEnchantments.SHIELD）</li>
+     *   <li>"ARMS" - 武器类型，剑+弓（对应 CarianStyleEnchantments.ARMS）</li>
+     *   <li>"PICKAXE" - 镐子类型（对应 CarianStyleEnchantments.PICKAXE）</li>
+     *   <li>"" (空字符串) - 不使用自定义类型，使用 type() 参数指定的原版类型</li>
+     * </ul>
+     * </p>
+     * <p>
+     * ⚠️ 注意：customType 和 type 只能二选一使用
+     * <ul>
+     *   <li>如果 customType 不为空，则使用自定义类型，忽略 type 参数</li>
+     *   <li>如果 customType 为空，则使用 type 参数指定的原版类型</li>
+     * </ul>
+     * </p>
+     */
+    String customType() default "";
 
     /**
      * 附魔可应用的装备槽位
+     * <p>
      * 1.20.1使用EquipmentSlot代替EntityEquipmentSlot
+     * </p>
      */
     EquipmentSlot[] slots() default {EquipmentSlot.MAINHAND};
 

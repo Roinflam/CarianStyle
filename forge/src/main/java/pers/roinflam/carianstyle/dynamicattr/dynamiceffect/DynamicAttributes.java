@@ -2,7 +2,6 @@ package pers.roinflam.carianstyle.dynamicattr.dynamiceffect;
 
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.AABB;
@@ -78,19 +77,7 @@ public class DynamicAttributes {
             .addModifier(Attributes.KNOCKBACK_RESISTANCE, 0.1, AttributeModifier.Operation.MULTIPLY_TOTAL)
             .addModifier(Attributes.ARMOR, 0.1, AttributeModifier.Operation.MULTIPLY_TOTAL)
             .addModifier(Attributes.ARMOR_TOUGHNESS, 0.1, AttributeModifier.Operation.MULTIPLY_TOTAL)
-            .withEventHandler(entity -> new Object() {
-                private final UUID boundEntityId = entity.getUUID();
-
-                @SubscribeEvent
-                public void onLivingUpdate(LivingEvent.LivingTickEvent event) {
-                    if (!event.getEntity().getUUID().equals(boundEntityId)) return;
-
-                    LivingEntity livingEntity = event.getEntity();
-                    if (DynamicAttributeManager.has(livingEntity, DynamicAttributes.CRAGBLADE)) {
-                        EntityLivingUtil.setJumped(livingEntity);
-                    }
-                }
-            });
+            .withEventHandler(CragbladeEventHandler::new);
 
     // ========== 负面效果 ==========
 
@@ -110,22 +97,7 @@ public class DynamicAttributes {
     public static final DynamicAttribute HOWL_SHABRIRI = new DynamicAttribute("carianstyle_howl_shabriri")
             .addModifier(Attributes.ARMOR, -0.15, AttributeModifier.Operation.MULTIPLY_TOTAL)
             .addModifier(Attributes.ARMOR_TOUGHNESS, -0.15, AttributeModifier.Operation.MULTIPLY_TOTAL)
-            .withEventHandler(entity -> new Object() {
-                private final UUID boundEntityId = entity.getUUID();
-
-                @SubscribeEvent(priority = EventPriority.LOW)
-                public void onHeal(LivingHealEvent event) {
-                    if (!event.getEntity().getUUID().equals(boundEntityId)) return;
-                    if (event.getEntity().level().isClientSide()) return;
-
-                    int level = DynamicAttributeManager.getAmplifier((LivingEntity) event.getEntity(),
-                            DynamicAttributes.HOWL_SHABRIRI);
-                    if (level < 0) return;
-
-                    float reduction = (level + 1) * 0.1f;
-                    event.setAmount(event.getAmount() * (1 - reduction));
-                }
-            });
+            .withEventHandler(HowlShabririEventHandler::new);
 
     // ========== 隐身效果 ==========
 
@@ -137,7 +109,7 @@ public class DynamicAttributes {
      * - 客户端同步渲染：序列号4
      */
     public static final DynamicAttribute STEALTH = new DynamicAttribute("carianstyle_stealth")
-            .withEventHandler(entity -> new StealthEventHandler(entity));
+            .withEventHandler(StealthEventHandler::new);
 
     // ========== 火焰燃烧效果 ==========
 
@@ -159,20 +131,7 @@ public class DynamicAttributes {
      * - 火焰渲染：黄色火焰（序列号3）
      */
     public static final DynamicAttribute EPILEPSY_FIRE_BURNING = new DynamicAttribute("carianstyle_epilepsy_fire_burning")
-            .withEventHandler(entity -> new Object() {
-                private final UUID boundEntityId = entity.getUUID();
-
-                @SubscribeEvent(priority = EventPriority.LOW)
-                public void onHeal(LivingHealEvent event) {
-                    if (!event.getEntity().getUUID().equals(boundEntityId)) return;
-                    if (event.getEntity().level().isClientSide()) return;
-
-                    if (DynamicAttributeManager.has((LivingEntity) event.getEntity(),
-                            DynamicAttributes.EPILEPSY_FIRE_BURNING)) {
-                        event.setAmount(event.getAmount() * 0.1f);
-                    }
-                }
-            });
+            .withEventHandler(EpilepsyFireEventHandler::new);
 
     // ========== 静态初始化：注册需要客户端同步的属性 ==========
 
@@ -204,7 +163,77 @@ public class DynamicAttributes {
                 .onRemoved(ClientSyncEffectHelper::onAttributeRemoved);
     }
 
-    // ========== 内部类：隐身效果处理器 ==========
+    // ========== 命名内部类：事件处理器 ==========
+
+    /**
+     * 岩石剑效果的事件处理器
+     * 阻止实体跳跃
+     */
+    private static class CragbladeEventHandler {
+        private final UUID boundEntityId;
+
+        public CragbladeEventHandler(LivingEntity entity) {
+            this.boundEntityId = entity.getUUID();
+        }
+
+        @SubscribeEvent
+        public void onLivingUpdate(LivingEvent.LivingTickEvent event) {
+            if (!event.getEntity().getUUID().equals(boundEntityId)) return;
+
+            LivingEntity livingEntity = event.getEntity();
+            if (DynamicAttributeManager.has(livingEntity, DynamicAttributes.CRAGBLADE)) {
+                EntityLivingUtil.setJumped(livingEntity);
+            }
+        }
+    }
+
+    /**
+     * 沙布里里的嚎叫效果的事件处理器
+     * 减少治疗量
+     */
+    private static class HowlShabririEventHandler {
+        private final UUID boundEntityId;
+
+        public HowlShabririEventHandler(LivingEntity entity) {
+            this.boundEntityId = entity.getUUID();
+        }
+
+        @SubscribeEvent(priority = EventPriority.LOW)
+        public void onHeal(LivingHealEvent event) {
+            if (!event.getEntity().getUUID().equals(boundEntityId)) return;
+            if (event.getEntity().level().isClientSide()) return;
+
+            int level = DynamicAttributeManager.getAmplifier((LivingEntity) event.getEntity(),
+                    DynamicAttributes.HOWL_SHABRIRI);
+            if (level < 0) return;
+
+            float reduction = (level + 1) * 0.1f;
+            event.setAmount(event.getAmount() * (1 - reduction));
+        }
+    }
+
+    /**
+     * 癫痫火焰燃烧效果的事件处理器
+     * 大幅减少治疗量(90%)
+     */
+    private static class EpilepsyFireEventHandler {
+        private final UUID boundEntityId;
+
+        public EpilepsyFireEventHandler(LivingEntity entity) {
+            this.boundEntityId = entity.getUUID();
+        }
+
+        @SubscribeEvent(priority = EventPriority.LOW)
+        public void onHeal(LivingHealEvent event) {
+            if (!event.getEntity().getUUID().equals(boundEntityId)) return;
+            if (event.getEntity().level().isClientSide()) return;
+
+            if (DynamicAttributeManager.has((LivingEntity) event.getEntity(),
+                    DynamicAttributes.EPILEPSY_FIRE_BURNING)) {
+                event.setAmount(event.getAmount() * 0.1f);
+            }
+        }
+    }
 
     /**
      * 隐身效果的事件处理器

@@ -40,7 +40,7 @@ import java.util.List;
         id = "holy_ground",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
         rarity = EnchantmentRarity.RARE,
-        type = EnchantmentCategory.BREAKABLE,
+        customType = "SHIELD",
         slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND}
 )
 @Mod.EventBusSubscriber

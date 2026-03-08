@@ -30,7 +30,7 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
         id = "immutable_shield",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.RARE,
-        type = EnchantmentCategory.BREAKABLE,
+        customType = "SHIELD",
         slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND}
 )
 public class EnchantmentImmutableShield extends EnchantmentBase {

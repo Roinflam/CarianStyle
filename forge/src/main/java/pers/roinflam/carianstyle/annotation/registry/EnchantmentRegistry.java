@@ -1,18 +1,19 @@
 package pers.roinflam.carianstyle.annotation.registry;
 
 import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.forgespi.language.ModFileScanData;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.objectweb.asm.Type;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
+import java.lang.reflect.Constructor;
 import java.util.*;
 
 /**
@@ -116,10 +117,13 @@ public class EnchantmentRegistry {
 
             LogUtil.debug("卡利亚式附魔 - 正在注册：%s", annotation.id());
 
-            // 创建附魔实例
-            Enchantment enchantment = enchantmentClass.getDeclaredConstructor().newInstance();
+            // ⭐ 解析 EnchantmentCategory
+            EnchantmentCategory category = resolveEnchantmentCategory(annotation);
 
-            // ⭐ 关键修改：通过 DeferredRegister 注册到游戏
+            // ⭐ 使用正确的 EnchantmentCategory 创建附魔实例
+            Enchantment enchantment = createEnchantmentInstance(enchantmentClass, annotation, category);
+
+            // 通过 DeferredRegister 注册到游戏
             CarianStyleEnchantments.registerEnchantment(annotation.id(), enchantment);
 
             // 存储到本地缓存（用于查询）
@@ -144,12 +148,107 @@ public class EnchantmentRegistry {
     }
 
     /**
+     * 解析注解中的 EnchantmentCategory
+     * <p>
+     * 优先使用 customType，如果为空则使用 type
+     * </p>
+     *
+     * @param annotation 附魔注解
+     * @return 解析后的 EnchantmentCategory
+     * @throws IllegalArgumentException 如果 customType 无效
+     */
+    private static EnchantmentCategory resolveEnchantmentCategory(@NotNull AutoRegisterEnchantment annotation) {
+        String customType = annotation.customType();
+
+        // 情况1：使用了自定义类型（customType 不为空）
+        if (customType != null && !customType.isEmpty()) {
+            EnchantmentCategory category = CarianStyleEnchantments.getCustomEnchantmentCategory(customType);
+
+            if (category == null) {
+                throw new IllegalArgumentException(
+                        String.format("未知的自定义附魔类型: %s (附魔ID: %s)。" +
+                                        "可用类型: SHIELD, ARMS, PICKAXE",
+                                customType, annotation.id())
+                );
+            }
+
+            LogUtil.debug("卡利亚式附魔 - 使用自定义类型：%s -> %s", customType, category);
+            return category;
+        }
+
+        // 情况2：使用原版类型（customType 为空）
+        EnchantmentCategory category = annotation.type();
+        LogUtil.debug("卡利亚式附魔 - 使用原版类型：%s", category);
+        return category;
+    }
+
+    /**
+     * 创建附魔实例
+     * <p>
+     * 尝试多种构造函数签名以兼容不同的附魔类实现
+     * </p>
+     *
+     * @param enchantmentClass 附魔类
+     * @param annotation 附魔注解
+     * @param category 附魔类型
+     * @return 附魔实例
+     * @throws Exception 如果创建失败
+     */
+    private static Enchantment createEnchantmentInstance(
+            @NotNull Class<? extends EnchantmentBase> enchantmentClass,
+            @NotNull AutoRegisterEnchantment annotation,
+            @NotNull EnchantmentCategory category
+    ) throws Exception {
+
+        // 尝试1：无参构造函数（最常见）
+        try {
+            Constructor<? extends EnchantmentBase> constructor = enchantmentClass.getDeclaredConstructor();
+            constructor.setAccessible(true);
+            Enchantment enchantment = constructor.newInstance();
+
+            // 如果附魔类支持后期设置 category，这里可以调用
+            // 目前使用构造函数中硬编码的方式，所以这里不做处理
+            LogUtil.debug("卡利亚式附魔 - 使用无参构造函数创建：%s", enchantmentClass.getSimpleName());
+
+            return enchantment;
+
+        } catch (NoSuchMethodException e) {
+            // 没有无参构造函数，尝试其他方式
+            LogUtil.debug("卡利亚式附魔 - 类 %s 没有无参构造函数，尝试其他构造函数", enchantmentClass.getSimpleName());
+        }
+
+        // 尝试2：(EnchantmentCategory, EquipmentSlot[]) 构造函数
+        try {
+            Constructor<? extends EnchantmentBase> constructor = enchantmentClass.getDeclaredConstructor(
+                    EnchantmentCategory.class,
+                    net.minecraft.world.entity.EquipmentSlot[].class
+            );
+            constructor.setAccessible(true);
+
+            Enchantment enchantment = constructor.newInstance(category, annotation.slots());
+            LogUtil.debug("卡利亚式附魔 - 使用 (EnchantmentCategory, EquipmentSlot[]) 构造函数创建：%s",
+                    enchantmentClass.getSimpleName());
+
+            return enchantment;
+
+        } catch (NoSuchMethodException e) {
+            // 没有找到合适的构造函数
+            throw new IllegalStateException(
+                    String.format("附魔类 %s 必须提供以下构造函数之一：\n" +
+                                    "1. 无参构造函数\n" +
+                                    "2. (EnchantmentCategory, EquipmentSlot[]) 构造函数",
+                            enchantmentClass.getSimpleName())
+            );
+        }
+    }
+
+    /**
      * 将附魔添加到对应分类列表
      *
      * @param registration 附魔注册信息
      */
     private static void addToCategory(@NotNull EnchantmentRegistration registration) {
-        EnchantmentCategory category = registration.annotation.category();
+        pers.roinflam.carianstyle.annotation.EnchantmentCategory category = registration.annotation.category();
         Enchantment enchantment = registration.enchantment;
 
         switch (category) {

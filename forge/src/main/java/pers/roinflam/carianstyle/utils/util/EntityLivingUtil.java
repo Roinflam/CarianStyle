@@ -23,61 +23,41 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class EntityLivingUtil {
 
-    // ========== 真伤系统的缓存 / True Damage System Cache ==========
+    // ========== 真伤系统的缓存 ==========
 
     /**
      * 缓存：实体类 -> 血量处理信息
-     * Cache: Entity Class -> Health Handling Info
      */
     private static final Map<Class<?>, HealthFieldInfo> HEALTH_FIELD_CACHE = new ConcurrentHashMap<>();
 
     /**
      * 血量处理方式枚举
-     * Health Handling Method Enum
      */
     private enum DamageMethod {
-        /**
-         * 普通setHealth方法有效
-         * Standard setHealth method works
-         */
+        /** 普通setHealth方法有效 */
         SET_HEALTH,
-
-        /**
-         * 需要使用原版DATA_HEALTH_ID字段
-         * Needs to use vanilla DATA_HEALTH_ID field
-         */
+        /** 需要使用原版DATA_HEALTH_ID字段（预留） */
         VANILLA_FIELD,
-
-        /**
-         * 需要使用自定义查找的字段
-         * Needs to use custom-found field
-         */
+        /** 需要使用暴力查找的字段 */
         CUSTOM_FIELD
     }
 
     /**
      * 血量字段信息
-     * Health Field Information
      */
     private static class HealthFieldInfo {
         final DamageMethod method;
         final EntityDataAccessor<?> accessor;
         final boolean isFloat;
 
-        /**
-         * 构造函数 - SET_HEALTH方式
-         * Constructor for SET_HEALTH method
-         */
+        /** 构造函数 - SET_HEALTH方式 */
         HealthFieldInfo() {
             this.method = DamageMethod.SET_HEALTH;
             this.accessor = null;
             this.isFloat = false;
         }
 
-        /**
-         * 构造函数 - VANILLA_FIELD或CUSTOM_FIELD方式
-         * Constructor for VANILLA_FIELD or CUSTOM_FIELD method
-         */
+        /** 构造函数 - VANILLA_FIELD或CUSTOM_FIELD方式 */
         HealthFieldInfo(DamageMethod method, EntityDataAccessor<?> accessor, boolean isFloat) {
             this.method = method;
             this.accessor = accessor;
@@ -85,11 +65,12 @@ public class EntityLivingUtil {
         }
     }
 
+    // ========== 跳跃 / 物品使用 ==========
+
     /**
      * 设置实体已跳跃状态（阻止连续跳跃）
-     * Set entity jumped state (prevent continuous jumping)
      *
-     * @param livingEntity 生物实体 / Living entity
+     * @param livingEntity 生物实体
      */
     public static void setJumped(@Nonnull LivingEntity livingEntity) {
         ReflectionCache.setJumpTicks(livingEntity, 10);
@@ -97,10 +78,9 @@ public class EntityLivingUtil {
 
     /**
      * 加速物品使用进度
-     * Accelerate item use progress
      *
-     * @param livingEntity 生物实体 / Living entity
-     * @param ticks        要加速的tick数 / Ticks to accelerate
+     * @param livingEntity 生物实体
+     * @param ticks        要加速的tick数
      */
     public static void accelerateItemUse(@Nonnull LivingEntity livingEntity, int ticks) {
         ReflectionCache.reduceUseItemRemaining(livingEntity, ticks);
@@ -108,9 +88,8 @@ public class EntityLivingUtil {
 
     /**
      * 更新手持物品使用状态
-     * Update held item use state
      *
-     * @param livingEntity 生物实体 / Living entity
+     * @param livingEntity 生物实体
      */
     public static void updateHeld(@Nonnull LivingEntity livingEntity) {
         ReflectionCache.invokeUpdatingUsingItem(livingEntity);
@@ -118,10 +97,9 @@ public class EntityLivingUtil {
 
     /**
      * 强制杀死实体
-     * Force kill entity
      *
-     * @param livingEntity 要杀死的实体 / Entity to kill
-     * @param damageSource 伤害源 / Damage source
+     * @param livingEntity 要杀死的实体
+     * @param damageSource 伤害源
      */
     public static void kill(@Nullable LivingEntity livingEntity, @Nonnull DamageSource damageSource) {
         if (livingEntity != null && livingEntity.isAlive()) {
@@ -130,18 +108,19 @@ public class EntityLivingUtil {
         }
     }
 
+    // ========== 真伤系统 ==========
+
     /**
-     * 真伤扣血 - 根据配置选择处理方式
-     * True damage - Choose handling method based on config
+     * 真伤扣血 - 三步优化策略
      *
-     * 如果启用高级真伤系统：使用三步优化策略
-     * If advanced true damage enabled: Use three-step optimization strategy
+     * 步骤1：优先尝试setHealth，检查是否生效
+     * 步骤2：如果setHealth无效，暴力查找SynchedEntityData中真实血量字段
+     * 步骤3：所有方法失败则降级回setHealth
      *
-     * 如果禁用高级真伤系统：直接使用setHealth
-     * If advanced true damage disabled: Use setHealth directly
+     * 结果按实体类缓存，同类实体第二次起直接走缓存
      *
-     * @param entity 目标实体 / Target entity
-     * @param damage 伤害值 / Damage amount
+     * @param entity 目标实体
+     * @param damage 伤害值
      */
     @SuppressWarnings("unchecked")
     public static void damageHealthDirectly(LivingEntity entity, float damage) {
@@ -149,40 +128,36 @@ public class EntityLivingUtil {
             return;
         }
 
-        // 计算目标血量 / Calculate target health
+        // 计算目标血量
         float currentHealth = entity.getHealth();
         float targetHealth = Math.max(0.0F, currentHealth - damage);
 
-        // 检查配置开关 / Check config toggle
+        // 配置关闭时直接用setHealth
         if (!ConfigLoader.enableTrueDamage) {
-            // 使用简单的setHealth方式 / Use simple setHealth method
             entity.setHealth(targetHealth);
             return;
         }
 
-        // 使用高级真伤系统 / Use advanced true damage system
-        // 检查缓存 / Check cache
+        // 检查缓存
         HealthFieldInfo cachedInfo = HEALTH_FIELD_CACHE.get(entity.getClass());
 
         if (cachedInfo != null) {
-            // 有缓存，直接使用缓存的方式 / Cache exists, use cached method
             applyDamageWithCachedInfo(entity, targetHealth, cachedInfo);
             return;
         }
 
-        // 无缓存，开始三步测试 / No cache, start three-step testing
+        // 无缓存，开始发现流程
         HealthFieldInfo discoveredInfo = discoverHealthHandlingMethod(entity, currentHealth, targetHealth);
-
-        // 缓存结果 / Cache result
         HEALTH_FIELD_CACHE.put(entity.getClass(), discoveredInfo);
-
-        // 应用伤害 / Apply damage
         applyDamageWithCachedInfo(entity, targetHealth, discoveredInfo);
     }
 
     /**
-     * 真伤扣血（带DamageSource）
-     * True damage with DamageSource
+     * 真伤扣血（带DamageSource，血量归零时触发die）
+     *
+     * @param entity 目标实体
+     * @param damage 伤害值
+     * @param source 伤害源
      */
     public static void damageHealthDirectly(@Nonnull LivingEntity entity, float damage, @Nonnull DamageSource source) {
         damageHealthDirectly(entity, damage);
@@ -194,7 +169,10 @@ public class EntityLivingUtil {
 
     /**
      * 使用缓存的信息应用伤害
-     * Apply damage using cached information
+     *
+     * @param entity       目标实体
+     * @param targetHealth 目标血量
+     * @param info         缓存的血量处理信息
      */
     @SuppressWarnings("unchecked")
     private static void applyDamageWithCachedInfo(LivingEntity entity, float targetHealth, HealthFieldInfo info) {
@@ -218,27 +196,25 @@ public class EntityLivingUtil {
             }
         } catch (Exception e) {
             LogUtil.error("应用伤害失败: " + entity.getName().getString() + " (方式: " + info.method + ")", e);
-            // 降级处理 / Fallback
+            // 降级处理
             entity.setHealth(targetHealth);
         }
     }
 
     /**
      * 三步测试：发现实体的血量处理方式
-     * Three-step testing: Discover entity's health handling method
      *
-     * @param entity        实体 / Entity
-     * @param currentHealth 当前血量 / Current health
-     * @param targetHealth  目标血量 / Target health
-     * @return 血量处理信息 / Health handling info
+     * @param entity        实体
+     * @param currentHealth 当前血量
+     * @param targetHealth  目标血量
+     * @return 血量处理信息
      */
-    @SuppressWarnings("unchecked")
     private static HealthFieldInfo discoverHealthHandlingMethod(
             LivingEntity entity, float currentHealth, float targetHealth) {
 
         String entityName = entity.getClass().getSimpleName();
 
-        // ========== 步骤1：测试setHealth / Step 1: Test setHealth ==========
+        // 步骤1：测试setHealth
         LogUtil.debug("[真伤系统] 步骤1：测试 " + entityName + " 的 setHealth 方法");
 
         try {
@@ -250,14 +226,14 @@ public class EntityLivingUtil {
                 return new HealthFieldInfo();
             }
 
-            // setHealth无效，恢复血量 / setHealth failed, restore health
+            // setHealth无效，恢复血量
             entity.setHealth(currentHealth);
             LogUtil.debug("[真伤系统] " + entityName + " 的 setHealth 无效，进入步骤2");
         } catch (Exception e) {
             LogUtil.error("[真伤系统] " + entityName + " 测试 setHealth 时出错", e);
         }
 
-        // ========== 步骤2：暴力查找 / Step 2: Brute-force search ==========
+        // 步骤2：暴力查找
         LogUtil.debug("[真伤系统] 步骤2：暴力查找 " + entityName + " 的真实血量字段");
 
         HealthFieldInfo customFieldInfo = bruteForceFindHealthField(entity, currentHealth);
@@ -267,21 +243,28 @@ public class EntityLivingUtil {
             return customFieldInfo;
         }
 
-        // 所有方法都失败，降级为SET_HEALTH / All methods failed, fallback to SET_HEALTH
+        // 步骤3：所有方法失败，降级
         LogUtil.warn("[真伤系统] " + entityName + " 所有方法都失败，降级为 SET_HEALTH");
         return new HealthFieldInfo();
     }
 
     /**
      * 暴力查找实体真正的血量字段
-     * Brute-force search for entity's real health field
+     *
+     * 反射拿到SynchedEntityData内部的itemsById映射，
+     * 遍历所有Float/Double类型字段，匹配当前血量值，
+     * 再通过临时赋值验证getHealth()是否同步，确认后缓存该accessor
+     *
+     * @param entity        实体
+     * @param currentHealth 当前血量
+     * @return 血量处理信息，失败返回null
      */
     @SuppressWarnings("unchecked")
     private static HealthFieldInfo bruteForceFindHealthField(LivingEntity entity, float currentHealth) {
         try {
             SynchedEntityData entityData = entity.getEntityData();
 
-            // 反射获取所有EntityData字段 / Get all EntityData fields via reflection
+            // 反射获取itemsById字段
             Field itemsByIdField = ObfuscationReflectionHelper.findField(
                     SynchedEntityData.class,
                     "f_135345_"
@@ -290,26 +273,24 @@ public class EntityLivingUtil {
             Map<Integer, SynchedEntityData.DataItem<?>> itemsById =
                     (Map<Integer, SynchedEntityData.DataItem<?>>) itemsByIdField.get(entityData);
 
-            // 遍历所有字段 / Iterate all fields
             for (SynchedEntityData.DataItem<?> item : itemsById.values()) {
                 Object value = item.getValue();
 
-                // 只检查Float和Double类型 / Only check Float and Double types
+                // 只检查Float和Double类型
                 if (!(value instanceof Float || value instanceof Double)) {
                     continue;
                 }
 
                 float fieldValue = value instanceof Float ? (Float) value : ((Double) value).floatValue();
 
-                // 值匹配当前血量？/ Value matches current health?
+                // 值匹配当前血量
                 if (Math.abs(fieldValue - currentHealth) < 0.01f) {
-                    // 验证测试 / Validation test
                     float testValue = currentHealth - 0.001f;
                     Object originalValue = value;
                     boolean isFloat = value instanceof Float;
 
                     try {
-                        // 临时修改 / Temporary modification
+                        // 临时修改，验证getHealth()是否同步
                         SynchedEntityData.DataItem dataItem = item;
                         if (isFloat) {
                             dataItem.setValue(testValue);
@@ -317,22 +298,19 @@ public class EntityLivingUtil {
                             dataItem.setValue((double) testValue);
                         }
 
-                        // 检查getHealth()是否同步变化 / Check if getHealth() changes
                         float newHealthValue = entity.getHealth();
                         boolean matched = Math.abs(newHealthValue - testValue) < 0.01f;
 
-                        // 恢复原值 / Restore original value
+                        // 恢复原值
                         dataItem.setValue(originalValue);
 
-                        // 如果匹配，说明找到了真正的血量字段 / If matched, found the real field
                         if (matched) {
                             return new HealthFieldInfo(DamageMethod.CUSTOM_FIELD, item.getAccessor(), isFloat);
                         }
                     } catch (Exception e) {
-                        // 恢复原值后继续 / Restore and continue
+                        // 恢复原值后继续
                         try {
-                            SynchedEntityData.DataItem dataItem = item;
-                            dataItem.setValue(originalValue);
+                            ((SynchedEntityData.DataItem) item).setValue(originalValue);
                         } catch (Exception ignored) {
                         }
                     }
@@ -346,9 +324,10 @@ public class EntityLivingUtil {
         return null;
     }
 
+    // ========== 调试工具 ==========
+
     /**
      * 清空血量处理缓存（用于调试）
-     * Clear health handling cache (for debugging)
      */
     public static void clearHealthCache() {
         HEALTH_FIELD_CACHE.clear();
@@ -357,7 +336,8 @@ public class EntityLivingUtil {
 
     /**
      * 获取缓存统计信息（用于调试）
-     * Get cache statistics (for debugging)
+     *
+     * @return 统计信息字符串
      */
     public static String getCacheStats() {
         int setHealthCount = 0;
@@ -366,15 +346,9 @@ public class EntityLivingUtil {
 
         for (HealthFieldInfo info : HEALTH_FIELD_CACHE.values()) {
             switch (info.method) {
-                case SET_HEALTH:
-                    setHealthCount++;
-                    break;
-                case VANILLA_FIELD:
-                    vanillaFieldCount++;
-                    break;
-                case CUSTOM_FIELD:
-                    customFieldCount++;
-                    break;
+                case SET_HEALTH -> setHealthCount++;
+                case VANILLA_FIELD -> vanillaFieldCount++;
+                case CUSTOM_FIELD -> customFieldCount++;
             }
         }
 

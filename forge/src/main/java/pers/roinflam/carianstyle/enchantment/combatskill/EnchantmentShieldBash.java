@@ -24,7 +24,7 @@ import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
         id = "shield_bash",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
         rarity = EnchantmentRarity.UNCOMMON,
-        type = net.minecraft.world.item.enchantment.EnchantmentCategory.BREAKABLE,
+        customType = "SHIELD",
         slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND}
 )
 public class EnchantmentShieldBash extends EnchantmentBase {

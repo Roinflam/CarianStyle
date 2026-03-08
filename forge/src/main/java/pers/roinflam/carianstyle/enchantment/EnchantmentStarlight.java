@@ -75,7 +75,9 @@ public class EnchantmentStarlight extends EnchantmentBase {
 
         Level world = entity.level();
         int blockX = Mth.floor(entity.getX());
-        int blockY = Mth.floor(entity.getY() - 0.2D - entity.getMyRidingOffset());
+        // 修复：去掉 getMyRidingOffset() 调用
+        // 原代码中 Shulker 等实体调用 getVehicle() 可能返回 null，导致 NPE
+        int blockY = Mth.floor(entity.getY() - 0.2D);
         int blockZ = Mth.floor(entity.getZ());
         BlockPos blockPos = new BlockPos(blockX, blockY + 1, blockZ);
 
@@ -92,7 +94,6 @@ public class EnchantmentStarlight extends EnchantmentBase {
             world.removeBlock(blockPos, false);
         }
 
-        // ✅ 修复：使用 .get() 获取实际的方块对象
         world.setBlock(blockPos, CarianStyleBlocks.HIDE_LIGHT.get().defaultBlockState(), 3);
     }
 

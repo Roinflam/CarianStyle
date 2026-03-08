@@ -50,15 +50,7 @@ public class CarianStyleEnchantments {
      */
     public static final EnchantmentCategory ARMS = EnchantmentCategory.create(
             "cs_arms",
-            item -> item instanceof SwordItem || item instanceof BowItem
-    );
-
-    /**
-     * 镐子附魔类型
-     */
-    public static final EnchantmentCategory PICKAXE = EnchantmentCategory.create(
-            "cs_pickaxe",
-            item -> item instanceof PickaxeItem
+            item -> item instanceof SwordItem || item instanceof BowItem || item instanceof CrossbowItem
     );
 
     // ==================== 附魔能力常量 ====================
@@ -152,5 +144,41 @@ public class CarianStyleEnchantments {
      */
     public static int getRegisteredCount() {
         return REGISTERED_ENCHANTMENTS.size();
+    }
+
+    // ==================== 自定义类型映射 ====================
+
+    /**
+     * 根据字符串标识符获取对应的自定义 EnchantmentCategory
+     * <p>
+     * 此方法用于将注解中的 customType 字符串参数映射到实际的 EnchantmentCategory 对象
+     * 因为注解参数必须是编译时常量，不能直接使用运行时创建的对象
+     * </p>
+     *
+     * @param customType 自定义类型标识符（大小写不敏感）
+     *                   <ul>
+     *                     <li>"SHIELD" - 盾牌类型</li>
+     *                     <li>"ARMS" - 武器类型（剑+弓）</li>
+     *                     <li>"PICKAXE" - 镐子类型</li>
+     *                   </ul>
+     * @return 对应的 EnchantmentCategory 对象，如果标识符无效或为空则返回 null
+     */
+    public static EnchantmentCategory getCustomEnchantmentCategory(String customType) {
+        // 空字符串或 null 表示不使用自定义类型
+        if (customType == null || customType.isEmpty()) {
+            return null;
+        }
+
+        // 转换为大写进行匹配（大小写不敏感）
+        switch (customType.toUpperCase()) {
+            case "SHIELD":
+                return SHIELD;
+            case "ARMS":
+                return ARMS;
+            default:
+                // 未知的自定义类型，返回 null
+                // 调用者应该处理这种情况（抛出异常或使用默认值）
+                return null;
+        }
     }
 }

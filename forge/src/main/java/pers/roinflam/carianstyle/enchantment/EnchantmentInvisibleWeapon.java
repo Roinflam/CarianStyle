@@ -32,7 +32,7 @@ import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
         id = "invisible_weapon",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.RARE,
-        type = EnchantmentCategory.WEAPON,
+        customType = "ARMS",
         slots = {EquipmentSlot.MAINHAND},
         forceTreasure = true
 )

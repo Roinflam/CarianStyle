@@ -73,7 +73,8 @@ public class EnchantmentShelterOfFire extends EnchantmentBase {
     }
 
     /**
-     * 着火时每tick回血（玩家Tick事件）
+     * 着火时回血（玩家Tick事件）
+     * 优化：每20tick（1秒）回血一次，避免每tick触发LivingHealEvent事件链
      */
     @Override
     protected void onPlayerTick(@NotNull EnchantmentContext ctx, int level) {
@@ -89,16 +90,22 @@ public class EnchantmentShelterOfFire extends EnchantmentBase {
             return;
         }
 
+        // 每20tick（1秒）执行一次，减少heal事件触发频率
+        if (entity.tickCount % 20 != 0) {
+            return;
+        }
+
         // 手动应用等级限制
         int effectiveLevel = level;
         if (ConfigLoader.levelLimit) {
             effectiveLevel = Math.min(effectiveLevel, 10);
         }
 
-        // 每秒恢复 0.1% × 等级 最大生命值
-        // 每tick恢复 = (maxHealth × 0.001 × level) / 20
-        float healAmount = entity.getMaxHealth() * effectiveLevel * 0.001f / 20.0f;
-        entity.heal(healAmount);
+        // 每秒恢复 0.1% × 等级 最大生命值（原本是每tick算1/20，现在1秒一次直接算总量）
+        float healAmount = entity.getMaxHealth() * effectiveLevel * 0.001f;
+        if (healAmount > 0) {
+            entity.heal(healAmount);
+        }
     }
 
     @Override
