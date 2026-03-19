@@ -1,4 +1,4 @@
-// 文件：EnchantmentBloodBlade.java
+// EnchantmentBloodBlade.java
 // 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentBloodBlade.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
@@ -20,8 +20,9 @@ import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 /**
  * 血刃附魔
  * <p>
- * 消耗10%当前血量，造成额外伤害
- * 额外伤害 = (伤害×等级×0.33 + 目标血量×等级×0.033) × 自身血量比例
+ * 消耗自身15%最大生命值，造成额外伤害
+ * 额外伤害 = (伤害×等级×0.33 + 目标当前生命值×等级×0.033) × 自身血量比例
+ * 上限为目标最大生命值
  * 玩家需刚挥剑，非玩家可直接触发
  * </p>
  *
@@ -48,6 +49,13 @@ public class EnchantmentBloodBlade extends EnchantmentBase {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
+    /**
+     * 攻击时触发血刃效果
+     * 根据自身血量比例和附魔等级计算额外伤害，同时消耗自身15%最大生命值
+     *
+     * @param ctx   附魔上下文
+     * @param level 附魔等级
+     */
     @Override
     protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
         LivingEntity attacker = ctx.getHolder();
@@ -64,22 +72,37 @@ public class EnchantmentBloodBlade extends EnchantmentBase {
             }
         }
 
-        // 额外伤害 = (当前伤害×等级×0.33 + 目标血量×等级×0.033) × 自身血量比例
+        // 额外伤害 = (当前伤害×等级×0.33 + 目标当前生命值×等级×0.033) × 自身血量比例，上限为目标最大生命值
         float healthRatio = attacker.getHealth() / attacker.getMaxHealth();
-        float bonusDamage = (ctx.getDamage() * level * 0.33f + victim.getHealth() * level * 0.033f) * healthRatio;
+        float bonusDamage = Math.min(
+                (ctx.getDamage() * level * 0.33f + victim.getHealth() * level * 0.033f) * healthRatio,
+                victim.getMaxHealth()
+        );
 
-        // 消耗自身10%当前血量
-        attacker.setHealth(attacker.getHealth() - attacker.getHealth() * 0.1f);
+        // 消耗自身15%最大生命值
+        attacker.setHealth(attacker.getHealth() - attacker.getMaxHealth() * 0.15f);
 
         // 增加伤害
         ctx.addDamage(bonusDamage);
     }
 
+    /**
+     * 获取最低附魔能力需求
+     *
+     * @param enchantmentLevel 附魔等级
+     * @return 最低附魔能力值
+     */
     @Override
     public int getMinCost(int enchantmentLevel) {
         return (int) ((10 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
     }
 
+    /**
+     * 获取最高附魔能力需求
+     *
+     * @param enchantmentLevel 附魔等级
+     * @return 最高附魔能力值
+     */
     @Override
     public int getMaxCost(int enchantmentLevel) {
         return getMinCost(enchantmentLevel) + 50;
