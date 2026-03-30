@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.enchantment;
 
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -7,7 +8,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -35,9 +35,15 @@ import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
  * - 创造模式玩家免疫自损
  * - 玩家必须是刚挥动武器时触发
  * </p>
+ * <p>
+ * 修复记录 v2.1：
+ * - getUsedItemHand() → InteractionHand.MAIN_HAND
+ *   攻击者刚造成伤害时不一定处于"使用物品"状态，getUsedItemHand()返回值不可靠
+ *   癫火是武器附魔，始终应检查主手
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "epilepsy_fire",
@@ -74,7 +80,8 @@ public class EnchantmentEpilepsyFire extends EnchantmentBase {
             return;
         }
 
-        ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
+        // v2.1修复：使用主手而非 getUsedItemHand()
+        ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) {
             return;
         }

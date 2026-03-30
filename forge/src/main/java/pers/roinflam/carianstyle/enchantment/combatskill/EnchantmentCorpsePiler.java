@@ -1,7 +1,6 @@
-// 文件：EnchantmentCorpsePiler.java
-// 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentCorpsePiler.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
@@ -31,12 +30,11 @@ import java.util.UUID;
 /**
  * 尸山血海附魔
  * <p>
- * 击杀敌人50%概率增加击杀计数（上限50），自身死亡时计数减半
- * 攻击时：增伤+1%×计数×等级，治疗=最大血量×0.05%×计数×等级
+ * 修复记录：修复击杀回调中getUsedItemHand → InteractionHand.MAIN_HAND
  * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "corpse_piler",
@@ -62,9 +60,6 @@ public class EnchantmentCorpsePiler extends EnchantmentBase {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
-    /**
-     * 攻击时根据击杀计数增伤和治疗（HIGHEST优先级）
-     */
     @Override
     protected void onDamageAsAttackerHighest(@NotNull EnchantmentContext ctx, int level) {
         LivingEntity attacker = ctx.getHolder();
@@ -75,16 +70,10 @@ public class EnchantmentCorpsePiler extends EnchantmentBase {
             return;
         }
 
-        // 增伤 +1% × 计数 × 等级
         ctx.addDamage(ctx.getDamage() * killCount * level * 0.01f);
-
-        // 治疗 = 最大血量 × 0.05% × 计数 × 等级
         attacker.heal(attacker.getMaxHealth() * killCount * level * 0.0005f);
     }
 
-    /**
-     * 击杀时增加计数，死亡时计数减半
-     */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingDeath(@NotNull LivingDeathEvent evt) {
         if (evt.getEntity().level().isClientSide) {
@@ -102,12 +91,12 @@ public class EnchantmentCorpsePiler extends EnchantmentBase {
         if (evt.getSource().getDirectEntity() instanceof LivingEntity) {
             LivingEntity killer = (LivingEntity) evt.getSource().getDirectEntity();
 
-            ItemStack heldItem = killer.getItemInHand(killer.getUsedItemHand());
+            // 修复：使用主手检查
+            ItemStack heldItem = killer.getItemInHand(InteractionHand.MAIN_HAND);
             if (!heldItem.isEmpty()) {
                 int level = EnchantmentHelper.getItemEnchantmentLevel(corpsePiler, heldItem);
 
                 if (level > 0) {
-                    // 50%概率增加计数
                     if (killer.level().random.nextBoolean()) {
                         int current = EnchantmentDataManager.getCounter(KILL_COUNT_KEY, killer.getUUID());
                         int newCount = Math.min(current + 1, 50);

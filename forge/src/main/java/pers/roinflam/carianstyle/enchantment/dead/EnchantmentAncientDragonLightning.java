@@ -29,9 +29,15 @@ import java.util.List;
  * - 根据天气加成伤害倍率
  * - 持续攻击直到敌人死亡
  * </p>
+ * <p>
+ * 修复记录 v2.1：
+ * - 天气倍率修正：原代码先乘isRaining再乘isThundering，
+ *   MC中雷暴时isRaining()也返回true，导致倍率变成1*2*4=8而不是4。
+ *   改为互斥判断：雷暴4x，下雨2x，晴天1x（与PreciseLightning一致）
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "ancient_dragon_lightning",
@@ -97,12 +103,14 @@ public class EnchantmentAncientDragonLightning extends EnchantmentBase {
 
                     entityLivingBase.invulnerableTime = 10;
 
+                    // v2.1修复：改为互斥判断，先判断雷暴再判断下雨
+                    // MC中isThundering()为true时isRaining()也为true
+                    // 原代码累乘导致雷暴=8x，修正后雷暴=4x、下雨=2x、晴天=1x
                     int magnification = 1;
-                    if (entityLivingBase.level().isRaining()) {
-                        magnification *= 2;
-                    }
                     if (entityLivingBase.level().isThundering()) {
-                        magnification *= 4;
+                        magnification = 4;
+                    } else if (entityLivingBase.level().isRaining()) {
+                        magnification = 2;
                     }
 
                     entityLivingBase.hurt(

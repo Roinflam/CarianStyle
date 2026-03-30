@@ -28,94 +28,56 @@ import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 /**
  * 精准落雷附魔
  * <p>
- * 护甲附魔，被投射物攻击时反击
- * 被投射物攻击时：
- * - 对攻击者召唤等级次落雷
- * - 每次落雷造成30%原伤害的雷电伤害
- * - 下雨时伤害×2，雷暴时伤害×4
- * - 击退攻击者
+ * 修复记录：
+ * - 天气倍率判断顺序修复：原代码先判断isRaining()再else if isThundering()
+ *   MC中雷暴时isRaining()也返回true，导致雷暴分支永远不执行
+ *   改为先判断isThundering()
  * </p>
  *
- * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
-@AutoRegisterEnchantment(
-        id = "precise_lightning",
-        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.RARE,
-        type = EnchantmentCategory.ARMOR,
-        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET},
-        conflictsWith = {EnchantmentCausalityPrinciple.class}
-)
+@AutoRegisterEnchantment(id = "precise_lightning", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.RARE, type = EnchantmentCategory.ARMOR, slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}, conflictsWith = {EnchantmentCausalityPrinciple.class})
 @Mod.EventBusSubscriber
 public class EnchantmentPreciseLightning extends EnchantmentBase {
 
     public EnchantmentPreciseLightning() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
-                EquipmentSlot.HEAD,
-                EquipmentSlot.CHEST,
-                EquipmentSlot.LEGS,
-                EquipmentSlot.FEET
+                EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
         });
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
-        if (evt.getEntity().level().isClientSide) {
-            return;
-        }
+        if (evt.getEntity().level().isClientSide) return;
 
         DamageSource damageSource = evt.getSource();
-
-        // 必须是投射物攻击且有攻击者
-        if (!(damageSource.getDirectEntity() instanceof Projectile)) {
-            return;
-        }
-        if (!(damageSource.getEntity() instanceof LivingEntity)) {
-            return;
-        }
+        if (!(damageSource.getDirectEntity() instanceof Projectile)) return;
+        if (!(damageSource.getEntity() instanceof LivingEntity)) return;
 
         LivingEntity victim = evt.getEntity();
         LivingEntity attacker = (LivingEntity) damageSource.getEntity();
 
         Enchantment preciseLightning = EnchantmentRegistry.getEnchantmentByClass(EnchantmentPreciseLightning.class);
-        if (preciseLightning == null) {
-            return;
-        }
+        if (preciseLightning == null) return;
 
-        // 从受击者的护甲累加附魔等级
         int totalLevel = 0;
         for (ItemStack armor : victim.getArmorSlots()) {
-            if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(preciseLightning, armor);
-            }
+            if (!armor.isEmpty()) totalLevel += EnchantmentHelper.getItemEnchantmentLevel(preciseLightning, armor);
         }
-
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
-        }
-
-        if (totalLevel <= 0) {
-            return;
-        }
+        if (ConfigLoader.levelLimit) totalLevel = Math.min(totalLevel, 10);
+        if (totalLevel <= 0) return;
 
         final int effectiveLevel = totalLevel;
         final float originalDamage = evt.getAmount();
 
-        // 延迟召唤落雷
         new SynchronizationTask(5, 5) {
             private int time = 0;
 
             @Override
             public void run() {
-                if (++time > effectiveLevel) {
-                    this.cancel();
-                    return;
-                }
+                if (++time > effectiveLevel) { this.cancel(); return; }
 
                 Level world = attacker.level();
-
-                // 召唤落雷（cosmetic=true，不造成火焰）
                 if (world instanceof ServerLevel serverLevel) {
                     LightningBolt lightning = EntityType.LIGHTNING_BOLT.create(serverLevel);
                     if (lightning != null) {
@@ -125,21 +87,19 @@ public class EnchantmentPreciseLightning extends EnchantmentBase {
                     }
                 }
 
-                // 重置无敌帧
                 attacker.invulnerableTime = attacker.invulnerableDuration / 2;
 
-                // 计算天气加成
+                // 修复：先判断雷暴再判断下雨，避免雷暴分支被下雨分支拦截
+                // MC中isThundering()为true时isRaining()也为true
                 int magnification = 1;
-                if (attacker.level().isRaining()) {
-                    magnification *= 2;
-                } else if (attacker.level().isThundering()) {
-                    magnification *= 4;
+                if (attacker.level().isThundering()) {
+                    magnification = 4;
+                } else if (attacker.level().isRaining()) {
+                    magnification = 2;
                 }
 
-                // 造成雷电伤害
                 attacker.hurt(attacker.damageSources().lightningBolt(), originalDamage * 0.3f * magnification);
 
-                // 击退攻击者
                 if (attacker.onGround()) {
                     double x = RandomUtils.nextBoolean() ? victim.getX() - attacker.getX() : attacker.getX() - victim.getX();
                     double z = RandomUtils.nextBoolean() ? victim.getZ() - attacker.getZ() : attacker.getZ() - victim.getZ();
@@ -149,13 +109,6 @@ public class EnchantmentPreciseLightning extends EnchantmentBase {
         }.start();
     }
 
-    @Override
-    public int getMinCost(int enchantmentLevel) {
-        return (int) ((30 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
-    }
-
-    @Override
-    public int getMaxCost(int enchantmentLevel) {
-        return getMinCost(enchantmentLevel) + 50;
-    }
+    @Override public int getMinCost(int l) { return (int)((30 + (l - 1) * 10) * ConfigLoader.enchantingDifficulty); }
+    @Override public int getMaxCost(int l) { return getMinCost(l) + 50; }
 }

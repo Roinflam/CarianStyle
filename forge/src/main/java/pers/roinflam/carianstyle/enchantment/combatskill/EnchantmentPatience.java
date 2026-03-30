@@ -1,7 +1,6 @@
-// 文件：EnchantmentPatience.java
-// 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentPatience.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
@@ -30,9 +29,14 @@ import java.util.UUID;
  * 受击时累积能量（累积值 = 伤害 × 等级 × 0.1，上限 = 最大血量 × 等级 × 0.4）
  * 攻击时释放累积的能量作为额外伤害
  * </p>
+ * <p>
+ * 修复记录：
+ * - 修复受击累积检查使用getUsedItemHand的bug，改为InteractionHand.MAIN_HAND
+ *   原bug：举盾时getUsedItemHand返回副手，导致主手忍耐附魔无法累积
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "patience",
@@ -62,6 +66,12 @@ public class EnchantmentPatience extends EnchantmentBase {
         }
     }
 
+    /**
+     * 受击时累积能量
+     * <p>
+     * 修复：使用InteractionHand.MAIN_HAND替代getUsedItemHand()
+     * </p>
+     */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingDamageStatic(@NotNull LivingDamageEvent evt) {
         if (evt.getEntity().level().isClientSide) {
@@ -74,7 +84,8 @@ public class EnchantmentPatience extends EnchantmentBase {
 
         LivingEntity victim = evt.getEntity();
 
-        ItemStack heldItem = victim.getItemInHand(victim.getUsedItemHand());
+        // 修复：使用主手检查而非getUsedItemHand
+        ItemStack heldItem = victim.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) {
             return;
         }

@@ -18,12 +18,27 @@ import java.util.concurrent.ConcurrentHashMap;
  * 提供线程安全的附魔运行时数据管理，包括冷却系统、计数器系统和通用数据存储
  * 所有数据都支持自动过期，避免内存泄漏
  * </p>
+ * <p>
+ * 修复记录：
+ * - 将 System.currentTimeMillis()/50 替换为服务器tick计数器，确保与游戏tick同步
+ * - TPS低时冷却不会提前结束，服务器暂停时冷却也暂停
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @Mod.EventBusSubscriber
 public class EnchantmentDataManager {
+
+    // ==================== 服务器Tick计数器 ====================
+
+    /**
+     * 服务器tick计数器，每个服务器tick递增1
+     * <p>
+     * 替代原来的 System.currentTimeMillis()/50，确保与游戏tick完全同步
+     * </p>
+     */
+    private static long serverTickCount = 0;
 
     // ==================== 冷却系统 ====================
 
@@ -39,21 +54,21 @@ public class EnchantmentDataManager {
     /**
      * 设置冷却时间
      *
-     * @param enchantmentId  附魔ID
-     * @param entityUuid     实体UUID
-     * @param durationTicks  持续时间（tick）
+     * @param enchantmentId 附魔ID
+     * @param entityUuid    实体UUID
+     * @param durationTicks 持续时间（tick）
      */
     public static void setCooldown(@NotNull String enchantmentId, @NotNull UUID entityUuid, int durationTicks) {
         String key = buildKey(enchantmentId, entityUuid);
-        long expireTime = getCurrentGameTime() + durationTicks;
+        long expireTime = serverTickCount + durationTicks;
         COOLDOWNS.put(key, expireTime);
     }
 
     /**
      * 检查是否在冷却中
      *
-     * @param enchantmentId  附魔ID
-     * @param entityUuid     实体UUID
+     * @param enchantmentId 附魔ID
+     * @param entityUuid    实体UUID
      * @return 是否在冷却中
      */
     public static boolean isOnCooldown(@NotNull String enchantmentId, @NotNull UUID entityUuid) {
@@ -64,7 +79,7 @@ public class EnchantmentDataManager {
             return false;
         }
 
-        if (getCurrentGameTime() >= expireTime) {
+        if (serverTickCount >= expireTime) {
             COOLDOWNS.remove(key);
             return false;
         }
@@ -75,8 +90,8 @@ public class EnchantmentDataManager {
     /**
      * 获取剩余冷却时间
      *
-     * @param enchantmentId  附魔ID
-     * @param entityUuid     实体UUID
+     * @param enchantmentId 附魔ID
+     * @param entityUuid    实体UUID
      * @return 剩余冷却时间（tick），0表示无冷却
      */
     public static int getRemainingCooldown(@NotNull String enchantmentId, @NotNull UUID entityUuid) {
@@ -87,20 +102,19 @@ public class EnchantmentDataManager {
             return 0;
         }
 
-        long currentTime = getCurrentGameTime();
-        if (currentTime >= expireTime) {
+        if (serverTickCount >= expireTime) {
             COOLDOWNS.remove(key);
             return 0;
         }
 
-        return (int) (expireTime - currentTime);
+        return (int) (expireTime - serverTickCount);
     }
 
     /**
      * 清除冷却
      *
-     * @param enchantmentId  附魔ID
-     * @param entityUuid     实体UUID
+     * @param enchantmentId 附魔ID
+     * @param entityUuid    实体UUID
      */
     public static void clearCooldown(@NotNull String enchantmentId, @NotNull UUID entityUuid) {
         String key = buildKey(enchantmentId, entityUuid);
@@ -113,8 +127,8 @@ public class EnchantmentDataManager {
      * @param entityUuid 实体UUID
      */
     public static void clearAllCooldowns(@NotNull UUID entityUuid) {
-        String uuidStr = entityUuid.toString();
-        COOLDOWNS.entrySet().removeIf(entry -> entry.getKey().endsWith(":" + uuidStr));
+        String suffix = ":" + entityUuid;
+        COOLDOWNS.entrySet().removeIf(entry -> entry.getKey().endsWith(suffix));
     }
 
     // ==================== 计数器系统 ====================
@@ -140,7 +154,7 @@ public class EnchantmentDataManager {
         String key = buildKey(counterId, entityUuid);
 
         Long expireTime = COUNTER_EXPIRY.get(key);
-        if (expireTime != null && getCurrentGameTime() >= expireTime) {
+        if (expireTime != null && serverTickCount >= expireTime) {
             COUNTERS.remove(key);
             COUNTER_EXPIRY.remove(key);
             return 0;
@@ -172,7 +186,7 @@ public class EnchantmentDataManager {
     public static void setCounter(@NotNull String counterId, @NotNull UUID entityUuid, int value, int expiryTicks) {
         String key = buildKey(counterId, entityUuid);
         COUNTERS.put(key, value);
-        COUNTER_EXPIRY.put(key, getCurrentGameTime() + expiryTicks);
+        COUNTER_EXPIRY.put(key, serverTickCount + expiryTicks);
     }
 
     /**
@@ -201,7 +215,7 @@ public class EnchantmentDataManager {
         String key = buildKey(counterId, entityUuid);
         int newValue = getCounter(counterId, entityUuid) + 1;
         COUNTERS.put(key, newValue);
-        COUNTER_EXPIRY.put(key, getCurrentGameTime() + expiryTicks);
+        COUNTER_EXPIRY.put(key, serverTickCount + expiryTicks);
         return newValue;
     }
 
@@ -237,9 +251,9 @@ public class EnchantmentDataManager {
      * @param entityUuid 实体UUID
      */
     public static void clearAllCounters(@NotNull UUID entityUuid) {
-        String uuidStr = entityUuid.toString();
-        COUNTERS.entrySet().removeIf(entry -> entry.getKey().endsWith(":" + uuidStr));
-        COUNTER_EXPIRY.entrySet().removeIf(entry -> entry.getKey().endsWith(":" + uuidStr));
+        String suffix = ":" + entityUuid;
+        COUNTERS.entrySet().removeIf(entry -> entry.getKey().endsWith(suffix));
+        COUNTER_EXPIRY.entrySet().removeIf(entry -> entry.getKey().endsWith(suffix));
     }
 
     // ==================== 通用数据存储系统 ====================
@@ -283,7 +297,7 @@ public class EnchantmentDataManager {
             GENERIC_DATA_EXPIRY.remove(key);
         } else {
             GENERIC_DATA.put(key, data);
-            GENERIC_DATA_EXPIRY.put(key, getCurrentGameTime() + expiryTicks);
+            GENERIC_DATA_EXPIRY.put(key, serverTickCount + expiryTicks);
         }
     }
 
@@ -302,13 +316,24 @@ public class EnchantmentDataManager {
 
         // 检查是否过期
         Long expireTime = GENERIC_DATA_EXPIRY.get(key);
-        if (expireTime != null && getCurrentGameTime() >= expireTime) {
+        if (expireTime != null && serverTickCount >= expireTime) {
             GENERIC_DATA.remove(key);
             GENERIC_DATA_EXPIRY.remove(key);
             return null;
         }
 
         return (T) GENERIC_DATA.get(key);
+    }
+
+    /**
+     * 检查数据是否存在且未过期
+     *
+     * @param dataId     数据ID
+     * @param entityUuid 实体UUID
+     * @return 数据是否存在
+     */
+    public static boolean hasData(@NotNull String dataId, @NotNull UUID entityUuid) {
+        return getData(dataId, entityUuid) != null;
     }
 
     /**
@@ -321,7 +346,7 @@ public class EnchantmentDataManager {
     public static void refreshDataExpiry(@NotNull String dataId, @NotNull UUID entityUuid, int expiryTicks) {
         String key = buildKey(dataId, entityUuid);
         if (GENERIC_DATA.containsKey(key)) {
-            GENERIC_DATA_EXPIRY.put(key, getCurrentGameTime() + expiryTicks);
+            GENERIC_DATA_EXPIRY.put(key, serverTickCount + expiryTicks);
         }
     }
 
@@ -343,9 +368,9 @@ public class EnchantmentDataManager {
      * @param entityUuid 实体UUID
      */
     public static void clearAllData(@NotNull UUID entityUuid) {
-        String uuidStr = entityUuid.toString();
-        GENERIC_DATA.entrySet().removeIf(entry -> entry.getKey().endsWith(":" + uuidStr));
-        GENERIC_DATA_EXPIRY.entrySet().removeIf(entry -> entry.getKey().endsWith(":" + uuidStr));
+        String suffix = ":" + entityUuid;
+        GENERIC_DATA.entrySet().removeIf(entry -> entry.getKey().endsWith(suffix));
+        GENERIC_DATA_EXPIRY.entrySet().removeIf(entry -> entry.getKey().endsWith(suffix));
     }
 
     // ==================== 工具方法 ====================
@@ -358,26 +383,30 @@ public class EnchantmentDataManager {
      * @return 格式化的键
      */
     private static String buildKey(@NotNull String id, @NotNull UUID uuid) {
-        return id + ":" + uuid.toString();
+        return id + ":" + uuid;
     }
 
     /**
      * 获取当前游戏时间
+     * <p>
+     * 使用服务器tick计数器，而非 System.currentTimeMillis()/50
+     * 这确保了冷却时间与服务器TPS完全同步：
+     * - TPS低时冷却不会提前结束
+     * - 服务器暂停时冷却也暂停
+     * </p>
      *
      * @return 游戏时间（以tick为单位）
      */
     private static long getCurrentGameTime() {
-        return System.currentTimeMillis() / 50;
+        return serverTickCount;
     }
 
     // ==================== 自动清理系统 ====================
 
-    private static int cleanupCounter = 0;
-
     /**
      * 服务器Tick事件处理器
      * <p>
-     * 每200 tick（10秒）自动清理一次过期数据
+     * 递增tick计数器，每200 tick（10秒）自动清理一次过期数据
      * </p>
      *
      * @param event 服务器Tick事件
@@ -388,9 +417,11 @@ public class EnchantmentDataManager {
             return;
         }
 
+        // 递增tick计数器
+        serverTickCount++;
+
         // 每200 tick（10秒）清理一次
-        if (++cleanupCounter >= 200) {
-            cleanupCounter = 0;
+        if (serverTickCount % 200 == 0) {
             cleanupExpiredData();
         }
     }
@@ -399,7 +430,7 @@ public class EnchantmentDataManager {
      * 清理所有过期数据
      */
     private static void cleanupExpiredData() {
-        long currentTime = getCurrentGameTime();
+        long currentTime = serverTickCount;
         int removedCount = 0;
 
         // 清理过期的冷却
@@ -447,6 +478,7 @@ public class EnchantmentDataManager {
         COUNTER_EXPIRY.clear();
         GENERIC_DATA.clear();
         GENERIC_DATA_EXPIRY.clear();
+        serverTickCount = 0;
         LogUtil.info("已清空所有附魔数据");
     }
 
@@ -467,7 +499,7 @@ public class EnchantmentDataManager {
      * @return 统计信息字符串
      */
     public static String getStatistics() {
-        return String.format("附魔数据统计 - 冷却: %d, 计数器: %d, 通用数据: %d",
-                COOLDOWNS.size(), COUNTERS.size(), GENERIC_DATA.size());
+        return String.format("附魔数据统计 - 冷却: %d, 计数器: %d, 通用数据: %d, 服务器Tick: %d",
+                COOLDOWNS.size(), COUNTERS.size(), GENERIC_DATA.size(), serverTickCount);
     }
 }

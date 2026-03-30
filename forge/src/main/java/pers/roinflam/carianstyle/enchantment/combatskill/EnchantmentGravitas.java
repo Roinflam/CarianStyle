@@ -1,18 +1,18 @@
-// 文件：EnchantmentGravitas.java
-// 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentGravitas.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -35,9 +35,14 @@ import java.util.UUID;
  * 攻击时激活重力场，给敌人施加重力效果
  * 激活期间周围12格内其他生物持续受到轻微重力效果
  * </p>
+ * <p>
+ * 修复/优化记录：
+ * - 修复getUsedItemHand → InteractionHand.MAIN_HAND
+ * - 性能优化：将LivingTickEvent改为PlayerTickEvent，避免所有LivingEntity每tick都进入方法
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "gravitas",
@@ -71,7 +76,8 @@ public class EnchantmentGravitas extends EnchantmentBase {
         LivingEntity victim = evt.getEntity();
         LivingEntity attacker = (LivingEntity) evt.getSource().getEntity();
 
-        ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
+        // 修复：使用主手检查而非getUsedItemHand
+        ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) {
             return;
         }
@@ -114,14 +120,19 @@ public class EnchantmentGravitas extends EnchantmentBase {
 
     /**
      * 激活状态时，周围生物持续受到轻微重力效果
+     * <p>
+     * 性能优化：改用PlayerTickEvent替代LivingTickEvent
+     * 原代码注册在所有LivingEntity的tick上，每个存活实体每tick都会进入
+     * 改为只对玩家检测，大幅减少无用调用
+     * </p>
      */
     @SubscribeEvent
-    public static void onLivingUpdate(@NotNull LivingEvent.LivingTickEvent evt) {
-        if (evt.getEntity().level().isClientSide) {
+    public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
+        if (evt.player.level().isClientSide || evt.phase != TickEvent.Phase.START) {
             return;
         }
 
-        LivingEntity holder = evt.getEntity();
+        Player holder = evt.player;
         if (!holder.isAlive()) {
             return;
         }
@@ -146,7 +157,6 @@ public class EnchantmentGravitas extends EnchantmentBase {
 
     @Override
     protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        // 与击退冲突
         if (ench == Enchantments.KNOCKBACK) {
             return false;
         }

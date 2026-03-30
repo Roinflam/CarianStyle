@@ -10,15 +10,19 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 
 /**
  * 盾击附魔
  * <p>
  * 举盾格挡时被攻击，将攻击者击退（击退强度 = 等级 × 0.25）
  * </p>
+ * <p>
+ * 修复记录：构造函数 EnchantmentCategory.BREAKABLE → CarianStyleEnchantments.getCustomEnchantmentCategory("SHIELD")
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "shield_bash",
@@ -30,7 +34,8 @@ import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 public class EnchantmentShieldBash extends EnchantmentBase {
 
     public EnchantmentShieldBash() {
-        super(net.minecraft.world.item.enchantment.EnchantmentCategory.BREAKABLE, new EquipmentSlot[]{
+        // 修复：BREAKABLE → SHIELD自定义类型
+        super(CarianStyleEnchantments.getCustomEnchantmentCategory("SHIELD"), new EquipmentSlot[]{
                 EquipmentSlot.MAINHAND,
                 EquipmentSlot.OFFHAND
         });

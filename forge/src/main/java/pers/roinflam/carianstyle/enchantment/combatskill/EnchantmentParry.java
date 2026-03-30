@@ -19,6 +19,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 
 import java.util.UUID;
 
@@ -28,9 +29,15 @@ import java.util.UUID;
  * 用盾牌完全格挡攻击后，10tick内攻击可触发增伤（+25% × 等级）
  * 触发后进入40tick冷却
  * </p>
+ * <p>
+ * 修复记录：
+ * - 修复招架状态检测bug：原代码用isOnCooldown检查通过setData存入的数据，
+ *   两个是不同的存储系统，导致重复触发检查永远失败。
+ *   现改为统一使用hasData/getData系统。
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "parry",
@@ -42,11 +49,13 @@ import java.util.UUID;
 @Mod.EventBusSubscriber
 public class EnchantmentParry extends EnchantmentBase {
 
+    /** 招架状态数据键（存储等级值，通过setData/getData管理） */
     private static final String PARRY_LEVEL_KEY = "parry_level";
+    /** 招架冷却键（通过setCooldown/isOnCooldown管理） */
     private static final String PARRY_COOLDOWN_KEY = "parry_cooldown";
 
     public EnchantmentParry() {
-        super(EnchantmentCategory.BREAKABLE, new EquipmentSlot[]{
+        super(CarianStyleEnchantments.getCustomEnchantmentCategory("SHIELD"), new EquipmentSlot[]{
                 EquipmentSlot.MAINHAND,
                 EquipmentSlot.OFFHAND
         });
@@ -96,8 +105,8 @@ public class EnchantmentParry extends EnchantmentBase {
             return;
         }
 
-        // 检查是否已有招架状态（避免重复触发）
-        if (EnchantmentDataManager.isOnCooldown(PARRY_LEVEL_KEY, uuid)) {
+        // 修复：使用hasData检查招架状态是否已存在（原代码误用isOnCooldown检查setData的数据）
+        if (EnchantmentDataManager.hasData(PARRY_LEVEL_KEY, uuid)) {
             return;
         }
 

@@ -24,9 +24,20 @@ import java.util.Map;
 
 /**
  * 附魔基类
- * 提供完整的事件优先级控制和攻击者受击者双视角支持
- *
+ * <p>
+ * 提供完整的事件优先级控制和攻击者/受击者双视角支持
+ * </p>
+ * <p>
  * 注意：所有静态事件监听器已移至 EnchantmentEventHandler
+ * </p>
+ * <p>
+ * 修复记录 v2.1：
+ * - dispatchLivingAttackEvent/HurtEvent/DamageEvent 从 private 改为 public，
+ *   供优化后的 EnchantmentEventHandler 缓存机制直接调用
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.1
  */
 public abstract class EnchantmentBase extends Enchantment {
 
@@ -35,6 +46,12 @@ public abstract class EnchantmentBase extends Enchantment {
     @Nullable
     protected final AutoRegisterEnchantment annotation;
 
+    /**
+     * 主构造函数（注解注册方式）
+     *
+     * @param category 附魔类别
+     * @param slots    适用装备槽位
+     */
     protected EnchantmentBase(@Nonnull EnchantmentCategory category, @Nonnull EquipmentSlot[] slots) {
         super(Enchantment.Rarity.COMMON, category, slots);
 
@@ -51,6 +68,14 @@ public abstract class EnchantmentBase extends Enchantment {
         }
     }
 
+    /**
+     * 传统构造函数（向后兼容）
+     *
+     * @param rarityIn 稀有度
+     * @param category 附魔类别
+     * @param slots    适用装备槽位
+     * @param name     附魔名称
+     */
     protected EnchantmentBase(@Nonnull Enchantment.Rarity rarityIn, @Nonnull EnchantmentCategory category,
                               @Nonnull EquipmentSlot[] slots, String name) {
         super(rarityIn, category, slots);
@@ -128,12 +153,14 @@ public abstract class EnchantmentBase extends Enchantment {
             return true;
         }
 
+        // 检查白名单：allowWith中的附魔始终兼容
         for (Class<?> allowedClass : annotation.allowWith()) {
             if (allowedClass.isInstance(other)) {
                 return true;
             }
         }
 
+        // 同类别互斥（GENERAL类别除外）
         AutoRegisterEnchantment otherAnnotation = other.getClass().getAnnotation(AutoRegisterEnchantment.class);
         if (otherAnnotation != null) {
             if (annotation.category() == otherAnnotation.category() &&
@@ -142,6 +169,7 @@ public abstract class EnchantmentBase extends Enchantment {
             }
         }
 
+        // 检查黑名单：conflictsWith中的附魔互斥
         for (Class<?> conflictClass : annotation.conflictsWith()) {
             if (conflictClass.isInstance(other)) {
                 return false;
@@ -151,6 +179,12 @@ public abstract class EnchantmentBase extends Enchantment {
         return true;
     }
 
+    /**
+     * 从武器（主手+副手）获取附魔等级
+     *
+     * @param entity 实体
+     * @return 附魔等级（取最大值，已应用等级上限）
+     */
     protected int getEnchantmentLevelFromWeapon(@Nonnull LivingEntity entity) {
         ItemStack mainHand = entity.getItemInHand(InteractionHand.MAIN_HAND);
         ItemStack offHand = entity.getItemInHand(InteractionHand.OFF_HAND);
@@ -168,6 +202,12 @@ public abstract class EnchantmentBase extends Enchantment {
         return applyLevelLimit(level);
     }
 
+    /**
+     * 从护甲获取附魔等级总和
+     *
+     * @param entity 实体
+     * @return 附魔等级总和（已应用等级上限）
+     */
     protected int getEnchantmentLevelFromArmor(@Nonnull LivingEntity entity) {
         int totalLevel = 0;
 
@@ -180,13 +220,25 @@ public abstract class EnchantmentBase extends Enchantment {
         return applyLevelLimit(totalLevel);
     }
 
-    protected int applyLevelLimit(int level) {
+    /**
+     * 应用附魔等级上限
+     *
+     * @param level 原始等级
+     * @return 限制后的等级
+     */
+    public int applyLevelLimit(int level) {
         if (ConfigLoader.levelLimit) {
             return Math.min(level, 10);
         }
         return level;
     }
 
+    /**
+     * 判断玩家是否刚完成满蓄力攻击
+     *
+     * @param player 玩家
+     * @return 是否满蓄力
+     */
     protected boolean isJustSwung(@Nonnull Player player) {
         return player.getAttackStrengthScale(0.5f) == 1;
     }
@@ -301,11 +353,15 @@ public abstract class EnchantmentBase extends Enchantment {
     protected void onCriticalHit(@Nonnull EnchantmentContext ctx, int level) {
     }
 
-    // ==================== 核心事件处理方法 (供 EnchantmentEventHandler 调用) ====================
+    // ==================== 核心事件处理方法 ====================
+    // handleLivingAttack/Hurt/Damage 保留向后兼容，但新的 EventHandler 不再调用它们
+    // 新的 EventHandler 在 HIGHEST 时一次性扫描缓存，然后直接调用 dispatch 方法
 
     /**
-     * 处理 LivingAttackEvent
-     * 由 EnchantmentEventHandler 调用
+     * 处理 LivingAttackEvent（向后兼容，新EventHandler不使用此方法）
+     *
+     * @param event    事件
+     * @param priority 优先级
      */
     public static void handleLivingAttack(@Nonnull LivingAttackEvent event, @Nonnull EventPriority priority) {
         if (event.getEntity().level().isClientSide) {
@@ -327,8 +383,10 @@ public abstract class EnchantmentBase extends Enchantment {
     }
 
     /**
-     * 处理 LivingHurtEvent
-     * 由 EnchantmentEventHandler 调用
+     * 处理 LivingHurtEvent（向后兼容，新EventHandler不使用此方法）
+     *
+     * @param event    事件
+     * @param priority 优先级
      */
     public static void handleLivingHurt(@Nonnull LivingHurtEvent event, @Nonnull EventPriority priority) {
         if (event.getEntity().level().isClientSide) {
@@ -350,8 +408,10 @@ public abstract class EnchantmentBase extends Enchantment {
     }
 
     /**
-     * 处理 LivingDamageEvent
-     * 由 EnchantmentEventHandler 调用
+     * 处理 LivingDamageEvent（向后兼容，新EventHandler不使用此方法）
+     *
+     * @param event    事件
+     * @param priority 优先级
      */
     public static void handleLivingDamage(@Nonnull LivingDamageEvent event, @Nonnull EventPriority priority) {
         if (event.getEntity().level().isClientSide) {
@@ -372,21 +432,10 @@ public abstract class EnchantmentBase extends Enchantment {
         processEntityEnchantments(victim, victim, source, event, priority, false);
     }
 
-    // ==================== 实体附魔处理 ====================
+    // ==================== 实体附魔处理（内部方法） ====================
 
     /**
-     * 处理实体的附魔
-     * <p>
-     * 关键修复：攻击者和受害者都检查所有装备槽位
-     * 这确保了护甲附魔（如魔力蝎符）在攻击时也能正确触发
-     * </p>
-     *
-     * @param holder 附魔持有者
-     * @param victim 受害者
-     * @param source 伤害源
-     * @param event 事件对象
-     * @param priority 事件优先级
-     * @param isAttacker 是否为攻击者
+     * 处理实体的附魔（原始遍历方式，保留向后兼容）
      */
     private static void processEntityEnchantments(
             @Nonnull LivingEntity holder,
@@ -408,13 +457,11 @@ public abstract class EnchantmentBase extends Enchantment {
                 processItemEnchantments(offHand, holder, victim, source, event, priority, true);
             }
 
-            // 关键修复：攻击者也检查护甲槽位（头盔、胸甲、护腿、靴子）
+            // 攻击者也检查护甲槽位
             for (EquipmentSlot slot : EquipmentSlot.values()) {
-                // 跳过已经检查过的主手和副手，避免重复处理
                 if (slot == EquipmentSlot.MAINHAND || slot == EquipmentSlot.OFFHAND) {
                     continue;
                 }
-
                 ItemStack stack = holder.getItemBySlot(slot);
                 if (!stack.isEmpty()) {
                     processItemEnchantments(stack, holder, victim, source, event, priority, true);
@@ -431,6 +478,9 @@ public abstract class EnchantmentBase extends Enchantment {
         }
     }
 
+    /**
+     * 处理单个物品上的附魔
+     */
     private static void processItemEnchantments(
             @Nonnull ItemStack stack,
             @Nonnull LivingEntity holder,
@@ -474,7 +524,21 @@ public abstract class EnchantmentBase extends Enchantment {
         }
     }
 
-    private static void dispatchLivingAttackEvent(
+    // ==================== 事件分发方法（改为public供EventHandler缓存机制调用） ====================
+
+    /**
+     * 分发 LivingAttackEvent 到对应优先级的模板方法
+     * <p>
+     * v2.1变更：private → public，供 EnchantmentEventHandler 缓存机制直接调用
+     * </p>
+     *
+     * @param enchantment 附魔实例
+     * @param ctx         附魔上下文
+     * @param level       附魔等级
+     * @param priority    事件优先级
+     * @param isAttacker  是否为攻击者视角
+     */
+    public static void dispatchLivingAttackEvent(
             @Nonnull EnchantmentBase enchantment,
             @Nonnull EnchantmentContext ctx,
             int level,
@@ -520,7 +584,19 @@ public abstract class EnchantmentBase extends Enchantment {
         }
     }
 
-    private static void dispatchLivingHurtEvent(
+    /**
+     * 分发 LivingHurtEvent 到对应优先级的模板方法
+     * <p>
+     * v2.1变更：private → public，供 EnchantmentEventHandler 缓存机制直接调用
+     * </p>
+     *
+     * @param enchantment 附魔实例
+     * @param ctx         附魔上下文
+     * @param level       附魔等级
+     * @param priority    事件优先级
+     * @param isAttacker  是否为攻击者视角
+     */
+    public static void dispatchLivingHurtEvent(
             @Nonnull EnchantmentBase enchantment,
             @Nonnull EnchantmentContext ctx,
             int level,
@@ -566,7 +642,19 @@ public abstract class EnchantmentBase extends Enchantment {
         }
     }
 
-    private static void dispatchLivingDamageEvent(
+    /**
+     * 分发 LivingDamageEvent 到对应优先级的模板方法
+     * <p>
+     * v2.1变更：private → public，供 EnchantmentEventHandler 缓存机制直接调用
+     * </p>
+     *
+     * @param enchantment 附魔实例
+     * @param ctx         附魔上下文
+     * @param level       附魔等级
+     * @param priority    事件优先级
+     * @param isAttacker  是否为攻击者视角
+     */
+    public static void dispatchLivingDamageEvent(
             @Nonnull EnchantmentBase enchantment,
             @Nonnull EnchantmentContext ctx,
             int level,

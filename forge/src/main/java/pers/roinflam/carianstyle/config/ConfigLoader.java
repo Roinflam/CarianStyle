@@ -51,6 +51,7 @@ public final class ConfigLoader {
 
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> uninstallEnchantment;
         public final ForgeConfigSpec.IntValue rockBlasterMaxRange;
+        public final ForgeConfigSpec.BooleanValue rockBlasterSuppressCommonDrops;
         public final ForgeConfigSpec.IntValue prayerfulStrikeMaxHealth;
 
         // ==================== 真伤系统配置 ====================
@@ -116,6 +117,15 @@ public final class ConfigLoader {
                     .comment("Higher values allow faster mining but may cause lag.")
                     .comment("更高的值允许更快的挖掘，但可能导致卡顿。")
                     .defineInRange("rockBlasterMaxRange", 10, 0, 20);
+
+            rockBlasterSuppressCommonDrops = builder
+                    .comment("When enabled, Rock Blaster will not drop items for common stone-type blocks.")
+                    .comment("启用后，碎岩者破坏常见石头类方块时不会掉落物品，以减少掉落物造成的卡顿。")
+                    .comment("Affected blocks: stone, cobblestone, deepslate, cobbled_deepslate, granite, diorite,")
+                    .comment("andesite, tuff, calcite, smooth_basalt, gravel, netherrack, basalt, blackstone, end_stone")
+                    .comment("受影响方块：石头、圆石、深板岩、花岗岩、闪长岩、安山岩、凝灰岩、方解石、")
+                    .comment("平滑玄武岩、沙砾、地狱岩、玄武岩、黑石、末地石")
+                    .define("rockBlasterSuppressCommonDrops", false);
 
             prayerfulStrikeMaxHealth = builder
                     .comment("Set the maximum stackable life limit for the Prayer Strike Enchantment.")
@@ -214,6 +224,11 @@ public final class ConfigLoader {
     public static int rockBlasterMaxRange = 10;
 
     /**
+     * 碎岩者是否抑制常见石头掉落物
+     */
+    public static boolean rockBlasterSuppressCommonDrops = false;
+
+    /**
      * 祈祷打击最大生命值
      */
     public static int prayerfulStrikeMaxHealth = 1000;
@@ -261,6 +276,7 @@ public final class ConfigLoader {
         uninstallEnchantment = enchList.toArray(new String[0]);
 
         rockBlasterMaxRange = COMMON.rockBlasterMaxRange.get();
+        rockBlasterSuppressCommonDrops = COMMON.rockBlasterSuppressCommonDrops.get();
         prayerfulStrikeMaxHealth = COMMON.prayerfulStrikeMaxHealth.get();
 
         enableTrueDamage = COMMON.enableTrueDamage.get();

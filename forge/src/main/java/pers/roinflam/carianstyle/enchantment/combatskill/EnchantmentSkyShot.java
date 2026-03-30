@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -28,9 +29,14 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
  * 额外造成目标当前生命值 × 10% 的伤害
  * 触发后自身获得减速II效果，持续5秒
  * </p>
+ * <p>
+ * 修复记录 v2.1：
+ * - getUsedItemHand() → InteractionHand.MAIN_HAND
+ *   箭矢命中时玩家可能已经放开弓，不再处于"使用物品"状态
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "sky_shot",
@@ -92,8 +98,9 @@ public class EnchantmentSkyShot extends EnchantmentBase {
         LivingEntity shooter = (LivingEntity) arrow.getOwner();
         LivingEntity target = (LivingEntity) entityHit.getEntity();
 
-        // 检查射手是否持有弓
-        ItemStack heldItem = shooter.getItemInHand(shooter.getUsedItemHand());
+        // v2.1修复：使用主手而非 getUsedItemHand()
+        // 箭矢命中时弓可能已放下
+        ItemStack heldItem = shooter.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) {
             return;
         }

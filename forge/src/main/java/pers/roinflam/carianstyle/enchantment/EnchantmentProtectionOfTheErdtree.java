@@ -29,9 +29,15 @@ import pers.roinflam.carianstyle.init.CarianStylePotion;
  * - 受击者获得黄金树庇佑效果（持续 = 2.5 × 等级 秒，效果等级 = 附魔等级 - 1）
  * - 攻击者也获得黄金树庇佑效果（等级上限额外限制为5）
  * </p>
+ * <p>
+ * 修复记录 v2.1：
+ * - 移除无效的 conflictsWith = {Enchantments.class}
+ *   Enchantments 是原版附魔的持有者类，不是 Enchantment 子类，isInstance永远不匹配
+ *   与原版保护的互斥通过 checkCompatibility 方法实现
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "protection_of_the_erdtree",
@@ -39,7 +45,8 @@ import pers.roinflam.carianstyle.init.CarianStylePotion;
         rarity = EnchantmentRarity.RARE,
         type = EnchantmentCategory.ARMOR,
         slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET},
-        conflictsWith = {Enchantments.class},
+        // v2.1修复：移除 conflictsWith = {Enchantments.class}，该配置无效
+        // 与原版保护附魔的互斥通过下方 checkCompatibility 方法实现
         forceTreasure = true
 )
 @Mod.EventBusSubscriber
@@ -131,6 +138,7 @@ public class EnchantmentProtectionOfTheErdtree extends EnchantmentBase {
 
     @Override
     protected boolean checkCompatibility(@NotNull Enchantment ench) {
+        // 与原版保护附魔互斥
         return super.checkCompatibility(ench) && !ench.equals(Enchantments.ALL_DAMAGE_PROTECTION);
     }
 }

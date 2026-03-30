@@ -2,12 +2,10 @@ package pers.roinflam.carianstyle.utils.helper.task;
 
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.common.MinecraftForge;
 
 import javax.annotation.Nonnull;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -26,7 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * // 延迟20tick后执行一次
  * // Execute once after 20 ticks
  * new SynchronizationTask(20) {
- *     @Override
+ *     &#064;Override
  *     public void run() {
  *         // 执行逻辑 / execution logic
  *     }
@@ -35,7 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * // 延迟10tick后开始，每5tick执行一次（周期任务）
  * // Start after 10 ticks, execute every 5 ticks (periodic task)
  * new SynchronizationTask(10, 5) {
- *     @Override
+ *     &#064;Override
  *     public void run() {
  *         // 周期执行逻辑 / periodic execution logic
  *     }
@@ -44,7 +42,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * // 立即开始，每1tick执行一次（持续伤害等）
  * // Start immediately, execute every tick (continuous damage, etc.)
  * new SynchronizationTask(0, 1) {
- *     @Override
+ *     &#064;Override
  *     public void run() {
  *         if (条件不满足) {
  *             this.cancel();
@@ -54,6 +52,15 @@ import java.util.concurrent.atomic.AtomicInteger;
  *     }
  * }.start();
  * </pre>
+ *
+ * <p>
+ * 性能优化记录 v2.1：
+ * - onServerTick 中使用 Iterator.remove() 替代每tick创建临时 ArrayList 收集待移除任务
+ *   原实现每tick执行 new ArrayList<>() + 遍历 + 二次遍历移除，产生GC压力
+ *   优化后直接在遍历中移除已完成任务，零额外分配
+ * </p>
+ *
+ * @version 2.1
  */
 public abstract class SynchronizationTask implements Runnable {
 
@@ -224,8 +231,15 @@ public abstract class SynchronizationTask implements Runnable {
      * - 100个任务只有1个监听器，而不是100个 / 100 tasks with 1 listener instead of 100
      * - 减少事件总线的遍历开销 / Reduces event bus traversal overhead
      * - 线程安全 / Thread-safe
+     * <p>
+     * v2.1修复：移除了无效的 @Mod.EventBusSubscriber 注解。
+     * 该注解只对static方法生效，但onServerTick是实例方法。
+     * 实际注册通过 ensureRegistered() 中的 MinecraftForge.EVENT_BUS.register(this) 完成。
+     * </p>
+     * <p>
+     * v2.1优化：onServerTick 使用 Iterator.remove() 替代临时列表
+     * </p>
      */
-    @Mod.EventBusSubscriber
     private static class TaskManager {
 
         /** 任务列表（线程安全）/ Task list (thread-safe) */
@@ -281,6 +295,11 @@ public abstract class SynchronizationTask implements Runnable {
          *
          * 每个服务器tick遍历所有任务并执行
          * Traverse and execute all tasks each server tick
+         * <p>
+         * v2.1优化：使用 Iterator.remove() 直接在遍历中移除已完成任务
+         * 替代原来每tick创建临时 ArrayList + 二次遍历的方式，避免GC压力
+         * ConcurrentHashMap.entrySet().iterator() 支持 remove() 操作
+         * </p>
          */
         @SubscribeEvent
         public void onServerTick(@Nonnull TickEvent.ServerTickEvent evt) {
@@ -294,21 +313,16 @@ public abstract class SynchronizationTask implements Runnable {
                 return;
             }
 
-            // 收集需要移除的任务（避免在遍历时修改）
-            List<Integer> toRemove = new ArrayList<>();
-
-            for (Map.Entry<Integer, SynchronizationTask> entry : tasks.entrySet()) {
+            // v2.1优化：使用 Iterator 直接移除已完成任务，避免临时列表分配
+            Iterator<Map.Entry<Integer, SynchronizationTask>> iterator = tasks.entrySet().iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<Integer, SynchronizationTask> entry = iterator.next();
                 SynchronizationTask task = entry.getValue();
 
-                // onTick()返回true表示任务已完成
+                // onTick()返回true表示任务已完成，直接移除
                 if (task.onTick()) {
-                    toRemove.add(entry.getKey());
+                    iterator.remove();
                 }
-            }
-
-            // 批量移除已完成的任务
-            for (Integer taskId : toRemove) {
-                tasks.remove(taskId);
             }
         }
     }

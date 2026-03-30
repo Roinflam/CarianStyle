@@ -25,17 +25,25 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
  * - 伤害转为魔法伤害
  * - 施加冻伤效果（持续10秒，效果等级 = 附魔等级 - 1）
  * </p>
+ * <p>
+ * 修复记录 v2.1：
+ * - 移除无效的 conflictsWith = {Enchantments.class}
+ *   Enchantments 是原版附魔的持有者类（包含静态字段如 FLAMING_ARROWS），
+ *   不是 Enchantment 的子类，checkCompatibility 中的 isInstance 检查永远不会匹配。
+ *   与火矢的互斥已在 checkCompatibility 方法中正确实现。
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "pyroxene_ice",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.UNCOMMON,
         type = EnchantmentCategory.BOW,
-        slots = {EquipmentSlot.MAINHAND},
-        conflictsWith = {Enchantments.class}
+        slots = {EquipmentSlot.MAINHAND}
+        // v2.1修复：移除 conflictsWith = {Enchantments.class}，该配置无效
+        // 与火矢(FLAMING_ARROWS)的互斥通过下方 checkCompatibility 方法实现
 )
 public class EnchantmentPyroxeneIce extends EnchantmentBase {
 
@@ -80,6 +88,7 @@ public class EnchantmentPyroxeneIce extends EnchantmentBase {
 
     @Override
     protected boolean checkCompatibility(@NotNull Enchantment ench) {
+        // 与火矢互斥
         return super.checkCompatibility(ench) && !ench.equals(Enchantments.FLAMING_ARROWS);
     }
 }

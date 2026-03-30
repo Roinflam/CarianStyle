@@ -20,6 +20,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
+import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
@@ -29,6 +30,12 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
  * 盾牌格挡远程/魔法攻击时生成魔法剑反击
  * 每把剑伤害 = 原伤害×等级×20%
  * </p>
+ * <p>
+ * 修复记录：
+ * - 构造函数 EnchantmentCategory.BREAKABLE → CarianStyleEnchantments.getCustomEnchantmentCategory("SHIELD")
+ *   原bug：所有可损坏物品都能附上此盾牌专属附魔
+ * - 注解添加 customType = "SHIELD"
+ * </p>
  *
  * @author RoinFlam
  * @version 2.1
@@ -37,7 +44,7 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
         id = "carian_retaliation",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.RARE,
-        type = EnchantmentCategory.BREAKABLE,
+        customType = "SHIELD",
         slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND},
         conflictsWith = {
                 EnchantmentScholarShield.class,
@@ -48,7 +55,9 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 public class EnchantmentCarianRetaliation extends EnchantmentBase {
 
     public EnchantmentCarianRetaliation() {
-        super(EnchantmentCategory.BREAKABLE, new EquipmentSlot[]{EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND});
+        // 修复：BREAKABLE → SHIELD自定义类型
+        super(CarianStyleEnchantments.getCustomEnchantmentCategory("SHIELD"),
+                new EquipmentSlot[]{EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND});
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -125,18 +134,16 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
             new SynchronizationTask(delay) {
                 @Override
                 public void run() {
-                    // 检查目标有效性
                     if (!attacker.isAlive() || attacker.isRemoved()) {
                         return;
                     }
 
-                    // 创建攻击剑
                     EntityGlintblades attackBlade = new EntityGlintblades(holder, attacker)
                             .setSize(1.0f)
                             .setDamage(baseDamage * effectiveLevel * 0.2f)
                             .setDamageSource(holder.damageSources().thrown(null, holder))
-                            .setTrackingStrength(0.15f)  // 中等追踪强度
-                            .setMaxLifetime(100);         // 5秒存活时间
+                            .setTrackingStrength(0.15f)
+                            .setMaxLifetime(100);
 
                     DamageSourceUtil.setMagicDamage(attackBlade.getDamageSource());
 

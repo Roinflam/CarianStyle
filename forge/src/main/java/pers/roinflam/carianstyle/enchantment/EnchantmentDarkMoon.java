@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.enchantment;
 
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -26,225 +27,92 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 /**
- * 暗月附魔
- * <p>
- * 武器附魔，夜晚魔法伤害强化
- * 功能：
- * 1. 受到魔法伤害时减伤25%（有满月时37.5%）
- * 2. 造成魔法伤害时增伤25%（有满月时37.5%）
- * 3. 对锁定自己为目标的敌人额外增伤并吸血
- * 4. 治疗增强25%（有满月时37.5%）
- * 5. 持续夜视效果
- * </p>
- *
- * @author RoinFlam
- * @version 2.0
+ * 暗月附魔 - 修复: 全部3处getUsedItemHand -> InteractionHand.MAIN_HAND / getMainHandItem
+ * @version 2.1
  */
-@AutoRegisterEnchantment(
-        id = "dark_moon",
-        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT,
-        rarity = EnchantmentRarity.VERY_RARE,
-        type = EnchantmentCategory.WEAPON,
-        slots = {EquipmentSlot.MAINHAND},
-        conflictsWith = {
-                EnchantmentScarletCorruption.class,
-                EnchantmentFireGivesPower.class,
-                EnchantmentFireDevoured.class,
-                EnchantmentVicDragonThunder.class
-        }
-)
+@AutoRegisterEnchantment(id = "dark_moon", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantmentCategory.WEAPON, slots = {EquipmentSlot.MAINHAND}, conflictsWith = {EnchantmentScarletCorruption.class, EnchantmentFireGivesPower.class, EnchantmentFireDevoured.class, EnchantmentVicDragonThunder.class})
 @Mod.EventBusSubscriber
 public class EnchantmentDarkMoon extends EnchantmentBase {
-
-    public EnchantmentDarkMoon() {
-        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
-    }
+    public EnchantmentDarkMoon() { super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND}); }
 
     private static boolean hasFullMoonEnchantment(@NotNull LivingEntity entity) {
         Enchantment fullMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentFullMoon.class);
-        if (fullMoon == null) {
-            return false;
-        }
-
+        if (fullMoon == null) return false;
         for (ItemStack armor : entity.getArmorSlots()) {
-            if (!armor.isEmpty()) {
-                if (EnchantmentHelper.getItemEnchantmentLevel(fullMoon, armor) > 0) {
-                    return true;
-                }
-            }
+            if (!armor.isEmpty() && EnchantmentHelper.getItemEnchantmentLevel(fullMoon, armor) > 0) return true;
         }
         return false;
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
-        if (evt.getEntity().level().isClientSide) {
-            return;
-        }
-
-        if (evt.getEntity().level().isDay()) {
-            return;
-        }
-
-        if (!DamageSourceUtil.isMagicDamage(evt.getSource())) {
-            return;
-        }
-
+        if (evt.getEntity().level().isClientSide || evt.getEntity().level().isDay()) return;
+        if (!DamageSourceUtil.isMagicDamage(evt.getSource())) return;
         LivingEntity victim = evt.getEntity();
         Enchantment darkMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDarkMoon.class);
-        if (darkMoon == null) {
-            return;
-        }
+        if (darkMoon == null) return;
 
-        // 受击者视角（减伤）
-        if (victim instanceof Mob) {
-            Mob livingVictim = (Mob) victim;
-
-            ItemStack heldItem = livingVictim.getItemInHand(livingVictim.getUsedItemHand());
+        // 受击者视角（减伤）- 修复：使用主手
+        if (victim instanceof Mob livingVictim) {
+            ItemStack heldItem = livingVictim.getItemInHand(InteractionHand.MAIN_HAND);
             if (!heldItem.isEmpty()) {
                 int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);
-
-                if (ConfigLoader.levelLimit) {
-                    level = Math.min(level, 10);
-                }
-
+                if (ConfigLoader.levelLimit) level = Math.min(level, 10);
                 if (level > 0) {
                     boolean hasFullMoon = hasFullMoonEnchantment(livingVictim);
-                    float reduction = hasFullMoon ? 0.375f : 0.25f;
-                    evt.setAmount(evt.getAmount() * (1 - reduction));
+                    evt.setAmount(evt.getAmount() * (1 - (hasFullMoon ? 0.375f : 0.25f)));
                 }
             }
         }
 
-        // 攻击者视角（增伤+吸血）
-        if (!(evt.getSource().getDirectEntity() instanceof LivingEntity)) {
-            return;
-        }
-
-        LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
-
-        ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
-        if (heldItem.isEmpty()) {
-            return;
-        }
-
+        // 攻击者视角（增伤+吸血）- 修复：使用主手
+        if (!(evt.getSource().getDirectEntity() instanceof LivingEntity attacker)) return;
+        ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
+        if (heldItem.isEmpty()) return;
         int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);
-
-        if (ConfigLoader.levelLimit) {
-            level = Math.min(level, 10);
-        }
-
-        if (level <= 0) {
-            return;
-        }
-
-        if (attacker instanceof Player) {
-            if (((Player) attacker).getAttackStrengthScale(0.5f) != 1) {
-                return;
-            }
-        }
-
+        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        if (level <= 0) return;
+        if (attacker instanceof Player && ((Player) attacker).getAttackStrengthScale(0.5f) != 1) return;
         boolean hasFullMoon = hasFullMoonEnchantment(attacker);
         float damageBonus = hasFullMoon ? 0.375f : 0.25f;
-
         evt.setAmount(evt.getAmount() * (1 + damageBonus));
-
-        if (victim instanceof Mob) {
-            Mob livingVictim = (Mob) victim;
-            if (livingVictim.getTarget() != null && livingVictim.getTarget().equals(attacker)) {
-                float extraDamage = hasFullMoon ? 0.075f : 0.05f;
-
-                evt.setAmount(evt.getAmount() + livingVictim.getHealth() * extraDamage);
-
-                float healAmount = Math.min(evt.getAmount() * extraDamage, attacker.getMaxHealth() * extraDamage);
-                attacker.heal(healAmount);
-            }
+        if (victim instanceof Mob livingVictim && livingVictim.getTarget() != null && livingVictim.getTarget().equals(attacker)) {
+            float extraDamage = hasFullMoon ? 0.075f : 0.05f;
+            evt.setAmount(evt.getAmount() + livingVictim.getHealth() * extraDamage);
+            attacker.heal(Math.min(evt.getAmount() * extraDamage, attacker.getMaxHealth() * extraDamage));
         }
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onLivingHeal(@NotNull LivingHealEvent evt) {
-        if (evt.getEntity().level().isClientSide) {
-            return;
-        }
-
-        if (evt.getEntity().level().isDay()) {
-            return;
-        }
-
+        if (evt.getEntity().level().isClientSide || evt.getEntity().level().isDay()) return;
         LivingEntity healer = evt.getEntity();
         Enchantment darkMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDarkMoon.class);
-        if (darkMoon == null) {
-            return;
-        }
-
-        ItemStack heldItem = healer.getItemInHand(healer.getUsedItemHand());
-        if (heldItem.isEmpty()) {
-            return;
-        }
-
+        if (darkMoon == null) return;
+        // 修复：使用主手
+        ItemStack heldItem = healer.getItemInHand(InteractionHand.MAIN_HAND);
+        if (heldItem.isEmpty()) return;
         int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);
-
-        if (ConfigLoader.levelLimit) {
-            level = Math.min(level, 10);
-        }
-
-        if (level <= 0) {
-            return;
-        }
-
+        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        if (level <= 0) return;
         boolean hasFullMoon = hasFullMoonEnchantment(healer);
-        float healBonus = hasFullMoon ? 0.375f : 0.25f;
-        evt.setAmount(evt.getAmount() * (1 + healBonus));
+        evt.setAmount(evt.getAmount() * (1 + (hasFullMoon ? 0.375f : 0.25f)));
     }
 
     @SubscribeEvent
     public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
-        if (evt.player.level().isClientSide) {
-            return;
-        }
-
-        if (evt.player.level().isDay()) {
-            return;
-        }
-
-        if (evt.phase != TickEvent.Phase.START) {
-            return;
-        }
-
+        if (evt.player.level().isClientSide || evt.player.level().isDay() || evt.phase != TickEvent.Phase.START) return;
         Player player = evt.player;
         Enchantment darkMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDarkMoon.class);
-        if (darkMoon == null) {
-            return;
-        }
-
-        if (!player.isAlive()) {
-            return;
-        }
-
-        ItemStack heldItem = player.getItemInHand(player.getUsedItemHand());
-        if (heldItem.isEmpty()) {
-            return;
-        }
-
+        if (darkMoon == null || !player.isAlive()) return;
+        // 修复：使用主手
+        ItemStack heldItem = player.getItemInHand(InteractionHand.MAIN_HAND);
+        if (heldItem.isEmpty()) return;
         int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);
-
-        if (ConfigLoader.levelLimit) {
-            level = Math.min(level, 10);
-        }
-
-        if (level > 0) {
-            player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 210));
-        }
+        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        if (level > 0) player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 210));
     }
 
-    @Override
-    public int getMinCost(int enchantmentLevel) {
-        return (int) (35 * ConfigLoader.enchantingDifficulty);
-    }
-
-    @Override
-    public int getMaxCost(int enchantmentLevel) {
-        return getMinCost(enchantmentLevel) + 50;
-    }
+    @Override public int getMinCost(int l) { return (int)(35 * ConfigLoader.enchantingDifficulty); }
+    @Override public int getMaxCost(int l) { return getMinCost(l) + 50; }
 }

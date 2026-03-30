@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.enchantment;
 
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.AbstractArrow;
@@ -32,9 +33,14 @@ import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
  * - 对自己造成持续3秒的癫火伤害（自己最大生命值 × 15%）
  * - 创造模式玩家免疫自损
  * </p>
+ * <p>
+ * 修复记录 v2.1：
+ * - getUsedItemHand() → InteractionHand.MAIN_HAND
+ *   箭矢命中时玩家已经放开弓，不再处于"使用物品"状态，getUsedItemHand()返回值不可靠
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "empty_epilepsy_fire",
@@ -89,7 +95,9 @@ public class EnchantmentEmptyEpilepsyFire extends EnchantmentBase {
             return;
         }
 
-        ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
+        // v2.1修复：使用主手而非 getUsedItemHand()
+        // 箭矢飞行/命中时弓已放开，玩家不再处于"使用物品"状态
+        ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) {
             return;
         }
@@ -106,7 +114,7 @@ public class EnchantmentEmptyEpilepsyFire extends EnchantmentBase {
 
         final int effectiveLevel = level;
 
-
+        // 对攻击者造成癫火伤害
         // 应用火焰燃烧效果（需要同步网络）
         DynamicAttributeManager.apply(attacker,
                 DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(BURN_DURATION, 0));

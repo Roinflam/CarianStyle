@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.enchantment;
 
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
@@ -30,9 +31,14 @@ import java.util.List;
  * 范围 = 等级 × 2格
  * 猩红腐败：持续时间 = 等级 × 5秒，等级 = 附魔等级 - 1
  * </p>
+ * <p>
+ * 修复记录 v2.1：
+ * - getUsedItemHand() → InteractionHand.MAIN_HAND
+ *   箭矢落地时玩家已放开弓，不再处于"使用物品"状态
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "dragon_breath_corruption",
@@ -66,7 +72,9 @@ public class EnchantmentDragonBreathCorruption extends EnchantmentBase {
             return;
         }
 
-        ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
+        // v2.1修复：使用主手而非 getUsedItemHand()
+        // 箭矢落地时玩家已放开弓
+        ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
 
         if (heldItem.isEmpty()) {
             return;

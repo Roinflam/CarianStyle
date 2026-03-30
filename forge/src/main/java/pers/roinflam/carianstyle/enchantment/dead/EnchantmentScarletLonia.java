@@ -33,9 +33,14 @@ import java.util.List;
  * - 1.5秒后对范围内敌人造成猩红腐败伤害并击退
  * - 最终自身死亡
  * </p>
+ * <p>
+ * 修复记录 v2.1：
+ * - 第一次击退方向修正：原代码传入 entity-hurter（从hurter指向entity），
+ *   knockback内部取反后把敌人拉向hurter。应传入 hurter-entity 才能推开。
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "scarlet_lonia",
@@ -87,8 +92,10 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
         );
 
         for (LivingEntity entityLivingBase : entities) {
-            double x = entityLivingBase.getX() - hurter.getX();
-            double z = entityLivingBase.getZ() - hurter.getZ();
+            // v2.1修复：方向改为 hurter - entity（从entity指向hurter），
+            // knockback内部取反后把entity推离hurter
+            double x = hurter.getX() - entityLivingBase.getX();
+            double z = hurter.getZ() - entityLivingBase.getZ();
             float stronge = (float) (level * 0.7 * Math.max(Math.abs(x), Math.abs(z)) / 14);
             entityLivingBase.knockback(stronge, x, z);
         }
@@ -113,6 +120,7 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
 
                         entityLivingBase.addEffect(new MobEffectInstance(CarianStylePotion.SCARLET_ROT.get(), finalLevel * 10 * 20, finalLevel - 1));
 
+                        // 第二次击退方向原本就正确（hurter - entity）
                         double x = hurter.getX() - entityLivingBase.getX();
                         double z = hurter.getZ() - entityLivingBase.getZ();
                         entityLivingBase.knockback(finalLevel * 0.75f, x, z);

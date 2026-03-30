@@ -9,6 +9,10 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraftforge.event.entity.EntityJoinLevelEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -28,9 +32,14 @@ import java.util.UUID;
  * 但会累积降低自身攻击力（等级 × -5%，最多-99%）
  * 对非亡灵生物：伤害降为20%
  * </p>
+ * <p>
+ * 修复记录：
+ * - 添加攻击力惩罚清除机制：玩家重生时清除、实体加入世界时清除
+ * - 修复累积逻辑：每次攻击亡灵时惩罚递增，而非固定值
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "sacred_blade",
@@ -44,6 +53,7 @@ import java.util.UUID;
                 EnchantmentBlackFlameBlade.class
         }
 )
+@Mod.EventBusSubscriber
 public class EnchantmentSacredBlade extends EnchantmentBase {
 
     private static final UUID ATTACK_DAMAGE_MODIFIER_ID = UUID.fromString("0dada439-4e61-fd5e-44d7-c620fd5a11fb");
@@ -83,6 +93,12 @@ public class EnchantmentSacredBlade extends EnchantmentBase {
 
     /**
      * 应用攻击力惩罚（累积降低，最多-99%）
+     * <p>
+     * 修复：每次攻击在现有基础上累积惩罚，而非覆盖
+     * </p>
+     *
+     * @param attacker 攻击者
+     * @param level    附魔等级
      */
     private void applyAttackPenalty(@NotNull LivingEntity attacker, int level) {
         AttributeInstance attributeInstance = attacker.getAttribute(Attributes.ATTACK_DAMAGE);
@@ -90,18 +106,20 @@ public class EnchantmentSacredBlade extends EnchantmentBase {
             return;
         }
 
-        double newReduction = Math.max(level * -0.05, -0.99);
+        double penaltyStep = level * -0.05;
         AttributeModifier existing = attributeInstance.getModifier(ATTACK_DAMAGE_MODIFIER_ID);
 
         if (existing == null) {
+            // 首次：添加惩罚
             attributeInstance.addPermanentModifier(new AttributeModifier(
                     ATTACK_DAMAGE_MODIFIER_ID,
                     ATTACK_DAMAGE_MODIFIER_NAME,
-                    newReduction,
+                    penaltyStep,
                     AttributeModifier.Operation.MULTIPLY_TOTAL
             ));
-        } else if (existing.getAmount() > newReduction) {
-            // 累积更大的惩罚
+        } else {
+            // 修复：累积惩罚，每次增加一个step，最多-99%
+            double newReduction = Math.max(existing.getAmount() + penaltyStep, -0.99);
             attributeInstance.removeModifier(ATTACK_DAMAGE_MODIFIER_ID);
             attributeInstance.addPermanentModifier(new AttributeModifier(
                     ATTACK_DAMAGE_MODIFIER_ID,
@@ -112,9 +130,46 @@ public class EnchantmentSacredBlade extends EnchantmentBase {
         }
     }
 
+    /**
+     * 玩家重生时清除攻击力惩罚
+     *
+     * @param evt 重生事件
+     */
+    @SubscribeEvent
+    public static void onPlayerRespawn(@NotNull PlayerEvent.PlayerRespawnEvent evt) {
+        if (evt.getEntity().level().isClientSide || evt.isEndConquered()) {
+            return;
+        }
+        removeAttackPenalty(evt.getEntity());
+    }
+
+    /**
+     * 实体加入世界时清除残留的攻击力惩罚
+     *
+     * @param evt 实体加入世界事件
+     */
+    @SubscribeEvent
+    public static void onEntityJoinLevel(@NotNull EntityJoinLevelEvent evt) {
+        if (evt.getLevel().isClientSide || !(evt.getEntity() instanceof LivingEntity)) {
+            return;
+        }
+        removeAttackPenalty((LivingEntity) evt.getEntity());
+    }
+
+    /**
+     * 移除攻击力惩罚修正器
+     *
+     * @param entity 实体
+     */
+    private static void removeAttackPenalty(@NotNull LivingEntity entity) {
+        AttributeInstance attributeInstance = entity.getAttribute(Attributes.ATTACK_DAMAGE);
+        if (attributeInstance != null) {
+            attributeInstance.removeModifier(ATTACK_DAMAGE_MODIFIER_ID);
+        }
+    }
+
     @Override
     protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        // 与原版锋利冲突
         if (ench == Enchantments.SHARPNESS) {
             return false;
         }

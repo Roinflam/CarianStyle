@@ -22,9 +22,17 @@ import javax.annotation.Nullable;
  * <p>
  * 封装事件处理所需的所有信息和常用操作，让附魔实现代码更加简洁清晰
  * </p>
+ * <p>
+ * 修复记录 v2.1：
+ * - knockback方向修正：LivingEntity.knockback(strength, ratioX, ratioZ) 内部会将
+ *   (ratioX, ratioZ)归一化后从速度中减去，即实体被推向(ratioX, ratioZ)的反方向。
+ *   因此要把对手推离持有者，ratioX应为 holder.x - opponent.x（从对手指向持有者），
+ *   内部取反后对手被推向远离持有者的方向。
+ *   原代码传的是 opponent.x - holder.x，效果是把对手拉向持有者。
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 public class EnchantmentContext {
 
@@ -252,7 +260,6 @@ public class EnchantmentContext {
      * @return 如果正在格挡返回true
      */
     public boolean isHolderBlocking() {
-        // 1.20.1: isHandActive → isUsingItem, getActiveItemStack → getUseItem
         return enchantmentHolder.isUsingItem() &&
                 enchantmentHolder.getUseItem().getItem() instanceof ShieldItem;
     }
@@ -273,7 +280,6 @@ public class EnchantmentContext {
      * @return 如果在燃烧返回true
      */
     public boolean isHolderBurning() {
-        // 1.20.1: isBurning → isOnFire
         return enchantmentHolder.isOnFire();
     }
 
@@ -283,7 +289,6 @@ public class EnchantmentContext {
      * @return 如果是魔法伤害返回true
      */
     public boolean isMagicDamage() {
-        // 1.20.1: isMagicDamage → isMagic
         return damageSource != null && (damageSource.getMsgId().contains("magic") || damageSource.is(DamageTypeTags.WITCH_RESISTANT_TO));
     }
 
@@ -293,7 +298,6 @@ public class EnchantmentContext {
      * @return 如果可以伤害创造模式玩家返回true
      */
     public boolean canHarmInCreative() {
-        // 1.20.1: canHarmInCreative → 检查 BYPASSES_INVULNERABILITY 标签
         return damageSource != null &&
                 damageSource.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY);
     }
@@ -332,7 +336,6 @@ public class EnchantmentContext {
      * @return 如果拥有该效果返回true
      */
     public boolean holderHasPotion(@Nonnull MobEffect effect) {
-        // 1.20.1: isPotionActive → hasEffect
         return enchantmentHolder.hasEffect(effect);
     }
 
@@ -435,30 +438,40 @@ public class EnchantmentContext {
     // ==================== 击退方法 ====================
 
     /**
-     * 对对手施加击退效果（自动计算方向）
+     * 对对手施加击退效果（自动计算方向，推离持有者）
+     * <p>
+     * v2.1修复：knockback(strength, ratioX, ratioZ) 内部将(ratioX, ratioZ)归一化后
+     * 从实体速度中减去。要把对手推离持有者，需要传入 holder→opponent 的反方向
+     * （即从opponent指向holder的方向），内部取反后对手被推向远离holder的方向。
+     * </p>
      *
      * @param strength 击退强度
      */
     public void knockback(double strength) {
         LivingEntity opponent = getOpponent();
         if (opponent != null && enchantmentHolder != null) {
-            // 1.20.1: knockBack → knockback, 参数变化
-            double dx = opponent.getX() - enchantmentHolder.getX();
-            double dz = opponent.getZ() - enchantmentHolder.getZ();
+            // 修复：方向应为 holder - opponent（从opponent指向holder）
+            // knockback内部取反后，对手被推向远离holder的方向
+            double dx = enchantmentHolder.getX() - opponent.getX();
+            double dz = enchantmentHolder.getZ() - opponent.getZ();
             opponent.knockback(strength, dx, dz);
         }
     }
 
     /**
-     * 对指定实体施加击退效果
+     * 对指定实体施加击退效果（推离持有者）
+     * <p>
+     * v2.1修复：方向修正，与无参版本一致
+     * </p>
      *
      * @param target 目标实体
      * @param strength 击退强度
      */
     public void knockback(@Nonnull LivingEntity target, double strength) {
         if (enchantmentHolder != null) {
-            double dx = target.getX() - enchantmentHolder.getX();
-            double dz = target.getZ() - enchantmentHolder.getZ();
+            // 修复：方向应为 holder - target（从target指向holder）
+            double dx = enchantmentHolder.getX() - target.getX();
+            double dz = enchantmentHolder.getZ() - target.getZ();
             target.knockback(strength, dx, dz);
         }
     }
@@ -522,7 +535,6 @@ public class EnchantmentContext {
      */
     public void addPotionToHolder(@Nonnull MobEffect effect, int duration, int amplifier) {
         if (enchantmentHolder != null) {
-            // 1.20.1: addPotionEffect → addEffect, PotionEffect → MobEffectInstance
             enchantmentHolder.addEffect(new MobEffectInstance(effect, duration, amplifier));
         }
     }
@@ -548,7 +560,6 @@ public class EnchantmentContext {
      */
     public void removePotionFromHolder(@Nonnull MobEffect effect) {
         if (enchantmentHolder != null) {
-            // 1.20.1: removePotionEffect → removeEffect
             enchantmentHolder.removeEffect(effect);
         }
     }
@@ -562,7 +573,6 @@ public class EnchantmentContext {
     @Nullable
     public MobEffectInstance getHolderPotionEffect(@Nonnull MobEffect effect) {
         if (enchantmentHolder != null) {
-            // 1.20.1: getActivePotionEffect → getEffect
             return enchantmentHolder.getEffect(effect);
         }
         return null;

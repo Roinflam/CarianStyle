@@ -1,6 +1,7 @@
 package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LightningBolt;
@@ -33,9 +34,15 @@ import java.util.List;
  * 箭矢落地时吸引周围敌人，延迟后召唤闪电造成伤害
  * 夜晚伤害×3
  * </p>
+ * <p>
+ * 修复记录 v2.1：
+ * - getUsedItemHand() → InteractionHand.MAIN_HAND
+ *   箭矢命中时玩家可能已经不在"使用"状态（弓已放开），
+ *   getUsedItemHand()可能返回错误的手，应直接检查主手
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "call_star",
@@ -95,7 +102,9 @@ public class EnchantmentCallStar extends EnchantmentBase {
 
         LivingEntity attacker = (LivingEntity) arrow.getOwner();
 
-        ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
+        // v2.1修复：使用主手而非getUsedItemHand()
+        // 箭矢飞行/命中时玩家可能已经不在"使用"状态
+        ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) {
             return;
         }
@@ -117,7 +126,7 @@ public class EnchantmentCallStar extends EnchantmentBase {
 
         final int effectiveLevel = level;
 
-        // 第一阶段：吸引周围敌人（击退）
+        // 第一阶段：吸引周围敌人（向箭矢位置拉近）
         List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 arrow,
@@ -126,6 +135,8 @@ public class EnchantmentCallStar extends EnchantmentBase {
         );
 
         for (LivingEntity entity : nearbyEntities) {
+            // 吸引方向：从entity指向arrow（内部取反后推向arrow方向→即拉近）
+            // 这里是有意为之的吸引效果，不是击退
             double x = entity.getX() - arrow.getX();
             double z = entity.getZ() - arrow.getZ();
             float strength = (float) (effectiveLevel * 0.35f * Math.max(Math.abs(x), Math.abs(z)) / 7);
@@ -167,7 +178,7 @@ public class EnchantmentCallStar extends EnchantmentBase {
 
                         target.hurt(target.damageSources().lightningBolt(), damage);
 
-                        // 如果目标在地面上，施加小幅击退
+                        // 如果目标在地面上，施加小幅随机击退
                         if (target.onGround()) {
                             double x = RandomUtils.nextBoolean() ? arrow.getX() - target.getX() : target.getX() - arrow.getX();
                             double z = RandomUtils.nextBoolean() ? arrow.getZ() - target.getZ() : target.getZ() - arrow.getZ();

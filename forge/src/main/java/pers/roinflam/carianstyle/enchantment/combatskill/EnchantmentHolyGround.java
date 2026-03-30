@@ -1,16 +1,15 @@
-// 文件：EnchantmentHolyGround.java
-// 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentHolyGround.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.event.entity.living.LivingEvent;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -20,6 +19,7 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
@@ -32,9 +32,15 @@ import java.util.List;
  * 治疗：最大血量×1.5%×等级（每60tick）
  * 护盾：吸收量+3%×等级，上限=最大血量/3×等级
  * </p>
+ * <p>
+ * 性能优化记录：
+ * - 将治疗/护盾光环从LivingTickEvent改为PlayerTickEvent
+ *   原代码：所有LivingEntity每tick都进入方法，即使99%的实体都没有圣地附魔
+ *   优化后：只在PlayerTickEvent中检查玩家，且提前检查附魔等级后再执行范围搜索
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "holy_ground",
@@ -47,7 +53,7 @@ import java.util.List;
 public class EnchantmentHolyGround extends EnchantmentBase {
 
     public EnchantmentHolyGround() {
-        super(EnchantmentCategory.BREAKABLE, new EquipmentSlot[]{
+        super(CarianStyleEnchantments.getCustomEnchantmentCategory("SHIELD"), new EquipmentSlot[]{
                 EquipmentSlot.MAINHAND,
                 EquipmentSlot.OFFHAND
         });
@@ -99,16 +105,29 @@ public class EnchantmentHolyGround extends EnchantmentBase {
 
     /**
      * 治疗/护盾光环：举盾时每60tick为附近同类生物提供治疗和护盾
+     * <p>
+     * 性能优化：改用PlayerTickEvent替代LivingTickEvent
+     * 原代码注册在所有LivingEntity的tick上，每个存活实体每tick都进入
+     * 优化为仅玩家检测，且提前判断附魔+举盾状态后才做范围搜索
+     * </p>
      */
     @SubscribeEvent
-    public static void onLivingUpdate(@NotNull LivingEvent.LivingTickEvent evt) {
-        if (evt.getEntity().tickCount % 60 != 0) {
+    public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
+        if (evt.player.level().isClientSide || evt.phase != TickEvent.Phase.START) {
             return;
         }
 
-        LivingEntity holder = evt.getEntity();
+        // 60tick间隔
+        if (evt.player.tickCount % 60 != 0) {
+            return;
+        }
 
-        // 检查是否正在举盾
+        Player holder = evt.player;
+        if (!holder.isAlive()) {
+            return;
+        }
+
+        // 提前检查：是否正在举盾
         if (!holder.isUsingItem()) {
             return;
         }
@@ -118,18 +137,18 @@ public class EnchantmentHolyGround extends EnchantmentBase {
             return;
         }
 
+        // 提前检查：盾牌是否有圣地附魔
         Enchantment holyGround = EnchantmentRegistry.getEnchantmentByClass(EnchantmentHolyGround.class);
         if (holyGround == null) {
             return;
         }
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(holyGround, activeItem);
-
         if (level <= 0) {
             return;
         }
 
-        // 查找附近16格内的同类生物
+        // 所有前置检查通过，才执行范围搜索
         List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 holder,

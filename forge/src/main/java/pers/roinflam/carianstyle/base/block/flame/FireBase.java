@@ -21,7 +21,6 @@ import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 import javax.annotation.Nonnull;
@@ -29,6 +28,11 @@ import java.util.Map;
 
 /**
  * 自定义火焰方块基类
+ * <p>
+ * v2.2修复：移除所有 System.out.println 调试输出
+ * System.out.println 是同步IO操作，在服务端每次调用都会阻塞当前线程，
+ * 加上字符串拼接的GC开销，对tick性能有负面影响
+ * </p>
  */
 public abstract class FireBase extends BaseFireBlock {
 
@@ -76,29 +80,34 @@ public abstract class FireBase extends BaseFireBlock {
     }
 
     /**
-     * 关键修复：指定渲染形状为不可见，让自定义渲染器处理
+     * 指定渲染形状为模型渲染
      */
     @Override
     @Nonnull
     public RenderShape getRenderShape(@Nonnull BlockState state) {
-        return RenderShape.MODEL; // 使用模型渲染
+        return RenderShape.MODEL;
     }
 
     /**
-     * 关键修复：设置方块为半透明以支持火焰效果
+     * 设置方块为半透明以支持火焰效果
      */
     @Override
     public boolean propagatesSkylightDown(@Nonnull BlockState state, @Nonnull BlockGetter level, @Nonnull BlockPos pos) {
-        return true; // 允许天空光照穿透
+        return true;
     }
 
     @Override
     public BlockState getStateForPlacement(@Nonnull BlockPlaceContext context) {
-        BlockState state = getStateWithConnections(context.getLevel(), context.getClickedPos());
-        System.out.println("[CarianStyle-调试] 放置火焰方块，位置: " + context.getClickedPos() + ", 状态: " + state);
-        return state;
+        return getStateWithConnections(context.getLevel(), context.getClickedPos());
     }
 
+    /**
+     * 根据相邻方块计算连接状态
+     *
+     * @param level 世界
+     * @param pos   方块位置
+     * @return 带连接信息的方块状态
+     */
     private BlockState getStateWithConnections(@Nonnull BlockGetter level, @Nonnull BlockPos pos) {
         BlockState state = this.defaultBlockState();
 
@@ -126,7 +135,6 @@ public abstract class FireBase extends BaseFireBlock {
                                   @Nonnull BlockState neighborState, @Nonnull LevelAccessor level,
                                   @Nonnull BlockPos pos, @Nonnull BlockPos neighborPos) {
         if (!this.canSurvive(state, level, pos)) {
-            System.out.println("[CarianStyle-调试] 火焰方块无法存活，移除: " + pos);
             return Blocks.AIR.defaultBlockState();
         }
 
@@ -150,7 +158,6 @@ public abstract class FireBase extends BaseFireBlock {
     public void attack(@Nonnull BlockState state, @Nonnull Level level,
                        @Nonnull BlockPos pos, @Nonnull Player player) {
         if (!level.isClientSide()) {
-            System.out.println("[CarianStyle-调试] 玩家点击熄灭火焰: " + pos);
             level.removeBlock(pos, false);
         }
     }
@@ -160,6 +167,9 @@ public abstract class FireBase extends BaseFireBlock {
         return false;
     }
 
+    /**
+     * 内部工具类，模拟 net.minecraft.Util.make 的功能
+     */
     private static class Util {
         public static <T> T make(T object, java.util.function.Consumer<T> consumer) {
             consumer.accept(object);

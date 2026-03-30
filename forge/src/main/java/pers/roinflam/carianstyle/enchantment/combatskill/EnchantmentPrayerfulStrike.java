@@ -1,8 +1,7 @@
-// 文件：EnchantmentPrayerfulStrike.java
-// 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentPrayerfulStrike.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -34,13 +33,11 @@ import java.util.UUID;
 /**
  * 祈祷一击附魔
  * <p>
- * 攻击后开始蓄力（8秒），4秒后进入准备状态
- * 准备状态下攻击触发：额外伤害、增加最大生命值、治疗自身
- * 蓄力期间每秒播放音效提示
+ * 修复记录：修复getUsedItemHand → InteractionHand.MAIN_HAND
  * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "prayerful_strike",
@@ -56,7 +53,6 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
 
     private static final UUID MAX_HEALTH_MODIFIER_ID = UUID.fromString("b55a7c8a-df03-bca7-b5ea-ec703b261525");
     private static final String MAX_HEALTH_MODIFIER_NAME = "enchantment.prayerful_strike";
-
     private static final String CHARGING_COOLDOWN_KEY = "prayerful_strike_charging";
     private static final String NOT_READY_COOLDOWN_KEY = "prayerful_strike_not_ready";
 
@@ -64,9 +60,6 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
-    /**
-     * 伤害事件处理（LOWEST优先级）
-     */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
         if (evt.getEntity().level().isClientSide) {
@@ -85,21 +78,19 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
             return;
         }
 
-        // 攻击者视角
-        ItemStack attackerHeld = attacker.getItemInHand(attacker.getUsedItemHand());
+        // 攻击者视角 - 修复：使用主手检查
+        ItemStack attackerHeld = attacker.getItemInHand(InteractionHand.MAIN_HAND);
         if (!attackerHeld.isEmpty()) {
             int level = EnchantmentHelper.getItemEnchantmentLevel(prayerfulStrike, attackerHeld);
-
             if (level > 0) {
                 handleAttackerLogic(evt, attacker, victim);
             }
         }
 
-        // 受击者视角
-        ItemStack victimHeld = victim.getItemInHand(victim.getUsedItemHand());
+        // 受击者视角 - 修复：使用主手检查
+        ItemStack victimHeld = victim.getItemInHand(InteractionHand.MAIN_HAND);
         if (!victimHeld.isEmpty()) {
             int level = EnchantmentHelper.getItemEnchantmentLevel(prayerfulStrike, victimHeld);
-
             if (level > 0) {
                 handleVictimLogic(victim);
             }
@@ -142,16 +133,13 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
                 victim.getMaxHealth() * 0.1f
         );
         evt.setAmount(evt.getAmount() + bonusDamage);
-
         applyMaxHealthBonus(attacker, bonusDamage);
         attacker.heal(bonusDamage);
-
         attacker.playSound(SoundEvents.PLAYER_LEVELUP, 1, 0);
         victim.playSound(SoundEvents.PLAYER_LEVELUP, 1, 0);
     }
 
     private static void applyMaxHealthBonus(LivingEntity attacker, float bonusDamage) {
-        // 1.20.1: getEntityAttribute → getAttribute
         AttributeInstance attribute = attacker.getAttribute(Attributes.MAX_HEALTH);
         if (attribute == null) {
             return;
@@ -163,10 +151,8 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
 
         if (existing == null) {
             attribute.addPermanentModifier(new AttributeModifier(
-                    MAX_HEALTH_MODIFIER_ID,
-                    MAX_HEALTH_MODIFIER_NAME,
-                    healthBonus,
-                    AttributeModifier.Operation.ADDITION
+                    MAX_HEALTH_MODIFIER_ID, MAX_HEALTH_MODIFIER_NAME,
+                    healthBonus, AttributeModifier.Operation.ADDITION
             ));
         } else {
             double newAmount = Math.min(
@@ -175,10 +161,8 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
             );
             attribute.removeModifier(MAX_HEALTH_MODIFIER_ID);
             attribute.addPermanentModifier(new AttributeModifier(
-                    MAX_HEALTH_MODIFIER_ID,
-                    MAX_HEALTH_MODIFIER_NAME,
-                    newAmount,
-                    AttributeModifier.Operation.ADDITION
+                    MAX_HEALTH_MODIFIER_ID, MAX_HEALTH_MODIFIER_NAME,
+                    newAmount, AttributeModifier.Operation.ADDITION
             ));
         }
     }
@@ -188,7 +172,6 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
         if (evt.getEntity().level().isClientSide || evt.isEndConquered()) {
             return;
         }
-
         AttributeInstance attribute = evt.getEntity().getAttribute(Attributes.MAX_HEALTH);
         if (attribute != null) {
             attribute.removeModifier(MAX_HEALTH_MODIFIER_ID);
@@ -207,16 +190,13 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
         if (evt.phase != TickEvent.Phase.START || evt.player.tickCount % 20 != 0) {
             return;
         }
-
         Player player = evt.player;
         if (!player.isAlive()) {
             return;
         }
-
         UUID uuid = player.getUUID();
         boolean inChargingPeriod = EnchantmentDataManager.isOnCooldown(CHARGING_COOLDOWN_KEY, uuid);
         boolean stillWaiting = EnchantmentDataManager.isOnCooldown(NOT_READY_COOLDOWN_KEY, uuid);
-
         if (inChargingPeriod && stillWaiting) {
             player.playSound(SoundEvents.PLAYER_LEVELUP, 1, 3);
         }

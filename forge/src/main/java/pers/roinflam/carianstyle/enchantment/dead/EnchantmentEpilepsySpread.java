@@ -36,9 +36,14 @@ import java.util.List;
  * - 1.5秒后对范围内所有实体施加癫火灼烧效果
  * - 持续3秒的伤害，最终自身死亡
  * </p>
+ * <p>
+ * 修复记录 v2.1：
+ * - 击退方向修正：原代码传入 entity-hurter（从hurter指向entity），
+ *   knockback内部取反后把敌人拉向hurter。应传入 hurter-entity 才能推开。
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "epilepsy_spread",
@@ -87,8 +92,10 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
             for (LivingEntity entityLivingBase : entities) {
                 entityLivingBase.playSound(SoundEvents.GHAST_HURT, 1, 1);
                 if (!entityLivingBase.equals(hurter)) {
-                    double x = entityLivingBase.getX() - hurter.getX();
-                    double z = entityLivingBase.getZ() - hurter.getZ();
+                    // v2.1修复：方向改为 hurter - entity（从entity指向hurter），
+                    // knockback内部取反后把entity推离hurter
+                    double x = hurter.getX() - entityLivingBase.getX();
+                    double z = hurter.getZ() - entityLivingBase.getZ();
                     float stronge = (float) (level * 0.7 * Math.max(Math.abs(x), Math.abs(z)) / 14);
                     entityLivingBase.knockback(stronge, x, z);
                 }

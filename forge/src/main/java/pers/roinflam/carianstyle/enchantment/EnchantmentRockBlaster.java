@@ -17,6 +17,7 @@ import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.registries.ForgeRegistries;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -36,7 +37,7 @@ import java.util.*;
  * </p>
  *
  * @author RoinFlam
- * @version 3.0
+ * @version 3.1
  */
 @AutoRegisterEnchantment(
         id = "rock_blaster",
@@ -69,6 +70,29 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
     private static final int[] DX = {1, -1, 0, 0, 0, 0};
     private static final int[] DY = {0, 0, 1, -1, 0, 0};
     private static final int[] DZ = {0, 0, 0, 0, 1, -1};
+
+    /**
+     * 常见废石方块注册名集合
+     * 开启 rockBlasterSuppressCommonDrops 配置后，碎岩者破坏这些方块时不产生掉落物，
+     * 以减少大范围挖掘时掉落物实体数量导致的卡顿
+     */
+    private static final Set<String> COMMON_STONE_IDS = Set.of(
+            "minecraft:stone",
+            "minecraft:cobblestone",
+            "minecraft:deepslate",
+            "minecraft:cobbled_deepslate",
+            "minecraft:granite",
+            "minecraft:diorite",
+            "minecraft:andesite",
+            "minecraft:tuff",
+            "minecraft:calcite",
+            "minecraft:smooth_basalt",
+            "minecraft:gravel",
+            "minecraft:netherrack",
+            "minecraft:basalt",
+            "minecraft:blackstone",
+            "minecraft:end_stone"
+    );
 
     public EnchantmentRockBlaster() {
         super(EnchantmentCategory.DIGGER, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
@@ -158,6 +182,21 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
     }
 
     /**
+     * 判断指定方块是否属于常见废石，需要在配置开启时抑制掉落物
+     *
+     * @param block 要检查的方块
+     * @return 如果配置开启且方块在废石列表中则返回 true
+     */
+    private static boolean shouldSuppressDrop(Block block) {
+        if (!ConfigLoader.rockBlasterSuppressCommonDrops) {
+            return false;
+        }
+        // 从注册表获取方块的注册名进行匹配
+        net.minecraft.resources.ResourceLocation key = ForgeRegistries.BLOCKS.getKey(block);
+        return key != null && COMMON_STONE_IDS.contains(key.toString());
+    }
+
+    /**
      * 方块破坏事件处理
      *
      * @param evt 方块破坏事件
@@ -232,6 +271,9 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
         // 提前获取时运等级，避免循环内重复查找附魔
         int fortuneLevel = EnchantmentHelper.getItemEnchantmentLevel(Enchantments.BLOCK_FORTUNE, tool);
 
+        // 提前判断目标方块是否需要抑制掉落物（同一批 BFS 结果全是同类方块，只需判断一次）
+        boolean suppressDrop = shouldSuppressDrop(targetBlock);
+
         for (BlockPos pos : targets) {
 
             // 工具耐久不足时立即终止整个范围挖掘
@@ -253,17 +295,22 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
                 }
 
                 if (!player.getAbilities().instabuild) {
-                    // 生存模式：触发破坏粒子、掉落物、耐久消耗、经验
+                    // 生存模式破坏方块
                     block.playerWillDestroy(world, pos, blockState, player);
 
-                    if (block.onDestroyedByPlayer(blockState, world, pos, player, true, world.getFluidState(pos))) {
+                    // willHarvest 参数：抑制掉落时传 false，阻止方块保留状态给后续掉落逻辑
+                    if (block.onDestroyedByPlayer(blockState, world, pos, player, !suppressDrop, world.getFluidState(pos))) {
                         block.destroy(world, pos, blockState);
-                        block.playerDestroy(world, player, pos, blockState, world.getBlockEntity(pos), tool);
 
-                        // 经验减半，避免范围挖掘获得过多经验
-                        block.popExperience(serverLevel, pos,
-                                block.getExpDrop(blockState, serverLevel, serverLevel.random, pos, fortuneLevel, 0) / 2);
+                        if (!suppressDrop) {
+                            // 非废石方块：正常产生掉落物，经验减半以避免范围挖掘获得过多经验
+                            block.playerDestroy(world, player, pos, blockState, world.getBlockEntity(pos), tool);
+                            block.popExperience(serverLevel, pos,
+                                    block.getExpDrop(blockState, serverLevel, serverLevel.random, pos, fortuneLevel, 0) / 2);
+                        }
+                        // 废石方块：跳过 playerDestroy 和 popExperience，方块直接消失，不产生掉落物和经验
 
+                        // 无论是否抑制掉落物，耐久消耗照常
                         if (isDamageable) {
                             tool.hurtAndBreak(1, player, (p) -> p.broadcastBreakEvent(player.getUsedItemHand()));
                         }

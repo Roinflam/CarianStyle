@@ -1,5 +1,3 @@
-// 文件：EnchantmentLungeUp.java
-// 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentLungeUp.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
 import net.minecraft.world.effect.MobEffectInstance;
@@ -20,9 +18,13 @@ import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
  * <p>
  * 疾跑攻击时触发：停止疾跑、短暂缓慢、5tick后击飞敌人、增伤+15%×等级
  * </p>
+ * <p>
+ * 修复记录：
+ * - 延迟任务中增加victim存活检查，避免对已死亡实体操作
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "lunge_up",
@@ -61,11 +63,11 @@ public class EnchantmentLungeUp extends EnchantmentBase {
         new SynchronizationTask(5) {
             @Override
             public void run() {
-                if (!attacker.isAlive()) {
+                // 修复：同时检查攻击者和受害者是否存活
+                if (!attacker.isAlive() || !victim.isAlive()) {
                     return;
                 }
 
-                // 1.20.1: 直接设置Y方向速度
                 victim.setDeltaMovement(
                         victim.getDeltaMovement().x,
                         level * 0.3,

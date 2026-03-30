@@ -1,10 +1,12 @@
 package pers.roinflam.carianstyle.enchantment;
 
+import net.minecraft.world.InteractionHand;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
@@ -24,17 +26,20 @@ import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 /**
  * 古龙雷附魔
  * <p>
- * 武器附魔，雷电攻击
- * 防御效果（受到雷电伤害时）：
- * - 减少 15% × 等级 的雷电伤害（超过100%时完全免疫）
- * 攻击效果：
- * - 概率召唤落雷（雷暴时100%，下雨时10%×等级，晴天5%×等级）
- * - 造成额外 50% × 等级 × 天气倍率 的雷电伤害
- * - 天气倍率：晴天1，下雨2，雷暴4
+ * 攻击时概率召唤落雷（概率受天气影响）
+ * 持有时减免雷电伤害
+ * </p>
+ * <p>
+ * 修复记录 v2.2：
+ * - 全部2处 getUsedItemHand() → InteractionHand.MAIN_HAND
+ * - 天气倍率bug修复：原代码先乘isRaining再乘isThundering，
+ *   MC中雷暴时isRaining()也返回true，导致倍率变成1*2*4=8而不是4。
+ *   改为互斥判断：雷暴4x，下雨2x，晴天1x
+ *   触发概率也改为互斥判断，与PreciseLightning和AncientDragonLightning一致
  * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "vic_dragon_thunder",
@@ -68,19 +73,16 @@ public class EnchantmentVicDragonThunder extends EnchantmentBase {
             return;
         }
 
-        // 防御：雷电伤害减免
+        // ==================== 防御：雷电伤害减免 ====================
+        // v2.2修复：使用主手
         if (!evt.getSource().is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)
                 && "lightningBolt".equals(evt.getSource().getMsgId())) {
-            if (!victim.getItemInHand(victim.getUsedItemHand()).isEmpty()) {
-                int level = EnchantmentHelper.getItemEnchantmentLevel(
-                        vicDragonThunder,
-                        victim.getItemInHand(victim.getUsedItemHand())
-                );
-
+            ItemStack victimHeld = victim.getItemInHand(InteractionHand.MAIN_HAND);
+            if (!victimHeld.isEmpty()) {
+                int level = EnchantmentHelper.getItemEnchantmentLevel(vicDragonThunder, victimHeld);
                 if (ConfigLoader.levelLimit) {
                     level = Math.min(level, 10);
                 }
-
                 if (level > 0) {
                     if (level * 0.15 >= 1) {
                         evt.setCanceled(true);
@@ -91,30 +93,28 @@ public class EnchantmentVicDragonThunder extends EnchantmentBase {
             }
         }
 
-        // 攻击：召唤落雷
-        if (!(evt.getSource().getDirectEntity() instanceof LivingEntity)) {
+        // ==================== 攻击：召唤落雷 ====================
+        if (!(evt.getSource().getDirectEntity() instanceof LivingEntity attacker)) {
             return;
         }
 
-        LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
-
-        if (attacker.getItemInHand(attacker.getUsedItemHand()).isEmpty()) {
+        // v2.2修复：使用主手
+        ItemStack attackerHeld = attacker.getItemInHand(InteractionHand.MAIN_HAND);
+        if (attackerHeld.isEmpty()) {
             return;
         }
 
-        int level = EnchantmentHelper.getItemEnchantmentLevel(
-                vicDragonThunder,
-                attacker.getItemInHand(attacker.getUsedItemHand())
-        );
-
+        int level = EnchantmentHelper.getItemEnchantmentLevel(vicDragonThunder, attackerHeld);
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
         }
-
         if (level <= 0) {
             return;
         }
 
+        // v2.2修复：触发概率改为互斥判断
+        // 原代码：晴天=level*5, 下雨=level*5*2, 雷暴=100（但雷暴时isRaining也true会先命中下雨分支）
+        // 修复后：先判断雷暴再判断下雨，确保分支互斥
         int triggerChance;
         if (attacker.level().isThundering()) {
             triggerChance = 100;
@@ -128,8 +128,8 @@ public class EnchantmentVicDragonThunder extends EnchantmentBase {
             return;
         }
 
+        // 召唤视觉闪电
         Level world = victim.level();
-
         if (world instanceof ServerLevel serverLevel) {
             LightningBolt lightning = EntityType.LIGHTNING_BOLT.create(serverLevel);
             if (lightning != null) {
@@ -139,14 +139,17 @@ public class EnchantmentVicDragonThunder extends EnchantmentBase {
             }
         }
 
+        // 重置无敌帧
         victim.invulnerableTime = 10;
 
+        // v2.2修复：伤害倍率改为互斥判断
+        // 原代码：if(isRaining) *=2; if(isThundering) *=4; → 雷暴时实际为1*2*4=8倍
+        // 修复后：互斥判断，雷暴=4x，下雨=2x，晴天=1x
         int magnification = 1;
-        if (attacker.level().isRaining()) {
-            magnification *= 2;
-        }
         if (attacker.level().isThundering()) {
-            magnification *= 4;
+            magnification = 4;
+        } else if (attacker.level().isRaining()) {
+            magnification = 2;
         }
 
         victim.hurt(victim.damageSources().lightningBolt(), evt.getAmount() * level * 0.5f * magnification);

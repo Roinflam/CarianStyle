@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
@@ -22,17 +23,11 @@ import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 /**
  * 岩石剑附魔
  * <p>
- * 效果：
- * - 攻击时给自己施加持续10秒的增益效果
- * - 无法跳跃
- * - 获得击退抗性 10% × 等级
- * - 攻击力提高 10% × 等级
- * - 护甲提高 10% × 等级
- * - 韧性提高 10% × 等级
+ * 修复记录：修复getUsedItemHand → InteractionHand.MAIN_HAND
  * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "cragblade",
@@ -48,9 +43,6 @@ public class EnchantmentCragblade extends EnchantmentBase {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
-    /**
-     * 攻击时给攻击者自己施加岩石剑增益效果
-     */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
         if (evt.getEntity().level().isClientSide) {
@@ -63,7 +55,8 @@ public class EnchantmentCragblade extends EnchantmentBase {
 
         LivingEntity attacker = (LivingEntity) evt.getSource().getEntity();
 
-        ItemStack heldItem = attacker.getItemInHand(attacker.getUsedItemHand());
+        // 修复：使用主手检查
+        ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) {
             return;
         }
@@ -80,7 +73,7 @@ public class EnchantmentCragblade extends EnchantmentBase {
         }
 
         // 给攻击者自己施加岩石剑增益效果
-        int duration = 200; // 10秒（200 tick）
+        int duration = 200;
         int amplifier = level - 1;
         DynamicAttributeManager.apply(attacker,
                 DynamicAttributes.CRAGBLADE.createInstance(duration, amplifier));
