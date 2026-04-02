@@ -1,6 +1,5 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
@@ -12,9 +11,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
-import pers.roinflam.carianstyle.init.CarianStylePotion;
-import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
 
 /**
  * 黑焰刃附魔
@@ -22,9 +19,13 @@ import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
  * 攻击时施加灭绝火焰燃烧效果
  * 持续伤害：伤害×等级×0.15/100 每tick，持续100tick
  * </p>
+ * <p>
+ * 性能优化 v3.0：使用 DamageOverTimeManager 替代 SynchronizationTask(5, 1)
+ * 黑焰刃是RARE级非宝藏附魔，使用频率最高的DoT附魔之一，优化效果显著
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 3.0
  */
 @AutoRegisterEnchantment(
         id = "black_flame_blade",
@@ -39,6 +40,11 @@ import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 )
 public class EnchantmentBlackFlameBlade extends EnchantmentBase {
 
+    /** 持续伤害总时长（tick） */
+    private static final int DOT_DURATION = 100;
+    /** 初始延迟（tick） */
+    private static final int DOT_DELAY = 5;
+
     public EnchantmentBlackFlameBlade() {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
@@ -51,40 +57,28 @@ public class EnchantmentBlackFlameBlade extends EnchantmentBase {
             return;
         }
 
-        // 手动应用等级限制
         int effectiveLevel = level;
         if (ConfigLoader.levelLimit) {
             effectiveLevel = Math.min(effectiveLevel, 10);
         }
 
-        // 使用动态属性系统施加灭绝火焰效果（21tick，会自动同步客户端渲染白色火焰）
+        // 施加灭绝火焰效果（白色火焰视觉）
         DynamicAttributeManager.apply(
                 victim,
-                DynamicAttributes.DESTRUCTION_FIRE_BURNING.createInstance( 5 * 20 + 5, 0)
+                DynamicAttributes.DESTRUCTION_FIRE_BURNING.createInstance(5 * 20 + 5, 0)
         );
 
         // 每tick伤害 = 原伤害×等级×0.15/100
-        float damagePerTick = ctx.getDamage() * effectiveLevel * 0.15f / 100;
+        float damagePerTick = ctx.getDamage() * effectiveLevel * 0.15f / DOT_DURATION;
 
-        // 持续伤害任务
-        new SynchronizationTask(5, 1) {
-            private int tick = 0;
-
-            @Override
-            public void run() {
-                if (++tick > 100 || !victim.isAlive()) {
-                    this.cancel();
-                    return;
-                }
-
-                if (victim.getHealth() - damagePerTick * 2 > 0) {
-                    EntityLivingUtil.damageHealthDirectly(victim, damagePerTick);
-                } else {
-                    EntityLivingUtil.kill(victim, ctx.getDamageSource());
-                    this.cancel();
-                }
-            }
-        }.start();
+        DamageOverTimeManager.applyLinear(
+                victim,
+                damagePerTick,
+                DOT_DURATION,
+                DOT_DELAY,
+                ctx.getDamageSource(),
+                true
+        );
     }
 
     @Override

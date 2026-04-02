@@ -10,8 +10,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 
@@ -21,9 +20,12 @@ import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
  * 攻击时施加诅咒效果，并造成持续递增伤害
  * 持续100tick，伤害随时间递增，足以致死时直接击杀
  * </p>
+ * <p>
+ * 性能优化 v3.0：使用 DamageOverTimeManager 替代 SynchronizationTask(5, 1)
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 3.0
  */
 @AutoRegisterEnchantment(
         id = "doomed_death",
@@ -33,6 +35,11 @@ import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
         slots = {EquipmentSlot.MAINHAND}
 )
 public class EnchantmentDoomedDeath extends EnchantmentBase {
+
+    /** 持续伤害总时长（tick） */
+    private static final int DOT_DURATION = 100;
+    /** 初始延迟（tick） */
+    private static final int DOT_DELAY = 5;
 
     public EnchantmentDoomedDeath() {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
@@ -47,7 +54,6 @@ public class EnchantmentDoomedDeath extends EnchantmentBase {
             return;
         }
 
-        // 手动应用等级限制
         int effectiveLevel = level;
         if (ConfigLoader.levelLimit) {
             effectiveLevel = Math.min(effectiveLevel, 10);
@@ -58,42 +64,31 @@ public class EnchantmentDoomedDeath extends EnchantmentBase {
             return;
         }
 
-        // 应用注定死亡燃烧效果（5秒 + 5tick，会自动同步客户端渲染猩红色火焰）
+        // 应用注定死亡燃烧效果（猩红色火焰视觉）
         DynamicAttributeManager.apply(
                 victim,
                 DynamicAttributes.DOOMED_DEATH_BURNING.createInstance(5 * 20 + 5, 0)
         );
 
-        // 应用注定死亡效果（10秒 + 5tick，最大生命值-25%）
+        // 应用注定死亡效果（最大生命值-25%）
         DynamicAttributeManager.apply(
                 victim,
                 DynamicAttributes.DOOMED_DEATH.createInstance(10 * 20 + 5, 0)
         );
 
-        // 持续伤害任务
+        // 递增伤害：baseDamage * 0.3 + baseDamage * elapsed / 50 * 0.7
         float originalDamage = ctx.getDamage();
-        new SynchronizationTask(5, 1) {
-            private int tick = 0;
+        float baseDamagePerTick = (originalDamage * 0.5f + victim.getHealth() * 0.1f) / DOT_DURATION;
 
-            @Override
-            public void run() {
-                if (++tick > 100 || victim.isDeadOrDying()) {
-                    this.cancel();
-                    return;
-                }
-
-                float baseDamage = (originalDamage * 0.5f + victim.getHealth() * 0.1f) / 100;
-                float actualDamage = baseDamage * 0.3f + baseDamage * tick / 50 * 0.7f;
-
-                if (victim.getHealth() - actualDamage > 0.01f) {
-                    victim.setHealth(victim.getHealth());
-                    EntityLivingUtil.damageHealthDirectly(victim, actualDamage);
-                } else {
-                    EntityLivingUtil.kill(victim, ctx.getDamageSource());
-                    this.cancel();
-                }
-            }
-        }.start();
+        DamageOverTimeManager.applyScaling(
+                victim,
+                baseDamagePerTick,
+                DOT_DURATION,
+                DOT_DELAY,
+                ctx.getDamageSource(),
+                true,
+                (base, elapsed) -> base * 0.3f + base * elapsed / 50f * 0.7f
+        );
     }
 
     @Override

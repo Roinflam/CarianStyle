@@ -12,8 +12,7 @@ import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
-import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
 
 /**
  * 死亡之刃附魔
@@ -22,9 +21,12 @@ import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
  * 初始伤害降为50%，但施加死亡烙印
  * 持续5秒造成累计伤害（总伤害=原伤害×75%）
  * </p>
+ * <p>
+ * 性能优化 v3.0：使用 DamageOverTimeManager 替代 SynchronizationTask(1, 1)
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 3.0
  */
 @AutoRegisterEnchantment(
         id = "death_blade",
@@ -35,6 +37,11 @@ import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
         forceTreasure = true
 )
 public class EnchantmentDeathBlade extends EnchantmentBase {
+
+    /** 持续伤害总时长（tick） */
+    private static final int DOT_DURATION = 100;
+    /** 初始延迟（tick） */
+    private static final int DOT_DELAY = 1;
 
     public EnchantmentDeathBlade() {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
@@ -49,11 +56,17 @@ public class EnchantmentDeathBlade extends EnchantmentBase {
             return;
         }
 
-        float damage = ctx.getDamage() * 0.75f / 100;
+        if (ctx.getVictim() == null) {
+            return;
+        }
 
+        // 计算每tick伤害
+        float damagePerTick = ctx.getDamage() * 0.75f / DOT_DURATION;
+
+        // 降低即时伤害为50%
         ctx.multiplyDamage(0.5f);
 
-        // 应用火焰燃烧效果（需要同步网络）
+        // 应用火焰燃烧效果（同步客户端渲染）
         DynamicAttributeManager.apply(ctx.getVictim(),
                 DynamicAttributes.DOOMED_DEATH_BURNING.createInstance(5 * 20 + 5, 0));
         ClientSyncEffectHelper.onAttributeApplied(ctx.getVictim(), DynamicAttributes.DOOMED_DEATH_BURNING);
@@ -62,24 +75,15 @@ public class EnchantmentDeathBlade extends EnchantmentBase {
         DynamicAttributeManager.apply(ctx.getVictim(),
                 DynamicAttributes.DOOMED_DEATH.createInstance(10 * 20 + 5, 0));
 
-        new SynchronizationTask(1, 1) {
-            private int tick = 0;
-
-            @Override
-            public void run() {
-                if (++tick > 100 || !ctx.getVictim().isAlive()) {
-                    this.cancel();
-                    return;
-                }
-
-                if (ctx.getVictim().getHealth() - damage * 2 > 0) {
-                    EntityLivingUtil.damageHealthDirectly(ctx.getVictim(), damage);
-                } else {
-                    EntityLivingUtil.kill(ctx.getVictim(), damageSource);
-                    this.cancel();
-                }
-            }
-        }.start();
+        // 持续伤害
+        DamageOverTimeManager.applyLinear(
+                ctx.getVictim(),
+                damagePerTick,
+                DOT_DURATION,
+                DOT_DELAY,
+                damageSource,
+                true
+        );
     }
 
     @Override

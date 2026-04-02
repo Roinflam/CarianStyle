@@ -5,6 +5,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.config.ModConfigEvent;
 import org.apache.commons.lang3.tuple.Pair;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import java.util.Arrays;
@@ -19,6 +20,11 @@ import java.util.List;
  * Unified management of all configuration items
  * 配置文件位置:config/carianstyle-common.toml
  * Config file location: config/carianstyle-common.toml
+ *
+ * <p>
+ * v2.2修复：bake() 末尾调用 EnchantmentBase.invalidateAllDisabledCaches()，
+ * 确保配置热重载后 uninstallEnchantment 黑名单立即生效。
+ * </p>
  *
  * @author RoinFlam
  */
@@ -208,65 +214,44 @@ public final class ConfigLoader {
 
     // ==================== 便捷访问属性 ====================
 
-    /**
-     * 是否启用详细日志
-     */
+    /** 是否启用详细日志 */
     public static boolean enableDetailedLogging = false;
 
-    /**
-     * 禁用的附魔ID列表
-     */
+    /** 禁用的附魔ID列表 */
     public static String[] uninstallEnchantment = new String[0];
 
-    /**
-     * 碎岩者最大范围
-     */
+    /** 碎岩者最大范围 */
     public static int rockBlasterMaxRange = 10;
 
-    /**
-     * 碎岩者是否抑制常见石头掉落物
-     */
+    /** 碎岩者是否抑制常见石头掉落物 */
     public static boolean rockBlasterSuppressCommonDrops = false;
 
-    /**
-     * 祈祷打击最大生命值
-     */
+    /** 祈祷打击最大生命值 */
     public static int prayerfulStrikeMaxHealth = 1000;
 
-    /**
-     * 是否启用高级真伤系统
-     */
+    /** 是否启用高级真伤系统 */
     public static boolean enableTrueDamage = true;
 
-    /**
-     * 超稀有附魔是否为宝藏
-     */
+    /** 超稀有附魔是否为宝藏 */
     public static boolean isTreasureVeryRaryEnchantment = false;
 
-    /**
-     * 稀有附魔是否为宝藏
-     */
+    /** 稀有附魔是否为宝藏 */
     public static boolean isTreasureRaryEnchantment = false;
 
-    /**
-     * 罕见附魔是否为宝藏
-     */
+    /** 罕见附魔是否为宝藏 */
     public static boolean isTreasureUncommonEnchantment = false;
 
-    /**
-     * 是否启用等级限制
-     */
+    /** 是否启用等级限制 */
     public static boolean levelLimit = false;
 
-    /**
-     * 附魔难度倍率
-     */
+    /** 附魔难度倍率 */
     public static double enchantingDifficulty = 1.0;
 
     /**
      * 从配置规范同步到静态字段
      * <p>
-     * 在配置加载或修改后调用
+     * 在配置加载或修改后调用。
+     * v2.2修复：末尾清除所有附魔的禁用状态缓存，确保黑名单变更立即生效。
      * </p>
      */
     public static void bake() {
@@ -287,6 +272,10 @@ public final class ConfigLoader {
 
         levelLimit = COMMON.levelLimit.get();
         enchantingDifficulty = COMMON.enchantingDifficulty.get();
+
+        // v2.2修复：清除所有附魔的禁用状态缓存
+        // 确保 uninstallEnchantment 配置变更后，isDisabled() 会重新计算
+        EnchantmentBase.invalidateAllDisabledCaches();
     }
 
     /**

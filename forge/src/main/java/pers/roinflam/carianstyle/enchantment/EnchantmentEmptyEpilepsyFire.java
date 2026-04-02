@@ -21,26 +21,24 @@ import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.source.NewDamageSource;
-import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
 
 /**
  * 空癫火附魔
  * <p>
  * 弓箭附魔，双刃剑效果
  * 箭矢命中敌人时：
- * - 对敌人造成持续3秒的癫火伤害（攻击者最大生命值 × 15% × 等级）
- * - 对自己造成持续3秒的癫火伤害（自己最大生命值 × 15%）
+ * - 对敌人造成持续3秒的癫火伤害（攻击者最大生命值 × 10% × 等级 × 20% / 60tick）
+ * - 对自己造成持续3秒的癫火伤害（自己最大生命值 × 10% / 60tick）
  * - 创造模式玩家免疫自损
  * </p>
  * <p>
- * 修复记录 v2.1：
- * - getUsedItemHand() → InteractionHand.MAIN_HAND
- *   箭矢命中时玩家已经放开弓，不再处于"使用物品"状态，getUsedItemHand()返回值不可靠
+ * 性能优化 v3.0：两个SynchronizationTask(5, 1)全部改用 DamageOverTimeManager
+ * 修复保留 v2.1：getUsedItemHand() → InteractionHand.MAIN_HAND
  * </p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 3.0
  */
 @AutoRegisterEnchantment(
         id = "empty_epilepsy_fire",
@@ -52,8 +50,12 @@ import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 @Mod.EventBusSubscriber
 public class EnchantmentEmptyEpilepsyFire extends EnchantmentBase {
 
-    private static final int BURN_DURATION = 65;  // 3秒 + 5 tick
-    private static final int DAMAGE_TICKS = 60;   // 持续伤害60 tick (3秒)
+    /** 燃烧视觉效果持续时间（tick） */
+    private static final int BURN_VISUAL_DURATION = 65;
+    /** 持续伤害时长（tick） */
+    private static final int DAMAGE_TICKS = 60;
+    /** 初始延迟（tick） */
+    private static final int DOT_DELAY = 5;
 
     public EnchantmentEmptyEpilepsyFire() {
         super(EnchantmentCategory.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
@@ -95,75 +97,45 @@ public class EnchantmentEmptyEpilepsyFire extends EnchantmentBase {
             return;
         }
 
-        // v2.1修复：使用主手而非 getUsedItemHand()
-        // 箭矢飞行/命中时弓已放开，玩家不再处于"使用物品"状态
+        // v2.1修复保留：使用主手
         ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) {
             return;
         }
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(emptyEpilepsyFire, heldItem);
-
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
         }
-
         if (level <= 0) {
             return;
         }
 
         final int effectiveLevel = level;
 
-        // 对攻击者造成癫火伤害
-        // 应用火焰燃烧效果（需要同步网络）
+        // ========== 攻击者自损 ==========
         DynamicAttributeManager.apply(attacker,
-                DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(BURN_DURATION, 0));
+                DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(BURN_VISUAL_DURATION, 0));
         ClientSyncEffectHelper.onAttributeApplied(attacker, DynamicAttributes.EPILEPSY_FIRE_BURNING);
 
-        new SynchronizationTask(5, 1) {
-            private int tick = 0;
+        // 自损：最大生命值 × 10% / 60tick
+        float attackerDmgPerTick = attacker.getMaxHealth() * 0.1f / DAMAGE_TICKS;
+        DamageOverTimeManager.applyLinear(
+                attacker, attackerDmgPerTick, DAMAGE_TICKS, DOT_DELAY,
+                NewDamageSource.epilepsyFire(attacker.level()), true
+        );
 
-            @Override
-            public void run() {
-                if (++tick > DAMAGE_TICKS || !attacker.isAlive()) {
-                    this.cancel();
-                    return;
-                }
-
-                float damage = attacker.getMaxHealth() * 0.1f / 60;
-                if (attacker.getHealth() - damage * 2 > 0) {
-                    EntityLivingUtil.damageHealthDirectly(attacker, damage);
-                } else {
-                    EntityLivingUtil.kill(attacker, NewDamageSource.epilepsyFire(attacker.level()));
-                    this.cancel();
-                }
-            }
-        }.start();
-
-        // 对受击者造成癫火伤害
+        // ========== 受击者伤害 ==========
         DynamicAttributeManager.apply(victim,
-                DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(BURN_DURATION, 0));
+                DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(BURN_VISUAL_DURATION, 0));
         ClientSyncEffectHelper.onAttributeApplied(victim, DynamicAttributes.EPILEPSY_FIRE_BURNING);
 
-        new SynchronizationTask(5, 1) {
-            private int tick = 0;
-
-            @Override
-            public void run() {
-                if (++tick > DAMAGE_TICKS || !victim.isAlive()) {
-                    this.cancel();
-                    return;
-                }
-
-                float damage = attacker.getMaxHealth() * 0.1f * effectiveLevel * 0.2f / 60;
-                if (victim.getHealth() - damage * 2 > 0) {
-                    EntityLivingUtil.damageHealthDirectly(victim, damage);
-                } else {
-                    EntityLivingUtil.kill(victim, NewDamageSource.epilepsyFire(victim.level()));
-                    this.cancel();
-                }
-            }
-        }.start();
+        // 受害者：攻击者最大生命值 × 10% × 等级 × 20% / 60tick
+        float victimDmgPerTick = attacker.getMaxHealth() * 0.1f * effectiveLevel * 0.2f / DAMAGE_TICKS;
+        DamageOverTimeManager.applyLinear(
+                victim, victimDmgPerTick, DAMAGE_TICKS, DOT_DELAY,
+                NewDamageSource.epilepsyFire(victim.level()), true
+        );
     }
 
     @Override

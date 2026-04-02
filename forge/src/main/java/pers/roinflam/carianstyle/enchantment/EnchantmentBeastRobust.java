@@ -21,7 +21,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
  * 胸甲附魔，缩短药水效果时间但大幅增强等级
  * 获得药水效果时：
  * - 持续时间变为 40%（不受附魔等级影响）
- * - 效果等级变为 原等级 × 2 + 1（不受附魔等级影响）
+ * - 效果等级变为 原等级 × 2 + 1（不受附魔等级影响），最高不超过 100
  * </p>
  *
  * @author RoinFlam
@@ -36,6 +36,11 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
         forceTreasure = true
 )
 public class EnchantmentBeastRobust extends EnchantmentBase implements IEffectModifier {
+
+    /**
+     * 药水效果等级的最大上限
+     */
+    private static final int MAX_AMPLIFIER = 100;
 
     public EnchantmentBeastRobust() {
         super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
@@ -78,7 +83,7 @@ public class EnchantmentBeastRobust extends EnchantmentBase implements IEffectMo
 
         // 计算新属性
         int newDuration = (int) (effectInstance.getDuration() * 0.4);  // 时间缩短到 40%
-        int newAmplifier = effectInstance.getAmplifier() * 2 + 1;      // 等级翻倍+1
+        int newAmplifier = Math.min(effectInstance.getAmplifier() * 2 + 1, MAX_AMPLIFIER);  // 等级翻倍+1，上限100
 
         // 创建修改后的效果实例
         return new MobEffectInstance(

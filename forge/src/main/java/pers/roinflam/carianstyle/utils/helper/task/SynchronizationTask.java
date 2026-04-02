@@ -7,7 +7,9 @@ import net.minecraftforge.common.MinecraftForge;
 import javax.annotation.Nonnull;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -22,78 +24,82 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>使用示例 / Usage examples:</p>
  * <pre>
  * // 延迟20tick后执行一次
- * // Execute once after 20 ticks
  * new SynchronizationTask(20) {
  *     &#064;Override
  *     public void run() {
- *         // 执行逻辑 / execution logic
+ *         // 执行逻辑
  *     }
  * }.start();
  *
  * // 延迟10tick后开始，每5tick执行一次（周期任务）
- * // Start after 10 ticks, execute every 5 ticks (periodic task)
  * new SynchronizationTask(10, 5) {
  *     &#064;Override
  *     public void run() {
- *         // 周期执行逻辑 / periodic execution logic
- *     }
- * }.start();
- *
- * // 立即开始，每1tick执行一次（持续伤害等）
- * // Start immediately, execute every tick (continuous damage, etc.)
- * new SynchronizationTask(0, 1) {
- *     &#064;Override
- *     public void run() {
- *         if (条件不满足) {
- *             this.cancel();
- *             return;
- *         }
- *         // 持续伤害逻辑 / continuous damage logic
+ *         // 周期执行逻辑
  *     }
  * }.start();
  * </pre>
  *
  * <p>
- * 性能优化记录 v2.1：
- * - onServerTick 中使用 Iterator.remove() 替代每tick创建临时 ArrayList 收集待移除任务
- *   原实现每tick执行 new ArrayList<>() + 遍历 + 二次遍历移除，产生GC压力
- *   优化后直接在遍历中移除已完成任务，零额外分配
+ * 性能优化记录 v3.0：
+ * 核心问题：出血(MobEffectHemorrhage)、切割(MobEffectIncision)等药水效果
+ * 每tick通过 new SynchronizationTask(1) 创建一次性延迟任务，
+ * 50人战斗时每秒产生数百个 ConcurrentHashMap.put() + .remove() 操作。
+ *
+ * 优化方案：
+ * 1. 新增 nextTickQueue（ConcurrentLinkedQueue）快速通道：
+ *    initialDelay <= 1 且非周期任务直接入队，跳过 ConcurrentHashMap。
+ *    Queue.offer() 比 ConcurrentHashMap.put() 快一个数量级，
+ *    且不需要后续的 remove() 操作（poll后自动释放）。
+ * 2. 超限只打印警告不丢弃任务，保证功能完整性。
+ * 3. 保留 v2.1 的 Iterator.remove() 优化。
  * </p>
  *
- * @version 2.1
+ * @version 3.0
  */
 public abstract class SynchronizationTask implements Runnable {
 
-    /** 全局任务管理器（单例）/ Global task manager (singleton) */
+    // ==================== 常量 ====================
+
+    /** 警告阈值：长期任务超过此数量时打印一次日志 */
+    private static final int WARN_THRESHOLD = 1500;
+
+    /** 是否已输出过警告（避免刷屏） */
+    private static volatile boolean warnPrinted = false;
+
+    // ==================== 全局管理器 ====================
+
+    /** 全局任务管理器（单例） */
     private static final TaskManager MANAGER = new TaskManager();
 
-    /** 任务ID生成器 / Task ID generator */
+    /** 任务ID生成器 */
     private static final AtomicInteger ID_GENERATOR = new AtomicInteger(0);
 
-    /** 任务唯一ID / Task unique ID */
+    // ==================== 实例字段 ====================
+
+    /** 任务唯一ID */
     protected final int taskId;
 
-    /** 是否为周期任务 / Whether it's a periodic task */
+    /** 是否为周期任务 */
     protected final boolean cycle;
 
-    /** 初始延迟（tick）/ Initial delay (ticks) */
+    /** 初始延迟（tick） */
     protected final int initialDelay;
 
-    /** 周期间隔（tick），-1表示一次性任务 / Period interval (ticks), -1 for one-time task */
+    /** 周期间隔（tick），-1表示一次性任务 */
     protected final int delay;
 
-    /** 是否已启动 / Whether started */
+    /** 是否已启动 */
     protected volatile boolean started = false;
 
-    /** 是否为首次执行前 / Whether before first execution */
+    /** 是否为首次执行前 */
     protected boolean first = true;
 
-    /** 当前计时器 / Current timer */
+    /** 当前计时器 */
     protected int tick = 0;
 
     /**
      * 创建立即执行的一次性任务
-     * Create an immediately executing one-time task
      */
     public SynchronizationTask() {
         this(0);
@@ -101,9 +107,8 @@ public abstract class SynchronizationTask implements Runnable {
 
     /**
      * 创建延迟执行的一次性任务
-     * Create a delayed one-time task
      *
-     * @param initialDelay 初始延迟（tick），0表示下一tick执行 / initial delay (ticks), 0 means execute next tick
+     * @param initialDelay 初始延迟（tick），0表示下一tick执行
      */
     public SynchronizationTask(int initialDelay) {
         this(initialDelay, -1);
@@ -111,10 +116,9 @@ public abstract class SynchronizationTask implements Runnable {
 
     /**
      * 创建延迟执行的周期任务
-     * Create a delayed periodic task
      *
-     * @param initialDelay 初始延迟（tick）/ initial delay (ticks)
-     * @param delay 周期间隔（tick），>=0表示周期任务，-1表示一次性任务 / period interval (ticks), >=0 for periodic task, -1 for one-time
+     * @param initialDelay 初始延迟（tick）
+     * @param delay 周期间隔（tick），>=0表示周期任务，-1表示一次性任务
      */
     public SynchronizationTask(int initialDelay, int delay) {
         this.taskId = ID_GENERATOR.incrementAndGet();
@@ -125,10 +129,9 @@ public abstract class SynchronizationTask implements Runnable {
 
     /**
      * 根据任务ID取消任务（静态方法）
-     * Cancel task by task ID (static method)
      *
-     * @param taskId 任务ID / task ID
-     * @return 是否成功取消 / whether successfully cancelled
+     * @param taskId 任务ID
+     * @return 是否成功取消
      */
     public static boolean cancel(int taskId) {
         return MANAGER.cancelTask(taskId);
@@ -136,9 +139,8 @@ public abstract class SynchronizationTask implements Runnable {
 
     /**
      * 获取任务ID
-     * Get task ID
      *
-     * @return 任务ID / task ID
+     * @return 任务ID
      */
     public int getTaskId() {
         return taskId;
@@ -146,10 +148,9 @@ public abstract class SynchronizationTask implements Runnable {
 
     /**
      * 启动任务
-     * Start task
-     *
-     * 任务启动后会在服务器tick中执行
-     * Task will execute in server ticks after being started
+     * <p>
+     * v3.0优化：短延迟一次性任务走 nextTickQueue 快速通道
+     * </p>
      */
     public synchronized void start() {
         if (!started) {
@@ -160,10 +161,10 @@ public abstract class SynchronizationTask implements Runnable {
 
     /**
      * 取消任务
-     * Cancel task
-     *
-     * 可在run()方法内调用以停止周期任务
-     * Can be called inside run() method to stop periodic task
+     * <p>
+     * 可在run()方法内调用以停止周期任务。
+     * 注意：nextTickQueue中的任务无法从队列移除，但执行前会检查started标记。
+     * </p>
      */
     public synchronized void cancel() {
         if (started) {
@@ -173,13 +174,11 @@ public abstract class SynchronizationTask implements Runnable {
     }
 
     /**
-     * 内部tick处理（由TaskManager调用）
-     * Internal tick processing (called by TaskManager)
+     * 内部tick处理（由TaskManager调用，仅用于长期任务）
      *
-     * @return true表示任务已完成需要移除，false表示继续执行 / true if task completed and should be removed, false to continue
+     * @return true表示任务已完成需要移除
      */
     boolean onTick() {
-        // 任务已被取消
         if (!started) {
             return true;
         }
@@ -187,26 +186,22 @@ public abstract class SynchronizationTask implements Runnable {
         tick++;
 
         if (first) {
-            // 首次执行前：等待初始延迟
             if (tick >= initialDelay) {
                 first = false;
                 tick = 0;
 
-                // 执行任务
                 try {
                     this.run();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
 
-                // 一次性任务执行后结束
                 if (!cycle) {
                     started = false;
                     return true;
                 }
             }
         } else {
-            // 周期执行
             if (cycle && tick >= delay) {
                 tick = 0;
 
@@ -218,56 +213,95 @@ public abstract class SynchronizationTask implements Runnable {
             }
         }
 
-        // 检查是否在run()中被取消
         return !started;
+    }
+
+    // ==================== 统计方法（调试用） ====================
+
+    /**
+     * 获取当前活跃任务数量
+     *
+     * @return 长期任务 + nextTick队列
+     */
+    public static int getActiveTaskCount() {
+        return MANAGER.getActiveCount();
+    }
+
+    /**
+     * 获取统计摘要字符串
+     *
+     * @return 统计摘要
+     */
+    public static String getStats() {
+        return MANAGER.getStats();
     }
 
     /**
      * 全局任务管理器
-     * Global task manager
+     * <p>
+     * v3.0核心优化：新增 nextTickQueue 快速通道
+     * - 出血、切割等每tick创建的 SynchronizationTask(1) 全部走 ConcurrentLinkedQueue
+     * - ConcurrentLinkedQueue.offer() 是无锁CAS操作，比 ConcurrentHashMap.put() 快得多
+     * - 不需要后续的 remove() 操作（poll后节点自动GC）
+     * - 长期任务（周期+延迟>1）仍走 ConcurrentHashMap
+     * </p>
      *
-     * 使用单一事件监听器管理所有任务，相比每个任务单独注册：
-     * Uses single event listener to manage all tasks, compared to individual registration:
-     * - 100个任务只有1个监听器，而不是100个 / 100 tasks with 1 listener instead of 100
-     * - 减少事件总线的遍历开销 / Reduces event bus traversal overhead
-     * - 线程安全 / Thread-safe
-     * <p>
-     * v2.1修复：移除了无效的 @Mod.EventBusSubscriber 注解。
-     * 该注解只对static方法生效，但onServerTick是实例方法。
-     * 实际注册通过 ensureRegistered() 中的 MinecraftForge.EVENT_BUS.register(this) 完成。
-     * </p>
-     * <p>
-     * v2.1优化：onServerTick 使用 Iterator.remove() 替代临时列表
-     * </p>
+     * @version 3.0
      */
     private static class TaskManager {
 
-        /** 任务列表（线程安全）/ Task list (thread-safe) */
+        /** 长期任务列表（周期任务 + delay>1的一次性任务） */
         private final Map<Integer, SynchronizationTask> tasks = new ConcurrentHashMap<>();
 
-        /** 是否已注册到事件总线 / Whether registered to event bus */
+        /**
+         * nextTick快速通道队列
+         * <p>
+         * 存放 initialDelay<=1 且非周期的一次性任务。
+         * 出血/切割等效果每tick创建的 SynchronizationTask(1) 全部走这条通道。
+         * </p>
+         */
+        private final Queue<SynchronizationTask> nextTickQueue = new ConcurrentLinkedQueue<>();
+
+        /** 是否已注册到事件总线 */
         private volatile boolean registered = false;
 
+        /** 累计处理的nextTick任务数（统计用） */
+        private volatile long totalNextTickProcessed = 0;
+
         /**
-         * 添加任务
-         * Add task
+         * 添加任务（自动路由到快速通道或长期任务表）
+         *
+         * @param task 要添加的任务
          */
         void addTask(@Nonnull SynchronizationTask task) {
-            tasks.put(task.getTaskId(), task);
             ensureRegistered();
+
+            // v3.0：短延迟一次性任务走快速通道
+            if (!task.cycle && task.initialDelay <= 1) {
+                nextTickQueue.offer(task);
+                return;
+            }
+
+            // 长期任务：超限时打印警告但不丢弃，保证功能完整
+            int currentSize = tasks.size();
+            if (currentSize >= WARN_THRESHOLD && !warnPrinted) {
+                warnPrinted = true;
+                System.err.println("[卡利亚式附魔] 警告：同步任务数量已达 " + currentSize
+                        + "，可能存在任务泄漏，请检查。");
+            }
+
+            tasks.put(task.getTaskId(), task);
         }
 
         /**
-         * 移除任务
-         * Remove task
+         * 移除长期任务
          */
         void removeTask(int taskId) {
             tasks.remove(taskId);
         }
 
         /**
-         * 根据ID取消任务
-         * Cancel task by ID
+         * 根据ID取消长期任务
          */
         boolean cancelTask(int taskId) {
             SynchronizationTask task = tasks.remove(taskId);
@@ -280,7 +314,6 @@ public abstract class SynchronizationTask implements Runnable {
 
         /**
          * 确保已注册到事件总线（只注册一次）
-         * Ensure registered to event bus (register only once)
          */
         private synchronized void ensureRegistered() {
             if (!registered) {
@@ -291,39 +324,68 @@ public abstract class SynchronizationTask implements Runnable {
 
         /**
          * 服务器tick事件处理
-         * Server tick event handling
-         *
-         * 每个服务器tick遍历所有任务并执行
-         * Traverse and execute all tasks each server tick
          * <p>
-         * v2.1优化：使用 Iterator.remove() 直接在遍历中移除已完成任务
-         * 替代原来每tick创建临时 ArrayList + 二次遍历的方式，避免GC压力
-         * ConcurrentHashMap.entrySet().iterator() 支持 remove() 操作
+         * v3.0优化：先drain nextTickQueue，再处理长期任务。
+         * nextTickQueue中的任务执行后自动释放，不需要额外的remove操作。
          * </p>
          */
         @SubscribeEvent
         public void onServerTick(@Nonnull TickEvent.ServerTickEvent evt) {
-            // 只在START阶段处理（与原版一致）
             if (evt.phase != TickEvent.Phase.START) {
                 return;
             }
 
-            // 无任务时跳过
+            // ========== 阶段1：处理 nextTickQueue 快速通道 ==========
+            int nextTickCount = 0;
+            SynchronizationTask fastTask;
+            while ((fastTask = nextTickQueue.poll()) != null) {
+                // 检查是否已被取消（cancel()会设置started=false）
+                if (!fastTask.started) {
+                    continue;
+                }
+
+                try {
+                    fastTask.run();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                fastTask.started = false;
+                nextTickCount++;
+            }
+            if (nextTickCount > 0) {
+                totalNextTickProcessed += nextTickCount;
+            }
+
+            // ========== 阶段2：处理长期任务 ==========
             if (tasks.isEmpty()) {
+                // 任务清空后重置警告标记
+                if (warnPrinted) {
+                    warnPrinted = false;
+                }
                 return;
             }
 
-            // v2.1优化：使用 Iterator 直接移除已完成任务，避免临时列表分配
+            // v2.1优化保留：使用 Iterator.remove() 替代临时列表
             Iterator<Map.Entry<Integer, SynchronizationTask>> iterator = tasks.entrySet().iterator();
             while (iterator.hasNext()) {
                 Map.Entry<Integer, SynchronizationTask> entry = iterator.next();
                 SynchronizationTask task = entry.getValue();
 
-                // onTick()返回true表示任务已完成，直接移除
                 if (task.onTick()) {
                     iterator.remove();
                 }
             }
+        }
+
+        // ========== 统计方法 ==========
+
+        int getActiveCount() {
+            return tasks.size() + nextTickQueue.size();
+        }
+
+        String getStats() {
+            return String.format("[SynchronizationTask] 长期任务: %d | nextTick队列: %d | 累计处理nextTick: %d",
+                    tasks.size(), nextTickQueue.size(), totalNextTickProcessed);
         }
     }
 }

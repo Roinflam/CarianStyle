@@ -20,12 +20,22 @@ import java.util.concurrent.ConcurrentHashMap;
  * </p>
  * <p>
  * 修复记录：
- * - 将 System.currentTimeMillis()/50 替换为服务器tick计数器，确保与游戏tick同步
- * - TPS低时冷却不会提前结束，服务器暂停时冷却也暂停
+ * - v2.1：将 System.currentTimeMillis()/50 替换为服务器tick计数器，确保与游戏tick同步
+ * </p>
+ * <p>
+ * 性能优化记录 v2.2：
+ * - buildKey()：UUID.toString() 每次调用创建新的36字符String，
+ *   加上字符串拼接 id + ":" + uuid.toString() 又创建中间String和最终String，
+ *   每次 buildKey 产生2-3个临时String对象。
+ *   50人服务器每tick大量调用 isOnCooldown/getCounter/getData 等方法。
+ *   优化：使用 ThreadLocal StringBuilder 复用缓冲区，临时字符串分配从3次降为1次（最终的toString()）。
+ * - cleanupExpiredData()：频率从200tick(10秒)降为600tick(30秒)。
+ *   过期数据在被访问时已被惰性清除（get/isOnCooldown时检查），
+ *   定期清理只是兜底防止长期未访问的数据堆积，30秒间隔足够。
  * </p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @Mod.EventBusSubscriber
 public class EnchantmentDataManager {
@@ -39,6 +49,19 @@ public class EnchantmentDataManager {
      * </p>
      */
     private static long serverTickCount = 0;
+
+    // ==================== Key构建优化（v2.2新增） ====================
+
+    /**
+     * ThreadLocal StringBuilder 复用缓冲区
+     * <p>
+     * 避免 buildKey() 中的字符串拼接产生临时对象。
+     * 每个线程独享一个 StringBuilder，线程安全且无锁。
+     * 初始容量80：典型key长度约为 enchantId(~30) + ":" + UUID(36) ≈ 67字符
+     * </p>
+     */
+    private static final ThreadLocal<StringBuilder> KEY_BUILDER =
+            ThreadLocal.withInitial(() -> new StringBuilder(80));
 
     // ==================== 冷却系统 ====================
 
@@ -376,23 +399,30 @@ public class EnchantmentDataManager {
     // ==================== 工具方法 ====================
 
     /**
-     * 构建存储键
+     * 构建存储键（v2.2优化版）
+     * <p>
+     * 使用 ThreadLocal StringBuilder 复用缓冲区，
+     * 避免字符串拼接产生的临时 String 对象。
+     * 原实现 id + ":" + uuid.toString() 每次产生2-3个临时String，
+     * 优化后只有最终 sb.toString() 产生1个String。
+     * </p>
      *
      * @param id   数据ID
      * @param uuid 实体UUID
      * @return 格式化的键
      */
     private static String buildKey(@NotNull String id, @NotNull UUID uuid) {
-        return id + ":" + uuid;
+        StringBuilder sb = KEY_BUILDER.get();
+        sb.setLength(0); // 重置长度而非创建新实例
+        sb.append(id).append(':').append(uuid);
+        return sb.toString();
     }
 
     /**
      * 获取当前游戏时间
      * <p>
      * 使用服务器tick计数器，而非 System.currentTimeMillis()/50
-     * 这确保了冷却时间与服务器TPS完全同步：
-     * - TPS低时冷却不会提前结束
-     * - 服务器暂停时冷却也暂停
+     * 这确保了冷却时间与服务器TPS完全同步
      * </p>
      *
      * @return 游戏时间（以tick为单位）
@@ -406,7 +436,10 @@ public class EnchantmentDataManager {
     /**
      * 服务器Tick事件处理器
      * <p>
-     * 递增tick计数器，每200 tick（10秒）自动清理一次过期数据
+     * 递增tick计数器，定期自动清理过期数据。
+     * v2.2优化：清理频率从200tick(10秒)降为600tick(30秒)。
+     * 过期数据在被访问时已被惰性清除（get/isOnCooldown时检查），
+     * 定期清理只是兜底防止长期未访问的数据堆积。
      * </p>
      *
      * @param event 服务器Tick事件
@@ -420,8 +453,8 @@ public class EnchantmentDataManager {
         // 递增tick计数器
         serverTickCount++;
 
-        // 每200 tick（10秒）清理一次
-        if (serverTickCount % 200 == 0) {
+        // v2.2优化：每600tick（30秒）清理一次
+        if (serverTickCount % 600 == 0) {
             cleanupExpiredData();
         }
     }

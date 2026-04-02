@@ -35,9 +35,17 @@ import java.util.Map;
  * - dispatchLivingAttackEvent/HurtEvent/DamageEvent 从 private 改为 public，
  *   供优化后的 EnchantmentEventHandler 缓存机制直接调用
  * </p>
+ * <p>
+ * 修复记录 v2.2：
+ * - 新增 isDisabled() 方法，读取 ConfigLoader.uninstallEnchantment 黑名单
+ * - 重写 canApplyAtEnchantingTable / isAllowedOnBooks / isTradeable / isDiscoverable，
+ *   被禁用的附魔无法从附魔台、书本、交易、战利品获得
+ * - 三个 dispatch 方法加入 isDisabled() 前置检查，被禁用的附魔不会触发任何效果
+ * - 新增静态工具方法 isEnchantmentDisabled(Enchantment)，供独立 @SubscribeEvent 方法使用
+ * </p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 public abstract class EnchantmentBase extends Enchantment {
 
@@ -45,6 +53,15 @@ public abstract class EnchantmentBase extends Enchantment {
 
     @Nullable
     protected final AutoRegisterEnchantment annotation;
+
+    /**
+     * 缓存禁用状态，避免每次调用都遍历数组
+     * <p>
+     * null = 未检查过（配置可能还没加载），true = 已确认禁用，false = 已确认启用
+     * 配置重载后通过 invalidateDisabledCache() 清除缓存
+     * </p>
+     */
+    private Boolean disabledCache = null;
 
     /**
      * 主构造函数（注解注册方式）
@@ -96,6 +113,136 @@ public abstract class EnchantmentBase extends Enchantment {
         CarianStyleEnchantments.ENCHANTMENTS.add(this);
         LogUtil.debug("卡利亚式附魔 - 通过传统方式注册附魔: %s", name);
     }
+
+    // ==================== 禁用检查（v2.2新增） ====================
+
+    /**
+     * 检查此附魔是否被配置黑名单禁用
+     * <p>
+     * 读取 ConfigLoader.uninstallEnchantment 数组，匹配注解中的 id。
+     * 结果会被缓存，配置重载后需调用 invalidateDisabledCache() 清除。
+     * </p>
+     *
+     * @return true 表示此附魔已被禁用，不应产生任何效果
+     */
+    public boolean isDisabled() {
+        // 无注解的附魔无法被禁用（没有id可匹配）
+        if (annotation == null) {
+            return false;
+        }
+
+        // 使用缓存避免每次遍历
+        if (disabledCache != null) {
+            return disabledCache;
+        }
+
+        // 遍历黑名单检查
+        String[] blacklist = ConfigLoader.uninstallEnchantment;
+        if (blacklist != null && blacklist.length > 0) {
+            String myId = annotation.id();
+            for (String disabledId : blacklist) {
+                if (myId.equals(disabledId)) {
+                    disabledCache = true;
+                    return true;
+                }
+            }
+        }
+
+        disabledCache = false;
+        return false;
+    }
+
+    /**
+     * 清除禁用状态缓存（配置重载时调用）
+     */
+    public void invalidateDisabledCache() {
+        disabledCache = null;
+    }
+
+    /**
+     * 静态工具方法：检查任意 Enchantment 是否被禁用
+     * <p>
+     * 供独立 @SubscribeEvent 方法使用，例如：
+     * <pre>
+     * Enchantment ench = EnchantmentRegistry.getEnchantmentByClass(MyEnchantment.class);
+     * if (EnchantmentBase.isEnchantmentDisabled(ench)) return;
+     * </pre>
+     * </p>
+     *
+     * @param enchantment 要检查的附魔
+     * @return true 表示被禁用或为 null
+     */
+    public static boolean isEnchantmentDisabled(@Nullable Enchantment enchantment) {
+        if (enchantment == null) {
+            return true;
+        }
+        if (enchantment instanceof EnchantmentBase base) {
+            return base.isDisabled();
+        }
+        return false;
+    }
+
+    /**
+     * 清除所有已注册附魔的禁用缓存
+     * <p>
+     * 在 ConfigLoader.bake() 中调用，确保配置热重载后黑名单立即生效
+     * </p>
+     */
+    public static void invalidateAllDisabledCaches() {
+        for (Enchantment enchantment : CarianStyleEnchantments.ENCHANTMENTS) {
+            if (enchantment instanceof EnchantmentBase base) {
+                base.invalidateDisabledCache();
+            }
+        }
+    }
+
+    // ==================== 附魔台/战利品拦截（v2.2新增） ====================
+
+    /**
+     * 被禁用的附魔无法从附魔台获得
+     */
+    @Override
+    public boolean canApplyAtEnchantingTable(@Nonnull ItemStack stack) {
+        if (isDisabled()) {
+            return false;
+        }
+        return super.canApplyAtEnchantingTable(stack);
+    }
+
+    /**
+     * 被禁用的附魔无法附在书上
+     */
+    @Override
+    public boolean isAllowedOnBooks() {
+        if (isDisabled()) {
+            return false;
+        }
+        return super.isAllowedOnBooks();
+    }
+
+    /**
+     * 被禁用的附魔无法从村民交易获得
+     */
+    @Override
+    public boolean isTradeable() {
+        if (isDisabled()) {
+            return false;
+        }
+        return super.isTradeable();
+    }
+
+    /**
+     * 被禁用的附魔无法从战利品表中获得
+     */
+    @Override
+    public boolean isDiscoverable() {
+        if (isDisabled()) {
+            return false;
+        }
+        return super.isDiscoverable();
+    }
+
+    // ==================== 原有方法（未修改） ====================
 
     @Override
     public int getMaxLevel() {
@@ -446,7 +593,6 @@ public abstract class EnchantmentBase extends Enchantment {
             boolean isAttacker
     ) {
         if (isAttacker) {
-            // 攻击者：先检查主手和副手武器
             ItemStack mainHand = holder.getItemInHand(InteractionHand.MAIN_HAND);
             ItemStack offHand = holder.getItemInHand(InteractionHand.OFF_HAND);
 
@@ -457,7 +603,6 @@ public abstract class EnchantmentBase extends Enchantment {
                 processItemEnchantments(offHand, holder, victim, source, event, priority, true);
             }
 
-            // 攻击者也检查护甲槽位
             for (EquipmentSlot slot : EquipmentSlot.values()) {
                 if (slot == EquipmentSlot.MAINHAND || slot == EquipmentSlot.OFFHAND) {
                     continue;
@@ -468,7 +613,6 @@ public abstract class EnchantmentBase extends Enchantment {
                 }
             }
         } else {
-            // 受害者：检查所有装备槽位
             for (EquipmentSlot slot : EquipmentSlot.values()) {
                 ItemStack stack = holder.getItemBySlot(slot);
                 if (!stack.isEmpty()) {
@@ -498,6 +642,12 @@ public abstract class EnchantmentBase extends Enchantment {
             }
 
             EnchantmentBase baseEnchantment = (EnchantmentBase) enchantment;
+
+            // v2.2：跳过被禁用的附魔
+            if (baseEnchantment.isDisabled()) {
+                continue;
+            }
+
             int level = EnchantmentHelper.getItemEnchantmentLevel(enchantment, stack);
             level = baseEnchantment.applyLevelLimit(level);
 
@@ -507,7 +657,7 @@ public abstract class EnchantmentBase extends Enchantment {
 
             LivingEntity attacker = isAttacker ? holder :
                     (source != null && source.getEntity() instanceof LivingEntity ?
-                            (LivingEntity) source.getEntity() : null);
+                     (LivingEntity) source.getEntity() : null);
 
             EnchantmentContext ctx = new EnchantmentContext(
                     event, holder, stack, level,
@@ -524,12 +674,13 @@ public abstract class EnchantmentBase extends Enchantment {
         }
     }
 
-    // ==================== 事件分发方法（改为public供EventHandler缓存机制调用） ====================
+    // ==================== 事件分发方法（v2.2：加入 isDisabled 前置检查） ====================
 
     /**
      * 分发 LivingAttackEvent 到对应优先级的模板方法
      * <p>
      * v2.1变更：private → public，供 EnchantmentEventHandler 缓存机制直接调用
+     * v2.2变更：加入 isDisabled() 前置检查
      * </p>
      *
      * @param enchantment 附魔实例
@@ -545,6 +696,11 @@ public abstract class EnchantmentBase extends Enchantment {
             @Nonnull EventPriority priority,
             boolean isAttacker
     ) {
+        // v2.2：被禁用的附魔不触发任何效果
+        if (enchantment.isDisabled()) {
+            return;
+        }
+
         switch (priority) {
             case HIGHEST:
                 if (isAttacker) {
@@ -588,6 +744,7 @@ public abstract class EnchantmentBase extends Enchantment {
      * 分发 LivingHurtEvent 到对应优先级的模板方法
      * <p>
      * v2.1变更：private → public，供 EnchantmentEventHandler 缓存机制直接调用
+     * v2.2变更：加入 isDisabled() 前置检查
      * </p>
      *
      * @param enchantment 附魔实例
@@ -603,6 +760,11 @@ public abstract class EnchantmentBase extends Enchantment {
             @Nonnull EventPriority priority,
             boolean isAttacker
     ) {
+        // v2.2：被禁用的附魔不触发任何效果
+        if (enchantment.isDisabled()) {
+            return;
+        }
+
         switch (priority) {
             case HIGHEST:
                 if (isAttacker) {
@@ -646,6 +808,7 @@ public abstract class EnchantmentBase extends Enchantment {
      * 分发 LivingDamageEvent 到对应优先级的模板方法
      * <p>
      * v2.1变更：private → public，供 EnchantmentEventHandler 缓存机制直接调用
+     * v2.2变更：加入 isDisabled() 前置检查
      * </p>
      *
      * @param enchantment 附魔实例
@@ -661,6 +824,11 @@ public abstract class EnchantmentBase extends Enchantment {
             @Nonnull EventPriority priority,
             boolean isAttacker
     ) {
+        // v2.2：被禁用的附魔不触发任何效果
+        if (enchantment.isDisabled()) {
+            return;
+        }
+
         switch (priority) {
             case HIGHEST:
                 if (isAttacker) {

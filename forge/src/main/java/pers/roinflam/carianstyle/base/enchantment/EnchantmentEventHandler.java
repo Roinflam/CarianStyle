@@ -10,6 +10,7 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.*;
 import net.minecraftforge.event.entity.player.CriticalHitEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -25,33 +26,45 @@ import java.util.concurrent.ConcurrentHashMap;
  * 附魔事件处理器
  * <p>
  * 性能优化记录：
- * - 原实现：每种事件×5优先级=15次遍历所有装备槽位，每次调用getEnchantments()反序列化NBT
- *   一次近战攻击（Attack→Hurt→Damage）= 15次×(攻击者6槽+受害者6槽) = 180次NBT解析
- * - 优化后：每种事件在HIGHEST优先级时扫描一次并缓存，后续4个优先级直接用缓存分发
- *   getEnchantments调用从15次降为3次，NBT解析从180次降为36次
- * - 使用事件对象identityHashCode作为缓存key，每个事件处理完LOWEST后自动清除
+ * - v2.x：伤害事件在HIGHEST缓存一次，后续4个优先级复用，NBT解析从180次降为36次
+ * - v2.2：LOWEST加receiveCanceled防止缓存泄漏
+ * - v2.3：EVENT_CACHE改为ConcurrentHashMap防止并发问题
  * </p>
  * <p>
- * 修复记录 v2.2：
- * - LOWEST的三个方法加上 receiveCanceled = true，防止事件被cancel后缓存永远不清除导致内存泄漏
+ * v3.0 核心新增 - PlayerTick装备缓存：
+ *
+ * 原问题：50个玩家×6槽位=每tick 300次 EnchantmentHelper.getEnchantments() 调用，
+ * 每次都反序列化ItemStack的NBT附魔标签，是最大的tick性能瓶颈之一。
+ *
+ * 优化策略：
+ * - 为每个玩家缓存6个槽位的物品身份哈希（item注册单例+count+damage，不含tag）
+ * - 哈希不含tag的原因：科技模组物品的能量NBT每tick变化，如果含tag则每tick都miss
+ * - 哈希匹配 → 用缓存结果，跳过NBT反序列化
+ * - 哈希不匹配（换装备/耐久变化） → 立即重新扫描
+ * - 每20tick（1秒）强制重新扫描一次 → 覆盖铁砧修改附魔等tag变但item不变的极端情况
+ * - 玩家体验：换装备立即生效，铁砧加附魔最多1秒后生效（完全无感知）
+ *
+ * 效果：50人服务器 300次NBT读取/tick → 约15次/秒（仅强制刷新时），降低95%。
+ *
+ * 清理：玩家登出时自动清理缓存，防止内存泄漏。
  * </p>
  * <p>
- * 修复记录 v2.3：
- * - EVENT_CACHE 从 HashMap 改为 ConcurrentHashMap
- *   虽然 Forge 事件通常在主线程触发，但部分优化mod可能在异步线程触发伤害事件，
- *   HashMap 在并发修改时可能导致死循环或数据丢失
+ * v3.1修复 - 黑名单附魔过滤：
+ * 在所有扫描点（scanEntity / scanPlayerEnchantments / 独立事件处理）
+ * 增加 isDisabled() 检查，被 uninstallEnchantment 配置禁用的附魔
+ * 不会进入缓存，不会触发任何效果。
  * </p>
  * <p>
  * 前置条件：需要EnchantmentBase中的dispatchLivingAttackEvent、dispatchLivingHurtEvent、
- * dispatchLivingDamageEvent三个方法改为public static（原来是private static）
+ * dispatchLivingDamageEvent三个方法为public static
  * </p>
  *
- * @version 2.3
+ * @version 3.1
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class EnchantmentEventHandler {
 
-    // ==================== 扫描缓存 ====================
+    // ==================== 伤害事件扫描缓存（v2.x已有，未修改） ====================
 
     /**
      * 扫描结果缓存
@@ -61,9 +74,6 @@ public class EnchantmentEventHandler {
      * </p>
      * <p>
      * 生命周期：HIGHEST时创建 → LOWEST后清除
-     * </p>
-     * <p>
-     * v2.3修复：HashMap → ConcurrentHashMap，防止并发安全问题
      * </p>
      */
     private static final Map<Integer, List<CachedEnchantmentEntry>> EVENT_CACHE = new ConcurrentHashMap<>();
@@ -93,10 +103,114 @@ public class EnchantmentEventHandler {
         }
     }
 
+    // ==================== PlayerTick装备缓存（v3.0新增） ====================
+
+    /**
+     * 强制刷新间隔（tick）
+     */
+    private static final int FORCE_RESCAN_INTERVAL = 20;
+
+    /**
+     * 玩家装备缓存
+     */
+    private static final Map<UUID, PlayerEquipmentCache> PLAYER_TICK_CACHE = new ConcurrentHashMap<>();
+
+    /**
+     * 玩家装备缓存条目
+     */
+    private static class PlayerEquipmentCache {
+        private final int[] slotHashes = new int[EquipmentSlot.values().length];
+        private List<TickEnchantmentEntry> tickEntries = Collections.emptyList();
+        private int ticksSinceForceRescan = 0;
+
+        List<TickEnchantmentEntry> getOrRescan(Player player) {
+            ticksSinceForceRescan++;
+
+            boolean equipmentChanged = false;
+            EquipmentSlot[] slots = EquipmentSlot.values();
+
+            for (int i = 0; i < slots.length; i++) {
+                ItemStack stack = player.getItemBySlot(slots[i]);
+                int hash = computeSlotHash(stack);
+                if (hash != slotHashes[i]) {
+                    slotHashes[i] = hash;
+                    equipmentChanged = true;
+                }
+            }
+
+            boolean forceRescan = ticksSinceForceRescan >= FORCE_RESCAN_INTERVAL;
+
+            if (equipmentChanged || forceRescan) {
+                tickEntries = scanPlayerEnchantments(player);
+                if (forceRescan) {
+                    ticksSinceForceRescan = 0;
+                }
+            }
+
+            return tickEntries;
+        }
+
+        private static int computeSlotHash(ItemStack stack) {
+            if (stack.isEmpty()) {
+                return 0;
+            }
+            int h = System.identityHashCode(stack.getItem());
+            h = h * 31 + stack.getCount();
+            h = h * 31 + stack.getDamageValue();
+            return h;
+        }
+
+        /**
+         * 完整扫描玩家所有槽位的CarianStyle附魔
+         * <p>
+         * v3.1修复：增加 isDisabled() 检查，被禁用的附魔不进入缓存
+         * </p>
+         *
+         * @param player 玩家
+         * @return 附魔条目列表
+         */
+        private static List<TickEnchantmentEntry> scanPlayerEnchantments(Player player) {
+            List<TickEnchantmentEntry> entries = new ArrayList<>();
+            for (EquipmentSlot slot : EquipmentSlot.values()) {
+                ItemStack stack = player.getItemBySlot(slot);
+                if (stack.isEmpty()) continue;
+
+                Map<Enchantment, Integer> enchantments = EnchantmentHelper.getEnchantments(stack);
+                for (Map.Entry<Enchantment, Integer> entry : enchantments.entrySet()) {
+                    if (!(entry.getKey() instanceof EnchantmentBase base)) continue;
+                    // v3.1：跳过被禁用的附魔
+                    if (base.isDisabled()) continue;
+                    int level = base.applyLevelLimit(entry.getValue());
+                    if (level <= 0) continue;
+                    entries.add(new TickEnchantmentEntry(base, level, stack));
+                }
+            }
+            return entries;
+        }
+    }
+
+    /**
+     * PlayerTick专用的附魔条目（比CachedEnchantmentEntry更轻量）
+     */
+    private static class TickEnchantmentEntry {
+        final EnchantmentBase enchantment;
+        final int level;
+        final ItemStack stack;
+
+        TickEnchantmentEntry(EnchantmentBase enchantment, int level, ItemStack stack) {
+            this.enchantment = enchantment;
+            this.level = level;
+            this.stack = stack;
+        }
+    }
+
+    // ==================== 伤害事件扫描方法 ====================
+
     /**
      * 扫描实体的所有装备槽位，收集CarianStyle附魔信息
      * <p>
      * 核心优化点：每个槽位只调用一次getEnchantments()，结果缓存给后续4个优先级复用
+     * v3.1修复：增加 isDisabled() 检查
      * </p>
      *
      * @param entries    收集结果的列表
@@ -112,10 +226,11 @@ public class EnchantmentEventHandler {
             ItemStack stack = holder.getItemBySlot(slot);
             if (stack.isEmpty()) continue;
 
-            // 核心优化点：getEnchantments()只在这里调用一次
             Map<Enchantment, Integer> enchantments = EnchantmentHelper.getEnchantments(stack);
             for (Map.Entry<Enchantment, Integer> entry : enchantments.entrySet()) {
                 if (!(entry.getKey() instanceof EnchantmentBase base)) continue;
+                // v3.1：跳过被禁用的附魔
+                if (base.isDisabled()) continue;
                 int level = base.applyLevelLimit(entry.getValue());
                 if (level <= 0) continue;
                 entries.add(new CachedEnchantmentEntry(base, level, stack, holder, isAttacker));
@@ -125,9 +240,6 @@ public class EnchantmentEventHandler {
 
     /**
      * 为伤害类事件（Attack/Hurt/Damage）构建缓存
-     * <p>
-     * 扫描攻击者（全槽位）和受害者（全槽位）
-     * </p>
      *
      * @param victim   受害者
      * @param attacker 攻击者（可能为null）
@@ -138,12 +250,10 @@ public class EnchantmentEventHandler {
             @Nullable LivingEntity attacker) {
         List<CachedEnchantmentEntry> entries = new ArrayList<>();
 
-        // 攻击者：所有槽位
         if (attacker != null) {
             scanEntity(entries, attacker, true, EquipmentSlot.values());
         }
 
-        // 受害者：所有槽位
         scanEntity(entries, victim, false, EquipmentSlot.values());
 
         return entries;
@@ -151,12 +261,6 @@ public class EnchantmentEventHandler {
 
     /**
      * 从缓存分发事件到对应优先级的模板方法
-     *
-     * @param cacheKey 缓存key（事件对象的identityHashCode）
-     * @param event    事件对象
-     * @param priority 当前优先级
-     * @param source   伤害来源
-     * @param victim   受害者
      */
     private static void dispatchFromCache(int cacheKey, @Nonnull Object event,
                                           @Nonnull EventPriority priority,
@@ -166,8 +270,6 @@ public class EnchantmentEventHandler {
         if (entries == null) return;
 
         for (CachedEnchantmentEntry entry : entries) {
-            // 攻击者装备：attacker就是holder自己
-            // 受害者装备：attacker需要从DamageSource获取（与原EnchantmentBase逻辑一致）
             LivingEntity ctxAttacker = entry.isAttacker ? entry.holder :
                     (source != null && source.getEntity() instanceof LivingEntity le ? le : null);
 
@@ -186,12 +288,6 @@ public class EnchantmentEventHandler {
         }
     }
 
-    /**
-     * 从DamageSource提取攻击者实体
-     *
-     * @param source 伤害来源
-     * @return 攻击者LivingEntity，若非生物实体则返回null
-     */
     @Nullable
     private static LivingEntity getAttacker(@Nonnull net.minecraft.world.damagesource.DamageSource source) {
         if (source.getDirectEntity() instanceof LivingEntity le) return le;
@@ -201,7 +297,6 @@ public class EnchantmentEventHandler {
 
     // ==================== LivingAttackEvent ====================
 
-    /** LivingAttackEvent HIGHEST：构建缓存并分发 */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void handleLivingAttackHighest(@Nonnull LivingAttackEvent event) {
         if (event.getEntity().level().isClientSide) return;
@@ -212,48 +307,36 @@ public class EnchantmentEventHandler {
         dispatchFromCache(key, event, EventPriority.HIGHEST, event.getSource(), victim);
     }
 
-    /** LivingAttackEvent HIGH：从缓存分发 */
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void handleLivingAttackHigh(@Nonnull LivingAttackEvent event) {
         if (event.getEntity().level().isClientSide) return;
         dispatchFromCache(System.identityHashCode(event), event, EventPriority.HIGH, event.getSource(), event.getEntity());
     }
 
-    /** LivingAttackEvent NORMAL：从缓存分发 */
     @SubscribeEvent(priority = EventPriority.NORMAL)
     public static void handleLivingAttackNormal(@Nonnull LivingAttackEvent event) {
         if (event.getEntity().level().isClientSide) return;
         dispatchFromCache(System.identityHashCode(event), event, EventPriority.NORMAL, event.getSource(), event.getEntity());
     }
 
-    /** LivingAttackEvent LOW：从缓存分发 */
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void handleLivingAttackLow(@Nonnull LivingAttackEvent event) {
         if (event.getEntity().level().isClientSide) return;
         dispatchFromCache(System.identityHashCode(event), event, EventPriority.LOW, event.getSource(), event.getEntity());
     }
 
-    /**
-     * LivingAttackEvent LOWEST：从缓存分发并清除缓存
-     * <p>
-     * v2.2修复：receiveCanceled = true，确保即使事件被cancel也能清除缓存
-     * </p>
-     */
     @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
     public static void handleLivingAttackLowest(@Nonnull LivingAttackEvent event) {
         if (event.getEntity().level().isClientSide) return;
         int key = System.identityHashCode(event);
-        // 只有未被cancel的事件才分发附魔逻辑
         if (!event.isCanceled()) {
             dispatchFromCache(key, event, EventPriority.LOWEST, event.getSource(), event.getEntity());
         }
-        // 无论是否cancel都必须清除缓存
         EVENT_CACHE.remove(key);
     }
 
     // ==================== LivingHurtEvent ====================
 
-    /** LivingHurtEvent HIGHEST：构建缓存并分发 */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void handleLivingHurtHighest(@Nonnull LivingHurtEvent event) {
         if (event.getEntity().level().isClientSide) return;
@@ -264,33 +347,24 @@ public class EnchantmentEventHandler {
         dispatchFromCache(key, event, EventPriority.HIGHEST, event.getSource(), victim);
     }
 
-    /** LivingHurtEvent HIGH：从缓存分发 */
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void handleLivingHurtHigh(@Nonnull LivingHurtEvent event) {
         if (event.getEntity().level().isClientSide) return;
         dispatchFromCache(System.identityHashCode(event), event, EventPriority.HIGH, event.getSource(), event.getEntity());
     }
 
-    /** LivingHurtEvent NORMAL：从缓存分发 */
     @SubscribeEvent(priority = EventPriority.NORMAL)
     public static void handleLivingHurtNormal(@Nonnull LivingHurtEvent event) {
         if (event.getEntity().level().isClientSide) return;
         dispatchFromCache(System.identityHashCode(event), event, EventPriority.NORMAL, event.getSource(), event.getEntity());
     }
 
-    /** LivingHurtEvent LOW：从缓存分发 */
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void handleLivingHurtLow(@Nonnull LivingHurtEvent event) {
         if (event.getEntity().level().isClientSide) return;
         dispatchFromCache(System.identityHashCode(event), event, EventPriority.LOW, event.getSource(), event.getEntity());
     }
 
-    /**
-     * LivingHurtEvent LOWEST：从缓存分发并清除缓存
-     * <p>
-     * v2.2修复：receiveCanceled = true，防止缓存泄漏
-     * </p>
-     */
     @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
     public static void handleLivingHurtLowest(@Nonnull LivingHurtEvent event) {
         if (event.getEntity().level().isClientSide) return;
@@ -303,7 +377,6 @@ public class EnchantmentEventHandler {
 
     // ==================== LivingDamageEvent ====================
 
-    /** LivingDamageEvent HIGHEST：构建缓存并分发 */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void handleLivingDamageHighest(@Nonnull LivingDamageEvent event) {
         if (event.getEntity().level().isClientSide) return;
@@ -314,33 +387,24 @@ public class EnchantmentEventHandler {
         dispatchFromCache(key, event, EventPriority.HIGHEST, event.getSource(), victim);
     }
 
-    /** LivingDamageEvent HIGH：从缓存分发 */
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void handleLivingDamageHigh(@Nonnull LivingDamageEvent event) {
         if (event.getEntity().level().isClientSide) return;
         dispatchFromCache(System.identityHashCode(event), event, EventPriority.HIGH, event.getSource(), event.getEntity());
     }
 
-    /** LivingDamageEvent NORMAL：从缓存分发 */
     @SubscribeEvent(priority = EventPriority.NORMAL)
     public static void handleLivingDamageNormal(@Nonnull LivingDamageEvent event) {
         if (event.getEntity().level().isClientSide) return;
         dispatchFromCache(System.identityHashCode(event), event, EventPriority.NORMAL, event.getSource(), event.getEntity());
     }
 
-    /** LivingDamageEvent LOW：从缓存分发 */
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void handleLivingDamageLow(@Nonnull LivingDamageEvent event) {
         if (event.getEntity().level().isClientSide) return;
         dispatchFromCache(System.identityHashCode(event), event, EventPriority.LOW, event.getSource(), event.getEntity());
     }
 
-    /**
-     * LivingDamageEvent LOWEST：从缓存分发并清除缓存
-     * <p>
-     * v2.2修复：receiveCanceled = true，防止缓存泄漏
-     * </p>
-     */
     @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
     public static void handleLivingDamageLowest(@Nonnull LivingDamageEvent event) {
         if (event.getEntity().level().isClientSide) return;
@@ -355,7 +419,10 @@ public class EnchantmentEventHandler {
 
     /**
      * 死亡事件处理
-     * <p>仅触发一次，无需缓存</p>
+     * <p>
+     * 仅触发一次，无需缓存
+     * v3.1修复：增加 isDisabled() 检查
+     * </p>
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void handleLivingDeath(@Nonnull LivingDeathEvent event) {
@@ -366,6 +433,8 @@ public class EnchantmentEventHandler {
             if (stack.isEmpty()) continue;
             for (Map.Entry<Enchantment, Integer> entry : EnchantmentHelper.getEnchantments(stack).entrySet()) {
                 if (!(entry.getKey() instanceof EnchantmentBase base)) continue;
+                // v3.1：跳过被禁用的附魔
+                if (base.isDisabled()) continue;
                 int level = base.applyLevelLimit(entry.getValue());
                 if (level > 0) {
                     EnchantmentContext ctx = new EnchantmentContext(event, victim, stack, level, null, victim, event.getSource());
@@ -377,7 +446,10 @@ public class EnchantmentEventHandler {
 
     /**
      * 治疗事件处理
-     * <p>频率低，无需缓存</p>
+     * <p>
+     * 频率低，无需缓存
+     * v3.1修复：增加 isDisabled() 检查
+     * </p>
      */
     @SubscribeEvent(priority = EventPriority.NORMAL)
     public static void handleLivingHeal(@Nonnull LivingHealEvent event) {
@@ -388,6 +460,8 @@ public class EnchantmentEventHandler {
             if (stack.isEmpty()) continue;
             for (Map.Entry<Enchantment, Integer> entry : EnchantmentHelper.getEnchantments(stack).entrySet()) {
                 if (!(entry.getKey() instanceof EnchantmentBase base)) continue;
+                // v3.1：跳过被禁用的附魔
+                if (base.isDisabled()) continue;
                 int level = base.applyLevelLimit(entry.getValue());
                 if (level > 0) {
                     EnchantmentContext ctx = new EnchantmentContext(event, healer, stack, level);
@@ -400,31 +474,37 @@ public class EnchantmentEventHandler {
     /**
      * 玩家Tick事件处理
      * <p>
-     * 注意：此方法每tick遍历每个玩家所有槽位所有附魔的NBT
-     * 这是架构级问题，需要更深层重构（如按槽位缓存+装备变更监听），暂保持原逻辑
+     * v3.0核心优化：使用装备缓存。
+     * v3.1修复：scanPlayerEnchantments 中已增加 isDisabled() 过滤。
      * </p>
      */
     @SubscribeEvent
     public static void handlePlayerTick(@Nonnull TickEvent.PlayerTickEvent event) {
         if (event.player.level().isClientSide || event.phase != TickEvent.Phase.START) return;
+
         Player player = event.player;
-        for (EquipmentSlot slot : EquipmentSlot.values()) {
-            ItemStack stack = player.getItemBySlot(slot);
-            if (stack.isEmpty()) continue;
-            for (Map.Entry<Enchantment, Integer> entry : EnchantmentHelper.getEnchantments(stack).entrySet()) {
-                if (!(entry.getKey() instanceof EnchantmentBase base)) continue;
-                int level = base.applyLevelLimit(entry.getValue());
-                if (level > 0) {
-                    EnchantmentContext ctx = new EnchantmentContext(event, player, stack, level);
-                    base.onPlayerTick(ctx, level);
-                }
-            }
+
+        if (!player.isAlive()) return;
+
+        PlayerEquipmentCache cache = PLAYER_TICK_CACHE.computeIfAbsent(
+                player.getUUID(), k -> new PlayerEquipmentCache());
+
+        List<TickEnchantmentEntry> entries = cache.getOrRescan(player);
+
+        if (entries.isEmpty()) return;
+
+        for (TickEnchantmentEntry entry : entries) {
+            EnchantmentContext ctx = new EnchantmentContext(event, player, entry.stack, entry.level);
+            entry.enchantment.onPlayerTick(ctx, entry.level);
         }
     }
 
     /**
      * 暴击事件处理
-     * <p>仅检查主手武器，频率低</p>
+     * <p>
+     * 仅检查主手武器，频率低
+     * v3.1修复：增加 isDisabled() 检查
+     * </p>
      */
     @SubscribeEvent(priority = EventPriority.NORMAL)
     public static void handleCriticalHit(@Nonnull CriticalHitEvent event) {
@@ -434,11 +514,40 @@ public class EnchantmentEventHandler {
         if (weapon.isEmpty()) return;
         for (Map.Entry<Enchantment, Integer> entry : EnchantmentHelper.getEnchantments(weapon).entrySet()) {
             if (!(entry.getKey() instanceof EnchantmentBase base)) continue;
+            // v3.1：跳过被禁用的附魔
+            if (base.isDisabled()) continue;
             int level = base.applyLevelLimit(entry.getValue());
             if (level > 0) {
                 EnchantmentContext ctx = new EnchantmentContext(event, player, weapon, level);
                 base.onCriticalHit(ctx, level);
             }
         }
+    }
+
+    // ==================== 缓存清理 ====================
+
+    /**
+     * 玩家登出时清理装备缓存，防止内存泄漏
+     */
+    @SubscribeEvent
+    public static void onPlayerLogout(@Nonnull PlayerEvent.PlayerLoggedOutEvent event) {
+        PLAYER_TICK_CACHE.remove(event.getEntity().getUUID());
+    }
+
+    /**
+     * 手动清除所有缓存（调试用）
+     */
+    public static void clearAllCaches() {
+        EVENT_CACHE.clear();
+        PLAYER_TICK_CACHE.clear();
+    }
+
+    /**
+     * 获取PlayerTick缓存统计
+     *
+     * @return 缓存条目数量
+     */
+    public static int getPlayerTickCacheSize() {
+        return PLAYER_TICK_CACHE.size();
     }
 }

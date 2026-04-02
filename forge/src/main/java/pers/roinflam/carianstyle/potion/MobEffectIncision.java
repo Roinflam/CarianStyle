@@ -17,7 +17,6 @@ import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
-import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
@@ -35,12 +34,25 @@ import java.util.UUID;
  * - 治疗量+60%
  * - 每tick扣除最大生命值×12.5%/20的血量（可致死）
  * </p>
+ * <p>
+ * 性能优化 v3.0：
+ * 移除 SynchronizationTask(1) 延迟调用，直接在 applyEffectTick 中扣血和衰减速度。
+ * </p>
  */
 @Mod.EventBusSubscriber
 public class MobEffectIncision extends IconBase {
 
+    /** 移动速度修改器UUID */
     public static final UUID ID = UUID.fromString("0a6b62ca-ead9-3641-c4dd-a4d33daf5cc1");
+
+    /** 移动速度修改器名称 */
     public static final String NAME = "potion.incision";
+
+    /** 速度衰减下限 */
+    private static final double SPEED_DECAY_FLOOR = 0.3;
+
+    /** 每tick速度衰减量 */
+    private static final double SPEED_DECAY_PER_TICK = 0.15 / 20.0;
 
     public MobEffectIncision(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
@@ -75,7 +87,10 @@ public class MobEffectIncision extends IconBase {
     public void removeAttributeModifiers(@Nonnull LivingEntity entityLivingBaseIn,
                                          @Nonnull AttributeMap attributeMapIn,
                                          int amplifier) {
-        entityLivingBaseIn.getAttribute(Attributes.MOVEMENT_SPEED).removeModifier(ID);
+        AttributeInstance speedAttr = entityLivingBaseIn.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (speedAttr != null) {
+            speedAttr.removeModifier(ID);
+        }
         super.removeAttributeModifiers(entityLivingBaseIn, attributeMapIn, amplifier);
     }
 
@@ -84,8 +99,11 @@ public class MobEffectIncision extends IconBase {
                                       @Nonnull AttributeMap attributeMapIn,
                                       int amplifier) {
         // 初始移动速度+120%
-        entityLivingBaseIn.getAttribute(Attributes.MOVEMENT_SPEED)
-                .addTransientModifier(new AttributeModifier(ID, NAME, 1.2, AttributeModifier.Operation.MULTIPLY_TOTAL));
+        AttributeInstance speedAttr = entityLivingBaseIn.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (speedAttr != null) {
+            speedAttr.addTransientModifier(
+                    new AttributeModifier(ID, NAME, 1.2, AttributeModifier.Operation.MULTIPLY_TOTAL));
+        }
         super.addAttributeModifiers(entityLivingBaseIn, attributeMapIn, amplifier);
     }
 
@@ -104,32 +122,38 @@ public class MobEffectIncision extends IconBase {
         }
     }
 
+    /**
+     * 每tick扣血 + 速度衰减（直接执行，不再创建延迟任务）
+     *
+     * @param entityLivingBaseIn 受影响的实体
+     * @param amplifier          效果等级
+     */
     @Override
     public void applyEffectTick(@Nonnull LivingEntity entityLivingBaseIn, int amplifier) {
-        // 每tick扣血（最大生命值×12.5%/20）
+        // ========== 扣血 ==========
         float damage = entityLivingBaseIn.getMaxHealth() * 0.125f / 20;
 
-        new SynchronizationTask(1) {
-            @Override
-            public void run() {
-                if (entityLivingBaseIn.getHealth() - damage * 2 > 0) {
-                    entityLivingBaseIn.setHealth(entityLivingBaseIn.getHealth() - damage);
-                } else {
-                    EntityLivingUtil.kill(entityLivingBaseIn, NewDamageSource.hemorrhage(entityLivingBaseIn.level()));
-                }
-            }
-        }.start();
+        if (entityLivingBaseIn.getHealth() - damage * 2 > 0) {
+            entityLivingBaseIn.setHealth(entityLivingBaseIn.getHealth() - damage);
+        } else {
+            EntityLivingUtil.kill(entityLivingBaseIn, NewDamageSource.hemorrhage(entityLivingBaseIn.level()));
+            return;
+        }
 
-        // 移动速度随时间衰减
+        // ========== 速度衰减 ==========
         AttributeInstance attributeInstance = entityLivingBaseIn.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (attributeInstance == null) {
+            return;
+        }
+
         AttributeModifier modifier = attributeInstance.getModifier(ID);
         if (modifier != null) {
             double currentBonus = modifier.getAmount();
-            // 衰减至30%时停止
-            if (currentBonus > 0.3) {
+            if (currentBonus > SPEED_DECAY_FLOOR) {
                 attributeInstance.removeModifier(ID);
-                // 每tick衰减0.75%
-                attributeInstance.addTransientModifier(new AttributeModifier(ID, NAME, currentBonus - 0.15 / 20f, AttributeModifier.Operation.MULTIPLY_TOTAL));
+                double newBonus = Math.max(currentBonus - SPEED_DECAY_PER_TICK, SPEED_DECAY_FLOOR);
+                attributeInstance.addTransientModifier(
+                        new AttributeModifier(ID, NAME, newBonus, AttributeModifier.Operation.MULTIPLY_TOTAL));
             }
         }
     }
