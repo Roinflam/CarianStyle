@@ -20,6 +20,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
@@ -31,18 +32,10 @@ import java.util.UUID;
 
 /**
  * 重力附魔
- * <p>
- * 攻击时激活重力场，给敌人施加重力效果
- * 激活期间周围12格内其他生物持续受到轻微重力效果
- * </p>
- * <p>
- * 修复/优化记录：
- * - 修复getUsedItemHand → InteractionHand.MAIN_HAND
- * - 性能优化：将LivingTickEvent改为PlayerTickEvent，避免所有LivingEntity每tick都进入方法
- * </p>
+ * <p>v2.2：攻击者视角接入怪物附魔触发开关。PlayerTick天然玩家专属，无需检查。</p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "gravitas",
@@ -76,7 +69,9 @@ public class EnchantmentGravitas extends EnchantmentBase {
         LivingEntity victim = evt.getEntity();
         LivingEntity attacker = (LivingEntity) evt.getSource().getEntity();
 
-        // 修复：使用主手检查而非getUsedItemHand
+        // ⭐ v2.2：怪物附魔触发开关（攻击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+
         ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) {
             return;
@@ -93,11 +88,9 @@ public class EnchantmentGravitas extends EnchantmentBase {
             return;
         }
 
-        // 激活重力场状态
         int activeDuration = level * 4 * 20;
         EnchantmentDataManager.setCooldown(GRAVITAS_ACTIVE_KEY, attacker.getUUID(), activeDuration);
 
-        // 给敌人施加重力效果
         int potionDuration = level * 2 * 20;
         int potionLevel = 10 + level * 4 - 1;
         victim.addEffect(new MobEffectInstance(
@@ -108,7 +101,7 @@ public class EnchantmentGravitas extends EnchantmentBase {
     }
 
     /**
-     * 死亡时清理状态
+     * 死亡时清理状态（清理类，不需要拦截）
      */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingDeath(@NotNull LivingDeathEvent evt) {
@@ -120,11 +113,7 @@ public class EnchantmentGravitas extends EnchantmentBase {
 
     /**
      * 激活状态时，周围生物持续受到轻微重力效果
-     * <p>
-     * 性能优化：改用PlayerTickEvent替代LivingTickEvent
-     * 原代码注册在所有LivingEntity的tick上，每个存活实体每tick都会进入
-     * 改为只对玩家检测，大幅减少无用调用
-     * </p>
+     * <p>PlayerTickEvent 仅玩家触发，无需开关检查</p>
      */
     @SubscribeEvent
     public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
@@ -142,7 +131,6 @@ public class EnchantmentGravitas extends EnchantmentBase {
             return;
         }
 
-        // 周围12格内其他生物受到轻微重力效果
         List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 holder,

@@ -25,6 +25,7 @@ import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -42,8 +43,19 @@ import java.util.List;
  *   knockback内部取反后把敌人拉向hurter。应传入 hurter-entity 才能推开。
  * </p>
  *
+ * <h3>性能安全上限（v2.2 新增）</h3>
+ * <ul>
+ *   <li>{@link #MAX_SEARCH_RADIUS}：AOE 搜索半径硬上限，防止 level*4 在 100 级时达 400 格。</li>
+ *   <li>{@link #MAX_TARGETS}：单次触发最大命中目标数上限，防止对大量实体创建
+ *       并发 SynchronizationTask 导致 tick 调度器过载。</li>
+ * </ul>
+ *
+ * <p>本附魔为每个命中目标创建一个独立的 SynchronizationTask（60tick 循环任务），
+ * 100 级 + 400 格范围 + 200 个实体 = 200 个并发 tick 任务，
+ * 即使有 1800tick 冷却，单次触发就是灾难级性能打击。</p>
+ *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "epilepsy_spread",
@@ -53,6 +65,12 @@ import java.util.List;
         slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}
 )
 public class EnchantmentEpilepsySpread extends EnchantmentBase {
+
+    /** AOE 搜索半径硬上限（方块）：不管等级多高，最多搜索半径 16 方块 */
+    private static final int MAX_SEARCH_RADIUS = 16;
+
+    /** 单次触发最大命中目标数：防止并发 SynchronizationTask 过载 */
+    private static final int MAX_TARGETS = 24;
 
     public EnchantmentEpilepsySpread() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
@@ -83,13 +101,26 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
             hurter.setHealth(hurter.getMaxHealth() * 0.3f);
             hurter.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 100, 6));
 
-            List<LivingEntity> entities = EntityUtil.getNearbyEntities(
+            // ⭐ v2.2：搜索半径硬上限，防止等级×4直接当半径
+            // 原：level * 4（100级 = 400格）
+            int searchRadius = Math.min(level * 4, MAX_SEARCH_RADIUS);
+
+            List<LivingEntity> rawEntities = EntityUtil.getNearbyEntities(
                     LivingEntity.class,
                     hurter,
-                    level * 4
+                    searchRadius
             );
 
-            for (LivingEntity entityLivingBase : entities) {
+            // ⭐ v2.2：命中数量硬上限，防止并发 SynchronizationTask 过载
+            // 使用单独的列表存储被处理的实体，供延迟任务复用
+            List<LivingEntity> entities = new ArrayList<>();
+            int hitCount = 0;
+            for (LivingEntity entityLivingBase : rawEntities) {
+                if (hitCount >= MAX_TARGETS) {
+                    break;
+                }
+                entities.add(entityLivingBase);
+
                 entityLivingBase.playSound(SoundEvents.GHAST_HURT, 1, 1);
                 if (!entityLivingBase.equals(hurter)) {
                     // v2.1修复：方向改为 hurter - entity（从entity指向hurter），
@@ -99,6 +130,7 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
                     float stronge = (float) (level * 0.7 * Math.max(Math.abs(x), Math.abs(z)) / 14);
                     entityLivingBase.knockback(stronge, x, z);
                 }
+                hitCount++;
             }
 
             int finalLevel = level;

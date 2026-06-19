@@ -15,22 +15,16 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 
 /**
  * 长尾猫附魔
- * <p>
- * 护甲附魔，减免摔落伤害
- * 受到摔落伤害时：
- * - 如果伤害 < 最大生命值 × (50% + (等级-1) × 25%)，则完全取消伤害
- * - 等级1: 可免疫50%血量以下的摔落伤害
- * - 等级2: 可免疫75%血量以下的摔落伤害
- * - 等级3: 可免疫100%血量以下的摔落伤害
- * </p>
+ * <p>v2.1：LivingAttack摔落减伤入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "long_tail_cat",
@@ -44,10 +38,7 @@ public class EnchantmentLongTailCat extends EnchantmentBase {
 
     public EnchantmentLongTailCat() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
-                EquipmentSlot.HEAD,
-                EquipmentSlot.CHEST,
-                EquipmentSlot.LEGS,
-                EquipmentSlot.FEET
+                EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
         });
     }
 
@@ -57,19 +48,20 @@ public class EnchantmentLongTailCat extends EnchantmentBase {
             return;
         }
 
-        // 必须是摔落伤害
         if (!evt.getSource().getMsgId().equals("fall")) {
             return;
         }
 
         LivingEntity victim = evt.getEntity();
 
+        // ⭐ v2.1：怪物附魔触发开关（受击者视角，摔落保护非濒死触发）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
         Enchantment longTailCat = EnchantmentRegistry.getEnchantmentByClass(EnchantmentLongTailCat.class);
         if (longTailCat == null) {
             return;
         }
 
-        // 从所有护甲累加附魔等级
         int totalLevel = 0;
         for (ItemStack armor : victim.getArmorSlots()) {
             if (!armor.isEmpty()) {
@@ -85,10 +77,8 @@ public class EnchantmentLongTailCat extends EnchantmentBase {
             return;
         }
 
-        // 计算伤害阈值：最大生命值 × (50% + (等级-1) × 25%)
         float threshold = victim.getMaxHealth() * 0.5f + victim.getMaxHealth() * (totalLevel - 1) * 0.25f;
 
-        // 如果摔落伤害低于阈值，完全取消
         if (evt.getAmount() < threshold) {
             evt.setCanceled(true);
         }

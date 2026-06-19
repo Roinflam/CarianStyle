@@ -16,6 +16,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
@@ -24,14 +25,10 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 /**
  * 龙徽大盾附魔
- * <p>
- * 护甲附魔，物理伤害护盾叠层系统
- * 受到物理伤害时叠加护盾层数（最多20层）
- * 每层持续30秒，满20层时减伤25%
- * </p>
+ * <p>v2.1：LivingDamage受击者叠盾入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "dragoncrest_greatshield",
@@ -48,10 +45,7 @@ public class EnchantmentDragoncrestGreatshield extends EnchantmentBase {
 
     public EnchantmentDragoncrestGreatshield() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
-                EquipmentSlot.HEAD,
-                EquipmentSlot.CHEST,
-                EquipmentSlot.LEGS,
-                EquipmentSlot.FEET
+                EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
         });
     }
 
@@ -69,6 +63,10 @@ public class EnchantmentDragoncrestGreatshield extends EnchantmentBase {
         }
 
         LivingEntity victim = evt.getEntity();
+
+        // ⭐ v2.1：怪物附魔触发开关（受击者视角，物理叠层护盾）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
         Enchantment dragoncrest = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDragoncrestGreatshield.class);
 
         if (dragoncrest == null) {
@@ -86,19 +84,15 @@ public class EnchantmentDragoncrestGreatshield extends EnchantmentBase {
             return;
         }
 
-        // 获取当前护盾等级
         int currentAmplifier = DynamicAttributeManager.getAmplifier(victim, DynamicAttributes.DRAGONCREST_GREATSHIELD);
 
         if (currentAmplifier < 0) {
-            // 没有护盾，添加0级
             DynamicAttributeManager.apply(victim,
                     DynamicAttributes.DRAGONCREST_GREATSHIELD.createInstance(SHIELD_DURATION, 0));
         } else if (currentAmplifier < MAX_SHIELD_LEVEL) {
-            // 提升护盾等级
             DynamicAttributeManager.apply(victim,
                     DynamicAttributes.DRAGONCREST_GREATSHIELD.createInstance(SHIELD_DURATION, currentAmplifier + 1));
         } else {
-            // 满层，刷新时间并减伤
             DynamicAttributeManager.apply(victim,
                     DynamicAttributes.DRAGONCREST_GREATSHIELD.createInstance(SHIELD_DURATION, MAX_SHIELD_LEVEL));
             evt.setAmount(evt.getAmount() * 0.75f);

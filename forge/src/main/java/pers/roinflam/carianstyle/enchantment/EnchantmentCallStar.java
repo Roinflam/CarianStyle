@@ -21,6 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
@@ -30,19 +31,10 @@ import java.util.List;
 
 /**
  * 唤星附魔
- * <p>
- * 箭矢落地时吸引周围敌人，延迟后召唤闪电造成伤害
- * 夜晚伤害×3
- * </p>
- * <p>
- * 修复记录 v2.1：
- * - getUsedItemHand() → InteractionHand.MAIN_HAND
- *   箭矢命中时玩家可能已经不在"使用"状态（弓已放开），
- *   getUsedItemHand()可能返回错误的手，应直接检查主手
- * </p>
+ * <p>v2.3：ProjectileImpact射手视角入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.3
  */
 @AutoRegisterEnchantment(
         id = "call_star",
@@ -58,23 +50,16 @@ import java.util.List;
 @Mod.EventBusSubscriber
 public class EnchantmentCallStar extends EnchantmentBase {
 
+    private static final int MAX_ATTRACT_RADIUS = 12;
+    private static final int MAX_LIGHTNING_RADIUS = 8;
+    private static final int MAX_TARGETS = 20;
+
     public EnchantmentCallStar() {
         super(EnchantmentCategory.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
-    /**
-     * 判断是否为夜晚
-     *
-     * @param level 世界
-     * @return 如果是夜晚返回true
-     */
     private static boolean isNightTime(@NotNull Level level) {
-        // 获取世界时间（0-24000循环）
         long dayTime = level.getDayTime() % 24000;
-
-        // 夜晚时间：13000-23000
-        // 12000是日落开始，13000完全黑暗
-        // 23000是日出开始，0是完全白天
         return dayTime >= 13000 && dayTime < 23000;
     }
 
@@ -84,14 +69,12 @@ public class EnchantmentCallStar extends EnchantmentBase {
             return;
         }
 
-        // 必须是箭矢
         if (!(evt.getProjectile() instanceof AbstractArrow)) {
             return;
         }
 
         AbstractArrow arrow = (AbstractArrow) evt.getProjectile();
 
-        // 必须有射击者且未击中实体（落地）
         if (arrow.getOwner() == null || evt.getRayTraceResult().getType() == net.minecraft.world.phys.HitResult.Type.ENTITY) {
             return;
         }
@@ -102,8 +85,9 @@ public class EnchantmentCallStar extends EnchantmentBase {
 
         LivingEntity attacker = (LivingEntity) arrow.getOwner();
 
-        // v2.1修复：使用主手而非getUsedItemHand()
-        // 箭矢飞行/命中时玩家可能已经不在"使用"状态
+        // ⭐ v2.3：怪物附魔触发开关（射手视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+
         ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) {
             return;
@@ -126,40 +110,48 @@ public class EnchantmentCallStar extends EnchantmentBase {
 
         final int effectiveLevel = level;
 
-        // 第一阶段：吸引周围敌人（向箭矢位置拉近）
+        int attractRadius = Math.min(effectiveLevel * 2, MAX_ATTRACT_RADIUS);
+
         List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 arrow,
-                effectiveLevel * 2,
+                attractRadius,
                 entity -> !entity.equals(attacker)
         );
 
+        int attractHitCount = 0;
         for (LivingEntity entity : nearbyEntities) {
-            // 吸引方向：从entity指向arrow（内部取反后推向arrow方向→即拉近）
-            // 这里是有意为之的吸引效果，不是击退
+            if (attractHitCount >= MAX_TARGETS) {
+                break;
+            }
             double x = entity.getX() - arrow.getX();
             double z = entity.getZ() - arrow.getZ();
             float strength = (float) (effectiveLevel * 0.35f * Math.max(Math.abs(x), Math.abs(z)) / 7);
             entity.knockback(strength, x, z);
+            attractHitCount++;
         }
 
-        // 第二阶段：延迟后召唤闪电
         new SynchronizationTask(20) {
             @Override
             public void run() {
-                // 重新获取目标列表（因为延迟了20tick，目标可能已移动）
+                int lightningRadius = Math.min(effectiveLevel, MAX_LIGHTNING_RADIUS);
+
                 List<LivingEntity> targets = EntityUtil.getNearbyEntities(
                         LivingEntity.class,
                         arrow,
-                        effectiveLevel,
+                        lightningRadius,
                         entity -> !entity.equals(attacker)
                 );
 
                 if (!targets.isEmpty()) {
+                    int hitCount = 0;
                     for (LivingEntity target : targets) {
+                        if (hitCount >= MAX_TARGETS) {
+                            break;
+                        }
+
                         Level world = target.level();
 
-                        // 召唤视觉闪电效果
                         if (world instanceof ServerLevel serverLevel) {
                             LightningBolt lightning = EntityType.LIGHTNING_BOLT.create(serverLevel);
                             if (lightning != null) {
@@ -169,24 +161,21 @@ public class EnchantmentCallStar extends EnchantmentBase {
                             }
                         }
 
-                        // 计算伤害倍率（夜晚×3）
                         int magnification = isNightTime(world) ? 3 : 1;
 
-                        // 计算伤害：箭基础伤害 × 等级 × 0.3 × 倍率
                         float baseDamage = (float) arrow.getBaseDamage();
                         float damage = baseDamage * effectiveLevel * 0.3f * magnification;
 
                         target.hurt(target.damageSources().lightningBolt(), damage);
 
-                        // 如果目标在地面上，施加小幅随机击退
                         if (target.onGround()) {
                             double x = RandomUtils.nextBoolean() ? arrow.getX() - target.getX() : target.getX() - arrow.getX();
                             double z = RandomUtils.nextBoolean() ? arrow.getZ() - target.getZ() : target.getZ() - arrow.getZ();
                             target.knockback(0.2f, x, z);
                         }
+                        hitCount++;
                     }
                 } else {
-                    // 如果没有目标，在箭矢位置召唤闪电效果
                     Level world = arrow.level();
                     if (world instanceof ServerLevel serverLevel) {
                         LightningBolt lightning = EntityType.LIGHTNING_BOLT.create(serverLevel);

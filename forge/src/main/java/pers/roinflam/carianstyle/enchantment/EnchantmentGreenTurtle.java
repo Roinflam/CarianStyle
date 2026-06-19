@@ -15,21 +15,16 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 
 /**
  * 绿龟附魔
- * <p>
- * 护甲附魔，增强治疗效果
- * 治疗时：
- * - 基础增益：治疗量 × 等级 × 7.5%
- * - 低血量加成：等级 × 15% × (1 - 当前血量百分比)
- * - 血量越低，加成越高
- * </p>
+ * <p>v2.1：LivingHeal受治疗者视角入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "green_turtle",
@@ -43,10 +38,7 @@ public class EnchantmentGreenTurtle extends EnchantmentBase {
 
     public EnchantmentGreenTurtle() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
-                EquipmentSlot.HEAD,
-                EquipmentSlot.CHEST,
-                EquipmentSlot.LEGS,
-                EquipmentSlot.FEET
+                EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
         });
     }
 
@@ -57,6 +49,9 @@ public class EnchantmentGreenTurtle extends EnchantmentBase {
         }
 
         LivingEntity entity = evt.getEntity();
+
+        // ⭐ v2.1：怪物附魔触发开关（受治疗者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(entity, false)) return;
 
         Enchantment greenTurtle = EnchantmentRegistry.getEnchantmentByClass(EnchantmentGreenTurtle.class);
         if (greenTurtle == null) {

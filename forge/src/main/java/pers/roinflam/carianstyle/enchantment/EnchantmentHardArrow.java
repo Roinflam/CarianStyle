@@ -18,13 +18,20 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 import java.util.List;
 
-/** 硬箭附魔 - 修复: 2处getUsedItemHand -> InteractionHand.MAIN_HAND @version 2.1 */
+/**
+ * 硬箭附魔
+ * <p>v2.2：ProjectileImpact射手+LivingKnockBack受击者入口接入怪物附魔触发开关。
+ * onHurtAsVictimHighest 走中央事件分发器，已被 scanEntity 拦截。</p>
+ *
+ * @version 2.2
+ */
 @AutoRegisterEnchantment(id = "hard_arrow", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.UNCOMMON, type = EnchantmentCategory.BOW, slots = {EquipmentSlot.MAINHAND})
 @Mod.EventBusSubscriber
 public class EnchantmentHardArrow extends EnchantmentBase {
@@ -35,7 +42,10 @@ public class EnchantmentHardArrow extends EnchantmentBase {
         if (evt.getEntity().level().isClientSide) return;
         if (!(evt.getProjectile() instanceof AbstractArrow arrow)) return;
         if (!(arrow.getOwner() instanceof LivingEntity attacker)) return;
-        // 修复：使用主手
+
+        // ⭐ v2.2：怪物附魔触发开关（射手视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+
         ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) return;
         Enchantment hardArrow = EnchantmentRegistry.getEnchantmentByClass(EnchantmentHardArrow.class);
@@ -59,7 +69,10 @@ public class EnchantmentHardArrow extends EnchantmentBase {
     public static void onLivingKnockBack(@NotNull LivingKnockBackEvent evt) {
         if (evt.getEntity().level().isClientSide) return;
         LivingEntity victim = evt.getEntity();
-        // 修复：使用主手
+
+        // ⭐ v2.2：怪物附魔触发开关（受击者视角，被击退强化）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
         ItemStack heldItem = victim.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) return;
         Enchantment hardArrow = EnchantmentRegistry.getEnchantmentByClass(EnchantmentHardArrow.class);

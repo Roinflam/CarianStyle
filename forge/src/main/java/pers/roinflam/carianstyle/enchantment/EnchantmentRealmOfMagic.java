@@ -14,6 +14,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
@@ -23,14 +24,10 @@ import java.util.List;
 
 /**
  * 魔法领域附魔
- * <p>
- * 护甲附魔，团队魔法增伤
- * 当队友（同类实体）造成魔法伤害时：
- * - 如果周围6格内有穿戴此附魔的同类实体，伤害增加50%
- * </p>
+ * <p>v2.1：LivingHurt攻击者视角入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "realm_of_magic",
@@ -46,10 +43,7 @@ public class EnchantmentRealmOfMagic extends EnchantmentBase {
 
     public EnchantmentRealmOfMagic() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
-                EquipmentSlot.HEAD,
-                EquipmentSlot.CHEST,
-                EquipmentSlot.LEGS,
-                EquipmentSlot.FEET
+                EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
         });
     }
 
@@ -59,7 +53,6 @@ public class EnchantmentRealmOfMagic extends EnchantmentBase {
             return;
         }
 
-        // 必须有攻击者且是魔法伤害
         if (!(evt.getSource().getEntity() instanceof LivingEntity)) {
             return;
         }
@@ -69,12 +62,14 @@ public class EnchantmentRealmOfMagic extends EnchantmentBase {
 
         LivingEntity attacker = (LivingEntity) evt.getSource().getEntity();
 
+        // ⭐ v2.1：怪物附魔触发开关（攻击者视角，团队魔法增伤）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+
         Enchantment realmOfMagic = EnchantmentRegistry.getEnchantmentByClass(EnchantmentRealmOfMagic.class);
         if (realmOfMagic == null) {
             return;
         }
 
-        // 获取攻击者周围6格内的同类实体
         List<LivingEntity> allies = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 attacker,
@@ -82,12 +77,10 @@ public class EnchantmentRealmOfMagic extends EnchantmentBase {
                 entity -> entity.getClass() == attacker.getClass()
         );
 
-        // 检查同类是否有穿戴此附魔
         for (LivingEntity ally : allies) {
             for (ItemStack armor : ally.getArmorSlots()) {
                 if (!armor.isEmpty()) {
                     if (EnchantmentHelper.getItemEnchantmentLevel(realmOfMagic, armor) > 0) {
-                        // 找到一个即增伤50%
                         evt.setAmount(evt.getAmount() + evt.getAmount() * 0.5f);
                         return;
                     }

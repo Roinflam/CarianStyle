@@ -17,20 +17,17 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 
 /**
  * 黄金树祝福附魔
- * <p>
- * 受击时和攻击时都获得黄金树祝福效果
- * 持续时间 = 2.5 × 等级 × 20 tick
- * 攻击者等级上限为5
- * </p>
+ * <p>v2.1：LivingAttack双向监听器入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "blessing_of_the_erdtree",
@@ -79,12 +76,20 @@ public class EnchantmentBlessingOfTheErdtree extends EnchantmentBase {
         LivingEntity victim = evt.getEntity();
         LivingEntity attacker = (LivingEntity) damageSource.getEntity();
 
-        int victimLevel = getTotalLevel(victim);
-        if (victimLevel > 0) {
-            int duration = (int) (2.5 * victimLevel * 20);
-            int amplifier = victimLevel - 1;
-            victim.addEffect(new MobEffectInstance(CarianStylePotion.BLESSING_OF_THE_ERDTREE.get(), duration, amplifier));
+        // 受击者视角
+        // ⭐ v2.1：怪物附魔触发开关（受击者视角）
+        if (!EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) {
+            int victimLevel = getTotalLevel(victim);
+            if (victimLevel > 0) {
+                int duration = (int) (2.5 * victimLevel * 20);
+                int amplifier = victimLevel - 1;
+                victim.addEffect(new MobEffectInstance(CarianStylePotion.BLESSING_OF_THE_ERDTREE.get(), duration, amplifier));
+            }
         }
+
+        // 攻击者视角
+        // ⭐ v2.1：怪物附魔触发开关（攻击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
 
         int attackerLevel = getTotalLevel(attacker);
         if (attackerLevel > 0) {

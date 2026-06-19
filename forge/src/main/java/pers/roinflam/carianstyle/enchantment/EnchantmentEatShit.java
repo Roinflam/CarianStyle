@@ -18,11 +18,17 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 
-/** 吃屎附魔 - 修复: getUsedItemHand -> InteractionHand.MAIN_HAND @version 2.1 */
+/**
+ * 吃屎附魔
+ * <p>v2.2：攻击者+治疗事件入口接入怪物附魔触发开关</p>
+ *
+ * @version 2.2
+ */
 @AutoRegisterEnchantment(id = "eat_shit", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.UNCOMMON, type = EnchantmentCategory.WEAPON, slots = {EquipmentSlot.MAINHAND})
 @Mod.EventBusSubscriber
 public class EnchantmentEatShit extends EnchantmentBase {
@@ -33,10 +39,13 @@ public class EnchantmentEatShit extends EnchantmentBase {
     public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
         if (evt.getEntity().level().isClientSide) return;
         if (!(evt.getSource().getDirectEntity() instanceof LivingEntity attacker)) return;
+
+        // ⭐ v2.2：怪物附魔触发开关（攻击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+
         LivingEntity victim = evt.getEntity();
         Enchantment eatShit = EnchantmentRegistry.getEnchantmentByClass(EnchantmentEatShit.class);
         if (eatShit == null) return;
-        // 修复：使用主手
         ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) return;
         int level = EnchantmentHelper.getItemEnchantmentLevel(eatShit, heldItem);
@@ -51,6 +60,10 @@ public class EnchantmentEatShit extends EnchantmentBase {
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onLivingHeal(@NotNull LivingHealEvent evt) {
         if (evt.getEntity().level().isClientSide) return;
+
+        // ⭐ v2.2：怪物附魔触发开关（受治疗者视角，被附加的debuff效果）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(evt.getEntity(), false)) return;
+
         if (EnchantmentDataManager.isOnCooldown(DEBUFF_KEY, evt.getEntity().getUUID())) {
             evt.setAmount(evt.getAmount() * 0.25f);
         }

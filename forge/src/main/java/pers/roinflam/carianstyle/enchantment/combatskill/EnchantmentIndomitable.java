@@ -1,5 +1,3 @@
-// 文件：EnchantmentIndomitable.java
-// 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentIndomitable.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
 import net.minecraft.world.entity.EquipmentSlot;
@@ -17,19 +15,17 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 
 /**
  * 不屈附魔
- * <p>
- * 血量越低越有概率完全免疫伤害
- * 免疫概率 = 损失血量百分比 × 75%
- * </p>
+ * <p>v2.1：受击者视角接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "indomitable",
@@ -46,28 +42,26 @@ public class EnchantmentIndomitable extends EnchantmentBase {
         super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
 
-    /**
-     * 使用静态事件因为需要累加所有护甲的附魔等级
-     */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingAttack(@NotNull LivingAttackEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        // 排除无视创造模式的伤害
         if (evt.getSource().is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) {
             return;
         }
 
         LivingEntity holder = evt.getEntity();
 
+        // ⭐ v2.1：怪物附魔触发开关（受击者视角，低血量伤害免疫）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
+
         Enchantment indomitable = EnchantmentRegistry.getEnchantmentByClass(EnchantmentIndomitable.class);
         if (indomitable == null) {
             return;
         }
 
-        // 累加所有护甲的附魔等级
         int totalLevel = 0;
         for (ItemStack armor : holder.getArmorSlots()) {
             if (!armor.isEmpty()) {
@@ -79,7 +73,6 @@ public class EnchantmentIndomitable extends EnchantmentBase {
             return;
         }
 
-        // 免疫概率 = 损失血量百分比 × 75%
         float missingHealthPercent = 1 - holder.getHealth() / holder.getMaxHealth();
         double immuneChance = missingHealthPercent * 100 * 0.75;
 
@@ -90,7 +83,6 @@ public class EnchantmentIndomitable extends EnchantmentBase {
 
     @Override
     protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        // 与原版保护类附魔冲突
         if (ench == Enchantments.ALL_DAMAGE_PROTECTION ||
                 ench == Enchantments.FIRE_PROTECTION ||
                 ench == Enchantments.PROJECTILE_PROTECTION ||

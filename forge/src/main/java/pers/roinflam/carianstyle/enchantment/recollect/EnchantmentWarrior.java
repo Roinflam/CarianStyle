@@ -16,6 +16,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
@@ -30,10 +31,11 @@ import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
  * <p>
  * 性能优化 v3.0：受击持续伤害改用 DamageOverTimeManager
  * 修复保留 v2.1：getUsedItemHand -> InteractionHand.MAIN_HAND
+ * v3.1新增：三个独立监听器入口接入怪物附魔触发开关
  * </p>
  *
  * @author RoinFlam
- * @version 3.0
+ * @version 3.1
  */
 @AutoRegisterEnchantment(
         id = "warrior",
@@ -57,11 +59,15 @@ public class EnchantmentWarrior extends EnchantmentBase {
 
     /**
      * 攻击者视角：伤害×1.25
+     * <p>v3.1：怪物作为攻击者时，由通用开关 allowMobTriggerEnchantments 控制</p>
      */
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onLivingDamage_attack(@NotNull LivingDamageEvent evt) {
         if (evt.getEntity().level().isClientSide) return;
         if (!(evt.getSource().getDirectEntity() instanceof LivingEntity attacker)) return;
+
+        // ⭐ v3.1：怪物附魔触发开关（攻击者视角，非死亡触发）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
 
         ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) return;
@@ -81,6 +87,7 @@ public class EnchantmentWarrior extends EnchantmentBase {
      * 受击者视角：即时伤害降为50%，剩余50%持续60tick扣血
      * <p>
      * v3.0优化：SynchronizationTask(5, 1) → DamageOverTimeManager.applyLinear
+     * v3.1：怪物作为受击者时，由通用开关 allowMobTriggerEnchantments 控制
      * </p>
      */
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -88,6 +95,9 @@ public class EnchantmentWarrior extends EnchantmentBase {
         if (evt.getEntity().level().isClientSide) return;
 
         LivingEntity victim = evt.getEntity();
+
+        // ⭐ v3.1：怪物附魔触发开关（受击者视角，非死亡触发）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
 
         ItemStack heldItem = victim.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) return;
@@ -117,11 +127,15 @@ public class EnchantmentWarrior extends EnchantmentBase {
 
     /**
      * 击杀时回复25%已损失生命值
+     * <p>v3.1：怪物作为击杀者时，由通用开关 allowMobTriggerEnchantments 控制</p>
      */
     @SubscribeEvent
     public static void onLivingDeath(@NotNull LivingDeathEvent evt) {
         if (evt.getEntity().level().isClientSide) return;
         if (!(evt.getSource().getDirectEntity() instanceof LivingEntity killer)) return;
+
+        // ⭐ v3.1：怪物附魔触发开关（击杀者视角，击杀奖励不属于濒死触发）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(killer, false)) return;
 
         ItemStack heldItem = killer.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) return;

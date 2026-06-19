@@ -15,6 +15,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
@@ -30,9 +31,13 @@ import java.util.UUID;
  * 逆转结束：治疗累积伤害×25%
  * 冷却6000tick
  * </p>
+ * <p>
+ * v2.1新增: onLivingDeath 入口接入怪物附魔触发开关，
+ * 怪物身上的"濒死逆转+反弹"效果可由配置 allowMobTriggerDeathEnchantments 控制
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "time_reversal",
@@ -76,6 +81,7 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
 
     /**
      * 监听生物死亡事件 - 触发时间逆转
+     * <p>v2.1新增：怪物附魔触发开关（濒死类）拦截</p>
      *
      * @param evt 死亡事件
      */
@@ -86,6 +92,14 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
         }
 
         LivingEntity holder = evt.getEntity();
+
+        // ⭐ v2.1：怪物附魔触发开关 —— 时间逆转属于濒死无敌类，怪物身上不触发
+        // 若此处被拦截，REVERSAL_STATE_KEY 不会被设置，
+        // onLivingAttack 中的反弹判断也自然失效，无需在 onLivingAttack 中重复拦截
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, true)) {
+            return;
+        }
+
         UUID uuid = holder.getUUID();
 
         int totalLevel = getTotalLevel(holder);
@@ -128,6 +142,9 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
 
     /**
      * 监听生物受击事件 - 逆转状态下反弹伤害
+     * <p>注意：本事件不属于"死亡触发"，未接入怪物附魔开关。
+     * 但由于 onLivingDeath 已拦截，REVERSAL_STATE_KEY 不会被设置，
+     * 本方法对怪物自然不会触发反弹效果。</p>
      *
      * @param evt 受击事件
      */

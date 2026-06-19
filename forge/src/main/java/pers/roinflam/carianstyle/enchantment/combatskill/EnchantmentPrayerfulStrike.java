@@ -23,6 +23,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.EnchantmentScarletCorruption;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
@@ -32,12 +33,11 @@ import java.util.UUID;
 
 /**
  * 祈祷一击附魔
- * <p>
- * 修复记录：修复getUsedItemHand → InteractionHand.MAIN_HAND
- * </p>
+ * <p>v2.2：LivingDamage双向入口接入怪物附魔触发开关。
+ * onPlayerTick 玩家专属，onLivingDeath 是清理类，onPlayerRespawn 是清理类，均无需检查。</p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "prayerful_strike",
@@ -78,16 +78,22 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
             return;
         }
 
-        // 攻击者视角 - 修复：使用主手检查
-        ItemStack attackerHeld = attacker.getItemInHand(InteractionHand.MAIN_HAND);
-        if (!attackerHeld.isEmpty()) {
-            int level = EnchantmentHelper.getItemEnchantmentLevel(prayerfulStrike, attackerHeld);
-            if (level > 0) {
-                handleAttackerLogic(evt, attacker, victim);
+        // 攻击者视角
+        // ⭐ v2.2：怪物附魔触发开关（攻击者视角）
+        if (!EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) {
+            ItemStack attackerHeld = attacker.getItemInHand(InteractionHand.MAIN_HAND);
+            if (!attackerHeld.isEmpty()) {
+                int level = EnchantmentHelper.getItemEnchantmentLevel(prayerfulStrike, attackerHeld);
+                if (level > 0) {
+                    handleAttackerLogic(evt, attacker, victim);
+                }
             }
         }
 
-        // 受击者视角 - 修复：使用主手检查
+        // 受击者视角
+        // ⭐ v2.2：怪物附魔触发开关（受击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
         ItemStack victimHeld = victim.getItemInHand(InteractionHand.MAIN_HAND);
         if (!victimHeld.isEmpty()) {
             int level = EnchantmentHelper.getItemEnchantmentLevel(prayerfulStrike, victimHeld);
@@ -180,6 +186,7 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingDeath(@NotNull LivingDeathEvent evt) {
+        // 清理类，无需开关检查
         UUID uuid = evt.getEntity().getUUID();
         EnchantmentDataManager.clearCooldown(CHARGING_COOLDOWN_KEY, uuid);
         EnchantmentDataManager.clearCooldown(NOT_READY_COOLDOWN_KEY, uuid);

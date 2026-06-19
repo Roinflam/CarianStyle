@@ -17,6 +17,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
@@ -26,19 +27,10 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 /**
  * 卡利亚报复附魔
- * <p>
- * 盾牌格挡远程/魔法攻击时生成魔法剑反击
- * 每把剑伤害 = 原伤害×等级×20%
- * </p>
- * <p>
- * 修复记录：
- * - 构造函数 EnchantmentCategory.BREAKABLE → CarianStyleEnchantments.getCustomEnchantmentCategory("SHIELD")
- *   原bug：所有可损坏物品都能附上此盾牌专属附魔
- * - 注解添加 customType = "SHIELD"
- * </p>
+ * <p>v2.2：LivingAttack格挡反击入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "carian_retaliation",
@@ -55,7 +47,6 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 public class EnchantmentCarianRetaliation extends EnchantmentBase {
 
     public EnchantmentCarianRetaliation() {
-        // 修复：BREAKABLE → SHIELD自定义类型
         super(CarianStyleEnchantments.getCustomEnchantmentCategory("SHIELD"),
                 new EquipmentSlot[]{EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND});
     }
@@ -72,7 +63,6 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
             return;
         }
 
-        // 检查是否为远程或魔法伤害
         boolean isRanged = !damageSource.getEntity().equals(damageSource.getDirectEntity());
         boolean isMagic = DamageSourceUtil.isMagicDamage(damageSource);
         if (!isRanged && !isMagic) {
@@ -80,9 +70,12 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
         }
 
         LivingEntity holder = evt.getEntity();
+
+        // ⭐ v2.2：怪物附魔触发开关（受击者视角，格挡反击）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
+
         Entity attacker = damageSource.getEntity();
 
-        // 检查是否正在格挡
         if (!holder.isUsingItem()) {
             return;
         }
@@ -93,7 +86,6 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
             return;
         }
 
-        // 获取附魔
         Enchantment carianRetaliation = EnchantmentRegistry.getEnchantmentByClass(EnchantmentCarianRetaliation.class);
         if (carianRetaliation == null) {
             return;
@@ -112,25 +104,21 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
         final int effectiveLevel = level;
         final float baseDamage = evt.getAmount();
 
-        // 生成3把魔法剑反击
         for (int i = 0; i < 3; i++) {
             int delay = 40 + i * 5;
 
-            // 计算初始位置（120度间隔环绕持有者）
             double angle = (i * 120) * Math.PI / 180.0;
             double radius = 1.5;
             double posX = holder.getX() + Math.cos(angle) * radius;
             double posY = holder.getY() + 0.5;
             double posZ = holder.getZ() + Math.sin(angle) * radius;
 
-            // 显示用的剑（悬浮效果）
             EntityGlintblades showBlade = new EntityGlintblades(holder, attacker)
                     .setDeadTick(delay)
                     .setSize(1.0f);
             showBlade.setPos(posX, posY, posZ);
             holder.level().addFreshEntity(showBlade);
 
-            // 延迟发射
             new SynchronizationTask(delay) {
                 @Override
                 public void run() {

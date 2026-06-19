@@ -21,14 +21,18 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentFullMoon;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 /**
- * 暗月附魔 - 修复: 全部3处getUsedItemHand -> InteractionHand.MAIN_HAND / getMainHandItem
- * @version 2.1
+ * 暗月附魔
+ * <p>v2.2：LivingHurt双向+LivingHeal入口接入怪物附魔触发开关。
+ * onPlayerTick 玩家专属，无需检查。</p>
+ *
+ * @version 2.2
  */
 @AutoRegisterEnchantment(id = "dark_moon", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantmentCategory.WEAPON, slots = {EquipmentSlot.MAINHAND}, conflictsWith = {EnchantmentScarletCorruption.class, EnchantmentFireGivesPower.class, EnchantmentFireDevoured.class, EnchantmentVicDragonThunder.class})
 @Mod.EventBusSubscriber
@@ -52,21 +56,28 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
         Enchantment darkMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDarkMoon.class);
         if (darkMoon == null) return;
 
-        // 受击者视角（减伤）- 修复：使用主手
+        // 受击者视角（减伤）
         if (victim instanceof Mob livingVictim) {
-            ItemStack heldItem = livingVictim.getItemInHand(InteractionHand.MAIN_HAND);
-            if (!heldItem.isEmpty()) {
-                int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);
-                if (ConfigLoader.levelLimit) level = Math.min(level, 10);
-                if (level > 0) {
-                    boolean hasFullMoon = hasFullMoonEnchantment(livingVictim);
-                    evt.setAmount(evt.getAmount() * (1 - (hasFullMoon ? 0.375f : 0.25f)));
+            // ⭐ v2.2：怪物附魔触发开关（受击者视角）
+            if (!EnchantmentEventHandler.shouldBlockMobTrigger(livingVictim, false)) {
+                ItemStack heldItem = livingVictim.getItemInHand(InteractionHand.MAIN_HAND);
+                if (!heldItem.isEmpty()) {
+                    int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);
+                    if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+                    if (level > 0) {
+                        boolean hasFullMoon = hasFullMoonEnchantment(livingVictim);
+                        evt.setAmount(evt.getAmount() * (1 - (hasFullMoon ? 0.375f : 0.25f)));
+                    }
                 }
             }
         }
 
-        // 攻击者视角（增伤+吸血）- 修复：使用主手
+        // 攻击者视角（增伤+吸血）
         if (!(evt.getSource().getDirectEntity() instanceof LivingEntity attacker)) return;
+
+        // ⭐ v2.2：怪物附魔触发开关（攻击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+
         ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) return;
         int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);
@@ -87,9 +98,12 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
     public static void onLivingHeal(@NotNull LivingHealEvent evt) {
         if (evt.getEntity().level().isClientSide || evt.getEntity().level().isDay()) return;
         LivingEntity healer = evt.getEntity();
+
+        // ⭐ v2.2：怪物附魔触发开关（受治疗者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(healer, false)) return;
+
         Enchantment darkMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDarkMoon.class);
         if (darkMoon == null) return;
-        // 修复：使用主手
         ItemStack heldItem = healer.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) return;
         int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);
@@ -105,7 +119,6 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
         Player player = evt.player;
         Enchantment darkMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDarkMoon.class);
         if (darkMoon == null || !player.isAlive()) return;
-        // 修复：使用主手
         ItemStack heldItem = player.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) return;
         int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);

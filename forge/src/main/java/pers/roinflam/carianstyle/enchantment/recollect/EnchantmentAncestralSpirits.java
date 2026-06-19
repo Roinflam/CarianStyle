@@ -14,6 +14,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
@@ -21,13 +22,10 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 /**
  * 先祖之魂附魔
- * <p>
- * 魔法伤害减半，受击后10秒内持续回血
- * 回血量 = (最大血量 - 当前血量) × 0.05 / 20
- * </p>
+ * <p>v2.1：LivingDamage受击者视角入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "ancestral_spirits",
@@ -51,12 +49,14 @@ public class EnchantmentAncestralSpirits extends EnchantmentBase {
             return;
         }
 
-        // 修复：1.20.1 应该检查 BYPASSES_INVULNERABILITY 标签
         if (evt.getSource().is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) {
             return;
         }
 
         LivingEntity holder = evt.getEntity();
+
+        // ⭐ v2.1：怪物附魔触发开关（受击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
 
         Enchantment ancestralSpirits = EnchantmentRegistry.getEnchantmentByClass(EnchantmentAncestralSpirits.class);
         if (ancestralSpirits == null) {
@@ -74,12 +74,10 @@ public class EnchantmentAncestralSpirits extends EnchantmentBase {
             return;
         }
 
-        // 魔法伤害减半
         if (DamageSourceUtil.isMagicDamage(evt.getSource())) {
             evt.setAmount(evt.getAmount() * 0.5f);
         }
 
-        // 持续回血（任何伤害都会触发）
         if (holder.isAlive()) {
             new SynchronizationTask(10, 10) {
                 private int tick = 0;
@@ -91,7 +89,6 @@ public class EnchantmentAncestralSpirits extends EnchantmentBase {
                         this.cancel();
                         return;
                     }
-                    // 每次 tick 重新计算回血量
                     float healPerTick = (holder.getMaxHealth() - holder.getHealth()) * 0.05f / 20;
                     holder.heal(healPerTick);
                 }

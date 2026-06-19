@@ -14,19 +14,16 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 
 /**
  * 坩埚鳞片护符附魔
- * <p>
- * 护甲附魔，致命伤害保护
- * 当受到的伤害 ≥ 最大生命值时触发
- * 减伤 = 原伤害 × min(等级, 6) × 15%
- * </p>
+ * <p>v2.1：LivingDamage受击者致命减伤入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "crucible_scale_talisman",
@@ -40,10 +37,7 @@ public class EnchantmentCrucibleScaleTalisman extends EnchantmentBase {
 
     public EnchantmentCrucibleScaleTalisman() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
-                EquipmentSlot.HEAD,
-                EquipmentSlot.CHEST,
-                EquipmentSlot.LEGS,
-                EquipmentSlot.FEET
+                EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
         });
     }
 
@@ -58,6 +52,9 @@ public class EnchantmentCrucibleScaleTalisman extends EnchantmentBase {
         if (evt.getAmount() < victim.getMaxHealth()) {
             return;
         }
+
+        // ⭐ v2.1：怪物附魔触发开关（受击者视角，致命伤害减伤）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
 
         Enchantment crucibleScaleTalisman = EnchantmentRegistry.getEnchantmentByClass(EnchantmentCrucibleScaleTalisman.class);
         if (crucibleScaleTalisman == null) {

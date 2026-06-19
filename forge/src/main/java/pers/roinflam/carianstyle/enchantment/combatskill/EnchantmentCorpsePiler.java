@@ -15,6 +15,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.EnchantmentDarkMoon;
 import pers.roinflam.carianstyle.enchantment.EnchantmentFireDevoured;
@@ -29,12 +30,12 @@ import java.util.UUID;
 
 /**
  * 尸山血海附魔
- * <p>
- * 修复记录：修复击杀回调中getUsedItemHand → InteractionHand.MAIN_HAND
- * </p>
+ * <p>v2.2：击杀计数器（killer视角）入口接入怪物附魔触发开关。
+ * 死亡者计数衰减为清理逻辑，无需开关。
+ * onDamageAsAttackerHighest 走中央分发器，已被 scanEntity 拦截。</p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "corpse_piler",
@@ -91,22 +92,24 @@ public class EnchantmentCorpsePiler extends EnchantmentBase {
         if (evt.getSource().getDirectEntity() instanceof LivingEntity) {
             LivingEntity killer = (LivingEntity) evt.getSource().getDirectEntity();
 
-            // 修复：使用主手检查
-            ItemStack heldItem = killer.getItemInHand(InteractionHand.MAIN_HAND);
-            if (!heldItem.isEmpty()) {
-                int level = EnchantmentHelper.getItemEnchantmentLevel(corpsePiler, heldItem);
+            // ⭐ v2.2：怪物附魔触发开关（击杀者视角）
+            if (!EnchantmentEventHandler.shouldBlockMobTrigger(killer, false)) {
+                ItemStack heldItem = killer.getItemInHand(InteractionHand.MAIN_HAND);
+                if (!heldItem.isEmpty()) {
+                    int level = EnchantmentHelper.getItemEnchantmentLevel(corpsePiler, heldItem);
 
-                if (level > 0) {
-                    if (killer.level().random.nextBoolean()) {
-                        int current = EnchantmentDataManager.getCounter(KILL_COUNT_KEY, killer.getUUID());
-                        int newCount = Math.min(current + 1, 50);
-                        EnchantmentDataManager.setCounter(KILL_COUNT_KEY, killer.getUUID(), newCount, 6000);
+                    if (level > 0) {
+                        if (killer.level().random.nextBoolean()) {
+                            int current = EnchantmentDataManager.getCounter(KILL_COUNT_KEY, killer.getUUID());
+                            int newCount = Math.min(current + 1, 50);
+                            EnchantmentDataManager.setCounter(KILL_COUNT_KEY, killer.getUUID(), newCount, 6000);
+                        }
                     }
                 }
             }
         }
 
-        // 死亡者计数减半
+        // 死亡者计数衰减（清理逻辑，无需开关）
         int deadCount = EnchantmentDataManager.getCounter(KILL_COUNT_KEY, dead.getUUID());
         if (deadCount > 0) {
             EnchantmentDataManager.setCounter(KILL_COUNT_KEY, dead.getUUID(), deadCount / 2, 6000);

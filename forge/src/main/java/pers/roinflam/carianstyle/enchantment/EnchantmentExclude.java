@@ -14,6 +14,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
@@ -27,9 +28,10 @@ import java.util.List;
  * 受到攻击时击退周围所有敌人
  * 范围 = 5 + (等级 - 1) × 0.75格
  * </p>
+ * <p>v2.2：受击者视角入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "exclude",
@@ -40,6 +42,9 @@ import java.util.List;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentExclude extends EnchantmentBase {
+
+    private static final double MAX_SEARCH_RADIUS = 10.0;
+    private static final int MAX_TARGETS = 20;
 
     public EnchantmentExclude() {
         super(EnchantmentCategory.ARMOR_LEGS, new EquipmentSlot[]{EquipmentSlot.LEGS});
@@ -56,6 +61,10 @@ public class EnchantmentExclude extends EnchantmentBase {
         }
 
         LivingEntity victim = evt.getEntity();
+
+        // ⭐ v2.2：怪物附魔触发开关（受击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
         Enchantment exclude = EnchantmentRegistry.getEnchantmentByClass(EnchantmentExclude.class);
 
         if (exclude == null) {
@@ -78,18 +87,24 @@ public class EnchantmentExclude extends EnchantmentBase {
         }
 
         double range = 5 + (totalLevel - 1) * 0.75;
+        double searchRadius = Math.min(range, MAX_SEARCH_RADIUS);
 
         List<LivingEntity> targets = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 victim,
-                range,
+                searchRadius,
                 entity -> !entity.equals(victim)
         );
 
+        int hitCount = 0;
         for (LivingEntity target : targets) {
+            if (hitCount >= MAX_TARGETS) {
+                break;
+            }
             double x = victim.getX() - target.getX();
             double z = victim.getZ() - target.getZ();
             target.knockback(0.5f, x, z);
+            hitCount++;
         }
     }
 

@@ -17,6 +17,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
@@ -26,21 +27,11 @@ import java.util.List;
 
 /**
  * 圣地附魔
- * <p>
- * 光环效果：举盾时为16格内同类生物提供减伤、治疗和护盾
- * 减伤：-5%×等级（叠加）
- * 治疗：最大血量×1.5%×等级（每60tick）
- * 护盾：吸收量+3%×等级，上限=最大血量/3×等级
- * </p>
- * <p>
- * 性能优化记录：
- * - 将治疗/护盾光环从LivingTickEvent改为PlayerTickEvent
- *   原代码：所有LivingEntity每tick都进入方法，即使99%的实体都没有圣地附魔
- *   优化后：只在PlayerTickEvent中检查玩家，且提前检查附魔等级后再执行范围搜索
- * </p>
+ * <p>v2.2：受击减伤光环入口接入怪物附魔触发开关。
+ * PlayerTickEvent 仅玩家触发，无需开关检查。</p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "holy_ground",
@@ -70,12 +61,14 @@ public class EnchantmentHolyGround extends EnchantmentBase {
 
         LivingEntity victim = evt.getEntity();
 
+        // ⭐ v2.2：怪物附魔触发开关（受益者是受击者，怪物受益等同于触发）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
         Enchantment holyGround = EnchantmentRegistry.getEnchantmentByClass(EnchantmentHolyGround.class);
         if (holyGround == null) {
             return;
         }
 
-        // 查找附近16格内的同类生物
         List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 victim,
@@ -84,7 +77,6 @@ public class EnchantmentHolyGround extends EnchantmentBase {
         );
 
         for (LivingEntity entity : nearbyEntities) {
-            // 检查是否正在举盾
             if (!entity.isUsingItem()) {
                 continue;
             }
@@ -97,19 +89,13 @@ public class EnchantmentHolyGround extends EnchantmentBase {
             int level = EnchantmentHelper.getItemEnchantmentLevel(holyGround, activeItem);
 
             if (level > 0) {
-                // 减伤 -5% × 等级
                 evt.setAmount(evt.getAmount() - evt.getAmount() * level * 0.05f);
             }
         }
     }
 
     /**
-     * 治疗/护盾光环：举盾时每60tick为附近同类生物提供治疗和护盾
-     * <p>
-     * 性能优化：改用PlayerTickEvent替代LivingTickEvent
-     * 原代码注册在所有LivingEntity的tick上，每个存活实体每tick都进入
-     * 优化为仅玩家检测，且提前判断附魔+举盾状态后才做范围搜索
-     * </p>
+     * 治疗/护盾光环（PlayerTickEvent，玩家专属）
      */
     @SubscribeEvent
     public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
@@ -117,7 +103,6 @@ public class EnchantmentHolyGround extends EnchantmentBase {
             return;
         }
 
-        // 60tick间隔
         if (evt.player.tickCount % 60 != 0) {
             return;
         }
@@ -127,7 +112,6 @@ public class EnchantmentHolyGround extends EnchantmentBase {
             return;
         }
 
-        // 提前检查：是否正在举盾
         if (!holder.isUsingItem()) {
             return;
         }
@@ -137,7 +121,6 @@ public class EnchantmentHolyGround extends EnchantmentBase {
             return;
         }
 
-        // 提前检查：盾牌是否有圣地附魔
         Enchantment holyGround = EnchantmentRegistry.getEnchantmentByClass(EnchantmentHolyGround.class);
         if (holyGround == null) {
             return;
@@ -148,7 +131,6 @@ public class EnchantmentHolyGround extends EnchantmentBase {
             return;
         }
 
-        // 所有前置检查通过，才执行范围搜索
         List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 holder,
@@ -159,13 +141,11 @@ public class EnchantmentHolyGround extends EnchantmentBase {
         for (LivingEntity entity : nearbyEntities) {
             boolean effectApplied = false;
 
-            // 治疗：最大血量 × 等级 × 1.5%
             if (entity.getHealth() < entity.getMaxHealth()) {
                 entity.heal(entity.getMaxHealth() * level * 0.015f);
                 effectApplied = true;
             }
 
-            // 护盾：吸收量 +3% × 等级，上限 = 最大血量/3 × 等级
             float maxAbsorption = entity.getMaxHealth() / 3 * level;
             if (entity.getAbsorptionAmount() < maxAbsorption) {
                 float newAbsorption = Math.min(
@@ -176,7 +156,6 @@ public class EnchantmentHolyGround extends EnchantmentBase {
                 effectApplied = true;
             }
 
-            // 有效果时播放音效
             if (effectApplied) {
                 entity.playSound(SoundEvents.PLAYER_LEVELUP, 1, 3);
             }

@@ -256,6 +256,7 @@
   "config.carianstyle.category.enchantment": "附魔系统",
   "config.carianstyle.category.treasure": "宝藏附魔配置",
   "config.carianstyle.category.balance": "游戏平衡配置",
+  "config.carianstyle.category.mobTrigger": "怪物附魔触发",
   "_comment_config_entries": "========== 配置项 / Configuration Entries ==========",
   "config.carianstyle.enableDetailedLogging": "启用详细调试日志",
   "config.carianstyle.enableDetailedLogging.tooltip": "启用后会在日志中记录所有详细信息\n包括：附魔效果触发、属性计算、事件处理等\n§c⚠ 警告：会产生大量日志输出！§r\n§c仅在调试时启用！§r",
@@ -279,5 +280,9 @@
   "config.carianstyle.enableTrueDamage": "启用高级真伤系统",
   "config.carianstyle.enableTrueDamage.tooltip": "启用后使用复杂的字段检测来绕过护甲和保护\n这可以让真伤对所有生物（包括模组生物）都有效\n§7true§r = 使用高级检测（推荐，默认）\n§7false§r = 使用简单的setHealth方法\n\n§c注意：§r禁用后某些模组生物可能无法受到真伤\n但性能会稍微提升一些",
   "config.carianstyle.rockBlasterSuppressCommonDrops": "碎岩者：抑制常见石头掉落物",
-  "config.carianstyle.rockBlasterSuppressCommonDrops.tooltip": "启用后，碎岩者破坏常见石头类方块时不会产生掉落物\n受影响方块：石头、圆石、深板岩、粗深板岩、花岗岩、\n闪长岩、安山岩、凝灰岩、方解石、平滑玄武岩、\n沙砾、地狱岩、玄武岩、黑石、末地石\n可有效防止大量掉落物导致的卡顿\n§7false§r = 正常掉落(默认)\n§7true§r = 常见石头不掉落"
+  "config.carianstyle.rockBlasterSuppressCommonDrops.tooltip": "启用后，碎岩者破坏常见石头类方块时不会产生掉落物\n受影响方块：石头、圆石、深板岩、粗深板岩、花岗岩、\n闪长岩、安山岩、凝灰岩、方解石、平滑玄武岩、\n沙砾、地狱岩、玄武岩、黑石、末地石\n可有效防止大量掉落物导致的卡顿\n§7false§r = 正常掉落(默认)\n§7true§r = 常见石头不掉落",
+  "config.carianstyle.allowMobTriggerEnchantments": "允许怪物触发附魔",
+  "config.carianstyle.allowMobTriggerEnchantments.tooltip": "是否允许非玩家生物（如怪物）触发卡利亚式附魔\n§7true§r = 允许（默认，与原版行为一致）\n§7false§r = 禁止（怪物身上的附魔不触发）\n\n§e性能提示：§r\n服务器存在大量附魔怪物时，禁用此项可显著降低开销\n因为会跳过对怪物装备槽位的附魔扫描和NBT解析\n\n§c注意：§r\n仅拦截走中央事件处理器的附魔触发路径\n少数使用独立 @SubscribeEvent 监听器的附魔不受此开关影响",
+  "config.carianstyle.allowMobTriggerDeathEnchantments": "允许怪物触发死亡/濒死类附魔",
+  "config.carianstyle.allowMobTriggerDeathEnchantments.tooltip": "是否允许非玩家生物触发死亡/濒死类附魔\n§7false§r = 拦截（默认推荐）\n§7true§r = 允许\n\n§e覆盖范围：§r\n• DEAD 分类：猩红艾奥尼亚、发狂扩散、巨剑阵、古龙雷击\n• RECOLLECT 分类濒死触发：满月、死诞者、时间逆转\n\n§c建议保持禁用§r\n避免精英怪/Boss 在被击杀的瞬间获得复活、\n范围反伤、闪电雨、辉剑追踪等过强的反击能力\n防止玩家被打破防\n\n§7注意：§r仅当上方的「允许怪物触发附魔」启用时此选项才生效"
 }

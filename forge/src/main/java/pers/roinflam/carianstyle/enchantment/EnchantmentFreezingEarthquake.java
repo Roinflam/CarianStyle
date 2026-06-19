@@ -15,6 +15,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
@@ -24,16 +25,10 @@ import java.util.List;
 
 /**
  * 冻结地震附魔
- * <p>
- * 护甲附魔，受到重击时触发范围冻结
- * 当受到伤害 >= 最大生命值25%时：
- * - 将周围地面上的敌人弹起（高度 = 等级 × 0.35）
- * - 施加冻伤效果（持续 = 等级 × 5秒，效果等级 = 附魔等级 - 1）
- * - 范围 = 3 + (等级 - 1) × 2 格
- * </p>
+ * <p>v2.2：LivingDamage受击者重击触发入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "freezing_earthquake",
@@ -45,12 +40,12 @@ import java.util.List;
 @Mod.EventBusSubscriber
 public class EnchantmentFreezingEarthquake extends EnchantmentBase {
 
+    private static final int MAX_SEARCH_RADIUS = 10;
+    private static final int MAX_TARGETS = 20;
+
     public EnchantmentFreezingEarthquake() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
-                EquipmentSlot.HEAD,
-                EquipmentSlot.CHEST,
-                EquipmentSlot.LEGS,
-                EquipmentSlot.FEET
+                EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
         });
     }
 
@@ -65,6 +60,10 @@ public class EnchantmentFreezingEarthquake extends EnchantmentBase {
         }
 
         LivingEntity victim = evt.getEntity();
+
+        // ⭐ v2.2：怪物附魔触发开关（受击者视角，重击范围冻结）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
         if (evt.getAmount() < victim.getMaxHealth() * 0.25f) {
             return;
         }
@@ -90,17 +89,23 @@ public class EnchantmentFreezingEarthquake extends EnchantmentBase {
         }
 
         int range = 3 + (totalLevel - 1) * 2;
+        int searchRadius = Math.min(range, MAX_SEARCH_RADIUS);
 
         List<LivingEntity> targets = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 victim,
-                range,
+                searchRadius,
                 entity -> entity.onGround() && !entity.equals(victim)
         );
 
         final int effectiveLevel = totalLevel;
 
+        int hitCount = 0;
         for (LivingEntity target : targets) {
+            if (hitCount >= MAX_TARGETS) {
+                break;
+            }
+
             if (target.onGround()) {
                 target.setDeltaMovement(
                         target.getDeltaMovement().x,
@@ -113,6 +118,7 @@ public class EnchantmentFreezingEarthquake extends EnchantmentBase {
                         effectiveLevel * 5 * 20,
                         effectiveLevel - 1
                 ));
+                hitCount++;
             }
         }
     }

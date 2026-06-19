@@ -14,6 +14,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
@@ -23,14 +24,10 @@ import java.util.List;
 
 /**
  * 托普斯之架附魔
- * <p>
- * 护甲附魔，魔法屏障
- * 当受击者或攻击者周围6格内有穿戴此附魔的实体时：
- * - 完全取消魔法伤害
- * </p>
+ * <p>v2.1：LivingDamage受击者视角入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "topps_stand",
@@ -45,10 +42,7 @@ public class EnchantmentToppsStand extends EnchantmentBase {
 
     public EnchantmentToppsStand() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
-                EquipmentSlot.HEAD,
-                EquipmentSlot.CHEST,
-                EquipmentSlot.LEGS,
-                EquipmentSlot.FEET
+                EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
         });
     }
 
@@ -64,24 +58,19 @@ public class EnchantmentToppsStand extends EnchantmentBase {
 
         LivingEntity victim = evt.getEntity();
 
+        // ⭐ v2.1：怪物附魔触发开关（受击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
         Enchantment toppsStand = EnchantmentRegistry.getEnchantmentByClass(EnchantmentToppsStand.class);
         if (toppsStand == null) {
             return;
         }
 
-        List<LivingEntity> entities = EntityUtil.getNearbyEntities(
-                LivingEntity.class,
-                victim,
-                6
-        );
+        List<LivingEntity> entities = EntityUtil.getNearbyEntities(LivingEntity.class, victim, 6);
 
         if (evt.getSource().getEntity() instanceof LivingEntity) {
             LivingEntity attacker = (LivingEntity) evt.getSource().getEntity();
-            entities.addAll(EntityUtil.getNearbyEntities(
-                    LivingEntity.class,
-                    attacker,
-                    6
-            ));
+            entities.addAll(EntityUtil.getNearbyEntities(LivingEntity.class, attacker, 6));
         }
 
         for (LivingEntity entity : entities) {

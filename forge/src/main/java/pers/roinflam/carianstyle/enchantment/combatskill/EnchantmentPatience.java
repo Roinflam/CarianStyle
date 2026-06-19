@@ -16,6 +16,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
@@ -25,18 +26,12 @@ import java.util.UUID;
 
 /**
  * 忍耐附魔
- * <p>
- * 受击时累积能量（累积值 = 伤害 × 等级 × 0.1，上限 = 最大血量 × 等级 × 0.4）
- * 攻击时释放累积的能量作为额外伤害
- * </p>
- * <p>
- * 修复记录：
- * - 修复受击累积检查使用getUsedItemHand的bug，改为InteractionHand.MAIN_HAND
- *   原bug：举盾时getUsedItemHand返回副手，导致主手忍耐附魔无法累积
- * </p>
+ * <p>v2.2：受击累积监听器接入怪物附魔触发开关。
+ * onHurtAsAttackerLowest 走中央事件分发器，已被 scanEntity 入口拦截。
+ * onLivingDeath 是清理类，不影响行为，无需检查。</p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "patience",
@@ -68,9 +63,6 @@ public class EnchantmentPatience extends EnchantmentBase {
 
     /**
      * 受击时累积能量
-     * <p>
-     * 修复：使用InteractionHand.MAIN_HAND替代getUsedItemHand()
-     * </p>
      */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingDamageStatic(@NotNull LivingDamageEvent evt) {
@@ -84,7 +76,9 @@ public class EnchantmentPatience extends EnchantmentBase {
 
         LivingEntity victim = evt.getEntity();
 
-        // 修复：使用主手检查而非getUsedItemHand
+        // ⭐ v2.2：怪物附魔触发开关（受击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
         ItemStack heldItem = victim.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) {
             return;
@@ -116,6 +110,7 @@ public class EnchantmentPatience extends EnchantmentBase {
         if (evt.getEntity().level().isClientSide) {
             return;
         }
+        // 清理类，无需开关检查
         EnchantmentDataManager.removeData(PATIENCE_DATA_KEY, evt.getEntity().getUUID());
     }
 

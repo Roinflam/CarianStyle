@@ -18,6 +18,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
@@ -30,14 +31,12 @@ import java.util.List;
 
 /**
  * 暗弃子附魔
- * <p>
- * 攻击时：伤害变为魔法且无视护甲，偷取敌人一个正面效果
- * 受击时：夜晚减伤10%
- * 被动：夜晚持续回血
- * </p>
+ * <p>v2.1：LivingDamage受击者视角入口接入怪物附魔触发开关。
+ * onHurtAsAttacker 走中央事件分发器，已被 scanEntity 拦截。
+ * onPlayerTick 玩家专属，无需检查。</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "dark_abandoned_child",
@@ -55,9 +54,6 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
-    /**
-     * 修复：改用 Normal 优先级
-     */
     @Override
     protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
         LivingEntity attacker = ctx.getHolder();
@@ -67,26 +63,22 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
             return;
         }
 
-        // 手动应用等级限制
         int effectiveLevel = level;
         if (ConfigLoader.levelLimit) {
             effectiveLevel = Math.min(effectiveLevel, 10);
         }
 
-        // 玩家需要刚挥剑
         if (ctx.isHolderPlayer()) {
             if (ctx.getHolderAsPlayer().getAttackStrengthScale(0.5F) < 0.9F) {
                 return;
             }
         }
 
-        // 设置为魔法伤害且无视护甲
         if (ctx.getDamageSource() != null) {
             DamageSourceUtil.setBypassesArmor(ctx.getDamageSource());
             DamageSourceUtil.setMagicDamage(ctx.getDamageSource());
         }
 
-        // 偷取一个正面效果
         Collection<MobEffectInstance> activeEffects = victim.getActiveEffects();
         if (!activeEffects.isEmpty()) {
             List<MobEffectInstance> positiveEffects = new ArrayList<>(activeEffects);
@@ -107,6 +99,7 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
 
     /**
      * 受击减伤（夜晚10%）
+     * <p>v2.1：受击者视角接入怪物附魔触发开关</p>
      */
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
@@ -119,6 +112,9 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
         }
 
         LivingEntity victim = evt.getEntity();
+
+        // ⭐ v2.1：怪物附魔触发开关（受击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
 
         ItemStack heldItem = victim.getMainHandItem();
         if (heldItem.isEmpty()) {
@@ -138,7 +134,7 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
     }
 
     /**
-     * 夜晚持续回血
+     * 夜晚持续回血（PlayerTickEvent玩家专属，无需开关检查）
      */
     @SubscribeEvent
     public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {

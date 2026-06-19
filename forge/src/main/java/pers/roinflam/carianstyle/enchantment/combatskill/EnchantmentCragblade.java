@@ -15,6 +15,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
@@ -22,12 +23,10 @@ import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 
 /**
  * 岩石剑附魔
- * <p>
- * 修复记录：修复getUsedItemHand → InteractionHand.MAIN_HAND
- * </p>
+ * <p>v2.2：attacker视角接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "cragblade",
@@ -55,7 +54,9 @@ public class EnchantmentCragblade extends EnchantmentBase {
 
         LivingEntity attacker = (LivingEntity) evt.getSource().getEntity();
 
-        // 修复：使用主手检查
+        // ⭐ v2.2：怪物附魔触发开关（攻击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+
         ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) {
             return;
@@ -72,7 +73,6 @@ public class EnchantmentCragblade extends EnchantmentBase {
             return;
         }
 
-        // 给攻击者自己施加岩石剑增益效果
         int duration = 200;
         int amplifier = level - 1;
         DynamicAttributeManager.apply(attacker,

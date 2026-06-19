@@ -16,13 +16,20 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
-/** 血斩附魔 - 修复: getUsedItemHand -> InteractionHand.MAIN_HAND @version 2.1 */
+/**
+ * 血斩附魔
+ * <p>v2.2：onLivingDeath 击杀者视角入口接入怪物附魔触发开关。
+ * onHurtAsAttackerLow 走中央事件分发器，已被 scanEntity 拦截。</p>
+ *
+ * @version 2.2
+ */
 @AutoRegisterEnchantment(id = "blood_slash", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.RARE, type = EnchantmentCategory.WEAPON, slots = {EquipmentSlot.MAINHAND}, conflictsWith = {EnchantmentScarletCorruption.class, EnchantmentFireGivesPower.class, EnchantmentFireDevoured.class, EnchantmentVicDragonThunder.class, EnchantmentDarkMoon.class})
 @Mod.EventBusSubscriber
 public class EnchantmentBloodSlash extends EnchantmentBase {
@@ -52,7 +59,10 @@ public class EnchantmentBloodSlash extends EnchantmentBase {
         if (evt.getEntity().level().isClientSide) return;
         if (!(evt.getSource().getDirectEntity() instanceof LivingEntity killer)) return;
         if (!killer.isAlive() || evt.getEntity().equals(killer)) return;
-        // 修复：使用主手
+
+        // ⭐ v2.2：怪物附魔触发开关（击杀者视角，击杀回血非濒死触发）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(killer, false)) return;
+
         ItemStack heldItem = killer.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) return;
         Enchantment bloodSlash = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBloodSlash.class);

@@ -21,20 +21,16 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
 /**
  * 精准落雷附魔
- * <p>
- * 修复记录：
- * - 天气倍率判断顺序修复：原代码先判断isRaining()再else if isThundering()
- *   MC中雷暴时isRaining()也返回true，导致雷暴分支永远不执行
- *   改为先判断isThundering()
- * </p>
+ * <p>v2.2：LivingDamage受击者视角入口接入怪物附魔触发开关</p>
  *
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(id = "precise_lightning", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.RARE, type = EnchantmentCategory.ARMOR, slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}, conflictsWith = {EnchantmentCausalityPrinciple.class})
 @Mod.EventBusSubscriber
@@ -55,6 +51,10 @@ public class EnchantmentPreciseLightning extends EnchantmentBase {
         if (!(damageSource.getEntity() instanceof LivingEntity)) return;
 
         LivingEntity victim = evt.getEntity();
+
+        // ⭐ v2.2：怪物附魔触发开关（受击者视角，远程反击落雷）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
         LivingEntity attacker = (LivingEntity) damageSource.getEntity();
 
         Enchantment preciseLightning = EnchantmentRegistry.getEnchantmentByClass(EnchantmentPreciseLightning.class);
@@ -75,7 +75,10 @@ public class EnchantmentPreciseLightning extends EnchantmentBase {
 
             @Override
             public void run() {
-                if (++time > effectiveLevel) { this.cancel(); return; }
+                if (++time > effectiveLevel) {
+                    this.cancel();
+                    return;
+                }
 
                 Level world = attacker.level();
                 if (world instanceof ServerLevel serverLevel) {
@@ -89,8 +92,6 @@ public class EnchantmentPreciseLightning extends EnchantmentBase {
 
                 attacker.invulnerableTime = attacker.invulnerableDuration / 2;
 
-                // 修复：先判断雷暴再判断下雨，避免雷暴分支被下雨分支拦截
-                // MC中isThundering()为true时isRaining()也为true
                 int magnification = 1;
                 if (attacker.level().isThundering()) {
                     magnification = 4;
@@ -109,6 +110,13 @@ public class EnchantmentPreciseLightning extends EnchantmentBase {
         }.start();
     }
 
-    @Override public int getMinCost(int l) { return (int)((30 + (l - 1) * 10) * ConfigLoader.enchantingDifficulty); }
-    @Override public int getMaxCost(int l) { return getMinCost(l) + 50; }
+    @Override
+    public int getMinCost(int l) {
+        return (int) ((30 + (l - 1) * 10) * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int l) {
+        return getMinCost(l) + 50;
+    }
 }

@@ -14,20 +14,16 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 
 /**
  * 戴狄卡之祸附魔（诅咒）
- * <p>
- * 护甲诅咒附魔
- * 受到伤害时：
- * - 伤害 ×3（严重增伤）
- * - 无敌时间减少到75%（更容易连续受击）
- * </p>
+ * <p>v2.1：LivingHurt受击者视角入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "daedicar_woe",
@@ -43,10 +39,7 @@ public class EnchantmentDaedicarWoe extends EnchantmentBase {
 
     public EnchantmentDaedicarWoe() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
-                EquipmentSlot.HEAD,
-                EquipmentSlot.CHEST,
-                EquipmentSlot.LEGS,
-                EquipmentSlot.FEET
+                EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
         });
     }
 
@@ -57,6 +50,9 @@ public class EnchantmentDaedicarWoe extends EnchantmentBase {
         }
 
         LivingEntity victim = evt.getEntity();
+
+        // ⭐ v2.1：怪物附魔触发开关（受击者视角，诅咒效果对怪物也属于触发）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
 
         Enchantment daedicarWoe = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDaedicarWoe.class);
         if (daedicarWoe == null) {

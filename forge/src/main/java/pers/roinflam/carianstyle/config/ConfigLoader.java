@@ -26,6 +26,17 @@ import java.util.List;
  * 确保配置热重载后 uninstallEnchantment 黑名单立即生效。
  * </p>
  *
+ * <p>
+ * v2.3新增：怪物附魔触发开关
+ * <ul>
+ *   <li>{@link #allowMobTriggerEnchantments}：是否允许非玩家生物（怪物等）触发卡利亚式附魔，默认开启。
+ *       关闭后可大幅降低存在大量附魔生物时的服务器开销。</li>
+ *   <li>{@link #allowMobTriggerDeathEnchantments}：是否允许非玩家生物触发死亡/濒死类附魔
+ *       （包括 DEAD 分类的全部附魔，以及 RECOLLECT 中的 满月/死诞者/时间逆转），默认关闭。
+ *       建议保持禁用，避免精英怪/Boss获得不公平的复活和范围反伤能力。</li>
+ * </ul>
+ * </p>
+ *
  * @author RoinFlam
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
@@ -74,6 +85,11 @@ public final class ConfigLoader {
 
         public final ForgeConfigSpec.BooleanValue levelLimit;
         public final ForgeConfigSpec.DoubleValue enchantingDifficulty;
+
+        // ==================== 怪物附魔触发配置（v2.3新增） ====================
+
+        public final ForgeConfigSpec.BooleanValue allowMobTriggerEnchantments;
+        public final ForgeConfigSpec.BooleanValue allowMobTriggerDeathEnchantments;
 
         /**
          * 构造配置
@@ -209,6 +225,45 @@ public final class ConfigLoader {
                     .defineInRange("enchantingDifficulty", 1.0, 0.1, 10.0);
 
             builder.pop();
+
+            // ========== 怪物附魔触发配置（v2.3新增） ==========
+            builder.comment("")
+                    .comment("═══════════════════════════════════════════════════════════════")
+                    .comment("Mob Enchantment Trigger Configuration")
+                    .comment("怪物附魔触发配置")
+                    .comment("═══════════════════════════════════════════════════════════════")
+                    .push("mobTrigger");
+
+            allowMobTriggerEnchantments = builder
+                    .comment("Allow non-player entities (mobs) to trigger CarianStyle enchantments.")
+                    .comment("是否允许非玩家生物（如怪物）触发卡利亚式附魔。")
+                    .comment("Disabling this can significantly reduce server load when many enchanted mobs are present.")
+                    .comment("禁用后可大幅降低存在大量附魔生物时的服务器开销，因为会跳过对怪物装备槽位的附魔扫描。")
+                    .comment("Note: This only blocks enchantments routed through the central event handler.")
+                    .comment("注意：仅拦截走中央事件处理器（EnchantmentEventHandler）路径的附魔触发。")
+                    .comment("Enchantments using their own @SubscribeEvent listeners may still trigger on mobs.")
+                    .comment("使用独立 @SubscribeEvent 监听器的附魔（部分附魔）仍可能在怪物身上触发。")
+                    .comment("Default: true (allow)")
+                    .comment("默认值：true（允许）")
+                    .define("allowMobTriggerEnchantments", true);
+
+            allowMobTriggerDeathEnchantments = builder
+                    .comment("Allow non-player entities to trigger death / last-stand enchantments.")
+                    .comment("是否允许非玩家生物触发死亡/濒死类附魔。")
+                    .comment("Covers all DEAD-category enchantments (Scarlet Aeonia, Frenzied Spread, Greatblade Phalanx,")
+                    .comment("Ancient Dragon Lightning) and the death-triggered RECOLLECT-category enchantments")
+                    .comment("(Full Moon, Living Corpse, Time Reversal).")
+                    .comment("覆盖所有 DEAD 分类附魔（猩红艾奥尼亚、发狂扩散、巨剑阵、古龙雷击）")
+                    .comment("以及 RECOLLECT 分类中的濒死触发型附魔（满月、死诞者、时间逆转）。")
+                    .comment("Recommended to keep disabled to prevent boss/elite mobs from gaining unfair revival/AOE abilities.")
+                    .comment("建议保持禁用，避免精英怪/Boss获得不公平的复活和范围反伤能力，防止玩家被打破防。")
+                    .comment("Note: This only applies when allowMobTriggerEnchantments is enabled.")
+                    .comment("注意：仅当 allowMobTriggerEnchantments 启用时此选项才生效。")
+                    .comment("Default: false (block)")
+                    .comment("默认值：false（拦截）")
+                    .define("allowMobTriggerDeathEnchantments", false);
+
+            builder.pop();
         }
     }
 
@@ -248,10 +303,43 @@ public final class ConfigLoader {
     public static double enchantingDifficulty = 1.0;
 
     /**
+     * 是否允许非玩家生物触发卡利亚式附魔
+     * <p>
+     * 默认 true（允许）。关闭后可大幅降低存在大量附魔怪物时的服务器开销，
+     * 因为 EnchantmentEventHandler 会在伤害事件扫描入口直接跳过非玩家持有者。
+     * </p>
+     * <p>
+     * 注意：仅作用于走中央事件处理器路径的附魔。部分使用独立 @SubscribeEvent
+     * 监听器的附魔不受此开关影响。
+     * </p>
+     */
+    public static boolean allowMobTriggerEnchantments = true;
+
+    /**
+     * 是否允许非玩家生物触发死亡/濒死类附魔
+     * <p>
+     * 默认 false（拦截）。覆盖范围：
+     * <ul>
+     *   <li>所有 DEAD 分类附魔（猩红艾奥尼亚、发狂扩散、巨剑阵、古龙雷击）</li>
+     *   <li>RECOLLECT 分类中的濒死触发型附魔（满月、死诞者、时间逆转）</li>
+     * </ul>
+     * </p>
+     * <p>
+     * 建议保持禁用，避免精英怪/Boss获得复活、范围反伤等过强能力，防止玩家"被打破防"。
+     * </p>
+     * <p>
+     * 仅当 {@link #allowMobTriggerEnchantments} 为 true 时才会被检查；
+     * 若通用开关为 false，则死亡类附魔自然也不会触发。
+     * </p>
+     */
+    public static boolean allowMobTriggerDeathEnchantments = false;
+
+    /**
      * 从配置规范同步到静态字段
      * <p>
      * 在配置加载或修改后调用。
      * v2.2修复：末尾清除所有附魔的禁用状态缓存，确保黑名单变更立即生效。
+     * v2.3新增：同步两个怪物附魔触发开关。
      * </p>
      */
     public static void bake() {
@@ -272,6 +360,10 @@ public final class ConfigLoader {
 
         levelLimit = COMMON.levelLimit.get();
         enchantingDifficulty = COMMON.enchantingDifficulty.get();
+
+        // v2.3新增：同步怪物附魔触发开关
+        allowMobTriggerEnchantments = COMMON.allowMobTriggerEnchantments.get();
+        allowMobTriggerDeathEnchantments = COMMON.allowMobTriggerDeathEnchantments.get();
 
         // v2.2修复：清除所有附魔的禁用状态缓存
         // 确保 uninstallEnchantment 配置变更后，isDisabled() 会重新计算

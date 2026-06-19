@@ -14,6 +14,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
@@ -23,14 +24,10 @@ import java.util.List;
 
 /**
  * 因果律附魔
- * <p>
- * 护甲附魔，受到5次伤害后触发范围反击
- * 对周围所有敌人造成等同于最后一次伤害×等级×75%的伤害
- * 反击范围 = 等级×3格
- * </p>
+ * <p>v2.2：LivingDamage受击者视角入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "causality_principle",
@@ -42,15 +39,14 @@ import java.util.List;
 @Mod.EventBusSubscriber
 public class EnchantmentCausalityPrinciple extends EnchantmentBase {
 
+    private static final int MAX_SEARCH_RADIUS = 10;
+    private static final int MAX_TARGETS = 20;
     private static final String COUNTER_KEY = "causality_principle";
     private static final int TRIGGER_COUNT = 5;
 
     public EnchantmentCausalityPrinciple() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
-                EquipmentSlot.HEAD,
-                EquipmentSlot.CHEST,
-                EquipmentSlot.LEGS,
-                EquipmentSlot.FEET
+                EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
         });
     }
 
@@ -69,6 +65,9 @@ public class EnchantmentCausalityPrinciple extends EnchantmentBase {
         }
 
         LivingEntity victim = evt.getEntity();
+
+        // ⭐ v2.2：怪物附魔触发开关（受击者视角，5次受击触发AOE反击）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
 
         Enchantment causalityPrinciple = EnchantmentRegistry.getEnchantmentByClass(EnchantmentCausalityPrinciple.class);
         if (causalityPrinciple == null) {
@@ -97,16 +96,24 @@ public class EnchantmentCausalityPrinciple extends EnchantmentBase {
         if (currentCount >= TRIGGER_COUNT) {
             EnchantmentDataManager.resetCounter(COUNTER_KEY, victim.getUUID());
 
+            int searchRadius = Math.min(effectiveLevel * 3, MAX_SEARCH_RADIUS);
+
             List<LivingEntity> targets = EntityUtil.getNearbyEntities(
                     LivingEntity.class,
                     victim,
-                    effectiveLevel * 3,
+                    searchRadius,
                     entity -> !entity.equals(victim)
             );
 
             float damage = evt.getAmount() * effectiveLevel * 0.75f;
+
+            int hitCount = 0;
             for (LivingEntity target : targets) {
+                if (hitCount >= MAX_TARGETS) {
+                    break;
+                }
                 target.hurt(victim.damageSources().mobAttack(victim), damage);
+                hitCount++;
             }
         }
     }

@@ -13,6 +13,8 @@ import java.util.List;
  * 卡利亚式附魔 Cloth Config 配置界面
  * Carian Style Cloth Config Screen
  *
+ * <p>v2.3新增：怪物附魔触发分类（两个开关：通用 / 死亡类）。</p>
+ *
  * @author RoinFlam
  */
 public class ClothConfigScreen {
@@ -161,6 +163,28 @@ public class ClothConfigScreen {
                 .setMax(10.0)
                 .setTooltip(Component.translatable("config.carianstyle.enchantingDifficulty.tooltip"))
                 .setSaveConsumer(ConfigLoader.COMMON.enchantingDifficulty::set)
+                .build());
+
+        // ═══════════════════════════════════════════════════════════════
+        // 怪物附魔触发配置 / Mob Enchantment Trigger Configuration（v2.3新增）
+        // ═══════════════════════════════════════════════════════════════
+        ConfigCategory mobTriggerCategory = builder.getOrCreateCategory(
+                Component.translatable("config.carianstyle.category.mobTrigger"));
+
+        mobTriggerCategory.addEntry(entryBuilder.startBooleanToggle(
+                        Component.translatable("config.carianstyle.allowMobTriggerEnchantments"),
+                        ConfigLoader.COMMON.allowMobTriggerEnchantments.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.translatable("config.carianstyle.allowMobTriggerEnchantments.tooltip"))
+                .setSaveConsumer(ConfigLoader.COMMON.allowMobTriggerEnchantments::set)
+                .build());
+
+        mobTriggerCategory.addEntry(entryBuilder.startBooleanToggle(
+                        Component.translatable("config.carianstyle.allowMobTriggerDeathEnchantments"),
+                        ConfigLoader.COMMON.allowMobTriggerDeathEnchantments.get())
+                .setDefaultValue(false)
+                .setTooltip(Component.translatable("config.carianstyle.allowMobTriggerDeathEnchantments.tooltip"))
+                .setSaveConsumer(ConfigLoader.COMMON.allowMobTriggerDeathEnchantments::set)
                 .build());
 
         return builder.build();

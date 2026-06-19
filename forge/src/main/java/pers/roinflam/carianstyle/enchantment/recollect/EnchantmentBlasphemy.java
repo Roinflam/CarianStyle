@@ -17,10 +17,16 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 
-/** 亵渎附魔 - 修复: getUsedItemHand -> InteractionHand.MAIN_HAND @version 2.1 */
+/**
+ * 亵渎附魔
+ * <p>v2.2：onLivingDeath 入口接入怪物附魔触发开关</p>
+ *
+ * @version 2.2
+ */
 @AutoRegisterEnchantment(id = "blasphemy", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantmentCategory.WEAPON, slots = {EquipmentSlot.MAINHAND})
 @Mod.EventBusSubscriber
 public class EnchantmentBlasphemy extends EnchantmentBase {
@@ -33,6 +39,10 @@ public class EnchantmentBlasphemy extends EnchantmentBase {
         if (!(evt.getSource().getDirectEntity() instanceof LivingEntity killer)) return;
         LivingEntity dead = evt.getEntity();
         if (!killer.isAlive() || dead.equals(killer)) return;
+
+        // ⭐ v2.2：怪物附魔触发开关（击杀者视角，击杀奖励非濒死触发）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(killer, false)) return;
+
         ItemStack heldItem = killer.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) return;
         Enchantment blasphemy = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBlasphemy.class);

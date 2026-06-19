@@ -16,20 +16,16 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 
 /**
  * 洛蕾塔大弓附魔
- * <p>
- * 弓箭附魔，箭矢命中时爆炸
- * 效果：
- * - 箭矢伤害增加50%
- * - 在箭矢位置创建爆炸（着火箭威力3，普通箭威力2）
- * </p>
+ * <p>v2.1：EntityJoinLevel箭矢生成+ProjectileImpact命中两个入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "loretta_big_bow",
@@ -46,7 +42,8 @@ public class EnchantmentLorettaBigBow extends EnchantmentBase {
     }
 
     /**
-     * 箭矢发射时增加伤害
+     * 箭矢生成时增加伤害
+     * <p>v2.1：射手视角接入怪物附魔触发开关</p>
      */
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onArrowJoinWorld(@NotNull EntityJoinLevelEvent evt) {
@@ -65,6 +62,9 @@ public class EnchantmentLorettaBigBow extends EnchantmentBase {
         if (!(arrow.getOwner() instanceof LivingEntity attacker)) {
             return;
         }
+
+        // ⭐ v2.1：怪物附魔触发开关（射手视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
 
         ItemStack heldItem = attacker.getMainHandItem();
         if (heldItem.isEmpty()) {
@@ -87,13 +87,13 @@ public class EnchantmentLorettaBigBow extends EnchantmentBase {
         }
 
         if (level > 0) {
-            // 箭矢伤害增加50%
             arrow.setBaseDamage(arrow.getBaseDamage() * 1.5);
         }
     }
 
     /**
      * 箭矢命中时爆炸
+     * <p>v2.1：射手视角接入怪物附魔触发开关</p>
      */
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onProjectileImpact_Arrow(@NotNull ProjectileImpactEvent evt) {
@@ -112,6 +112,9 @@ public class EnchantmentLorettaBigBow extends EnchantmentBase {
         if (!(arrow.getOwner() instanceof LivingEntity attacker)) {
             return;
         }
+
+        // ⭐ v2.1：怪物附魔触发开关（射手视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
 
         ItemStack heldItem = attacker.getMainHandItem();
         if (heldItem.isEmpty()) {
@@ -137,7 +140,6 @@ public class EnchantmentLorettaBigBow extends EnchantmentBase {
             return;
         }
 
-        // 创建爆炸（着火箭威力3，普通箭威力2）
         float explosionStrength = arrow.getRemainingFireTicks() > 0 ? 3 : 2;
         attacker.level().explode(
                 attacker,

@@ -256,6 +256,7 @@
   "config.carianstyle.category.enchantment": "Enchantment System",
   "config.carianstyle.category.treasure": "Treasure Enchantments",
   "config.carianstyle.category.balance": "Game Balance",
+  "config.carianstyle.category.mobTrigger": "Mob Enchantment Triggers",
   "_comment_config_entries": "========== Configuration Entries ==========",
   "config.carianstyle.enableDetailedLogging": "Enable Detailed Debug Logging",
   "config.carianstyle.enableDetailedLogging.tooltip": "When enabled, all detailed information will be logged\nIncluding: Enchantment trigger, attribute calculation, event handling, etc.\n§c⚠ Warning: Will produce large amount of log output!§r\n§cOnly enable when debugging!§r",
@@ -279,5 +280,9 @@
   "config.carianstyle.enableTrueDamage": "Enable Advanced True Damage",
   "config.carianstyle.enableTrueDamage.tooltip": "When enabled, use complex field detection to bypass armor and protection\nThis makes true damage work on all creatures (including modded ones)\n§7true§r = Use advanced detection (Recommended, default)\n§7false§r = Use simple setHealth method\n\n§cNote:§r When disabled, some modded creatures may not take true damage\nBut performance will be slightly better",
   "config.carianstyle.rockBlasterSuppressCommonDrops": "Rock Blaster: Suppress Common Stone Drops",
-  "config.carianstyle.rockBlasterSuppressCommonDrops.tooltip": "When enabled, Rock Blaster will not produce item drops\nfor common stone-type blocks (stone, cobblestone, deepslate,\ngranite, diorite, andesite, tuff, calcite, smooth basalt,\ngravel, netherrack, basalt, blackstone, end stone)\nThis prevents lag caused by excessive dropped items\n§7false§r = Normal drops (default)\n§7true§r = No drops for common stones"
+  "config.carianstyle.rockBlasterSuppressCommonDrops.tooltip": "When enabled, Rock Blaster will not produce item drops\nfor common stone-type blocks (stone, cobblestone, deepslate,\ngranite, diorite, andesite, tuff, calcite, smooth basalt,\ngravel, netherrack, basalt, blackstone, end stone)\nThis prevents lag caused by excessive dropped items\n§7false§r = Normal drops (default)\n§7true§r = No drops for common stones",
+  "config.carianstyle.allowMobTriggerEnchantments": "Allow Mobs to Trigger Enchantments",
+  "config.carianstyle.allowMobTriggerEnchantments.tooltip": "Whether non-player entities (mobs) can trigger CarianStyle enchantments\n§7true§r = Allow (default, vanilla behavior)\n§7false§r = Block (enchantments on mobs do not trigger)\n\n§ePerformance Tip:§r\nDisabling this can significantly reduce server load\nwhen many enchanted mobs are present, by skipping\nNBT scanning of mob equipment slots entirely\n\n§cNote:§r\nOnly blocks enchantments routed through the central event handler\nA few enchantments using their own @SubscribeEvent listeners\nare not affected by this toggle",
+  "config.carianstyle.allowMobTriggerDeathEnchantments": "Allow Mobs to Trigger Death/Last-Stand Enchantments",
+  "config.carianstyle.allowMobTriggerDeathEnchantments.tooltip": "Whether non-player entities can trigger death / last-stand enchantments\n§7false§r = Block (default, recommended)\n§7true§r = Allow\n\n§eCoverage:§r\n• DEAD category: Scarlet Aeonia, Howl of Shabriri,\n  Greatblade Phalanx, Ancient Dragon Lightning\n• RECOLLECT death-triggered: Full Moon, Living Corpse,\n  Placidusax's Reversal\n\n§cKeeping this disabled is recommended§r\nto prevent elite mobs/bosses from gaining unfair\nrevival, AOE retaliation, lightning storm, or\nGlintblade-tracking abilities on death\n\n§7Note:§r Only takes effect when \"Allow Mobs to Trigger Enchantments\"\nabove is enabled"
 }

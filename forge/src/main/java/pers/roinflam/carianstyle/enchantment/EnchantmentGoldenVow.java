@@ -17,21 +17,17 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 
 /**
  * 黄金誓约附魔
- * <p>
- * 护甲附魔，战斗时双方都能获得增益
- * 受到攻击时：
- * - 受击者获得黄金誓约效果（持续 = 2.5 × 等级 秒，效果等级 = 附魔等级 - 1）
- * - 攻击者也获得黄金誓约效果（等级上限额外限制为5）
- * </p>
+ * <p>v2.1：LivingAttack双向监听器入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "golden_vow",
@@ -72,25 +68,33 @@ public class EnchantmentGoldenVow extends EnchantmentBase {
             return;
         }
 
-        int victimLevel = 0;
-        for (ItemStack armor : victim.getArmorSlots()) {
-            if (!armor.isEmpty()) {
-                victimLevel += EnchantmentHelper.getItemEnchantmentLevel(goldenVow, armor);
+        // 受击者视角
+        // ⭐ v2.1：怪物附魔触发开关（受击者视角）
+        if (!EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) {
+            int victimLevel = 0;
+            for (ItemStack armor : victim.getArmorSlots()) {
+                if (!armor.isEmpty()) {
+                    victimLevel += EnchantmentHelper.getItemEnchantmentLevel(goldenVow, armor);
+                }
+            }
+
+            if (ConfigLoader.levelLimit) {
+                victimLevel = Math.min(victimLevel, 10);
+            }
+
+            if (victimLevel > 0) {
+                int duration = (int) (2.5 * victimLevel * 20);
+                victim.addEffect(new MobEffectInstance(
+                        CarianStylePotion.GOLDEN_VOW.get(),
+                        duration,
+                        victimLevel - 1
+                ));
             }
         }
 
-        if (ConfigLoader.levelLimit) {
-            victimLevel = Math.min(victimLevel, 10);
-        }
-
-        if (victimLevel > 0) {
-            int duration = (int) (2.5 * victimLevel * 20);
-            victim.addEffect(new MobEffectInstance(
-                    CarianStylePotion.GOLDEN_VOW.get(),
-                    duration,
-                    victimLevel - 1
-            ));
-        }
+        // 攻击者视角
+        // ⭐ v2.1：怪物附魔触发开关（攻击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
 
         int attackerLevel = 0;
         for (ItemStack armor : attacker.getArmorSlots()) {

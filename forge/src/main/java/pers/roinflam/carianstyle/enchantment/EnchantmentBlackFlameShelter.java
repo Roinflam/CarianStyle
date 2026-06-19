@@ -18,19 +18,17 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 /**
  * 黑焰庇护附魔
- * <p>
- * 受击：非魔法非无视防御伤害减少（等级×12.5%）
- * 代价：治疗量减少（等级×25%）
- * </p>
+ * <p>v2.1：LivingDamage受击+LivingHeal受治疗入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "black_flame_shelter",
@@ -76,13 +74,15 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
 
         DamageSource damageSource = evt.getSource();
 
-        // 1.20.1: isMagicDamage → DamageSourceUtil, isUnblockable → BYPASSES_ARMOR
         if (DamageSourceUtil.isMagicDamage(damageSource) ||
                 damageSource.is(DamageTypeTags.BYPASSES_ARMOR)) {
             return;
         }
 
         LivingEntity holder = evt.getEntity();
+
+        // ⭐ v2.1：怪物附魔触发开关（受击者视角，物理减伤）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
 
         int totalLevel = getTotalLevel(holder);
         if (totalLevel <= 0) {
@@ -99,6 +99,9 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
         }
 
         LivingEntity holder = evt.getEntity();
+
+        // ⭐ v2.1：怪物附魔触发开关（受治疗者视角，治疗削减）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
 
         int totalLevel = getTotalLevel(holder);
         if (totalLevel <= 0) {

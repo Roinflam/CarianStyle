@@ -16,6 +16,7 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
@@ -25,20 +26,10 @@ import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
 
 /**
  * 空癫火附魔
- * <p>
- * 弓箭附魔，双刃剑效果
- * 箭矢命中敌人时：
- * - 对敌人造成持续3秒的癫火伤害（攻击者最大生命值 × 10% × 等级 × 20% / 60tick）
- * - 对自己造成持续3秒的癫火伤害（自己最大生命值 × 10% / 60tick）
- * - 创造模式玩家免疫自损
- * </p>
- * <p>
- * 性能优化 v3.0：两个SynchronizationTask(5, 1)全部改用 DamageOverTimeManager
- * 修复保留 v2.1：getUsedItemHand() → InteractionHand.MAIN_HAND
- * </p>
+ * <p>v3.1：ProjectileImpact射手视角入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 3.0
+ * @version 3.1
  */
 @AutoRegisterEnchantment(
         id = "empty_epilepsy_fire",
@@ -50,11 +41,8 @@ import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
 @Mod.EventBusSubscriber
 public class EnchantmentEmptyEpilepsyFire extends EnchantmentBase {
 
-    /** 燃烧视觉效果持续时间（tick） */
     private static final int BURN_VISUAL_DURATION = 65;
-    /** 持续伤害时长（tick） */
     private static final int DAMAGE_TICKS = 60;
-    /** 初始延迟（tick） */
     private static final int DOT_DELAY = 5;
 
     public EnchantmentEmptyEpilepsyFire() {
@@ -90,6 +78,10 @@ public class EnchantmentEmptyEpilepsyFire extends EnchantmentBase {
         }
 
         LivingEntity attacker = (LivingEntity) arrow.getOwner();
+
+        // ⭐ v3.1：怪物附魔触发开关（射手视角，自损+对敌DoT）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+
         LivingEntity victim = (LivingEntity) ((net.minecraft.world.phys.EntityHitResult) evt.getRayTraceResult()).getEntity();
 
         Enchantment emptyEpilepsyFire = EnchantmentRegistry.getEnchantmentByClass(EnchantmentEmptyEpilepsyFire.class);
@@ -97,7 +89,6 @@ public class EnchantmentEmptyEpilepsyFire extends EnchantmentBase {
             return;
         }
 
-        // v2.1修复保留：使用主手
         ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) {
             return;
@@ -113,24 +104,20 @@ public class EnchantmentEmptyEpilepsyFire extends EnchantmentBase {
 
         final int effectiveLevel = level;
 
-        // ========== 攻击者自损 ==========
         DynamicAttributeManager.apply(attacker,
                 DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(BURN_VISUAL_DURATION, 0));
         ClientSyncEffectHelper.onAttributeApplied(attacker, DynamicAttributes.EPILEPSY_FIRE_BURNING);
 
-        // 自损：最大生命值 × 10% / 60tick
         float attackerDmgPerTick = attacker.getMaxHealth() * 0.1f / DAMAGE_TICKS;
         DamageOverTimeManager.applyLinear(
                 attacker, attackerDmgPerTick, DAMAGE_TICKS, DOT_DELAY,
                 NewDamageSource.epilepsyFire(attacker.level()), true
         );
 
-        // ========== 受击者伤害 ==========
         DynamicAttributeManager.apply(victim,
                 DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(BURN_VISUAL_DURATION, 0));
         ClientSyncEffectHelper.onAttributeApplied(victim, DynamicAttributes.EPILEPSY_FIRE_BURNING);
 
-        // 受害者：攻击者最大生命值 × 10% × 等级 × 20% / 60tick
         float victimDmgPerTick = attacker.getMaxHealth() * 0.1f * effectiveLevel * 0.2f / DAMAGE_TICKS;
         DamageOverTimeManager.applyLinear(
                 victim, victimDmgPerTick, DAMAGE_TICKS, DOT_DELAY,

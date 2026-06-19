@@ -14,7 +14,9 @@ import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
@@ -55,11 +57,33 @@ import java.util.concurrent.ConcurrentHashMap;
  * 不会进入缓存，不会触发任何效果。
  * </p>
  * <p>
+ * v3.2新增 - 怪物附魔触发开关：
+ * <ul>
+ *   <li>{@link ConfigLoader#allowMobTriggerEnchantments}：通用开关（默认 true）。
+ *       关闭后，{@link #scanEntity} 在入口直接跳过非玩家持有者，
+ *       所有走中央事件处理器的伤害/死亡事件都不再扫描怪物的附魔，
+ *       是性能收益最大的拦截点。</li>
+ *   <li>{@link ConfigLoader#allowMobTriggerDeathEnchantments}：死亡/濒死类附魔开关
+ *       （默认 false）。覆盖范围：
+ *       <ul>
+ *         <li>DEAD 分类的全部附魔（在 {@link #scanEntity} 内按分类过滤，
+ *             覆盖 {@code EnchantmentEpilepsySpread} 的 onDamageAsVictimLowest 路径）</li>
+ *         <li>走 {@code onDeath()} 模板方法的附魔（在 {@link #handleLivingDeath} 入口拦截，
+ *             覆盖 {@code EnchantmentScarletLonia}/{@code EnchantmentGreatbladePhalanx}/
+ *             {@code EnchantmentAncientDragonLightning}）</li>
+ *         <li>独立 @SubscribeEvent 监听 LivingDeathEvent 的濒死类附魔
+ *             （满月/死诞者/时间逆转）通过调用 {@link #shouldBlockMobTrigger}
+ *             在各自类内拦截</li>
+ *       </ul>
+ *   </li>
+ * </ul>
+ * </p>
+ * <p>
  * 前置条件：需要EnchantmentBase中的dispatchLivingAttackEvent、dispatchLivingHurtEvent、
  * dispatchLivingDamageEvent三个方法为public static
  * </p>
  *
- * @version 3.1
+ * @version 3.2
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class EnchantmentEventHandler {
@@ -204,6 +228,72 @@ public class EnchantmentEventHandler {
         }
     }
 
+    // ==================== 怪物附魔触发开关工具方法（v3.2新增） ====================
+
+    /**
+     * 判断是否应该拦截怪物（非玩家）的附魔触发
+     * <p>
+     * 对外公开的工具方法，供独立 @SubscribeEvent 监听器使用，
+     * 主要用于 RECOLLECT 分类中独立监听 LivingDeathEvent 的濒死类附魔：
+     * 满月（FullMoon）、死诞者（LivingCorpse）、时间逆转（TimeReversal）。
+     * </p>
+     * <p>
+     * 判断逻辑：
+     * <ol>
+     *   <li>玩家持有 → 永不拦截</li>
+     *   <li>非玩家 + {@code allowMobTriggerEnchantments} 关 → 拦截</li>
+     *   <li>非玩家 + {@code isDeathTrigger=true} + {@code allowMobTriggerDeathEnchantments} 关 → 拦截</li>
+     *   <li>其余情况 → 不拦截</li>
+     * </ol>
+     * </p>
+     *
+     * @param holder         附魔持有者实体
+     * @param isDeathTrigger 是否为死亡/濒死触发的附魔（如满月/死诞者/时间逆转传 true）
+     * @return true 表示应该拦截（不触发附魔），false 表示正常触发
+     */
+    public static boolean shouldBlockMobTrigger(@Nonnull LivingEntity holder, boolean isDeathTrigger) {
+        // 玩家持有 → 永不拦截
+        if (holder instanceof Player) {
+            return false;
+        }
+
+        // 非玩家 + 通用开关关闭 → 拦截全部
+        if (!ConfigLoader.allowMobTriggerEnchantments) {
+            return true;
+        }
+
+        // 非玩家 + 死亡类开关关闭 + 当前是死亡/濒死触发 → 拦截
+        if (isDeathTrigger && !ConfigLoader.allowMobTriggerDeathEnchantments) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 判断指定附魔是否属于「死亡/濒死类」
+     * <p>
+     * 仅判断 DEAD 分类的附魔（覆盖 EnchantmentEpilepsySpread 在
+     * onDamageAsVictimLowest 路径的触发）。
+     * </p>
+     * <p>
+     * 注意：此方法不识别 RECOLLECT 中的濒死类（满月/死诞者/时间逆转），
+     * 因为它们走独立 @SubscribeEvent 监听 LivingDeathEvent，
+     * 不经过 scanEntity 路径，需要在它们各自的监听器内调用
+     * {@link #shouldBlockMobTrigger} 拦截。
+     * </p>
+     *
+     * @param enchantment 附魔实例
+     * @return 是否为 DEAD 分类附魔
+     */
+    private static boolean isDeadCategoryEnchantment(@Nonnull EnchantmentBase enchantment) {
+        AutoRegisterEnchantment ann = enchantment.getClass().getAnnotation(AutoRegisterEnchantment.class);
+        if (ann == null) {
+            return false;
+        }
+        return ann.category() == pers.roinflam.carianstyle.annotation.EnchantmentCategory.DEAD;
+    }
+
     // ==================== 伤害事件扫描方法 ====================
 
     /**
@@ -211,6 +301,13 @@ public class EnchantmentEventHandler {
      * <p>
      * 核心优化点：每个槽位只调用一次getEnchantments()，结果缓存给后续4个优先级复用
      * v3.1修复：增加 isDisabled() 检查
+     * v3.2新增：
+     * <ul>
+     *   <li>方法入口：怪物 + {@code allowMobTriggerEnchantments=false} → 直接 return，
+     *       不扫描怪物身上的任何附魔，是最大性能收益点</li>
+     *   <li>循环内：怪物 + {@code allowMobTriggerDeathEnchantments=false} + DEAD 分类 → 跳过该条目，
+     *       覆盖 EnchantmentEpilepsySpread 等通过 onDamageAsVictimLowest 触发的濒死类附魔</li>
+     * </ul>
      * </p>
      *
      * @param entries    收集结果的列表
@@ -222,6 +319,19 @@ public class EnchantmentEventHandler {
                                    @Nonnull LivingEntity holder,
                                    boolean isAttacker,
                                    @Nonnull EquipmentSlot[] slots) {
+
+        // ⭐ v3.2：怪物 + 通用关 → 整个 holder 跳过
+        // 这是性能收益最大的拦截点，跳过整个装备槽位的 NBT 扫描
+        boolean holderIsPlayer = holder instanceof Player;
+        if (!holderIsPlayer && !ConfigLoader.allowMobTriggerEnchantments) {
+            return;
+        }
+
+        // 是否需要在循环内过滤 DEAD 分类附魔
+        // 仅当：非玩家 + 通用开 + 死亡类关 时为 true
+        boolean filterDeathEnchantmentsInLoop = !holderIsPlayer
+                && !ConfigLoader.allowMobTriggerDeathEnchantments;
+
         for (EquipmentSlot slot : slots) {
             ItemStack stack = holder.getItemBySlot(slot);
             if (stack.isEmpty()) continue;
@@ -229,8 +339,16 @@ public class EnchantmentEventHandler {
             Map<Enchantment, Integer> enchantments = EnchantmentHelper.getEnchantments(stack);
             for (Map.Entry<Enchantment, Integer> entry : enchantments.entrySet()) {
                 if (!(entry.getKey() instanceof EnchantmentBase base)) continue;
+
                 // v3.1：跳过被禁用的附魔
                 if (base.isDisabled()) continue;
+
+                // ⭐ v3.2：怪物 + 死亡类关 + 是 DEAD 分类 → 跳过
+                // 覆盖 EnchantmentEpilepsySpread（通过 onDamageAsVictimLowest 触发的濒死类）
+                if (filterDeathEnchantmentsInLoop && isDeadCategoryEnchantment(base)) {
+                    continue;
+                }
+
                 int level = base.applyLevelLimit(entry.getValue());
                 if (level <= 0) continue;
                 entries.add(new CachedEnchantmentEntry(base, level, stack, holder, isAttacker));
@@ -422,12 +540,24 @@ public class EnchantmentEventHandler {
      * <p>
      * 仅触发一次，无需缓存
      * v3.1修复：增加 isDisabled() 检查
+     * v3.2新增：在入口拦截怪物的死亡触发——
+     * 怪物 + (通用关 或 死亡类关) → 整体 return，
+     * 覆盖所有走 onDeath() 模板方法的附魔
+     * （如 EnchantmentScarletLonia / EnchantmentGreatbladePhalanx /
+     * EnchantmentAncientDragonLightning）
      * </p>
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void handleLivingDeath(@Nonnull LivingDeathEvent event) {
         if (event.getEntity().level().isClientSide) return;
         LivingEntity victim = event.getEntity();
+
+        // ⭐ v3.2：怪物死亡触发拦截
+        // 死亡是濒死类的典型场景，所以传 isDeathTrigger=true
+        if (shouldBlockMobTrigger(victim, true)) {
+            return;
+        }
+
         for (EquipmentSlot slot : EquipmentSlot.values()) {
             ItemStack stack = victim.getItemBySlot(slot);
             if (stack.isEmpty()) continue;
@@ -449,12 +579,19 @@ public class EnchantmentEventHandler {
      * <p>
      * 频率低，无需缓存
      * v3.1修复：增加 isDisabled() 检查
+     * v3.2新增：怪物 + 通用关 → 跳过整体扫描
      * </p>
      */
     @SubscribeEvent(priority = EventPriority.NORMAL)
     public static void handleLivingHeal(@Nonnull LivingHealEvent event) {
         if (event.getEntity().level().isClientSide) return;
         LivingEntity healer = event.getEntity();
+
+        // ⭐ v3.2：治疗事件不属于死亡/濒死类，传 false
+        if (shouldBlockMobTrigger(healer, false)) {
+            return;
+        }
+
         for (EquipmentSlot slot : EquipmentSlot.values()) {
             ItemStack stack = healer.getItemBySlot(slot);
             if (stack.isEmpty()) continue;
@@ -476,6 +613,8 @@ public class EnchantmentEventHandler {
      * <p>
      * v3.0核心优化：使用装备缓存。
      * v3.1修复：scanPlayerEnchantments 中已增加 isDisabled() 过滤。
+     * v3.2备注：本方法本身就是 PlayerTickEvent，仅玩家触发，
+     * 不受怪物附魔触发开关影响（怪物本来就不会进入此方法）。
      * </p>
      */
     @SubscribeEvent
@@ -504,6 +643,8 @@ public class EnchantmentEventHandler {
      * <p>
      * 仅检查主手武器，频率低
      * v3.1修复：增加 isDisabled() 检查
+     * v3.2备注：CriticalHitEvent 在 1.20.1 中只对玩家触发（参数类型为 Player），
+     * 怪物攻击不会触发此事件，无需额外拦截。
      * </p>
      */
     @SubscribeEvent(priority = EventPriority.NORMAL)

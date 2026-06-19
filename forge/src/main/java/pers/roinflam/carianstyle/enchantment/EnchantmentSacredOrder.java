@@ -19,23 +19,17 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 
 /**
  * 神圣秩序附魔
- * <p>
- * 护甲附魔，吸收盾系统
- * 效果：
- * - 进入世界时获得100%最大生命值的吸收盾
- * - 击杀敌人时获得10%最大生命值的吸收盾（最多叠加到300%）
- * - 有吸收盾时受到伤害减少25%，并反弹5%吸收盾值的魔法伤害
- * - 有吸收盾时造成伤害增加50%
- * - 无法被治疗
- * </p>
+ * <p>v2.1：onLivingDeath（击杀者）+ onLivingDamage（双向）+ onLivingHeal（受治疗者）入口
+ * 接入怪物附魔触发开关。EntityJoinLevel是恢复初始吸收盾，属于状态恢复而非"触发"，无需检查。</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "sacred_order",
@@ -49,10 +43,7 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
 
     public EnchantmentSacredOrder() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
-                EquipmentSlot.HEAD,
-                EquipmentSlot.CHEST,
-                EquipmentSlot.LEGS,
-                EquipmentSlot.FEET
+                EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
         });
     }
 
@@ -67,6 +58,9 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
         }
 
         LivingEntity killer = (LivingEntity) evt.getSource().getEntity();
+
+        // ⭐ v2.1：怪物附魔触发开关（击杀者视角，击杀加吸收盾非濒死）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(killer, false)) return;
 
         Enchantment sacredOrder = EnchantmentRegistry.getEnchantmentByClass(EnchantmentSacredOrder.class);
         if (sacredOrder == null) {
@@ -105,26 +99,34 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
             return;
         }
 
-        if (victim.getAbsorptionAmount() > 0) {
-            int victimLevel = 0;
-            for (ItemStack armor : victim.getArmorSlots()) {
-                if (!armor.isEmpty()) {
-                    victimLevel += EnchantmentHelper.getItemEnchantmentLevel(sacredOrder, armor);
+        // 受击者视角（吸收盾减伤+反弹）
+        // ⭐ v2.1：怪物附魔触发开关（受击者视角）
+        if (!EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) {
+            if (victim.getAbsorptionAmount() > 0) {
+                int victimLevel = 0;
+                for (ItemStack armor : victim.getArmorSlots()) {
+                    if (!armor.isEmpty()) {
+                        victimLevel += EnchantmentHelper.getItemEnchantmentLevel(sacredOrder, armor);
+                    }
                 }
-            }
 
-            if (victimLevel > 0) {
-                evt.setAmount(evt.getAmount() * 0.75f);
+                if (victimLevel > 0) {
+                    evt.setAmount(evt.getAmount() * 0.75f);
 
-                if (damageSource.getEntity() instanceof LivingEntity) {
-                    LivingEntity attacker = (LivingEntity) damageSource.getEntity();
-                    attacker.hurt(attacker.damageSources().magic(), victim.getAbsorptionAmount() * 0.05f);
+                    if (damageSource.getEntity() instanceof LivingEntity) {
+                        LivingEntity attacker = (LivingEntity) damageSource.getEntity();
+                        attacker.hurt(attacker.damageSources().magic(), victim.getAbsorptionAmount() * 0.05f);
+                    }
                 }
             }
         }
 
+        // 攻击者视角（持有吸收盾时增伤）
         if (damageSource.getEntity() instanceof LivingEntity) {
             LivingEntity attacker = (LivingEntity) damageSource.getEntity();
+
+            // ⭐ v2.1：怪物附魔触发开关（攻击者视角）
+            if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
 
             if (attacker.getAbsorptionAmount() > 0) {
                 int attackerLevel = 0;
@@ -141,6 +143,11 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
         }
     }
 
+    /**
+     * 实体进入世界时获得初始吸收盾。
+     * 此事件属于状态恢复（玩家重连等），未接入怪物附魔开关。
+     * 但若有"启用开关时怪物已经获得过盾"的情况，无法回收，这是设计权衡。
+     */
     @SubscribeEvent
     public static void onEntityJoinWorld(@NotNull EntityJoinLevelEvent evt) {
         if (evt.getLevel().isClientSide()) {
@@ -156,6 +163,9 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
         if (entity.getAbsorptionAmount() > 0) {
             return;
         }
+
+        // ⭐ v2.1：状态恢复也加开关检查，避免新生怪物获得吸收盾
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(entity, false)) return;
 
         Enchantment sacredOrder = EnchantmentRegistry.getEnchantmentByClass(EnchantmentSacredOrder.class);
         if (sacredOrder == null) {
@@ -181,6 +191,9 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
         }
 
         LivingEntity entity = evt.getEntity();
+
+        // ⭐ v2.1：怪物附魔触发开关（受治疗者视角，"无法被治疗"也属于附魔触发）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(entity, false)) return;
 
         Enchantment sacredOrder = EnchantmentRegistry.getEnchantmentByClass(EnchantmentSacredOrder.class);
         if (sacredOrder == null) {

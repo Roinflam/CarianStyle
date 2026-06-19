@@ -16,6 +16,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.EnchantmentDarkMoon;
 import pers.roinflam.carianstyle.enchantment.EnchantmentFireDevoured;
@@ -28,12 +29,11 @@ import pers.roinflam.carianstyle.init.CarianStylePotion;
 
 /**
  * 切割附魔
- * <p>
- * 修复记录：修复击杀回调中getUsedItemHand → InteractionHand.MAIN_HAND
- * </p>
+ * <p>v2.2：onLivingDeath 击杀者视角接入怪物附魔触发开关。
+ * onDamageAsAttacker 走中央事件分发器，已经在 scanEntity 入口被通用开关拦截。</p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "incision",
@@ -99,7 +99,9 @@ public class EnchantmentIncision extends EnchantmentBase {
             return;
         }
 
-        // 修复：使用主手检查
+        // ⭐ v2.2：怪物附魔触发开关（击杀者视角，击杀续命非濒死触发）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(killer, false)) return;
+
         ItemStack heldItem = killer.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) {
             return;

@@ -17,6 +17,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
@@ -26,19 +27,10 @@ import java.util.List;
 
 /**
  * 龙息腐败附魔
- * <p>
- * 弓箭附魔，箭矢落地时对范围内敌人施加猩红腐败
- * 范围 = 等级 × 2格
- * 猩红腐败：持续时间 = 等级 × 5秒，等级 = 附魔等级 - 1
- * </p>
- * <p>
- * 修复记录 v2.1：
- * - getUsedItemHand() → InteractionHand.MAIN_HAND
- *   箭矢落地时玩家已放开弓，不再处于"使用物品"状态
- * </p>
+ * <p>v2.3：ProjectileImpact射手视角入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.3
  */
 @AutoRegisterEnchantment(
         id = "dragon_breath_corruption",
@@ -49,6 +41,9 @@ import java.util.List;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentDragonBreathCorruption extends EnchantmentBase {
+
+    private static final int MAX_SEARCH_RADIUS = 10;
+    private static final int MAX_TARGETS = 20;
 
     public EnchantmentDragonBreathCorruption() {
         super(EnchantmentCategory.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
@@ -72,8 +67,9 @@ public class EnchantmentDragonBreathCorruption extends EnchantmentBase {
             return;
         }
 
-        // v2.1修复：使用主手而非 getUsedItemHand()
-        // 箭矢落地时玩家已放开弓
+        // ⭐ v2.3：怪物附魔触发开关（射手视角，落地AOE腐败）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+
         ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
 
         if (heldItem.isEmpty()) {
@@ -95,18 +91,25 @@ public class EnchantmentDragonBreathCorruption extends EnchantmentBase {
             return;
         }
 
+        int searchRadius = Math.min(level * 2, MAX_SEARCH_RADIUS);
+
         List<LivingEntity> targets = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 arrow,
-                level * 2
+                searchRadius
         );
 
+        int hitCount = 0;
         for (LivingEntity target : targets) {
+            if (hitCount >= MAX_TARGETS) {
+                break;
+            }
             target.addEffect(new MobEffectInstance(
                     CarianStylePotion.SCARLET_ROT.get(),
                     level * 5 * 20,
                     level - 1
             ));
+            hitCount++;
         }
     }
 

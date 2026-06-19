@@ -19,6 +19,8 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import java.util.List;
+
 /**
  * 回归法则附魔
  * <p>
@@ -27,8 +29,19 @@ import pers.roinflam.carianstyle.utils.util.EntityUtil;
  * - 清除周围（等级×3格）内所有有药水效果的实体的所有药水
  * </p>
  *
+ * <h3>性能安全上限（v2.1 新增）</h3>
+ * <ul>
+ *   <li>{@link #MAX_SEARCH_RADIUS}：AOE 搜索半径硬上限，防止高等级附魔（如 100 级）
+ *       直接把等级×3 当半径，导致 300 格搜索扫过数千个实体。</li>
+ *   <li>{@link #MAX_TARGETS}：单次触发最大命中目标数上限，防止密集怪物场景下
+ *       对大量实体执行 removeAllEffects 导致事件风暴。</li>
+ * </ul>
+ *
+ * <p>本附魔触发频率极高（每 tick 5% 概率 = 平均每秒触发 1 次），
+ * 是服务端性能风险最大的附魔之一，必须双重封顶。</p>
+ *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "regressive_principle",
@@ -40,6 +53,12 @@ import pers.roinflam.carianstyle.utils.util.EntityUtil;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentRegressivePrinciple extends EnchantmentBase {
+
+    /** AOE 搜索半径硬上限（方块）：不管等级多高，最多搜索半径 8 方块 */
+    private static final int MAX_SEARCH_RADIUS = 8;
+
+    /** 单次触发最大命中目标数：防止密集怪物场景下事件风暴 */
+    private static final int MAX_TARGETS = 16;
 
     public EnchantmentRegressivePrinciple() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
@@ -91,13 +110,26 @@ public class EnchantmentRegressivePrinciple extends EnchantmentBase {
             return;
         }
 
-        // 清除周围有药水效果的实体的所有药水
-        EntityUtil.getNearbyEntities(
+        // ⭐ v2.1：搜索半径硬上限，防止等级×3直接当半径
+        // 原：totalLevel * 3（100级 = 300格，扫过整个区块区域）
+        int searchRadius = Math.min(totalLevel * 3, MAX_SEARCH_RADIUS);
+
+        List<LivingEntity> targets = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 player,
-                totalLevel * 3,
+                searchRadius,
                 entity -> !entity.getActiveEffects().isEmpty()
-        ).forEach(LivingEntity::removeAllEffects);
+        );
+
+        // ⭐ v2.1：命中数量硬上限，防止对上千个实体执行 removeAllEffects
+        int hitCount = 0;
+        for (LivingEntity target : targets) {
+            if (hitCount >= MAX_TARGETS) {
+                break;
+            }
+            target.removeAllEffects();
+            hitCount++;
+        }
     }
 
     @Override

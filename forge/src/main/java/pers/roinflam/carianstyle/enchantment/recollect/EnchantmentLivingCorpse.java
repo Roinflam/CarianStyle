@@ -16,6 +16,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
@@ -25,14 +26,18 @@ import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import java.util.UUID;
 
 /**
- * 活尸附魔
+ * 死诞者附魔
  * <p>
  * 死亡时满血复活，但开始持续失血直到再次死亡
  * 冷却4800tick
  * </p>
+ * <p>
+ * v2.1新增: onLivingDeath 入口接入怪物附魔触发开关，
+ * 怪物身上的"濒死复活+流血"效果可由配置 allowMobTriggerDeathEnchantments 控制
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "living_corpse",
@@ -53,7 +58,7 @@ public class EnchantmentLivingCorpse extends EnchantmentBase {
     }
 
     /**
-     * 获取实体装备的活尸附魔总等级
+     * 获取实体装备的死诞者附魔总等级
      *
      * @param entity 实体
      * @return 附魔总等级
@@ -78,6 +83,7 @@ public class EnchantmentLivingCorpse extends EnchantmentBase {
 
     /**
      * 监听生物死亡事件 - 触发复活机制
+     * <p>v2.1新增：怪物附魔触发开关（濒死类）拦截</p>
      *
      * @param evt 死亡事件
      */
@@ -88,6 +94,12 @@ public class EnchantmentLivingCorpse extends EnchantmentBase {
         }
 
         LivingEntity holder = evt.getEntity();
+
+        // ⭐ v2.1：怪物附魔触发开关 —— 死诞者属于濒死复活类，怪物身上不触发
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, true)) {
+            return;
+        }
+
         UUID uuid = holder.getUUID();
 
         int totalLevel = getTotalLevel(holder);
@@ -139,6 +151,10 @@ public class EnchantmentLivingCorpse extends EnchantmentBase {
 
     /**
      * 监听实体加入世界事件 - 恢复失血状态
+     * <p>注意：此事件用于玩家重新登录时恢复未完结的流血状态，
+     * 不属于"触发亡语"，未接入怪物附魔开关。
+     * 若 onLivingDeath 被拦截，BLEEDING_STATE_KEY 本来就不会被设置，
+     * 本方法不会对怪物产生影响。</p>
      *
      * @param evt 实体加入事件
      */

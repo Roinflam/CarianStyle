@@ -16,6 +16,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
@@ -23,13 +24,10 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 /**
  * 先祖之角附魔
- * <p>
- * 受到魔法伤害时减伤25%
- * 受到魔法伤害后持续回血（伤害×等级×0.05/20 每10tick，持续200tick）
- * </p>
+ * <p>v2.1：LivingDamage受击者视角入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "ancestral_spirit_horn",
@@ -82,6 +80,9 @@ public class EnchantmentAncestralSpiritHorn extends EnchantmentBase {
         }
 
         LivingEntity holder = evt.getEntity();
+
+        // ⭐ v2.1：怪物附魔触发开关（受击者视角，魔法减伤+持续回血）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
 
         int totalLevel = getTotalLevel(holder);
         if (totalLevel <= 0) {

@@ -22,8 +22,18 @@ import java.util.List;
  * 白天：叠加+1等级，夜晚：叠加+2等级
  * </p>
  *
+ * <h3>性能安全上限（v2.1 新增）</h3>
+ * <ul>
+ *   <li>{@link #MAX_SEARCH_RADIUS}：AOE 搜索半径硬上限，防止高等级附魔（如 100 级）
+ *       直接把等级当半径，导致 100 格搜索扫过大量实体。</li>
+ *   <li>{@link #MAX_TARGETS}：单次触发最大命中目标数上限，防止密集怪物场景下
+ *       对大量实体施加效果导致事件风暴。</li>
+ * </ul>
+ *
+ * <p>本附魔每次攻击触发，触发频率极高，必须严格封顶。</p>
+ *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "adura_moonlight_sword",
@@ -40,6 +50,12 @@ import java.util.List;
         }
 )
 public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
+
+    /** AOE 搜索半径硬上限（方块）：不管等级多高，最多搜索半径 6 方块 */
+    private static final int MAX_SEARCH_RADIUS = 6;
+
+    /** 单次触发最大命中目标数：防止密集怪物场景下事件风暴 */
+    private static final int MAX_TARGETS = 16;
 
     public EnchantmentAduraMoonlightSword() {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
@@ -75,11 +91,15 @@ public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
             pers.roinflam.carianstyle.utils.util.DamageSourceUtil.setMagicDamage(ctx.getDamageSource());
         }
 
-        // 获取目标周围的敌人（范围=等级）
+        // ⭐ v2.1：搜索半径硬上限，防止等级直接当半径
+        // 原：effectiveLevel（100级 = 100格）
+        int searchRadius = Math.min(effectiveLevel, MAX_SEARCH_RADIUS);
+
+        // 获取目标周围的敌人
         List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 victim,
-                effectiveLevel,
+                searchRadius,
                 entity -> !entity.equals(attacker)
         );
 
@@ -88,7 +108,13 @@ public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
         int stackIncrease = isNight ? 2 : 1;
         int initialLevel = isNight ? 1 : 0;
 
+        // ⭐ v2.1：命中数量硬上限，防止密集怪物场景下事件风暴
+        int hitCount = 0;
         for (LivingEntity entity : nearbyEntities) {
+            if (hitCount >= MAX_TARGETS) {
+                break;
+            }
+
             MobEffectInstance existingEffect = entity.getEffect(CarianStylePotion.FROSTBITE.get());
 
             int newLevel;
@@ -99,6 +125,7 @@ public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
             }
 
             entity.addEffect(new MobEffectInstance(CarianStylePotion.FROSTBITE.get(), 200, newLevel));
+            hitCount++;
         }
     }
 

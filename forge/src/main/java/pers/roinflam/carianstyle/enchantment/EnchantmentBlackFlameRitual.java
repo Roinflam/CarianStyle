@@ -21,6 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
@@ -28,28 +29,36 @@ import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 
 /**
  * 黑焰仪式附魔
- * 修复: getUsedItemHand -> InteractionHand.MAIN_HAND
- * 优化: LivingTickEvent -> PlayerTickEvent
- * @version 2.1
+ * <p>v2.2：LivingHurt攻击者视角入口接入怪物附魔触发开关。
+ * onPlayerTick 玩家专属，无需检查。</p>
+ *
+ * @version 2.2
  */
 @AutoRegisterEnchantment(id = "black_flame_ritual", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.VERY_RARE, type = EnchantmentCategory.ARMOR_CHEST, slots = {EquipmentSlot.CHEST}, conflictsWith = {EnchantmentShelterOfFire.class, EnchantmentHealingByFire.class})
 @Mod.EventBusSubscriber
 public class EnchantmentBlackFlameRitual extends EnchantmentBase {
-    public EnchantmentBlackFlameRitual() { super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST}); }
+    public EnchantmentBlackFlameRitual() {
+        super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
+    }
 
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
         if (evt.getEntity().level().isClientSide) return;
         DamageSource damageSource = evt.getSource();
         if (!(damageSource.getEntity() instanceof LivingEntity attacker)) return;
+
+        // ⭐ v2.2：怪物附魔触发开关（攻击者视角，根据自身效果数增伤）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+
         Enchantment blackFlameRitual = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBlackFlameRitual.class);
         if (blackFlameRitual == null) return;
-        // 修复：攻击者检查主手+护甲
+
         int totalLevel = EnchantmentHelper.getItemEnchantmentLevel(blackFlameRitual, attacker.getItemInHand(InteractionHand.MAIN_HAND));
         for (ItemStack armor : attacker.getArmorSlots()) {
             if (!armor.isEmpty()) totalLevel += EnchantmentHelper.getItemEnchantmentLevel(blackFlameRitual, armor);
         }
         if (totalLevel <= 0) return;
+
         float damageMultiplier = 1;
         for (MobEffectInstance effect : attacker.getActiveEffects()) {
             MobEffect potion = effect.getEffect();
@@ -60,7 +69,9 @@ public class EnchantmentBlackFlameRitual extends EnchantmentBase {
         evt.setAmount(evt.getAmount() * damageMultiplier);
     }
 
-    /** 优化：从LivingTickEvent改为PlayerTickEvent，避免所有实体每tick进入 */
+    /**
+     * 持续燃烧自损（PlayerTickEvent 玩家专属，无需开关检查）
+     */
     @SubscribeEvent
     public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
         if (evt.player.level().isClientSide || evt.phase != TickEvent.Phase.START) return;
@@ -76,7 +87,10 @@ public class EnchantmentBlackFlameRitual extends EnchantmentBase {
         boolean hasPotion = false;
         for (MobEffectInstance effect : holder.getActiveEffects()) {
             MobEffect potion = effect.getEffect();
-            if (!potion.isInstantenous() && effect.isVisible()) { hasPotion = true; break; }
+            if (!potion.isInstantenous() && effect.isVisible()) {
+                hasPotion = true;
+                break;
+            }
         }
         if (hasPotion) {
             DynamicAttributeManager.apply(holder, DynamicAttributes.DESTRUCTION_FIRE_BURNING.createInstance(21, 0));
@@ -84,9 +98,18 @@ public class EnchantmentBlackFlameRitual extends EnchantmentBase {
         }
     }
 
-    @Override protected boolean checkCompatibility(@NotNull Enchantment ench) {
+    @Override
+    protected boolean checkCompatibility(@NotNull Enchantment ench) {
         return super.checkCompatibility(ench) && !ench.equals(Enchantments.ALL_DAMAGE_PROTECTION);
     }
-    @Override public int getMinCost(int l) { return (int)(30 * ConfigLoader.enchantingDifficulty); }
-    @Override public int getMaxCost(int l) { return getMinCost(l) + 50; }
+
+    @Override
+    public int getMinCost(int l) {
+        return (int) (30 * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int l) {
+        return getMinCost(l) + 50;
+    }
 }

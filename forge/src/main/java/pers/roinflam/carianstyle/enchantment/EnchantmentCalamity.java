@@ -18,6 +18,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
@@ -27,18 +28,11 @@ import java.util.List;
 
 /**
  * 灾厄附魔（诅咒）
- * <p>
- * 受击伤害×1.5
- * 每tick 2%概率吸引32格内怪物
- * </p>
- * <p>
- * 修复记录 v2.1：
- * - getTotalLevel() 中 getUsedItemHand() → InteractionHand.MAIN_HAND
- *   PlayerTickEvent 中玩家可能没有在"使用"物品，getUsedItemHand()返回值不确定
- * </p>
+ * <p>v2.2：LivingHurt受击者视角入口接入怪物附魔触发开关。
+ * onPlayerTick 玩家专属，无需检查。</p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "calamity",
@@ -55,12 +49,6 @@ public class EnchantmentCalamity extends EnchantmentBase {
         super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
 
-    /**
-     * 获取护甲上的灾厄附魔总等级
-     *
-     * @param entity 实体
-     * @return 附魔总等级
-     */
     private static int getArmorLevel(LivingEntity entity) {
         Enchantment calamity = EnchantmentRegistry.getEnchantmentByClass(EnchantmentCalamity.class);
         if (calamity == null) {
@@ -79,15 +67,6 @@ public class EnchantmentCalamity extends EnchantmentBase {
         return totalLevel;
     }
 
-    /**
-     * 获取所有装备（包括主手和护甲）的灾厄附魔总等级
-     * <p>
-     * v2.1修复：getUsedItemHand() → InteractionHand.MAIN_HAND
-     * </p>
-     *
-     * @param entity 实体
-     * @return 附魔总等级
-     */
     private static int getTotalLevel(LivingEntity entity) {
         Enchantment calamity = EnchantmentRegistry.getEnchantmentByClass(EnchantmentCalamity.class);
         if (calamity == null) {
@@ -96,7 +75,6 @@ public class EnchantmentCalamity extends EnchantmentBase {
 
         int totalLevel = 0;
 
-        // v2.1修复：使用主手而非 getUsedItemHand()
         ItemStack heldItem = entity.getItemInHand(InteractionHand.MAIN_HAND);
         if (!heldItem.isEmpty()) {
             totalLevel += EnchantmentHelper.getItemEnchantmentLevel(calamity, heldItem);
@@ -114,9 +92,6 @@ public class EnchantmentCalamity extends EnchantmentBase {
         return totalLevel;
     }
 
-    /**
-     * 受击伤害增加50%
-     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
         if (evt.getEntity().level().isClientSide) {
@@ -125,15 +100,15 @@ public class EnchantmentCalamity extends EnchantmentBase {
 
         LivingEntity victim = evt.getEntity();
 
+        // ⭐ v2.2：怪物附魔触发开关（受击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
         int totalLevel = getArmorLevel(victim);
         if (totalLevel > 0) {
             evt.setAmount(evt.getAmount() * 1.5f);
         }
     }
 
-    /**
-     * 每tick 2%概率吸引周围怪物
-     */
     @SubscribeEvent
     public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
         if (evt.player.level().isClientSide) {

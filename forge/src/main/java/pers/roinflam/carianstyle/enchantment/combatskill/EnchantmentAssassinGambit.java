@@ -16,6 +16,7 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
@@ -23,12 +24,11 @@ import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 
 /**
  * 刺客赌局附魔
- * <p>
- * 修复记录：修复getUsedItemHand → InteractionHand.MAIN_HAND
- * </p>
+ * <p>v2.2：双向监听器+暴击事件入口接入怪物附魔触发开关。
+ * CriticalHitEvent 仅玩家触发，开关检查作为安全网保留。</p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "assassin_gambit",
@@ -62,22 +62,28 @@ public class EnchantmentAssassinGambit extends EnchantmentBase {
             return;
         }
 
-        // 攻击者视角：隐身状态下增伤 - 修复：使用主手检查
-        if (DynamicAttributeManager.has(attacker, DynamicAttributes.STEALTH)) {
-            ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
-            if (!heldItem.isEmpty()) {
-                int level = EnchantmentHelper.getItemEnchantmentLevel(assassinGambit, heldItem);
-                if (ConfigLoader.levelLimit) {
-                    level = Math.min(level, 10);
-                }
-                if (level > 0) {
-                    DynamicAttributeManager.remove(attacker, DynamicAttributes.STEALTH);
-                    evt.setAmount(evt.getAmount() + evt.getAmount() * level * 0.25f);
+        // 攻击者视角：隐身状态下增伤
+        // ⭐ v2.2：怪物附魔触发开关（攻击者视角）
+        if (!EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) {
+            if (DynamicAttributeManager.has(attacker, DynamicAttributes.STEALTH)) {
+                ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
+                if (!heldItem.isEmpty()) {
+                    int level = EnchantmentHelper.getItemEnchantmentLevel(assassinGambit, heldItem);
+                    if (ConfigLoader.levelLimit) {
+                        level = Math.min(level, 10);
+                    }
+                    if (level > 0) {
+                        DynamicAttributeManager.remove(attacker, DynamicAttributes.STEALTH);
+                        evt.setAmount(evt.getAmount() + evt.getAmount() * level * 0.25f);
+                    }
                 }
             }
         }
 
-        // 受击者视角：获得隐身 - 修复：使用主手检查
+        // 受击者视角：获得隐身
+        // ⭐ v2.2：怪物附魔触发开关（受击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
         ItemStack victimHeldItem = victim.getItemInHand(InteractionHand.MAIN_HAND);
         if (!victimHeldItem.isEmpty()) {
             int level = EnchantmentHelper.getItemEnchantmentLevel(assassinGambit, victimHeldItem);
@@ -101,11 +107,14 @@ public class EnchantmentAssassinGambit extends EnchantmentBase {
         }
 
         Player attacker = evt.getEntity();
+
+        // ⭐ v2.2：CriticalHitEvent 仅玩家触发，开关检查作为安全网（玩家始终放行）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+
         if (!DynamicAttributeManager.has(attacker, DynamicAttributes.STEALTH)) {
             return;
         }
 
-        // 修复：使用主手检查
         ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) {
             return;

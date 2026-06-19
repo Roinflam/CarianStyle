@@ -16,11 +16,11 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
-import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.UUID;
 
@@ -31,9 +31,10 @@ import java.util.UUID;
  * 减伤：伤害 × 血量比例 × 0.25
  * 免疫火焰伤害并转化为治疗（10tick冷却）
  * </p>
+ * <p>v2.1：三个监听器入口接入怪物附魔触发开关</p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "giant_flame",
@@ -85,6 +86,10 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
         }
 
         LivingEntity holder = evt.getEntity();
+
+        // ⭐ v2.1：怪物附魔触发开关（受击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
+
         LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
 
         if (holder.getRemainingFireTicks() <= 0) {
@@ -111,6 +116,9 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
 
         LivingEntity holder = evt.getEntity();
 
+        // ⭐ v2.1：怪物附魔触发开关（受击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
+
         int totalLevel = getTotalLevel(holder);
         if (totalLevel <= 0) {
             return;
@@ -135,6 +143,10 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
         }
 
         LivingEntity holder = evt.getEntity();
+
+        // ⭐ v2.1：怪物附魔触发开关（受击者视角，火免疫属于自保不属于濒死）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
+
         UUID uuid = holder.getUUID();
 
         int totalLevel = getTotalLevel(holder);
