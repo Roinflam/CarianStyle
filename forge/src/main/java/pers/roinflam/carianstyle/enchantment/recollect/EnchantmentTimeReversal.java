@@ -35,9 +35,14 @@ import java.util.UUID;
  * v2.1新增: onLivingDeath 入口接入怪物附魔触发开关，
  * 怪物身上的"濒死逆转+反弹"效果可由配置 allowMobTriggerDeathEnchantments 控制
  * </p>
+ * <p>
+ * v2.2新增: 反弹步骤新增 ThreadLocal 重入保护，阻断两个同时处于逆转状态的实体
+ * 互相反弹形成的事件级联。逆转免疫（取消伤害）、伤害累积、单次反弹逻辑完全保留，
+ * 仅阻断"反弹伤害再次触发反弹"的连锁。
+ * </p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "time_reversal",
@@ -53,6 +58,18 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
     private static final String REVERSAL_STATE_KEY = "time_reversal_state";
     private static final String REVERSAL_DAMAGE_KEY = "time_reversal_damage";
     private static final int RECOLLECT_ENCHANTABILITY = 35;
+
+    /**
+     * 线程级重入保护标记。
+     * <p>
+     * 当本线程正在执行逆转反弹时置为 {@code true}。
+     * 反弹使用原始伤害源（带攻击者实体），会再次进入 {@link #onLivingAttack}，
+     * 若反弹目标同样处于逆转状态则会再次反弹，形成来回反弹。
+     * 此标记在「反弹」步骤前拦截，确保反弹只发生一次；
+     * 而逆转免疫（{@code setCanceled}）与伤害累积在标记拦截前已执行，正常效果完整保留。
+     * </p>
+     */
+    private static final ThreadLocal<Boolean> PROCESSING_REFLECT = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
     public EnchantmentTimeReversal() {
         super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
@@ -145,6 +162,8 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
      * <p>注意：本事件不属于"死亡触发"，未接入怪物附魔开关。
      * 但由于 onLivingDeath 已拦截，REVERSAL_STATE_KEY 不会被设置，
      * 本方法对怪物自然不会触发反弹效果。</p>
+     * <p>v2.2：反弹步骤前增加 {@link #PROCESSING_REFLECT} 重入保护，
+     * 阻断双方逆转状态下的连锁反弹；免疫与累积在拦截前已执行，效果不变。</p>
      *
      * @param evt 受击事件
      */
@@ -184,8 +203,22 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
 
         // 反弹伤害
         if (evt.getSource().getEntity() instanceof LivingEntity) {
+            // ⭐ v2.2：重入保护 —— 若本次受击由另一个逆转实体的反弹造成，跳过本次反弹，
+            // 阻断双方逆转状态下的连锁反弹。免疫（取消伤害）与累积已在上方执行，正常效果保留
+            if (PROCESSING_REFLECT.get()) {
+                return;
+            }
+
             LivingEntity attacker = (LivingEntity) evt.getSource().getEntity();
-            attacker.hurt(evt.getSource(), evt.getAmount());
+
+            // 反弹期间置位重入标记，确保反弹伤害不会再次触发反弹；
+            // try-finally 保证标记可靠复位，避免标记滞留导致逆转反弹永久失效
+            PROCESSING_REFLECT.set(Boolean.TRUE);
+            try {
+                attacker.hurt(evt.getSource(), evt.getAmount());
+            } finally {
+                PROCESSING_REFLECT.set(Boolean.FALSE);
+            }
         }
     }
 

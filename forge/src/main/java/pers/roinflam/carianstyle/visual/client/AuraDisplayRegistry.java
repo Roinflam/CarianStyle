@@ -1,0 +1,273 @@
+package pers.roinflam.carianstyle.visual.client;
+
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.registries.ForgeRegistries;
+import pers.roinflam.carianstyle.utils.Reference;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 光环显示注册表（纯客户端）。
+ * <p>
+ * 光环是否激活、半径多大、什么形状，全部由客户端根据“附近实体的同步装备 NBT”自行判断，
+ * 因此无需任何网络包。每个光环登记：序列号、颜色、形状 {@link AuraShape}、探测器 {@link AuraDetector}。
+ * <p>
+ * <b>形状说明（关键）：</b>本系附魔的范围判定基本都是
+ * {@code EntityUtil.getNearbyEntities(类, 实体, R)}，其底层是 {@code AABB.inflate(R)}——
+ * 即一个从 -R 到 +R 的轴对齐立方体（俯视为边长 2R 的正方形），并非球形距离判定。
+ * 因此这些光环的真实生效区是 {@link AuraShape#SQUARE}（半径 R 即正方形半边长）。
+ * 若将来有附魔改用 {@code distanceTo <= R} 的球形判定，则用 {@link AuraShape#CIRCLE}。
+ * <p>
+ * 内置探测器工厂覆盖三类：装备常驻（取任意槽最高等级）、护甲叠加（4 件护甲等级求和）、举盾触发。
+ * 计时型/状态型光环（如重力场）无法仅凭客户端状态判断，需另走服务端同步，暂不在此。
+ *
+ * @author FlameForge
+ */
+@OnlyIn(Dist.CLIENT)
+public final class AuraDisplayRegistry {
+
+    /**
+     * 光环形状。
+     * <ul>
+     *     <li>{@link #SQUARE}：轴对齐正方形，半径 = 半边长（对应 {@code AABB.inflate(R)} 的盒形判定）；</li>
+     *     <li>{@link #CIRCLE}：圆形，半径 = 圆半径（对应球形距离判定）。</li>
+     * </ul>
+     */
+    public enum AuraShape {
+        SQUARE,
+        CIRCLE
+    }
+
+    /** 光环探测器：给定实体与扫描上下文，返回光环半径（格）；<=0 表示该实体当前未激活此光环。 */
+    @FunctionalInterface
+    public interface AuraDetector {
+        /**
+         * @param entity 被检测实体
+         * @param ctx    扫描上下文（缓存了该实体的装备附魔等级）
+         * @return 半径（格），<=0 表示未激活
+         */
+        double getRadius(LivingEntity entity, ScanContext ctx);
+    }
+
+    /** 半径函数：由附魔等级算半径。 */
+    @FunctionalInterface
+    public interface RadiusFunction {
+        /**
+         * @param level 附魔等级
+         * @return 半径（格）
+         */
+        double radius(int level);
+    }
+
+    /**
+     * 一条光环注册项。
+     *
+     * @param serialId 序列号
+     * @param color    颜色（0xRRGGBB）
+     * @param shape    形状
+     * @param detector 探测器
+     */
+    public record AuraInfo(int serialId, int color, AuraShape shape, AuraDetector detector) {
+    }
+
+    /** 全部注册项 */
+    private static final List<AuraInfo> AURAS = new ArrayList<>();
+
+    private AuraDisplayRegistry() {
+    }
+
+    /**
+     * 注册一个光环显示项。
+     *
+     * @param serialId 序列号（唯一）
+     * @param color    颜色（0xRRGGBB）
+     * @param shape    形状
+     * @param detector 探测器
+     */
+    public static void register(int serialId, int color, AuraShape shape, AuraDetector detector) {
+        AURAS.add(new AuraInfo(serialId, color, shape, detector));
+    }
+
+    /**
+     * @return 全部光环注册项（只读）
+     */
+    public static List<AuraInfo> getAuras() {
+        return AURAS;
+    }
+
+    // ===================== 探测器工厂 =====================
+
+    /**
+     * 固定半径的装备常驻光环（任意槽位存在该附魔即激活，取最高等级）。
+     *
+     * @param enchantId 附魔注册 id（命名空间默认 mod id，如 "realm_of_magic"）
+     * @param radius    固定半径
+     * @return 探测器
+     */
+    public static AuraDetector fixed(String enchantId, double radius) {
+        return new EnchantAuraDetector(enchantId, level -> radius, false, false);
+    }
+
+    /**
+     * 半径随“任意槽最高等级”缩放的装备常驻光环。
+     *
+     * @param enchantId 附魔注册 id
+     * @param fn        半径函数
+     * @return 探测器
+     */
+    public static AuraDetector scaled(String enchantId, RadiusFunction fn) {
+        return new EnchantAuraDetector(enchantId, fn, false, false);
+    }
+
+    /**
+     * 半径随“4 件护甲等级之和”缩放的装备常驻光环（用于护甲套装叠加型，如回归性原理）。
+     * <p>与游戏内 {@code for(armor) totalLevel += getItemEnchantmentLevel} 的口径一致。
+     *
+     * @param enchantId 附魔注册 id
+     * @param fn        半径函数（入参为护甲等级之和）
+     * @return 探测器
+     */
+    public static AuraDetector scaledArmorSum(String enchantId, RadiusFunction fn) {
+        return new EnchantAuraDetector(enchantId, fn, false, true);
+    }
+
+    /**
+     * 举盾时才激活的光环（如圣域）。半径固定，按任意槽最高等级判定是否激活。
+     *
+     * @param enchantId 附魔注册 id
+     * @param radius    固定半径
+     * @return 探测器
+     */
+    public static AuraDetector blocking(String enchantId, double radius) {
+        return new EnchantAuraDetector(enchantId, level -> radius, true, false);
+    }
+
+    /**
+     * 基于“装备附魔等级”的通用探测器实现。
+     * <p>
+     * 用标准 Forge 注册表按 {@code carianstyle:<id>} 解析附魔，不依赖自定义注册类。
+     */
+    private static final class EnchantAuraDetector implements AuraDetector {
+
+        private final String enchantId;
+        private final RadiusFunction radiusFunction;
+        private final boolean requireBlocking;
+        /** true=用 4 件护甲等级之和；false=用任意槽最高等级 */
+        private final boolean useArmorSum;
+
+        /** 解析后的附魔对象缓存（首次解析成功后固定） */
+        private Enchantment cached;
+        private boolean resolved;
+
+        EnchantAuraDetector(String enchantId, RadiusFunction radiusFunction,
+                            boolean requireBlocking, boolean useArmorSum) {
+            this.enchantId = enchantId;
+            this.radiusFunction = radiusFunction;
+            this.requireBlocking = requireBlocking;
+            this.useArmorSum = useArmorSum;
+        }
+
+        /**
+         * 懒解析附魔对象（注册表在 mod 加载后才可用，故首次调用时解析）。
+         *
+         * @return 附魔对象，未注册时为 null
+         */
+        private Enchantment resolve() {
+            if (!resolved) {
+                cached = ForgeRegistries.ENCHANTMENTS.getValue(new ResourceLocation(Reference.MOD_ID, enchantId));
+                // 仅在成功解析后才标记完成，否则下次重试
+                resolved = (cached != null);
+            }
+            return cached;
+        }
+
+        @Override
+        public double getRadius(LivingEntity entity, ScanContext ctx) {
+            Enchantment ench = resolve();
+            if (ench == null) {
+                return -1;
+            }
+            int level = useArmorSum ? ctx.getArmorSum(ench) : ctx.getLevel(ench);
+            if (level <= 0) {
+                return -1;
+            }
+            if (requireBlocking && !entity.isBlocking()) {
+                return -1;
+            }
+            return radiusFunction.radius(level);
+        }
+    }
+
+    // ===================== 扫描上下文 =====================
+
+    /**
+     * 扫描上下文：一次性收集某实体所有装备槽上的附魔等级，供同一实体的多个探测器复用。
+     * <p>
+     * 同时维护两套数据：
+     * <ul>
+     *     <li>{@code levels}：任意槽位的最高等级（用于固定半径/举盾型的激活判定）；</li>
+     *     <li>{@code armorLevels}：仅 4 件护甲槽的等级之和（用于护甲套装叠加型的半径计算）。</li>
+     * </ul>
+     */
+    public static final class ScanContext {
+
+        /**
+         * 缓存的装备槽数组。
+         * <p><b>性能（视觉/行为零变化）：</b>{@link EquipmentSlot#values()} 每次调用都会克隆一份新数组，
+         * 而本上下文对扫描范围内<b>每个</b>带附魔装备的实体都会构建一次并遍历全部槽位；
+         * 缓存为静态常量可避免逐实体的数组分配。枚举值不可变、外部不修改，共享安全。
+         */
+        private static final EquipmentSlot[] EQUIPMENT_SLOTS = EquipmentSlot.values();
+
+        /** 任意槽位最高等级 */
+        private final Map<Enchantment, Integer> levels = new HashMap<>();
+        /** 4 件护甲等级之和 */
+        private final Map<Enchantment, Integer> armorLevels = new HashMap<>();
+
+        /**
+         * @param entity 被检测实体
+         */
+        public ScanContext(LivingEntity entity) {
+            // 使用缓存的 EQUIPMENT_SLOTS，避免每次 EquipmentSlot.values() 克隆数组
+            for (EquipmentSlot slot : EQUIPMENT_SLOTS) {
+                ItemStack stack = entity.getItemBySlot(slot);
+                if (stack.isEmpty()) {
+                    continue;
+                }
+                boolean isArmor = slot.getType() == EquipmentSlot.Type.ARMOR;
+                for (Map.Entry<Enchantment, Integer> e : EnchantmentHelper.getEnchantments(stack).entrySet()) {
+                    levels.merge(e.getKey(), e.getValue(), Math::max);
+                    if (isArmor) {
+                        armorLevels.merge(e.getKey(), e.getValue(), Integer::sum);
+                    }
+                }
+            }
+        }
+
+        /**
+         * @param ench 附魔
+         * @return 该实体任意装备槽上的最高等级；不存在为 0
+         */
+        public int getLevel(Enchantment ench) {
+            return ench == null ? 0 : levels.getOrDefault(ench, 0);
+        }
+
+        /**
+         * @param ench 附魔
+         * @return 该实体 4 件护甲上的等级之和；不存在为 0
+         */
+        public int getArmorSum(Enchantment ench) {
+            return ench == null ? 0 : armorLevels.getOrDefault(ench, 0);
+        }
+    }
+}

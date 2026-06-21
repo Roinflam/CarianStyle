@@ -30,8 +30,20 @@ import java.util.List;
  *   直接目标通过ctx增伤，周围其他敌人通过hurt造成伤害
  * </p>
  *
+ * <h3>性能安全上限（v2.2 新增）</h3>
+ * <ul>
+ *   <li>{@link #MAX_TARGETS}：单次冲刺斩最大命中目标数上限。
+ *       原逻辑对 3 格内所有敌人无上限 hurt，且每次 hurt 使用带攻击者实体的
+ *       mobAttack 伤害源，会触发每个目标各自的受击类附魔（如因果律累积、各类反伤）。
+ *       在密集怪物场景（村民聚集、刷怪塔）下可能一次攻击触发大量伤害事件链，
+ *       故增加命中数量硬上限封顶。</li>
+ * </ul>
+ *
+ * <p>注意：本次仅新增命中数量上限，旋转动画、增伤公式、目标筛选逻辑均保持不变；
+ * 3 格范围内常规战斗几乎不会超过上限，对正常玩法无可观察影响。</p>
+ *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "stamp_sweep",
@@ -41,6 +53,9 @@ import java.util.List;
         slots = {EquipmentSlot.MAINHAND}
 )
 public class EnchantmentStampSweep extends EnchantmentBase {
+
+    /** 单次冲刺斩最大命中目标数：防止密集怪物场景下无上限 AOE 触发大量受击事件链 */
+    private static final int MAX_TARGETS = 20;
 
     public EnchantmentStampSweep() {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
@@ -104,9 +119,15 @@ public class EnchantmentStampSweep extends EnchantmentBase {
         );
 
         // 对周围其他敌人造成伤害
+        // ⭐ v2.2：命中数量硬上限，防止密集怪物场景下无上限 hurt 触发事件链风暴
+        int hitCount = 0;
         for (LivingEntity target : nearbyEntities) {
+            if (hitCount >= MAX_TARGETS) {
+                break;
+            }
             DamageSource damageSource = attacker.damageSources().mobAttack(attacker);
             target.hurt(damageSource, baseDamage + bonusDamage);
+            hitCount++;
         }
     }
 

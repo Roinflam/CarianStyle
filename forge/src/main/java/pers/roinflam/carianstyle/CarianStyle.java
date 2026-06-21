@@ -39,6 +39,10 @@ public class CarianStyle {
             pers.roinflam.carianstyle.network.NetworkHandler.register();
             LogUtil.info("卡利亚式附魔 - 网络通信处理器注册成功");
 
+            // 注册可视化系统专用网络通道（叠层 HUD 同步用，与现有 NetworkHandler 独立）
+            pers.roinflam.carianstyle.network.VisualNetwork.register();
+            LogUtil.info("卡利亚式附魔 - 可视化网络通道注册成功");
+
             // 获取模组事件总线
             IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
@@ -116,6 +120,11 @@ public class CarianStyle {
                 LogUtil.info("卡利亚式附魔 - 正在注册数据管理器");
                 MinecraftForge.EVENT_BUS.register(EnchantmentDataManager.class);
                 LogUtil.debug("卡利亚式附魔 - 数据管理器注册成功");
+
+                // 注册叠层显示读取器（HUD 数据源，双端都需要；默认无读取器，接入后才显示）
+                LogUtil.info("卡利亚式附魔 - 正在注册叠层显示");
+                pers.roinflam.carianstyle.visual.CarianStyleStackDisplays.init();
+                LogUtil.debug("卡利亚式附魔 - 叠层显示注册完成");
 
                 // 加载并验证配置
                 LogUtil.info("卡利亚式附魔 - 正在验证配置文件");
