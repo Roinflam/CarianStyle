@@ -26,8 +26,10 @@ import java.util.List;
  *     <li>每 {@link #SCAN_INTERVAL} tick 才扫描一次（光环出现/消失有 ≤0.5 秒延迟，视觉无碍）；</li>
  *     <li>扫描范围限定 {@link #SCAN_RANGE} 格，且<b>与 AuraGroundRenderer 的 RENDER_CULL 取同值</b>，
  *         避免「扫描产出范围 ≠ 渲染裁剪范围」造成的浪费；</li>
- *     <li><b>无附魔装备的实体直接跳过</b>（廉价的 NBT 标签存在性检查），不再为成片普通怪物
- *         构建昂贵的全槽位附魔等级表，详见 {@link #hasEnchantedEquipment(LivingEntity)}；</li>
+ *     <li><b>不可能激活任何光环的实体直接跳过</b>（廉价的 NBT 标签存在性检查）：仅当实体
+ *         「护甲槽带附魔」或「举盾且手持带附魔」时才构建昂贵的全槽位附魔等级表，
+ *         详见 {@link #mayHaveAura(LivingEntity)}。这样仅主手拿着附魔武器、未举盾的玩家
+ *         （很常见）会被直接略过，不再白白构建 ScanContext；</li>
  *     <li>每个实体只构建一次附魔等级表（{@link AuraDisplayRegistry.ScanContext}），多探测器复用；</li>
  *     <li>结果存 volatile 列表，渲染线程直接读。</li>
  * </ul>
@@ -62,13 +64,15 @@ public final class AuraScanner {
     private static final double SCAN_RANGE = 48.0;
 
     /**
-     * 缓存的装备槽数组。
-     * <p><b>性能（视觉/行为零变化）：</b>{@link EquipmentSlot#values()} 每次调用都会克隆一份新数组
-     * （Java 枚举 {@code values()} 的固有行为），而 {@link #hasEnchantedEquipment(LivingEntity)}
-     * 处于扫描热路径、会对范围内<b>每个</b>实体调用一次。缓存为静态常量后，逐实体检查不再产生
-     * 数组分配，直接降低 GC 压力。注意：枚举值不可变，外部也不会修改本数组，故共享安全。
+     * 护甲装备槽数组（头/胸/腿/脚）。
+     * <p><b>性能（视觉/行为零变化）：</b>快速过滤 {@link #hasEnchantedArmor(LivingEntity)} 处于扫描
+     * 热路径、会对范围内<b>每个</b>实体调用一次。直接列举为静态常量，既避免
+     * {@link EquipmentSlot#values()} 每次克隆数组，又只遍历 4 个护甲槽而非全部 6 个槽位。
+     * 注意：枚举值不可变、外部也不会修改本数组，故共享安全。
      */
-    private static final EquipmentSlot[] EQUIPMENT_SLOTS = EquipmentSlot.values();
+    private static final EquipmentSlot[] ARMOR_SLOTS = {
+            EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
+    };
 
     /** tick 计数 */
     private static int counter = 0;
@@ -121,9 +125,9 @@ public final class AuraScanner {
         }
         List<ActiveAura> result = new ArrayList<>();
         for (LivingEntity entity : entities) {
-            // 性能：无任何带附魔装备的实体绝不可能激活光环（所有探测器都要求附魔等级>0），
-            // 先做一次廉价的 NBT 标签检查跳过它们，避免为成片普通怪物构建昂贵的 ScanContext。
-            if (!hasEnchantedEquipment(entity)) {
+            // 性能：先做一次廉价过滤跳过「不可能激活任何光环」的实体（详见 mayHaveAura），
+            // 避免为成片普通怪物、或仅主手持武器未举盾的玩家构建昂贵的 ScanContext。
+            if (!mayHaveAura(entity)) {
                 continue;
             }
             AuraDisplayRegistry.ScanContext ctx = new AuraDisplayRegistry.ScanContext(entity);
@@ -138,25 +142,64 @@ public final class AuraScanner {
     }
 
     /**
-     * 快速判断实体是否至少有一件带附魔的装备。
-     * <p>仅检查各装备槽物品的 NBT 是否含非空 {@code Enchantments} 标签
-     * （{@link ItemStack#isEnchanted()}，不解析具体附魔），开销远小于
-     * {@link AuraDisplayRegistry.ScanContext} 构建时的「全槽位逐附魔解析 + 入表」。
-     * <p>行为等价性：所有光环探测器都要求对应附魔等级 &gt; 0，而无任何附魔装备的实体
-     * 不可能满足，故跳过它们不会改变扫描结果。
+     * 快速判断实体是否<b>可能</b>激活某个已注册光环。
+     * <p>仅做廉价的 NBT 标签存在性检查（{@link ItemStack#isEnchanted()}，不解析具体附魔），
+     * 开销远小于 {@link AuraDisplayRegistry.ScanContext} 构建时的「全槽位逐附魔解析 + 入表」。
+     * 返回 true 才构建上下文交由各探测器精确判定。
+     * <p>
+     * <b>口径必须覆盖所有已注册光环的 {@link AuraDisplayRegistry.SlotScope}：</b>
+     * <ul>
+     *     <li>护甲类光环（ARMOR_MAX / ARMOR_SUM）→ 由 {@link #hasEnchantedArmor} 覆盖；</li>
+     *     <li>手持类光环（当前仅圣域 holy_ground，ANY_MAX 且要求举盾）→ 由
+     *         {@link #isBlockingWithEnchantedHand} 覆盖。</li>
+     * </ul>
+     * <b>⚠ 耦合警告：</b>若将来新增「不要求举盾的手持/任意槽光环」，必须在此扩展过滤条件，
+     * 否则该光环会被错误略过、永不显示。
      *
      * @param entity 待检测实体
-     * @return 任一装备槽存在带附魔物品返回 true
+     * @return 可能激活某光环返回 true
      */
-    private static boolean hasEnchantedEquipment(LivingEntity entity) {
-        // 使用缓存的 EQUIPMENT_SLOTS，避免每次 EquipmentSlot.values() 克隆数组
-        for (EquipmentSlot slot : EQUIPMENT_SLOTS) {
+    private static boolean mayHaveAura(LivingEntity entity) {
+        return hasEnchantedArmor(entity) || isBlockingWithEnchantedHand(entity);
+    }
+
+    /**
+     * 快速判断实体 4 件护甲槽中是否至少有一件带附魔。
+     * <p>覆盖所有护甲类光环（realm_of_magic / topps_stand 的 ARMOR_MAX、
+     * regressive_principle 的 ARMOR_SUM）的激活前提。
+     *
+     * @param entity 待检测实体
+     * @return 任一护甲槽存在带附魔物品返回 true
+     */
+    private static boolean hasEnchantedArmor(LivingEntity entity) {
+        for (EquipmentSlot slot : ARMOR_SLOTS) {
             ItemStack stack = entity.getItemBySlot(slot);
             if (!stack.isEmpty() && stack.isEnchanted()) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * 快速判断实体是否正在举盾、且主手或副手持有带附魔物品。
+     * <p>覆盖圣域 holy_ground（盾牌附魔，装在盾上、举盾触发）这类「手持 + 举盾」光环：
+     * 举盾时盾位于手持槽，故只要手持物带附魔即放行，交由探测器精确判定；
+     * 未举盾时这类光环本就不激活，无需放行。
+     *
+     * @param entity 待检测实体
+     * @return 正在举盾且手持带附魔物品返回 true
+     */
+    private static boolean isBlockingWithEnchantedHand(LivingEntity entity) {
+        if (!entity.isBlocking()) {
+            return false;
+        }
+        ItemStack main = entity.getItemBySlot(EquipmentSlot.MAINHAND);
+        if (!main.isEmpty() && main.isEnchanted()) {
+            return true;
+        }
+        ItemStack off = entity.getItemBySlot(EquipmentSlot.OFFHAND);
+        return !off.isEmpty() && off.isEnchanted();
     }
 
     /**

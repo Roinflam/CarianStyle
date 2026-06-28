@@ -1,5 +1,7 @@
 package pers.roinflam.carianstyle.enchantment;
 
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
@@ -19,6 +21,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
+import pers.roinflam.carianstyle.visual.effect.CarianStyleBurstParticles;
 
 import java.util.List;
 
@@ -30,6 +33,8 @@ import java.util.List;
  * 自我喂养式伤害事件级联，导致单 tick 耗时突破 Spigot Watchdog 阈值而崩服的问题。</p>
  * <p>v2.4：新增 1 秒（20 tick）触发冷却，限制 AOE 反击的最大触发频率，
  * 进一步抑制密集战斗下的事件压力与数值爆发。</p>
+ * <p>v2.5：新增 AOE 触发时的能量冲击波粒子视觉（纯服务端 sendParticles 广播，
+ * 不新增网络包，不触碰任何伤害与崩服修复逻辑）。</p>
  *
  * <h3>崩溃链路（v2.3 修复前，对应看门狗线程转储第 133 行）</h3>
  * <ol>
@@ -47,7 +52,7 @@ import java.util.List;
  * </ul>
  *
  * @author RoinFlam
- * @version 2.4
+ * @version 2.5
  */
 @AutoRegisterEnchantment(
         id = "causality_principle",
@@ -161,6 +166,16 @@ public class EnchantmentCausalityPrinciple extends EnchantmentBase {
             EnchantmentDataManager.setCooldown(COOLDOWN_KEY, victim.getUUID(), TRIGGER_COOLDOWN);
 
             int searchRadius = Math.min(effectiveLevel * 3, MAX_SEARCH_RADIUS);
+
+            // ⭐ v2.5 视觉：AOE 触发时在受击者周围发射一圈能量冲击波粒子。
+            // 纯服务端 sendParticles 广播，粒子不触发任何事件，不影响伤害逻辑与上方崩服修复
+            if (victim.level() instanceof ServerLevel serverLevel) {
+                CarianStyleBurstParticles.shockwaveRing(
+                        serverLevel,
+                        victim.getX(), victim.getY() + 0.1, victim.getZ(),
+                        searchRadius, 28, ParticleTypes.END_ROD
+                );
+            }
 
             List<LivingEntity> targets = EntityUtil.getNearbyEntities(
                     LivingEntity.class,

@@ -1,5 +1,7 @@
 package pers.roinflam.carianstyle.enchantment;
 
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
@@ -18,6 +20,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
+import pers.roinflam.carianstyle.visual.effect.CarianStyleBurstParticles;
 
 import java.util.List;
 
@@ -29,9 +32,11 @@ import java.util.List;
  * 范围 = 5 + (等级 - 1) × 0.75格
  * </p>
  * <p>v2.2：受击者视角入口接入怪物附魔触发开关</p>
+ * <p>v2.3：新增受击触发时的白色气浪爆发粒子视觉（单数据包 sendParticles 广播，
+ * 不新增网络包，不触碰任何击退/上限逻辑）。</p>
  *
  * @author RoinFlam
- * @version 2.2
+ * @version 2.3
  */
 @AutoRegisterEnchantment(
         id = "exclude",
@@ -88,6 +93,16 @@ public class EnchantmentExclude extends EnchantmentBase {
 
         double range = 5 + (totalLevel - 1) * 0.75;
         double searchRadius = Math.min(range, MAX_SEARCH_RADIUS);
+
+        // 视觉：受击触发范围击退时，在自身周围撒一团白色气浪（排斥反馈，单数据包）。
+        // 纯服务端 sendParticles 广播，粒子不触发任何事件，不影响下方击退逻辑
+        if (victim.level() instanceof ServerLevel serverLevel) {
+            CarianStyleBurstParticles.burst(
+                    serverLevel,
+                    victim.getX(), victim.getY() + victim.getBbHeight() * 0.5, victim.getZ(),
+                    12, ParticleTypes.CLOUD, 0.4, 0.05
+            );
+        }
 
         List<LivingEntity> targets = EntityUtil.getNearbyEntities(
                 LivingEntity.class,

@@ -10,6 +10,17 @@ import net.minecraftforge.api.distmarker.OnlyIn;
  * 改为「精确小数坐标 + 水平圆（垂直 ±R 的圆柱）」，故形状统一为
  * {@link AuraDisplayRegistry.AuraShape#CIRCLE}，半径 R 即圆半径，与效果生效区逐像素一致。
  * <p>
+ * <b>装备槽口径（修复护甲附魔拿手上误显示光环）：</b>
+ * 护甲类常驻光环必须只统计 4 件护甲槽，否则把护甲拿在主手/副手也会触发光环。因此：
+ * <ul>
+ *     <li>魔法之境、托普斯的立场 —— 护甲常驻型，改用 {@link AuraDisplayRegistry#fixedArmor}
+ *         （仅护甲槽最高等级判定）；</li>
+ *     <li>回归性原理 —— 护甲套装叠加型，沿用 {@link AuraDisplayRegistry#scaledArmorSum}
+ *         （仅护甲槽等级之和），本就只看护甲，无需改动；</li>
+ *     <li>圣域 —— 盾牌附魔（装在盾上、举盾触发），沿用 {@link AuraDisplayRegistry#blocking}
+ *         （任意槽 + 举盾判定）。</li>
+ * </ul>
+ * <p>
  * 配色取自艾尔登法环原作意象：
  * <ul>
  *     <li>魔法之境（卡利亚辉石魔法）——青色；</li>
@@ -62,20 +73,22 @@ public final class CarianStyleAuraDisplays {
         }
         initialized = true;
 
-        // 魔法之境 realm_of_magic：6 格固定圆形（友方魔法增伤场，穿戴护甲即生效）
+        // 魔法之境 realm_of_magic：6 格固定圆形（友方魔法增伤场）。护甲常驻型——
+        // 仅统计护甲槽，护甲拿手上时护甲槽为空、不再误显示光环。
         AuraDisplayRegistry.register(TERRA_MAGICA, COLOR_TERRA_MAGICA, AuraDisplayRegistry.AuraShape.CIRCLE,
-                AuraDisplayRegistry.fixed("realm_of_magic", 6.0));
+                AuraDisplayRegistry.fixedArmor("realm_of_magic", 6.0));
 
-        // 托普斯的立场 topps_stand：6 格固定圆形（魔法免疫场，穿戴护甲即生效）
+        // 托普斯的立场 topps_stand：6 格固定圆形（魔法免疫场）。护甲常驻型——同上，仅统计护甲槽。
         AuraDisplayRegistry.register(TOPPS_STAND, COLOR_TOPPS_STAND, AuraDisplayRegistry.AuraShape.CIRCLE,
-                AuraDisplayRegistry.fixed("topps_stand", 6.0));
+                AuraDisplayRegistry.fixedArmor("topps_stand", 6.0));
 
-        // 回归性原理 regressive_principle：护甲等级之和 ×3 格、封顶 8 格的圆形（范围净化场）
+        // 回归性原理 regressive_principle：护甲等级之和 ×3 格、封顶 8 格的圆形（范围净化场）。
+        // 护甲套装叠加型，本就只看护甲槽，无需改动。
         AuraDisplayRegistry.register(REGRESSIVE_PRINCIPLE, COLOR_REGRESSIVE, AuraDisplayRegistry.AuraShape.CIRCLE,
                 AuraDisplayRegistry.scaledArmorSum("regressive_principle",
                         level -> Math.min(level * 3.0, REGRESSIVE_MAX_RADIUS)));
 
-        // 圣域 holy_ground：举盾时 16 格圆形（友方减伤/增益场）
+        // 圣域 holy_ground：举盾时 16 格圆形（友方减伤/增益场）。盾牌附魔，沿用任意槽 + 举盾判定。
         AuraDisplayRegistry.register(HOLY_GROUND, COLOR_HOLY_GROUND, AuraDisplayRegistry.AuraShape.CIRCLE,
                 AuraDisplayRegistry.blocking("holy_ground", 16.0));
     }

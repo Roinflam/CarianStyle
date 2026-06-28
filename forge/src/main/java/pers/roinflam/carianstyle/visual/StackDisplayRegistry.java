@@ -21,21 +21,45 @@ import java.util.Map;
  * 客户端据此决定是否画进度条（上限>0 才画）。
  * <p>
  * 本类在客户端与服务端都会被加载并填充（静态注册），客户端凭 serialId 反查 {@link Info}，
- * 因此网络包里传 (serialId, 层数, 上限) 即可。
+ * 因此网络包里传 (serialId, 层数, 上限, 是否冷却) 即可。
  *
  * @author FlameForge
  */
 public final class StackDisplayRegistry {
 
     /**
-     * 叠层读取结果：当前层数 + 当前上限。
+     * 叠层读取结果：当前层数 + 当前上限 + 是否为冷却倒计时项。
+     * <p>
+     * <b>两种显示模式（由 {@code cooldown} 区分，复用同一套同步与渲染管线）：</b>
+     * <ul>
+     *     <li>{@code cooldown=false}（叠层模式，默认）：{@code count} 为当前层数 / 数值，
+     *         {@code max} 为上限；HUD 显示「×count」+ 进度条（填充 = count/max），满层燃烧。</li>
+     *     <li>{@code cooldown=true}（冷却模式）：{@code count} 为<b>剩余冷却 tick</b>，
+     *         {@code max} 为<b>总冷却 tick</b>；HUD 显示「剩余秒数 s」+ 充能进度条
+     *         （填充 = (max-count)/max，从空到满表示冷却恢复），冷却结束（count 归 0）即消失，
+     *         不触发满层燃烧。</li>
+     * </ul>
      *
-     * @param count 当前层数（<=0 表示当前没有该叠层，不显示）
-     * @param max   当前上限（<=0 表示无固定上限，HUD 只显示数字不画进度条）
+     * @param count    叠层模式为层数 / 数值；冷却模式为剩余冷却 tick（&lt;=0 表示无、不显示）
+     * @param max      叠层模式为上限；冷却模式为总冷却 tick（&lt;=0 时 HUD 不画进度条）
+     * @param cooldown true 为冷却倒计时项，false 为普通叠层项
      */
-    public record Stacks(int count, int max) {
-        /** 表示“当前没有该叠层”的常量。 */
-        public static final Stacks NONE = new Stacks(0, 0);
+    public record Stacks(int count, int max, boolean cooldown) {
+
+        /** 表示“当前没有该叠层 / 冷却”的常量。 */
+        public static final Stacks NONE = new Stacks(0, 0, false);
+
+        /**
+         * 兼容旧调用的双参构造（叠层模式，{@code cooldown=false}）。
+         * <p>现有十余处 {@code new Stacks(count, max)} 调用无需改动，仍创建普通叠层项；
+         * 冷却倒计时项改用三参构造、传 {@code cooldown=true}。</p>
+         *
+         * @param count 当前层数 / 数值
+         * @param max   当前上限
+         */
+        public Stacks(int count, int max) {
+            this(count, max, false);
+        }
     }
 
     /** 叠层读取器：给定玩家返回其当前 {@link Stacks}。仅服务端调用。 */

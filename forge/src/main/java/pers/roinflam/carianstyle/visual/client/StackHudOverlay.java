@@ -9,6 +9,7 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
 import net.minecraftforge.client.gui.overlay.IGuiOverlay;
+import pers.roinflam.carianstyle.visual.CarianStyleStackDisplays;
 import pers.roinflam.carianstyle.visual.StackDisplayRegistry;
 import pers.roinflam.carianstyle.visual.StackHudManager;
 
@@ -22,6 +23,14 @@ import java.util.Map;
  * <p>
  * 屏幕左上角竖排显示所有叠层，每行一张卡片：左侧呼吸光条 + 名称 + “×层数” + 进度条。
  * 是否画进度条由<b>服务端下发的上限</b>决定（上限&gt;0 才画）。
+ * <p>
+ * <b>计数文本三态：</b>
+ * <ul>
+ *     <li>冷却倒计时项 → 显示剩余秒数（如 "5s"）；</li>
+ *     <li>联动徽标（血之共鸣 / 月之共鸣，以 {@code Stacks(1,0,false)} 注册）→ 显示「已触发」，
+ *         因其表达布尔激活态而非可累加层数（详见 {@link #isResonanceBadge}）；</li>
+ *     <li>其余叠层项（连击数等）→ 显示 "×层数"。</li>
+ * </ul>
  * <p>
  * <b>常驻动效（不满层也一直在动，让整体"活"起来）：</b>
  * <ul>
@@ -74,6 +83,15 @@ public final class StackHudOverlay implements IGuiOverlay {
     private static final int BAR_HEIGHT = 5;
     /** 出现/消失时的水平滑动距离（像素，负向为左） */
     private static final int SLIDE_PX = 18;
+
+    /**
+     * 联动徽标计数文本的翻译键（带回退值，无需额外补语言键即可显示「已触发」）。
+     * <p>如需自定义文案或多语言，可在语言文件中覆盖此键；缺省时由 {@link #RESONANCE_BADGE_FALLBACK}
+     * 兜底，不会显示原始键名。</p>
+     */
+    private static final String RESONANCE_BADGE_KEY = "carianstyle.hud.triggered";
+    /** 联动徽标计数文本的默认回退值。 */
+    private static final String RESONANCE_BADGE_FALLBACK = "已触发";
 
     /**
      * 文字最小可绘制透明度（4/255）。
@@ -165,6 +183,7 @@ public final class StackHudOverlay implements IGuiOverlay {
         float targetY;
         int lastCount;
         int lastMax;
+        boolean cooldown;         // 本行是否为冷却倒计时项（影响数字格式与进度条方向）
         boolean present;          // 本帧是否仍在显示列表中
         boolean presentLastFrame; // 上一帧是否在显示列表中（抑制"消失再出现"误闪）
         boolean initialized;
@@ -215,7 +234,15 @@ public final class StackHudOverlay implements IGuiOverlay {
 
             int count = entry.count();
             int max = entry.max();
-            float targetRatio = max > 0 ? Math.min(1f, (float) count / max) : 0f;
+            boolean cooldown = entry.cooldown();
+            // 冷却项进度条为「充能」方向：填充 = 已恢复/总 = (max-count)/max（从空到满表示冷却恢复）；
+            // 叠层项为「累积」方向：填充 = count/max。
+            float targetRatio;
+            if (cooldown) {
+                targetRatio = max > 0 ? Math.min(1f, (float) (max - count) / max) : 0f;
+            } else {
+                targetRatio = max > 0 ? Math.min(1f, (float) count / max) : 0f;
+            }
             float targetY = ANCHOR_Y + index * ROW_STRIDE;
 
             if (!a.initialized) {
@@ -232,6 +259,7 @@ public final class StackHudOverlay implements IGuiOverlay {
             }
             a.lastCount = count;
             a.lastMax = max;
+            a.cooldown = cooldown;
             a.targetRatio = targetRatio;
             a.targetY = targetY;
             a.present = true;
@@ -291,7 +319,9 @@ public final class StackHudOverlay implements IGuiOverlay {
         int accent = info.color();
         int accentBright = brighten(accent, 0.35f);
         boolean hasBar = a.lastMax > 0;
-        boolean atMax = hasBar && a.lastCount >= a.lastMax;
+        // 冷却项不参与「满层燃烧」：其 count 是剩余 tick，count>=max 只在冷却刚开始的瞬间成立、
+        // 会误触发燃烧；且冷却结束（count 归 0）时该行直接消失、不会停在满条。故冷却项 atMax 恒 false。
+        boolean atMax = hasBar && !a.cooldown && a.lastCount >= a.lastMax;
 
         // —— 火焰强度 heat 平滑（只有有进度条的行才会"燃烧"）——
         if (hasBar) {
@@ -306,7 +336,17 @@ public final class StackHudOverlay implements IGuiOverlay {
             NAME_CACHE.put(serialId, name);
         }
         int nameWidth = font.width(name);
-        String countText = "×" + a.lastCount;
+        // 计数文本三态：冷却项显示剩余秒数（如 "5s"）；联动徽标（血之/月之共鸣）显示「已触发」；
+        // 其余叠层项显示 "×层数"。联动徽标以 Stacks(1,0,false) 注册，表达布尔激活态而非可累加层数，
+        // 故不显示 "×1"（详见 isResonanceBadge）；连击数等其它非冷却项不受影响，仍为 "×层数"。
+        String countText;
+        if (a.cooldown) {
+            countText = formatCooldownSeconds(a.lastCount);
+        } else if (isResonanceBadge(serialId)) {
+            countText = resonanceBadgeText();
+        } else {
+            countText = "×" + a.lastCount;
+        }
         int countWidth = font.width(countText);
 
         int textX = x + 3 + 7; // 竖条(2~3) + 间距
@@ -633,6 +673,34 @@ public final class StackHudOverlay implements IGuiOverlay {
     }
 
     /**
+     * 是否为「联动徽标」行（血之共鸣 / 月之共鸣）。
+     * <p>这两项以 {@code Stacks(1, 0, false)} 注册，本应表达「已触发」的布尔激活态，
+     * 而非可累加的层数，故其计数文本显示「已触发」而非 "×1"。其余非冷却叠层项（连击数等）
+     * 仍显示 "×层数"，不受影响。serialId 直接引用 {@link CarianStyleStackDisplays} 的公开常量，
+     * 避免魔数（与 {@code AuraGroundRenderer} 引用光环序号常量的写法一致）。</p>
+     *
+     * @param serialId 行序列号
+     * @return 是联动徽标返回 true
+     */
+    private static boolean isResonanceBadge(int serialId) {
+        return serialId == CarianStyleStackDisplays.BLOOD_RESONANCE
+                || serialId == CarianStyleStackDisplays.MOON_RESONANCE;
+    }
+
+    /**
+     * 联动徽标的计数文本「已触发」。
+     * <p>使用带回退值的翻译键：默认显示 {@link #RESONANCE_BADGE_FALLBACK}（「已触发」），
+     * 无需额外补语言键即可工作；如需自定义文案或多语言，可在语言文件中覆盖
+     * {@link #RESONANCE_BADGE_KEY}。每帧至多 2 个激活徽标调用，开销可忽略
+     * （与冷却项每帧构建秒数字符串同量级）。</p>
+     *
+     * @return 本地化后的「已触发」文本
+     */
+    private static String resonanceBadgeText() {
+        return Component.translatableWithFallback(RESONANCE_BADGE_KEY, RESONANCE_BADGE_FALLBACK).getString();
+    }
+
+    /**
      * 用缩放绘制字符串（围绕其中心缩放，用于层数弹动/呼吸）。
      */
     private static void drawScaledString(GuiGraphics g, Font font, String text, int x, int y, int color, float scale) {
@@ -719,5 +787,18 @@ public final class StackHudOverlay implements IGuiOverlay {
             return 0f;
         }
         return Math.min(v, 1f);
+    }
+
+    /**
+     * 把剩余冷却 tick 格式化为「剩余秒数 s」（向上取整，至少显示 1s）。
+     * <p>例：90 tick → "5s"（90/20=4.5 向上取整为 5）。剩余不足 1 秒但仍在冷却时显示 "1s"，
+     * 直到归 0 那一刻该行从列表移除。</p>
+     *
+     * @param remainingTicks 剩余冷却 tick（&gt;0）
+     * @return 形如 "5s" 的字符串
+     */
+    private static String formatCooldownSeconds(int remainingTicks) {
+        int seconds = Math.max(1, (int) Math.ceil(remainingTicks / 20.0));
+        return seconds + "s";
     }
 }

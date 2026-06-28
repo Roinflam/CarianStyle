@@ -24,10 +24,11 @@ public final class StackHudManager {
      * 一条叠层显示数据。
      *
      * @param serialId 序列号（用于反查元数据）
-     * @param count    当前层数
-     * @param max      当前上限（<=0 表示无固定上限，不画进度条）
+     * @param count    叠层模式为当前层数；冷却模式为剩余冷却 tick
+     * @param max      叠层模式为当前上限；冷却模式为总冷却 tick（<=0 表示不画进度条）
+     * @param cooldown true 为冷却倒计时项（显示剩余秒数 + 充能进度条），false 为普通叠层项
      */
-    public record Entry(int serialId, int count, int max) {
+    public record Entry(int serialId, int count, int max, boolean cooldown) {
     }
 
     /** 当前要显示的叠层列表（volatile：网络线程写、渲染线程读） */
@@ -39,7 +40,7 @@ public final class StackHudManager {
     /**
      * 用服务端推送的全量快照刷新列表。
      *
-     * @param stacks serialId -> (层数, 上限) 的映射（空映射表示清空 HUD）
+     * @param stacks serialId -> (层数 / 剩余冷却, 上限 / 总冷却, 是否冷却) 的映射（空映射表示清空 HUD）
      */
     public static void accept(Map<Integer, StackDisplayRegistry.Stacks> stacks) {
         if (stacks.isEmpty()) {
@@ -49,7 +50,7 @@ public final class StackHudManager {
         List<Entry> list = new ArrayList<>(stacks.size());
         for (Map.Entry<Integer, StackDisplayRegistry.Stacks> e : stacks.entrySet()) {
             StackDisplayRegistry.Stacks s = e.getValue();
-            list.add(new Entry(e.getKey(), s.count(), s.max()));
+            list.add(new Entry(e.getKey(), s.count(), s.max(), s.cooldown()));
         }
         // 按 serialId 排序，保证多附魔同时显示时顺序稳定（不会每帧跳动）
         list.sort(Comparator.comparingInt(Entry::serialId));

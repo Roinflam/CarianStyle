@@ -1,6 +1,7 @@
 package pers.roinflam.carianstyle.network;
 
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.PacketDistributor;
@@ -11,7 +12,7 @@ import pers.roinflam.carianstyle.utils.Reference;
  * 可视化系统专用网络通道（与现有 {@code NetworkHandler} 完全独立）。
  * <p>
  * 单独建一条 SimpleChannel，避免改动现有 NetworkHandler，
- * 因而不会影响已经在工作的火焰/隐身同步逻辑。本通道目前只承载叠层显示包。
+ * 因而不会影响已经在工作的火焰/隐身同步逻辑。本通道承载：叠层显示包、定点 AOE 自绘特效包。
  * <p>
  * 注意：{@link #register()} 必须在 mod 加载阶段（如主类构造或 FMLCommonSetupEvent）
  * 于双端各调用一次——客户端需要注册解码/处理器才能接收 S2C 包。
@@ -54,6 +55,14 @@ public final class VisualNetwork {
                 StackDisplayPacket::decode,
                 StackDisplayPacket::handle
         );
+        // 定点 AOE 自绘特效包（S2C）
+        CHANNEL.registerMessage(
+                packetId++,
+                AoeEffectPacket.class,
+                AoeEffectPacket::encode,
+                AoeEffectPacket::decode,
+                AoeEffectPacket::handle
+        );
     }
 
     /**
@@ -64,5 +73,25 @@ public final class VisualNetwork {
      */
     public static void sendToPlayer(ServerPlayer player, StackDisplayPacket packet) {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
+    }
+
+    /**
+     * 把包广播给某点附近一定范围内的玩家（用于定点 AOE 自绘特效）。
+     * <p>
+     * 使用 {@link PacketDistributor#NEAR}，原版只会发给该维度内距 (x,y,z) 在 {@code range} 格内、
+     * 且正在追踪该区域的玩家，因此带宽随近场玩家数自然受限。
+     * </p>
+     *
+     * @param level  服务端世界（取其维度键）
+     * @param x      中心 X
+     * @param y      中心 Y
+     * @param z      中心 Z
+     * @param range  广播半径（格）
+     * @param packet 待发送包
+     */
+    public static void sendToNearby(ServerLevel level, double x, double y, double z,
+                                    double range, AoeEffectPacket packet) {
+        CHANNEL.send(PacketDistributor.NEAR.with(
+                () -> new PacketDistributor.TargetPoint(x, y, z, range, level.dimension())), packet);
     }
 }

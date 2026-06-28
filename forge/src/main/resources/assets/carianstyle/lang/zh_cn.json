@@ -284,5 +284,8 @@
   "config.carianstyle.allowMobTriggerEnchantments": "允许怪物触发附魔",
   "config.carianstyle.allowMobTriggerEnchantments.tooltip": "是否允许非玩家生物（如怪物）触发卡利亚式附魔\n§7true§r = 允许（默认，与原版行为一致）\n§7false§r = 禁止（怪物身上的附魔不触发）\n\n§e性能提示：§r\n服务器存在大量附魔怪物时，禁用此项可显著降低开销\n因为会跳过对怪物装备槽位的附魔扫描和NBT解析\n\n§c注意：§r\n仅拦截走中央事件处理器的附魔触发路径\n少数使用独立 @SubscribeEvent 监听器的附魔不受此开关影响",
   "config.carianstyle.allowMobTriggerDeathEnchantments": "允许怪物触发死亡/濒死类附魔",
-  "config.carianstyle.allowMobTriggerDeathEnchantments.tooltip": "是否允许非玩家生物触发死亡/濒死类附魔\n§7false§r = 拦截（默认推荐）\n§7true§r = 允许\n\n§e覆盖范围：§r\n• DEAD 分类：猩红艾奥尼亚、发狂扩散、巨剑阵、古龙雷击\n• RECOLLECT 分类濒死触发：满月、死诞者、时间逆转\n\n§c建议保持禁用§r\n避免精英怪/Boss 在被击杀的瞬间获得复活、\n范围反伤、闪电雨、辉剑追踪等过强的反击能力\n防止玩家被打破防\n\n§7注意：§r仅当上方的「允许怪物触发附魔」启用时此选项才生效"
+  "config.carianstyle.allowMobTriggerDeathEnchantments.tooltip": "是否允许非玩家生物触发死亡/濒死类附魔\n§7false§r = 拦截（默认推荐）\n§7true§r = 允许\n\n§e覆盖范围：§r\n• DEAD 分类：猩红艾奥尼亚、发狂扩散、巨剑阵、古龙雷击\n• RECOLLECT 分类濒死触发：满月、死诞者、时间逆转\n\n§c建议保持禁用§r\n避免精英怪/Boss 在被击杀的瞬间获得复活、\n范围反伤、闪电雨、辉剑追踪等过强的反击能力\n防止玩家被打破防\n\n§7注意：§r仅当上方的「允许怪物触发附魔」启用时此选项才生效",
+  "carianstyle.hud.blood_resonance": "蒙格温",
+  "carianstyle.hud.moon_resonance": "群星",
+  "carianstyle.hud.triggered": "已触发"
 }
