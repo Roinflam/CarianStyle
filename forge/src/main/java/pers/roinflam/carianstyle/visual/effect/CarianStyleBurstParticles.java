@@ -34,12 +34,18 @@ import pers.roinflam.carianstyle.network.VisualNetwork;
  * 完全一致）。仅猩红立体花 / 癫火扩散需要跟随，排斥 / 因果律 / 冻结地震仍为定点。
  * </p>
  * <p>
+ * <b>v7（龙雷红色闪电）：</b>新增 {@link #redLightning} 入口（定点）。在指定坐标劈下一道竖直红色
+ * 之字闪电柱（含蜿蜒主干 + 分叉 + 落地红色冲击环），供古龙雷击 / 维克的龙雷替代原版蓝白闪电的视觉。
+ * 注意：调用方去掉原版 {@code LightningBolt} 后，原版闪电自带的雷声也会随之消失，需在附魔触发处
+ * 自行补播 {@code SoundEvents.LIGHTNING_BOLT_THUNDER / LIGHTNING_BOLT_IMPACT}。
+ * </p>
+ * <p>
  * 特效包只广播给附近玩家、且每次触发仅发一个轻量包，对崩服敏感的 AOE 触发点安全。
  * 所有方法均应只在<b>服务端</b>调用（调用方自行用 {@code instanceof ServerLevel} 守卫）。
  * </p>
  *
  * @author RoinFlam
- * @version 6.1
+ * @version 7.0
  */
 public final class CarianStyleBurstParticles {
 
@@ -57,6 +63,9 @@ public final class CarianStyleBurstParticles {
 
     /** 排斥默认特效半径（格） */
     private static final float REPULSION_RADIUS = 2.4f;
+
+    /** 龙雷红色闪电默认特效半径（格）：仅用于落地冲击环的尺寸，闪电柱粗细 / 高度由渲染器常量控制。 */
+    private static final float RED_LIGHTNING_RADIUS = 4.5f;
 
     private CarianStyleBurstParticles() {
     }
@@ -163,6 +172,33 @@ public final class CarianStyleBurstParticles {
      */
     public static void repulsionWave(ServerLevel level, double cx, double cy, double cz) {
         send(level, cx, cy, cz, REPULSION_RADIUS, AoeEffectPacket.TYPE_REPULSION);
+    }
+
+    /**
+     * 龙雷红色闪电（定点）：在 (cx,cy,cz) 劈下一道炫酷红色之字闪电柱 + 落地红色冲击。
+     * <p>供古龙雷击 / 维克的龙雷替代原版蓝白闪电的视觉。使用默认半径 {@link #RED_LIGHTNING_RADIUS}。
+     * 注意：原版闪电去掉后雷声也会消失，调用方需自行补播雷鸣 / 落地音效。</p>
+     *
+     * @param level 服务端世界
+     * @param cx    中心 X（落地点）
+     * @param cy    中心 Y（落地点脚底，闪电柱由此向上延伸）
+     * @param cz    中心 Z（落地点）
+     */
+    public static void redLightning(ServerLevel level, double cx, double cy, double cz) {
+        redLightning(level, cx, cy, cz, RED_LIGHTNING_RADIUS);
+    }
+
+    /**
+     * 龙雷红色闪电（定点 + 带半径重载）：落地冲击环大小随 radius 变化（闪电柱粗细 / 高度不变）。
+     *
+     * @param level  服务端世界
+     * @param cx     中心 X（落地点）
+     * @param cy     中心 Y（落地点脚底）
+     * @param cz     中心 Z（落地点）
+     * @param radius 落地冲击半径（格）
+     */
+    public static void redLightning(ServerLevel level, double cx, double cy, double cz, float radius) {
+        send(level, cx, cy, cz, radius, AoeEffectPacket.TYPE_RED_LIGHTNING);
     }
 
     /**

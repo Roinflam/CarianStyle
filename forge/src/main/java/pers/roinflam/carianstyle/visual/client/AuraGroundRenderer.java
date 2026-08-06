@@ -1,13 +1,7 @@
 package pers.roinflam.carianstyle.visual.client;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.BufferUploader;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.Tesselator;
-import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
@@ -55,6 +49,17 @@ import java.util.Set;
  * {@link #fillSegments(double)} 的系数与上限已下调——半径 ≤8 的光环仍取原下限、像素无差，
  * 仅最大的圣域（16 格）分段适度减少（与真圆偏离亚厘米级、肉眼不可见）；
  * 同时 {@link #RENDER_CULL} 与扫描范围对齐，去除多余裁剪段。
+ * <p>
+ * <b>v2（性能，视觉零变化）：</b>接入 {@link VisualBatch}——不再自行设置 / 恢复 GL 状态、
+ * 不再自行 {@code begin/end} 顶点缓冲，改为向共享缓冲写顶点，由 {@link VisualBatch} 在本帧末
+ * 统一提交（本模组七个世界渲染器合并为一次 GL 状态切换与一次 draw call）。
+ * 本渲染器不做范围实体查询（数据来自 {@link AuraScanner} 的 tick 级扫描），故不涉及
+ * {@link SharedEntityQuery}。
+ * <p>
+ * <b>注意（迁移要点）：</b>{@code mc.level == null} 时清空 {@link #STATE} 的分支<b>必须放在
+ * 取共享缓冲之前</b>——离开世界那一帧共享批次本就不会开启，若把清空逻辑排在取缓冲的判空之后，
+ * 淡出状态会残留到下次进入世界，与新的实体网络 id 撞号后会闪出一两帧错误光环。
+ * 状态机的刷新时序、淡入淡出计时与全部几何参数均未改动。
  *
  * @author FlameForge
  */
@@ -192,6 +197,9 @@ public final class AuraGroundRenderer {
 
     /**
      * 渲染回调。
+     * <p>
+     * v2：GL 状态与顶点缓冲由 {@link VisualBatch} 统一管理；本方法只负责状态机推进与写顶点。
+     * </p>
      *
      * @param event 渲染阶段事件
      */
@@ -202,6 +210,7 @@ public final class AuraGroundRenderer {
         }
         List<AuraScanner.ActiveAura> auras = AuraScanner.getActiveAuras();
         Minecraft mc = Minecraft.getInstance();
+        // 迁移要点：清空状态必须先于「取共享缓冲」的判空，否则离开世界时状态会残留（见类注释）
         if (mc.level == null) {
             STATE.clear();
             return;
@@ -209,8 +218,16 @@ public final class AuraGroundRenderer {
         // 注意：即使本帧没有任何激活光环（auras 为空），仍需继续——
         // 因为可能有刚消失、正在播放淡出动画的光环要渲染。
 
-        Vec3 cam = event.getCamera().getPosition();
-        float partial = event.getPartialTick();
+        BufferBuilder builder = VisualBatch.builder();
+        if (builder == null) {
+            return;
+        }
+        Vec3 cam = VisualBatch.cameraPosition();
+        if (cam == null) {
+            return;
+        }
+
+        float partial = VisualBatch.partialTick();
         float now = (float) (mc.level.getGameTime() % 1_000_000L) + partial;
 
         // ===== 1) 刷新本帧激活光环的状态（取消淡出、记录最新参数与世界坐标）=====
@@ -329,22 +346,11 @@ public final class AuraGroundRenderer {
         float lineMul = 0.80f + 0.20f * pulse;
         float runeRot = now * RUNE_SPEED;
 
-        Matrix4f matrix = event.getPoseStack().last().pose();
-        Tesselator tesselator = Tesselator.getInstance();
-        BufferBuilder builder = tesselator.getBuilder();
+        Matrix4f matrix = VisualBatch.matrix();
 
-        // GL 状态：普通 alpha 混合、关闭深度写入、保留深度测试
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.disableCull();
-        RenderSystem.depthMask(false);
-        RenderSystem.enableDepthTest();
-        RenderSystem.setShader(GameRenderer::getPositionColorShader);
-
-        // 单批绘制：每个光环按 填充→辉光→核心→强调 的顺序追加（顺序即混合顺序）。
+        // 每个光环按 填充→辉光→核心→强调 的顺序追加（顺序即混合顺序）。
         // 把整体 alpha 折入 fillMul/lineMul——因绘制函数内所有顶点 alpha 均为
         // “基值 × fillMul/lineMul”，故乘一次即可让整张光环统一淡入/淡出（颜色不受影响）。
-        builder.begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
         for (Prepared p : prepared) {
             float af = fillMul * (float) p.alpha();
             float al = lineMul * (float) p.alpha();
@@ -354,12 +360,6 @@ public final class AuraGroundRenderer {
                 drawCircle(builder, matrix, p, af, al, runeRot, now);
             }
         }
-        BufferUploader.drawWithShader(builder.end());
-
-        // 恢复 GL 状态
-        RenderSystem.depthMask(true);
-        RenderSystem.enableCull();
-        RenderSystem.disableBlend();
     }
 
     // ==================== 方形绘制 ====================

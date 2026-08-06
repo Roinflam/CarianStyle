@@ -25,17 +25,24 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 重力附魔
  * <p>v2.2：攻击者视角接入怪物附魔触发开关。PlayerTick天然玩家专属，无需检查。</p>
+ * <p>v2.3：力场激活/结束时同步给客户端（{@link #GRAVITY_FIELD_SERIAL}），供
+ * {@code GravitasDistortionRenderer} 绘制以施法者为中心、半径 {@link #FIELD_RADIUS} 格的
+ * 地面范围圈。范围判定与视觉共用同一个 {@link #FIELD_RADIUS} 常量，避免两处各自写死数值导致
+ * 以后改动漏改一处。</p>
  *
  * @author RoinFlam
- * @version 2.2
+ * @version 2.3
  */
 @AutoRegisterEnchantment(
         id = "gravitas",
@@ -48,6 +55,30 @@ import java.util.UUID;
 public class EnchantmentGravitas extends EnchantmentBase {
 
     private static final String GRAVITAS_ACTIVE_KEY = "gravitas_active";
+
+    /**
+     * 重力力场的作用半径（格）。周围生物范围判定（{@link #onPlayerTick}）与客户端范围圈视觉
+     * （{@code GravitasDistortionRenderer}）必须保持一致，故抽成公开常量供渲染器引用，
+     * 避免两处各自写死 12 导致以后改动漏改一处。
+     */
+    public static final int FIELD_RADIUS = 12;
+
+    /**
+     * 重力力场的客户端同步序列号，供 {@code GravitasDistortionRenderer} 判断「谁正在施放力场」，
+     * 从而绘制以施法者为中心、半径 {@link #FIELD_RADIUS} 格的地面范围圈。序列号 1~3 为自定义火焰、
+     * 4 为隐身、5 为猩红腐败（见 {@code ScarletRotSyncHandler}），本附魔取 6，避免冲突。
+     */
+    public static final int GRAVITY_FIELD_SERIAL = 6;
+
+    /**
+     * 力场持有者集合：记录当前「已同步给客户端」的玩家 UUID。
+     * <p>{@link EnchantmentDataManager} 只提供「是否在冷却中」的瞬时查询、没有到期回调，
+     * 故力场的开启/关闭边沿由本集合自行检测：力场刚激活时（此前不在集合中）才调用一次
+     * {@link ClientSyncEffectManager#addEntity} 广播；力场结束时（不再在冷却中但仍在集合中）
+     * 才调用一次 {@link ClientSyncEffectManager#removeEntity}，避免每 tick 重复处理。
+     * 仅服务端 tick 线程访问。</p>
+     */
+    private static final Set<UUID> ACTIVE_FIELD_HOLDERS = ConcurrentHashMap.newKeySet();
 
     public EnchantmentGravitas() {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
@@ -108,11 +139,17 @@ public class EnchantmentGravitas extends EnchantmentBase {
         if (evt.getEntity().level().isClientSide) {
             return;
         }
-        EnchantmentDataManager.clearCooldown(GRAVITAS_ACTIVE_KEY, evt.getEntity().getUUID());
+        LivingEntity dead = evt.getEntity();
+        EnchantmentDataManager.clearCooldown(GRAVITAS_ACTIVE_KEY, dead.getUUID());
+        // 力场持有者死亡：同步移除范围圈视觉，无需等待客户端每 5 秒一次的定期重同步
+        if (ACTIVE_FIELD_HOLDERS.remove(dead.getUUID())) {
+            ClientSyncEffectManager.removeEntity(dead, GRAVITY_FIELD_SERIAL);
+        }
     }
 
     /**
-     * 激活状态时，周围生物持续受到轻微重力效果
+     * 激活状态时，周围生物持续受到轻微重力效果；同时维护力场的客户端同步状态，
+     * 驱动 {@code GravitasDistortionRenderer} 绘制以自身为中心的地面范围圈。
      * <p>PlayerTickEvent 仅玩家触发，无需开关检查</p>
      */
     @SubscribeEvent
@@ -127,14 +164,25 @@ public class EnchantmentGravitas extends EnchantmentBase {
         }
 
         UUID uuid = holder.getUUID();
-        if (!EnchantmentDataManager.isOnCooldown(GRAVITAS_ACTIVE_KEY, uuid)) {
+        boolean active = EnchantmentDataManager.isOnCooldown(GRAVITAS_ACTIVE_KEY, uuid);
+
+        if (!active) {
+            // 力场已结束：若此前同步过范围圈，通知客户端移除
+            if (ACTIVE_FIELD_HOLDERS.remove(uuid)) {
+                ClientSyncEffectManager.removeEntity(holder, GRAVITY_FIELD_SERIAL);
+            }
             return;
+        }
+
+        // 力场刚激活（此前不在集合中）：同步给客户端，绘制范围圈
+        if (ACTIVE_FIELD_HOLDERS.add(uuid)) {
+            ClientSyncEffectManager.addEntity(holder, GRAVITY_FIELD_SERIAL);
         }
 
         List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 holder,
-                12,
+                FIELD_RADIUS,
                 entity -> !entity.equals(holder)
         );
 

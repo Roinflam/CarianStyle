@@ -25,9 +25,14 @@ import java.util.function.Supplier;
  * 客户端回退到最后已知坐标继续播放剩余演出）。为保持对现有大量 5 参调用点的兼容，保留 5 参构造
  * （{@code entityId} 默认 {@code -1}），新增 6 参构造。
  * </p>
+ * <p>
+ * <b>v3（龙雷红色闪电）：</b>新增特效类型 {@link #TYPE_RED_LIGHTNING}。用于古龙雷击 / 维克的龙雷
+ * 替代原版蓝白闪电的视觉——客户端用纯顶点自绘一道竖直红色之字闪电柱（含蜿蜒主干 + 分叉 + 落地红色
+ * 冲击环）。该类型为定点特效（不跟随），通过 5 参构造发包即可。
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 3.0
  */
 public class AoeEffectPacket {
 
@@ -44,6 +49,8 @@ public class AoeEffectPacket {
     public static final int TYPE_FRENZIED_FLAME = 4;
     /** 通用回退：中性扩张双环（兼容层未匹配到专属类型时使用） */
     public static final int TYPE_GENERIC = 5;
+    /** 龙雷红色闪电：竖直红色之字电柱 + 分叉 + 落地红色冲击（古龙雷击 / 维克的龙雷专用） */
+    public static final int TYPE_RED_LIGHTNING = 6;
 
     /** 「不跟随」哨兵值：entityId 为该值时特效锁死在发包坐标 */
     public static final int NO_ENTITY = -1;

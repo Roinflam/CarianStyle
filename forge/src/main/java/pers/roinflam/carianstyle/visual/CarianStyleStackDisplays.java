@@ -4,10 +4,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.registries.ForgeRegistries;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
@@ -31,7 +28,11 @@ import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentBlood;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentMikaelaBlade;
 import pers.roinflam.carianstyle.utils.Reference;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 叠层显示注册入口（双端通用，需在公共初始化阶段调用一次 {@link #init()}）。
@@ -95,10 +96,26 @@ import java.util.UUID;
  * 五个死亡附魔）要求<b>任一护甲带有该附魔</b>才显示；切走装备即隐藏（服务端数据仍按各自规则存续）。
  * 龙徽大盾的层数由动态属性自带时效，沿用原逻辑不额外门控。
  * <p>
+ * <b>v3 性能优化（显示与行为完全不变，仅改数据来源）：</b>
+ * <ul>
+ *     <li><b>门控判断改查快照：</b>全部读取器改为 {@link StackDisplayRegistry.ContextualStackProvider}，
+ *         接收 {@link EquipmentEnchantContext}（本玩家本轮的装备附魔快照，由
+ *         {@code StackDisplayManager} 每轮统一构建一次）。原先每个读取器各自调用
+ *         {@code EnchantmentHelper.getItemEnchantmentLevel} 解析装备 NBT，同一件装备一轮内被
+ *         反复解析数十遍；现在全部降为 O(1) 查表，单玩家单轮的 NBT 反序列化次数由数十次降为至多 5 次。</li>
+ *     <li><b>按 id 解析附魔加缓存：</b>{@link #resolveEnchantment(String)} 原先每次调用都
+ *         {@code new ResourceLocation(...)} 并查一次注册表，而死亡类门控与两个联动徽标每轮要调用约 10 次；
+ *         现改为解析成功后写入 {@link #ENCHANTMENT_ID_CACHE}，后续直接命中缓存。
+ *         与 {@code AuraDisplayRegistry.EnchantAuraDetector#resolve()} 同款「仅缓存非 null」策略，
+ *         避免在注册表就绪前把 null 固化下来。</li>
+ *     <li>按类解析（{@link EnchantmentRegistry#getEnchantmentByClass}）本身就是 HashMap 查询，
+ *         已足够廉价，未作改动。</li>
+ * </ul>
+ * <p>
  * 读取器仅在服务端轮询时调用，均为廉价查询。
  *
  * @author FlameForge
- * @version 2
+ * @version 3
  */
 public final class CarianStyleStackDisplays {
 
@@ -290,6 +307,16 @@ public final class CarianStyleStackDisplays {
     private static final UUID PRAYERFUL_STRIKE_MAX_HEALTH_MODIFIER_ID =
             UUID.fromString("b55a7c8a-df03-bca7-b5ea-ec703b261525");
 
+    /**
+     * 按注册 id 解析出的附魔对象缓存（v3 新增）。
+     * <p>原实现每次调用 {@link #resolveEnchantment(String)} 都要 {@code new ResourceLocation(...)}
+     * 并查一次注册表，而死亡类门控与两个联动徽标每轮合计约 10 次调用。
+     * 缓存后除首次外均为 Map 命中。仅缓存解析成功（非 null）的结果，
+     * 避免在注册表尚未就绪时把 null 固化下来（与 {@code AuraDisplayRegistry} 的懒解析策略一致）。</p>
+     * <p>虽然读取器只在服务端主线程调用，但注册表解析可能在其它时机被触发，故用 ConcurrentHashMap 保险。</p>
+     */
+    private static final Map<String, Enchantment> ENCHANTMENT_ID_CACHE = new ConcurrentHashMap<>();
+
     private static boolean initialized = false;
 
     private CarianStyleStackDisplays() {
@@ -308,7 +335,7 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 DRAGONCREST_GREATSHIELD,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.dragoncrest_greatshield", 0x5AA0FF),
-                player -> {
+                (player, ctx) -> {
                     int amp = DynamicAttributeManager.getAmplifier(player, DynamicAttributes.DRAGONCREST_GREATSHIELD);
                     if (amp < 0) {
                         return StackDisplayRegistry.Stacks.NONE;
@@ -320,8 +347,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 CORPSE_PILER,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.corpse_piler", 0xD64550),
-                player -> {
-                    if (!mainHandHas(player, EnchantmentCorpsePiler.class)) {
+                (player, ctx) -> {
+                    if (!mainHandHas(ctx, EnchantmentCorpsePiler.class)) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     int count = EnchantmentDataManager.getCounter(CORPSE_PILER_KEY, player.getUUID());
@@ -332,8 +359,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 CORRUPTED_WING_SWORD,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.corrupted_wing_sword", 0xB05CE0),
-                player -> {
-                    if (!mainHandHas(player, EnchantmentCorruptedWingSword.class)) {
+                (player, ctx) -> {
+                    if (!mainHandHas(ctx, EnchantmentCorruptedWingSword.class)) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     int count = EnchantmentDataManager.getCounter(CORRUPTED_WING_SWORD_KEY, player.getUUID());
@@ -344,8 +371,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 MIKAELA_BLADE,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.mikaela_blade", 0x5FE0C8),
-                player -> {
-                    if (!mainHandHas(player, EnchantmentMikaelaBlade.class)) {
+                (player, ctx) -> {
+                    if (!mainHandHas(ctx, EnchantmentMikaelaBlade.class)) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     int count = EnchantmentDataManager.getCounter(MIKAELA_BLADE_KEY, player.getUUID());
@@ -360,8 +387,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 MILLICENT_PROSTHESIS,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.millicent_prosthesis", 0xF2B135),
-                player -> {
-                    int level = mainHandLevel(player, EnchantmentMillicentProsthesis.class);
+                (player, ctx) -> {
+                    int level = mainHandLevel(ctx, EnchantmentMillicentProsthesis.class);
                     if (level <= 0) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
@@ -381,8 +408,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 UNSHEATHE,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.unsheathe", 0x88B5CC),
-                player -> {
-                    if (!mainHandHas(player, EnchantmentUnsheathe.class)) {
+                (player, ctx) -> {
+                    if (!mainHandHas(ctx, EnchantmentUnsheathe.class)) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     int count = EnchantmentDataManager.getCounter(UNSHEATHE_KEY, player.getUUID());
@@ -395,8 +422,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 PATIENCE,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.patience", 0xC07BB0),
-                player -> {
-                    int level = mainHandLevel(player, EnchantmentPatience.class);
+                (player, ctx) -> {
+                    int level = mainHandLevel(ctx, EnchantmentPatience.class);
                     if (level <= 0) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
@@ -414,8 +441,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 SACRED_ORDER,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.sacred_order", 0xE0C060),
-                player -> {
-                    if (!armorHas(player, EnchantmentSacredOrder.class)) {
+                (player, ctx) -> {
+                    if (!armorHas(ctx, EnchantmentSacredOrder.class)) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     float absorption = player.getAbsorptionAmount();
@@ -432,8 +459,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 PRAYERFUL_STRIKE,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.prayerful_strike", 0x86C06E),
-                player -> {
-                    if (!mainHandHas(player, EnchantmentPrayerfulStrike.class)) {
+                (player, ctx) -> {
+                    if (!mainHandHas(ctx, EnchantmentPrayerfulStrike.class)) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     AttributeInstance attribute = player.getAttribute(Attributes.MAX_HEALTH);
@@ -453,8 +480,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 GODSKIN_SWADDLING,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.godskin_swaddling", 0xCBB892),
-                player -> {
-                    if (!mainHandHas(player, EnchantmentGodskinSwaddling.class)) {
+                (player, ctx) -> {
+                    if (!mainHandHas(ctx, EnchantmentGodskinSwaddling.class)) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     int count = EnchantmentDataManager.getCounter(GODSKIN_SWADDLING_KEY, player.getUUID());
@@ -466,8 +493,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 BLOOD,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.blood", 0x8E2F4A),
-                player -> {
-                    if (!mainHandHas(player, EnchantmentBlood.class)) {
+                (player, ctx) -> {
+                    if (!mainHandHas(ctx, EnchantmentBlood.class)) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     int count = EnchantmentDataManager.getCounter(BLOOD_KEY, player.getUUID());
@@ -479,8 +506,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 REPEATING_THRUST,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.repeating_thrust", 0xE07A50),
-                player -> {
-                    if (!mainHandHas(player, EnchantmentRepeatingThrust.class)) {
+                (player, ctx) -> {
+                    if (!mainHandHas(ctx, EnchantmentRepeatingThrust.class)) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     int count = EnchantmentDataManager.getCounter(REPEATING_THRUST_KEY, player.getUUID());
@@ -493,8 +520,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 CAUSALITY_PRINCIPLE,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.causality_principle", 0x7268C0),
-                player -> {
-                    if (!armorHas(player, EnchantmentCausalityPrinciple.class)) {
+                (player, ctx) -> {
+                    if (!armorHas(ctx, EnchantmentCausalityPrinciple.class)) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     int count = EnchantmentDataManager.getCounter(CAUSALITY_PRINCIPLE_KEY, player.getUUID());
@@ -506,8 +533,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 SCARLET_LONIA,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.scarlet_lonia", 0xE0244A),
-                player -> {
-                    if (!armorHas(player, EnchantmentScarletLonia.class)) {
+                (player, ctx) -> {
+                    if (!armorHas(ctx, EnchantmentScarletLonia.class)) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     int remaining = EnchantmentDataManager.getRemainingCooldown(SCARLET_LONIA_COOLDOWN_KEY, player.getUUID());
@@ -521,8 +548,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 EPILEPSY_SPREAD,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.epilepsy_spread", 0xFF6A1A),
-                player -> {
-                    if (!armorHas(player, EnchantmentEpilepsySpread.class)) {
+                (player, ctx) -> {
+                    if (!armorHas(ctx, EnchantmentEpilepsySpread.class)) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     int remaining = EnchantmentDataManager.getRemainingCooldown(EPILEPSY_SPREAD_COOLDOWN_KEY, player.getUUID());
@@ -542,8 +569,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 FULL_MOON,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.full_moon", 0xC9D8FF),
-                player -> {
-                    if (!anyArmorHasEnchId(player, FULL_MOON_ID)) {
+                (player, ctx) -> {
+                    if (!anyArmorHasEnchId(ctx, FULL_MOON_ID)) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     int remaining = EnchantmentDataManager.getRemainingCooldown(FULL_MOON_COOLDOWN_KEY, player.getUUID());
@@ -557,8 +584,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 LIVING_CORPSE,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.living_corpse", 0x84B58A),
-                player -> {
-                    if (!anyArmorHasEnchId(player, "living_corpse")) {
+                (player, ctx) -> {
+                    if (!anyArmorHasEnchId(ctx, "living_corpse")) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     int remaining = EnchantmentDataManager.getRemainingCooldown(LIVING_CORPSE_COOLDOWN_KEY, player.getUUID());
@@ -572,8 +599,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 TIME_REVERSAL,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.time_reversal", 0xB8902A),
-                player -> {
-                    if (!anyArmorHasEnchId(player, "time_reversal")) {
+                (player, ctx) -> {
+                    if (!anyArmorHasEnchId(ctx, "time_reversal")) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     int remaining = EnchantmentDataManager.getRemainingCooldown(TIME_REVERSAL_COOLDOWN_KEY, player.getUUID());
@@ -587,8 +614,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 ANCIENT_DRAGON_LIGHTNING,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.ancient_dragon_lightning", 0xC41E1E),
-                player -> {
-                    if (!anyArmorHasEnchId(player, "ancient_dragon_lightning")) {
+                (player, ctx) -> {
+                    if (!anyArmorHasEnchId(ctx, "ancient_dragon_lightning")) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     int remaining = EnchantmentDataManager.getRemainingCooldown(ANCIENT_DRAGON_LIGHTNING_COOLDOWN_KEY, player.getUUID());
@@ -602,8 +629,8 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 GREATBLADE_PHALANX,
                 new StackDisplayRegistry.Info("enchantment.carianstyle.greatblade_phalanx", 0x9D8AFF),
-                player -> {
-                    if (!anyArmorHasEnchId(player, "greatblade_phalanx")) {
+                (player, ctx) -> {
+                    if (!anyArmorHasEnchId(ctx, "greatblade_phalanx")) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     int remaining = EnchantmentDataManager.getRemainingCooldown(GREATBLADE_PHALANX_COOLDOWN_KEY, player.getUUID());
@@ -621,11 +648,10 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 BLOOD_RESONANCE,
                 new StackDisplayRegistry.Info(BLOOD_RESONANCE_NAME_KEY, BLOOD_RESONANCE_COLOR),
-                player -> {
-                    ItemStack weapon = player.getMainHandItem();
-                    boolean active = itemEnchLevelById(weapon, BLOOD_ID) > 0
-                            && itemEnchLevelById(weapon, BLOOD_SLASH_ID) > 0
-                            && itemEnchLevelById(weapon, BLOOD_COLLECTION_ID) > 0;
+                (player, ctx) -> {
+                    boolean active = mainHandEnchLevelById(ctx, BLOOD_ID) > 0
+                            && mainHandEnchLevelById(ctx, BLOOD_SLASH_ID) > 0
+                            && mainHandEnchLevelById(ctx, BLOOD_COLLECTION_ID) > 0;
                     if (!active) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
@@ -637,9 +663,9 @@ public final class CarianStyleStackDisplays {
         StackDisplayRegistry.register(
                 MOON_RESONANCE,
                 new StackDisplayRegistry.Info(MOON_RESONANCE_NAME_KEY, MOON_RESONANCE_COLOR),
-                player -> {
-                    boolean active = itemEnchLevelById(player.getMainHandItem(), DARK_MOON_ID) > 0
-                            && anyArmorHasEnchId(player, FULL_MOON_ID);
+                (player, ctx) -> {
+                    boolean active = mainHandEnchLevelById(ctx, DARK_MOON_ID) > 0
+                            && anyArmorHasEnchId(ctx, FULL_MOON_ID);
                     if (!active) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
@@ -649,101 +675,93 @@ public final class CarianStyleStackDisplays {
 
     /**
      * 判断玩家主手物品是否带有指定附魔。
+     * <p>v3：改为查本轮装备附魔快照，不再解析 NBT。</p>
      *
-     * @param player 玩家
-     * @param clazz  附魔类
+     * @param ctx   本轮装备附魔快照
+     * @param clazz 附魔类
      * @return 主手带有该附魔（等级>0）返回 true
      */
-    private static boolean mainHandHas(Player player, Class<? extends EnchantmentBase> clazz) {
-        return mainHandLevel(player, clazz) > 0;
+    private static boolean mainHandHas(@Nonnull EquipmentEnchantContext ctx,
+                                       @Nonnull Class<? extends EnchantmentBase> clazz) {
+        return mainHandLevel(ctx, clazz) > 0;
     }
 
     /**
      * 取玩家主手物品上指定附魔的等级。
+     * <p>v3：改为查本轮装备附魔快照，不再解析 NBT。
+     * 按类解析附魔走 {@link EnchantmentRegistry#getEnchantmentByClass}（HashMap 查询，本身已足够廉价）。</p>
      *
-     * @param player 玩家
-     * @param clazz  附魔类
+     * @param ctx   本轮装备附魔快照
+     * @param clazz 附魔类
      * @return 等级；附魔未注册或主手未带时为 0
      */
-    private static int mainHandLevel(Player player, Class<? extends EnchantmentBase> clazz) {
-        Enchantment ench = EnchantmentRegistry.getEnchantmentByClass(clazz);
-        if (ench == null) {
-            return 0;
-        }
-        return EnchantmentHelper.getItemEnchantmentLevel(ench, player.getMainHandItem());
+    private static int mainHandLevel(@Nonnull EquipmentEnchantContext ctx,
+                                     @Nonnull Class<? extends EnchantmentBase> clazz) {
+        return ctx.mainHandLevel(EnchantmentRegistry.getEnchantmentByClass(clazz));
     }
 
     /**
      * 判断玩家护甲（4 件）上是否带有指定附魔。
-     * <p>用于护甲类附魔的显示门控：任一护甲槽带有该附魔即返回 true。</p>
+     * <p>用于护甲类附魔的显示门控：任一护甲槽带有该附魔即返回 true。
+     * v3：改为查本轮装备附魔快照（护甲表已按最高等级归并），不再逐件解析 NBT。</p>
      *
-     * @param player 玩家
-     * @param clazz  附魔类
+     * @param ctx   本轮装备附魔快照
+     * @param clazz 附魔类
      * @return 任一护甲带有该附魔（等级>0）返回 true
      */
-    private static boolean armorHas(Player player, Class<? extends EnchantmentBase> clazz) {
-        Enchantment ench = EnchantmentRegistry.getEnchantmentByClass(clazz);
-        if (ench == null) {
-            return false;
-        }
-        for (ItemStack armor : player.getArmorSlots()) {
-            if (!armor.isEmpty() && EnchantmentHelper.getItemEnchantmentLevel(ench, armor) > 0) {
-                return true;
-            }
-        }
-        return false;
+    private static boolean armorHas(@Nonnull EquipmentEnchantContext ctx,
+                                    @Nonnull Class<? extends EnchantmentBase> clazz) {
+        return ctx.armorMaxLevel(EnchantmentRegistry.getEnchantmentByClass(clazz)) > 0;
     }
 
     // ===================== v2 新增：按注册 id 的附魔解析辅助（不依赖具体附魔类）=====================
     // 与 AuraDisplayRegistry 一致，用 carianstyle:<id> 从标准 Forge 注册表解析附魔，便于死亡附魔门控与联动检测，
-    // 无需为每个伙伴附魔新增 import。注册表在 mod 加载后才可用，故每次查询时解析（开销极小，仅服务端轮询调用）。
+    // 无需为每个伙伴附魔新增 import。
+    // v3：解析结果加缓存（ENCHANTMENT_ID_CACHE），避免每轮重复 new ResourceLocation + 查注册表。
 
     /**
-     * 按注册 id 解析本模组的附魔对象。
+     * 按注册 id 解析本模组的附魔对象（带缓存）。
+     * <p>v3：解析成功后写入 {@link #ENCHANTMENT_ID_CACHE}；解析失败（返回 null，如附魔被禁用或
+     * 注册表尚未就绪）不写入缓存，下次调用会重试——与 {@code AuraDisplayRegistry} 的懒解析策略一致。</p>
      *
      * @param enchId 附魔注册 id（命名空间固定为 {@link Reference#MOD_ID}，如 "full_moon"）
      * @return 附魔对象；未注册时返回 null
      */
-    private static Enchantment resolveEnchantment(String enchId) {
-        return ForgeRegistries.ENCHANTMENTS.getValue(new ResourceLocation(Reference.MOD_ID, enchId));
+    @Nullable
+    private static Enchantment resolveEnchantment(@Nonnull String enchId) {
+        Enchantment cached = ENCHANTMENT_ID_CACHE.get(enchId);
+        if (cached != null) {
+            return cached;
+        }
+        Enchantment resolved = ForgeRegistries.ENCHANTMENTS.getValue(new ResourceLocation(Reference.MOD_ID, enchId));
+        if (resolved != null) {
+            ENCHANTMENT_ID_CACHE.put(enchId, resolved);
+        }
+        return resolved;
     }
 
     /**
-     * 取指定物品上某 id 附魔的等级。
+     * 取玩家主手物品上某 id 附魔的等级。
+     * <p>v3：改为查本轮装备附魔快照，不再解析 NBT。</p>
      *
-     * @param stack  物品
+     * @param ctx    本轮装备附魔快照
      * @param enchId 附魔注册 id
-     * @return 等级；物品为空、附魔未注册或未带时为 0
+     * @return 等级；附魔未注册或主手未带时为 0
      */
-    private static int itemEnchLevelById(ItemStack stack, String enchId) {
-        if (stack.isEmpty()) {
-            return 0;
-        }
-        Enchantment ench = resolveEnchantment(enchId);
-        if (ench == null) {
-            return 0;
-        }
-        return EnchantmentHelper.getItemEnchantmentLevel(ench, stack);
+    private static int mainHandEnchLevelById(@Nonnull EquipmentEnchantContext ctx, @Nonnull String enchId) {
+        return ctx.mainHandLevel(resolveEnchantment(enchId));
     }
 
     /**
      * 判断玩家护甲（4 件）上是否带有某 id 附魔。
-     * <p>用于护甲类死亡附魔的显示门控与联动检测：任一护甲槽带有该 id 附魔即返回 true。</p>
+     * <p>用于护甲类死亡附魔的显示门控与联动检测：任一护甲槽带有该 id 附魔即返回 true。
+     * v3：改为查本轮装备附魔快照，不再逐件解析 NBT。</p>
      *
-     * @param player 玩家
+     * @param ctx    本轮装备附魔快照
      * @param enchId 附魔注册 id
      * @return 任一护甲带有该附魔（等级>0）返回 true
      */
-    private static boolean anyArmorHasEnchId(Player player, String enchId) {
-        Enchantment ench = resolveEnchantment(enchId);
-        if (ench == null) {
-            return false;
-        }
-        for (ItemStack armor : player.getArmorSlots()) {
-            if (!armor.isEmpty() && EnchantmentHelper.getItemEnchantmentLevel(ench, armor) > 0) {
-                return true;
-            }
-        }
-        return false;
+    private static boolean anyArmorHasEnchId(@Nonnull EquipmentEnchantContext ctx, @Nonnull String enchId) {
+        return ctx.armorMaxLevel(resolveEnchantment(enchId)) > 0;
     }
 }

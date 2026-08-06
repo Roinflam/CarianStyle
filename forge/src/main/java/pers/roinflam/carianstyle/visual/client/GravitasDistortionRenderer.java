@@ -1,0 +1,643 @@
+package pers.roinflam.carianstyle.visual.client;
+
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import net.minecraft.client.Minecraft;
+import net.minecraft.util.Mth;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.client.event.RenderLevelStageEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+import org.joml.Matrix4f;
+import pers.roinflam.carianstyle.enchantment.combatskill.EnchantmentGravitas;
+import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
+import pers.roinflam.carianstyle.utils.Reference;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * 重力「压制」客户端渲染器（纯客户端自绘）。
+ * <p>
+ * 视觉分两类，分别对应重力附魔的两种作用对象：
+ * <ol>
+ *     <li><b>个人压制视觉</b>——判定依据 {@code entity.hasEffect(CarianStylePotion.GRAVITAS.get())}。
+ *         核心是 {@link #drawCrushingCage}：一圈竖直立柱（十字双面三角面，与
+ *         {@code AoeEffectRenderer#drawRedLightning} 的电柱建模手法一致）从头顶收拢到脚下，
+ *         周期性收紧再重置；另配合脚下反复收缩的挤压环 + 向心汇聚的浮尘作为氛围补充；</li>
+ *     <li><b>施法者力场范围圈</b>——判定依据 {@code ClientSyncEffectManager.shouldRenderEffect(
+ *         EnchantmentGravitas.GRAVITY_FIELD_SERIAL, entityId)}（由 {@code EnchantmentGravitas}
+ *         在力场激活 / 结束时主动同步），绘制以施法者为中心、半径
+ *         {@code EnchantmentGravitas.FIELD_RADIUS} 格的地面范围圈。<b>出现 / 消失均带展开缓出 /
+ *         收缩淡出动画</b>（{@link #FIELD_STATE} + {@link FieldAnimState}），与
+ *         {@code AuraGroundRenderer} 里「圣域」等装备光环的出现/消失动画同一套逻辑——不再像
+ *         早期版本那样跟随同步状态瞬间蹦出/消失。半径与实际判定半径共用同一个
+ *         {@code EnchantmentGravitas.FIELD_RADIUS} 常量，不会出现「圈画的地方和实际生效范围
+ *         对不上」的情况。</li>
+ * </ol>
+ * 两类视觉互不依赖、可同时出现。
+ * </p>
+ * <p>
+ * <b>v2（性能，视觉零变化）：</b>接入 {@link VisualBatch} 与 {@link SharedEntityQuery}——
+ * <ul>
+ *     <li>不再自行设置 / 恢复 GL 状态、不再自行 {@code begin/end} 顶点缓冲，改为向
+ *         {@link VisualBatch} 提供的共享缓冲写顶点，由其在本帧末统一提交；</li>
+ *     <li><b>原先每帧要做两次范围实体查询</b>（受压制者 + 施法者，是全模组渲染器里唯一查两次的），
+ *         现改为遍历 {@link SharedEntityQuery} 的每帧共享列表两遍、在循环内 {@code continue} 筛选，
+ *         零额外列表分配；</li>
+ *     <li>原先「受压制者为空且 FIELD_STATE 为空则提前返回」的判断，其唯一目的是跳过 GL 状态设置；
+ *         GL 现由 {@link VisualBatch} 统一处理，该分支已无意义，故移除——两个循环在无对象时
+ *         本就不做任何事，行为完全一致。</li>
+ * </ul>
+ * 判定条件、{@link #FIELD_STATE} 状态机的刷新时序、精确平方距离裁剪、绘制顺序
+ * （先全部受压制者、再全部力场范围圈）与全部几何参数均未改动。
+ * </p>
+ * <p>
+ * 渲染管线与 {@code ScarletRotMistRenderer} 同款：{@link RenderLevelStageEvent} 的
+ * {@code AFTER_TRANSLUCENT_BLOCKS} 阶段，{@code POSITION_COLOR} 纯顶点绘制，无贴图、无原版粒子；
+ * 顶点格式与着色器现由 {@link VisualBatch} 统一设置。
+ * </p>
+ *
+ * @author FlameForge
+ */
+@OnlyIn(Dist.CLIENT)
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+public final class GravitasDistortionRenderer {
+
+    /** 距离裁剪（格）。必须 ≤ {@link SharedEntityQuery#QUERY_RANGE}，否则会漏掉实体。 */
+    private static final double CULL = 48.0;
+    private static final double CULL_SQR = CULL * CULL;
+    private static final float TAU = (float) (Math.PI * 2.0);
+    private static final float Y_OFFSET = 0.02f;
+    private static final long START_MILLIS = System.currentTimeMillis();
+
+    // ===== 配色（0xRRGGBB）=====
+    private static final int GRAVITY_DEEP = 0x1B1030;
+    private static final int GRAVITY_MID = 0x5A3AB0;
+    private static final int GRAVITY_CORE = 0xC7B4FF;
+
+    // ===== 头顶收拢牢笼（个人压制视觉的核心立体形状）=====
+    private static final int CAGE_PILLAR_COUNT = 8;
+    /** 牢笼总高度系数（× 实体高度） */
+    private static final float CAGE_HEIGHT_FACTOR = 1.9f;
+    /** 收紧-重置的循环速度 */
+    private static final float CAGE_RATE = 0.35f;
+    private static final float CAGE_HALF_WIDTH = 0.06f;
+    /** 牢笼起始半径系数（× 实体宽度，收紧终点约为该值的 35%） */
+    private static final float CAGE_OUTER_FACTOR = 1.7f;
+
+    // ===== 脚下挤压环（个人压制视觉，氛围补充）=====
+    private static final int SQUEEZE_RING_COUNT = 2;
+    private static final int RING_SEGMENTS = 28;
+    private static final float SQUEEZE_RATE = 0.5f;
+    private static final float SQUEEZE_OUTER_FACTOR = 1.2f;
+    private static final float RING_HALF_WIDTH = 0.05f;
+    private static final float SQUEEZE_ALPHA = 0.6f;
+
+    // ===== 向心浮尘（个人压制视觉，氛围补充）=====
+    private static final int DUST_COUNT = 16;
+    private static final float DUST_RATE = 0.4f;
+    private static final float DUST_SIZE = 0.08f;
+    private static final int DUST_SEGMENTS = 8;
+    private static final float DUST_ALPHA = 0.65f;
+
+    // ===== 施法者力场范围圈 =====
+    /** 范围圈半径（格），与 {@link EnchantmentGravitas#FIELD_RADIUS} 保持一致（int 隐式转 float） */
+    private static final float FIELD_RADIUS = EnchantmentGravitas.FIELD_RADIUS;
+    /** 范围圈分段数（半径较大，适当提高分段避免多边形感） */
+    private static final int FIELD_RING_SEGMENTS = 48;
+    private static final float FIELD_RING_HALF_WIDTH = 0.09f;
+    /** 场地底色填充分段数与透明度：让整片受影响区域一眼可辨 */
+    private static final int FIELD_FILL_SEGMENTS = 48;
+    private static final float FIELD_FILL_ALPHA = 0.10f;
+    /** 塌陷环数量与速度：从边界向心收拢并淡出，循环播放 */
+    private static final int FIELD_COLLAPSE_RING_COUNT = 4;
+    private static final float FIELD_COLLAPSE_RATE = 0.18f;
+    /** 边界压制柱数量、旋转速度与高度（格） */
+    private static final int FIELD_PYLON_COUNT = 20;
+    private static final float FIELD_PYLON_ROT_SPEED = 0.1f;
+    private static final float FIELD_PYLON_HEIGHT = 1.6f;
+    /** 范围圈展开动画时长（秒） */
+    private static final float FIELD_APPEAR_DURATION = 0.3f;
+    /** 范围圈消失动画时长（秒） */
+    private static final float FIELD_FADE_DURATION = 0.35f;
+
+    /**
+     * 力场范围圈的出现 / 消失动画状态（按施法者 entityId 索引）。
+     * <p>与 {@code AuraGroundRenderer} 的 {@code AuraState} 同一思路：出现时展开 + 淡入，
+     * 消失时收缩 + 淡出，而不是直接瞬间出现/消失；即便施法者暂时离开世界（卸载），
+     * 也能用最近一次已知坐标原地把淡出动画播完。仅渲染线程访问。</p>
+     */
+    private static final class FieldAnimState {
+        /** 出现时刻（秒，墙钟） */
+        float appearTime;
+        /** 开始消失的时刻（秒）；<0 表示仍激活（未开始淡出） */
+        float fadeStart = -1f;
+        /** 最近一次的世界坐标（用于实体卸载后原地播完淡出） */
+        double lastX;
+        double lastY;
+        double lastZ;
+    }
+
+    /** entityId -> 力场动画状态。 */
+    private static final Map<Integer, FieldAnimState> FIELD_STATE = new HashMap<>();
+
+    private GravitasDistortionRenderer() {
+    }
+
+    /**
+     * 世界渲染回调：在半透明方块之后，绘制相机附近所有「受重力压制」与「正在施放重力场」的视觉。
+     * <p>
+     * v2：GL 状态与顶点缓冲由 {@link VisualBatch} 统一管理，实体列表取自
+     * {@link SharedEntityQuery} 的每帧共享查询（原先的两次范围查询改为对同一列表遍历两遍）。
+     * </p>
+     *
+     * @param event 渲染阶段事件
+     */
+    @SubscribeEvent
+    public static void onRenderLevel(RenderLevelStageEvent event) {
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
+            return;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        // 世界 / 玩家不可用：清空力场动画状态（与优化前一致），避免重进世界时实体 id 撞号残留
+        if (mc.level == null || mc.player == null) {
+            FIELD_STATE.clear();
+            return;
+        }
+        // 共享批次未开启：直接跳过
+        BufferBuilder builder = VisualBatch.builder();
+        if (builder == null) {
+            return;
+        }
+        Vec3 cam = VisualBatch.cameraPosition();
+        if (cam == null) {
+            return;
+        }
+
+        List<LivingEntity> candidates = SharedEntityQuery.livingEntitiesNearCamera(mc, cam);
+
+        MobEffect gravitas = CarianStylePotion.GRAVITAS.get();
+
+        float partial = VisualBatch.partialTick();
+        float time = (System.currentTimeMillis() - START_MILLIS) / 1000f;
+
+        // ===== 刷新力场范围圈的出现/消失状态（即使本帧没有受压制者也要做，
+        // 否则「刚失去同步的力场」永远等不到淡出的机会）=====
+        // v2：不再单独查询施法者列表，改为遍历共享列表筛选（共享列表已保证 isAlive）
+        Set<Integer> activeCasterIds = new HashSet<>();
+        for (LivingEntity entity : candidates) {
+            if (!ClientSyncEffectManager.shouldRenderEffect(
+                    EnchantmentGravitas.GRAVITY_FIELD_SERIAL, entity.getId())) {
+                continue;
+            }
+            int id = entity.getId();
+            activeCasterIds.add(id);
+            FieldAnimState st = FIELD_STATE.get(id);
+            if (st == null) {
+                st = new FieldAnimState();
+                st.appearTime = time;
+                FIELD_STATE.put(id, st);
+            }
+            st.fadeStart = -1f; // 仍激活：清除淡出标记（若此前在淡出会被“救回”）
+            st.lastX = entity.getX();
+            st.lastY = entity.getY();
+            st.lastZ = entity.getZ();
+        }
+        for (Map.Entry<Integer, FieldAnimState> e : FIELD_STATE.entrySet()) {
+            if (e.getValue().fadeStart < 0f && !activeCasterIds.contains(e.getKey())) {
+                e.getValue().fadeStart = time;
+            }
+        }
+
+        // v2：原先此处有「受压制者为空且 FIELD_STATE 为空则提前返回」的分支，
+        // 其唯一作用是跳过 GL 状态设置；GL 现由 VisualBatch 统一处理，该分支已无意义，故移除。
+        // 下面两个循环在无对象时本就不做任何事，行为完全一致。
+
+        Matrix4f matrix = VisualBatch.matrix();
+        float rightX = VisualBatch.rightX();
+        float rightY = VisualBatch.rightY();
+        float rightZ = VisualBatch.rightZ();
+        float upX = VisualBatch.upX();
+        float upY = VisualBatch.upY();
+        float upZ = VisualBatch.upZ();
+
+        // ===== 1) 个人压制视觉：受重力压制的每个实体 =====
+        // v2：原先作为查询谓词的 hasEffect 判定，现下沉为循环内筛选
+        if (gravitas != null) {
+            for (LivingEntity entity : candidates) {
+                if (!entity.hasEffect(gravitas)) {
+                    continue;
+                }
+
+                double ex = Mth.lerp((double) partial, entity.xo, entity.getX());
+                double ey = Mth.lerp((double) partial, entity.yo, entity.getY());
+                double ez = Mth.lerp((double) partial, entity.zo, entity.getZ());
+
+                double dx = ex - cam.x;
+                double dy = ey - cam.y;
+                double dz = ez - cam.z;
+                if (dx * dx + dy * dy + dz * dz > CULL_SQR) {
+                    continue;
+                }
+
+                float width = entity.getBbWidth();
+                float height = entity.getBbHeight();
+
+                float rx = (float) dx;
+                float ryFoot = (float) dy;
+                float rz = (float) dz;
+
+                drawCrushingCage(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId());
+                drawSqueezeRings(builder, matrix, rx, ryFoot + Y_OFFSET, rz, width, time, entity.getId());
+                drawInwardDust(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId(),
+                        rightX, rightY, rightZ, upX, upY, upZ);
+            }
+        }
+
+        // ===== 2) 施法者力场范围圈：按展开/淡出状态绘制（含已离开同步列表、正在淡出的） =====
+        Iterator<Map.Entry<Integer, FieldAnimState>> fieldIt = FIELD_STATE.entrySet().iterator();
+        while (fieldIt.hasNext()) {
+            Map.Entry<Integer, FieldAnimState> entry = fieldIt.next();
+            FieldAnimState st = entry.getValue();
+
+            float radiusFactor;
+            float animAlpha;
+            if (st.fadeStart < 0f) {
+                // 出现/稳定：展开 + 淡入
+                float p = clamp01((time - st.appearTime) / FIELD_APPEAR_DURATION);
+                float eased = easeOutCubic(p);
+                radiusFactor = eased;
+                animAlpha = eased;
+            } else {
+                // 消失：收缩 + 淡出
+                float p = clamp01((time - st.fadeStart) / FIELD_FADE_DURATION);
+                if (p >= 1f) {
+                    fieldIt.remove(); // 淡出结束，移除状态
+                    continue;
+                }
+                float v = 1f - p; // 1 -> 0
+                radiusFactor = 0.6f + 0.4f * v; // 收缩到 ~60%
+                animAlpha = v;
+            }
+
+            // 位置：施法者仍在世界中用实时插值坐标，否则用最近已知坐标原地播完淡出
+            Entity rawEntity = mc.level.getEntity(entry.getKey());
+            double wx, wy, wz;
+            if (rawEntity instanceof LivingEntity liveEntity && liveEntity.isAlive()) {
+                wx = Mth.lerp((double) partial, liveEntity.xo, liveEntity.getX());
+                wy = Mth.lerp((double) partial, liveEntity.yo, liveEntity.getY());
+                wz = Mth.lerp((double) partial, liveEntity.zo, liveEntity.getZ());
+            } else {
+                wx = st.lastX;
+                wy = st.lastY;
+                wz = st.lastZ;
+            }
+
+            double dx = wx - cam.x;
+            double dy = wy - cam.y;
+            double dz = wz - cam.z;
+            if (dx * dx + dy * dy + dz * dz > CULL_SQR) {
+                continue; // 太远：本帧不渲染，但保留状态，淡出计时继续
+            }
+
+            float rx = (float) dx;
+            float ry = (float) dy + Y_OFFSET;
+            float rz = (float) dz;
+
+            drawFieldRange(builder, matrix, rx, ry, rz, time, entry.getKey(), radiusFactor, animAlpha);
+        }
+    }
+
+    // ==================== 个人压制视觉 ====================
+
+    /**
+     * 头顶收拢的立体牢笼：{@link #CAGE_PILLAR_COUNT} 根竖直立柱（十字双面三角面，
+     * 与 {@code AoeEffectRenderer#drawRedLightning} 的电柱建模手法一致——沿世界 X、Z 轴
+     * 各展开一个四边形，任意水平视角皆可见），半径随 {@link #CAGE_RATE} 周期性收紧后瞬间重置，
+     * 象征重力场持续把周围空间压向实体所在的一点。柱身顶部偏暗、底部偏亮，突出「向下汇聚」。
+     */
+    private static void drawCrushingCage(BufferBuilder b, Matrix4f m,
+                                         float cx, float cyFoot, float cz, float width, float height,
+                                         float time, int seedId) {
+        float cageHeight = height * CAGE_HEIGHT_FACTOR;
+        float t = frac(time * CAGE_RATE + seedId * 0.09f);
+        // 半径随周期从较宽收拢到贴近身体，然后瞬间重置重新展开
+        float outer = width * CAGE_OUTER_FACTOR;
+        float radius = outer * (1f - 0.65f * easeOutCubic(t));
+        float alpha = 0.5f + 0.35f * Mth.sin(t * (float) Math.PI);
+        float[] mid = unpack(GRAVITY_MID);
+        float[] core = unpack(GRAVITY_CORE);
+
+        for (int i = 0; i < CAGE_PILLAR_COUNT; i++) {
+            double ang = TAU * i / CAGE_PILLAR_COUNT + seedId * 0.2f;
+            float cosA = (float) Math.cos(ang), sinA = (float) Math.sin(ang);
+            float px = cx + cosA * radius;
+            float pz = cz + sinA * radius;
+            // 顶部略比底部宽一圈，营造「向内收拢」的锥笼感
+            float topRadius = radius * 1.18f;
+            float topX = cx + cosA * topRadius;
+            float topZ = cz + sinA * topRadius;
+            cagePillar(b, m, topX, cyFoot + cageHeight, topZ, px, cyFoot + Y_OFFSET, pz,
+                    CAGE_HALF_WIDTH, mid, core, alpha);
+        }
+    }
+
+    /**
+     * 一根竖直牢笼柱：十字双面（沿世界 X、Z 轴各一个四边形），顶部用 {@code colTop} 且更暗淡，
+     * 底部用 {@code colBottom} 且更亮，表现「重压自上而下汇聚」。
+     */
+    private static void cagePillar(BufferBuilder b, Matrix4f m,
+                                   float x1, float y1, float z1, float x2, float y2, float z2,
+                                   float hw, float[] colTop, float[] colBottom, float alpha) {
+        // 面1：沿世界 X 轴展开
+        cageQuad(b, m, x1 - hw, y1, z1, x1 + hw, y1, z1, x2 + hw, y2, z2, x2 - hw, y2, z2,
+                colTop, colBottom, alpha);
+        // 面2：沿世界 Z 轴展开
+        cageQuad(b, m, x1, y1, z1 - hw, x1, y1, z1 + hw, x2, y2, z2 + hw, x2, y2, z2 - hw,
+                colTop, colBottom, alpha);
+    }
+
+    private static void cageQuad(BufferBuilder b, Matrix4f m,
+                                 float ax, float ay, float az, float bx, float by, float bz,
+                                 float cxp, float cyp, float czp, float dx, float dy, float dz,
+                                 float[] colTop, float[] colBottom, float alpha) {
+        float topAlpha = alpha * 0.45f;
+        b.vertex(m, ax, ay, az).color(colTop[0], colTop[1], colTop[2], topAlpha).endVertex();
+        b.vertex(m, bx, by, bz).color(colTop[0], colTop[1], colTop[2], topAlpha).endVertex();
+        b.vertex(m, cxp, cyp, czp).color(colBottom[0], colBottom[1], colBottom[2], alpha).endVertex();
+
+        b.vertex(m, ax, ay, az).color(colTop[0], colTop[1], colTop[2], topAlpha).endVertex();
+        b.vertex(m, cxp, cyp, czp).color(colBottom[0], colBottom[1], colBottom[2], alpha).endVertex();
+        b.vertex(m, dx, dy, dz).color(colBottom[0], colBottom[1], colBottom[2], alpha).endVertex();
+    }
+
+    /** 脚下反复收缩的挤压环：从外向内收拢并淡出，循环播放，作为牢笼之外的地面氛围补充。 */
+    private static void drawSqueezeRings(BufferBuilder b, Matrix4f m,
+                                         float cx, float cy, float cz, float width,
+                                         float time, int seedId) {
+        float outer = width * SQUEEZE_OUTER_FACTOR;
+        for (int i = 0; i < SQUEEZE_RING_COUNT; i++) {
+            float phase = (float) i / SQUEEZE_RING_COUNT;
+            float t = frac(time * SQUEEZE_RATE + phase + seedId * 0.07f);
+            float radius = outer * (1f - easeOutCubic(t));
+            if (radius <= 0.06f) {
+                continue;
+            }
+            float alpha = SQUEEZE_ALPHA * (1f - t) * smoothstep(0f, 0.15f, t);
+            int col = lerpRgb(GRAVITY_MID, GRAVITY_CORE, 1f - t);
+            float[] c = unpack(col);
+            ring(b, m, cx, cy, cz, radius, RING_SEGMENTS, RING_HALF_WIDTH, c, alpha);
+        }
+    }
+
+    /** 向心汇聚的浮尘：从周围缓慢被吸向脚下中心点，抵达时淡出。 */
+    private static void drawInwardDust(BufferBuilder b, Matrix4f m,
+                                       float cx, float cyFoot, float cz, float width, float height,
+                                       float time, int seedId,
+                                       float rightX, float rightY, float rightZ,
+                                       float upX, float upY, float upZ) {
+        float outerRadius = width * 1.4f;
+        float riseSpan = height * 0.6f;
+        for (int i = 0; i < DUST_COUNT; i++) {
+            long s = seedFor(seedId, i);
+            float phase = rngFloat(s);
+            s = rngNext(s);
+            float ang = rngFloat(s) * TAU;
+            s = rngNext(s);
+            float heightRand = rngFloat(s);
+            s = rngNext(s);
+            float sizeRand = 0.7f + 0.6f * rngFloat(s);
+
+            float t = frac(time * DUST_RATE + phase);
+            float radius = outerRadius * (1f - t);
+            float px = cx + (float) Math.cos(ang) * radius;
+            float pz = cz + (float) Math.sin(ang) * radius;
+            float py = cyFoot + riseSpan * heightRand * (1f - t) + Y_OFFSET;
+
+            float alpha = DUST_ALPHA * (1f - smoothstep(0.7f, 1f, t)) * smoothstep(0f, 0.1f, t);
+            if (alpha <= 0.01f) {
+                continue;
+            }
+
+            int col = lerpRgb(GRAVITY_DEEP, GRAVITY_CORE, 1f - t);
+            float[] c = unpack(col);
+            float size = DUST_SIZE * sizeRand;
+
+            emitSoftMote(b, m, px, py, pz, size, c[0], c[1], c[2], alpha,
+                    rightX, rightY, rightZ, upX, upY, upZ);
+        }
+    }
+
+    // ==================== 施法者力场范围圈 ====================
+
+    /**
+     * 施法者力场范围圈：以施法者为中心、半径 {@link #FIELD_RADIUS}×{@code radiusFactor} 格的
+     * 地面警示环。{@code radiusFactor} / {@code animAlpha} 由调用方按「出现展开 / 消失收缩淡出」
+     * 的动画状态传入，不再跟随同步状态瞬间出现/消失。由「淡色底色填充」+「边界主环（双层辉光）」+
+     * 「持续向心收拢的塌陷环」+「沿边界起伏明灭的立体压制柱栅栏」四部分组成。
+     *
+     * @param radiusFactor 半径缩放系数（出现时 0→1 展开，消失时 1→0.6 收缩）
+     * @param animAlpha    整体透明度系数（出现淡入、消失淡出）
+     */
+    private static void drawFieldRange(BufferBuilder b, Matrix4f m,
+                                       float cx, float cy, float cz,
+                                       float time, int seedId, float radiusFactor, float animAlpha) {
+        if (animAlpha <= 0.01f || radiusFactor <= 0.02f) {
+            return;
+        }
+        float radius = FIELD_RADIUS * radiusFactor;
+        float[] deep = unpack(GRAVITY_DEEP);
+        float[] mid = unpack(GRAVITY_MID);
+        float[] core = unpack(GRAVITY_CORE);
+
+        // 淡色底色填充：让整片受影响区域一眼可辨（否则大半径的环单独看太不明显）
+        float fillBreath = 0.85f + 0.15f * Mth.sin(time * 0.7f + seedId * 0.3f);
+        disc(b, m, cx, cy, cz, radius, FIELD_FILL_SEGMENTS, deep, FIELD_FILL_ALPHA * fillBreath * animAlpha);
+
+        // 边界主环：固定半径，随呼吸轻微明灭（内层实线 + 外层柔光）
+        float breath = 0.8f + 0.2f * Mth.sin(time * 1.0f + seedId * 0.4f);
+        ring(b, m, cx, cy, cz, radius, FIELD_RING_SEGMENTS, FIELD_RING_HALF_WIDTH, mid,
+                0.7f * breath * animAlpha);
+        ring(b, m, cx, cy, cz, radius, FIELD_RING_SEGMENTS, FIELD_RING_HALF_WIDTH * 3.2f, core,
+                0.24f * breath * animAlpha);
+
+        // 持续向心收拢的塌陷环：从边界向中心收拢并淡出，循环播放
+        for (int i = 0; i < FIELD_COLLAPSE_RING_COUNT; i++) {
+            float phase = (float) i / FIELD_COLLAPSE_RING_COUNT;
+            float t = frac(time * FIELD_COLLAPSE_RATE + phase + seedId * 0.09f);
+            float collapseRadius = radius * (1f - t);
+            if (collapseRadius <= 0.3f) {
+                continue;
+            }
+            float alpha = 0.5f * (1f - t) * smoothstep(0f, 0.1f, t) * animAlpha;
+            ring(b, m, cx, cy, cz, collapseRadius, FIELD_RING_SEGMENTS, FIELD_RING_HALF_WIDTH * 0.75f,
+                    core, alpha);
+        }
+
+        // 边界压制柱栅栏：均布的立体短柱，高度随时间起伏明灭，替代纯平面刻度线，
+        // 给范围圈补上真正的立体轮廓
+        float rot = time * FIELD_PYLON_ROT_SPEED + seedId * 0.2f;
+        for (int i = 0; i < FIELD_PYLON_COUNT; i++) {
+            double ang = rot + TAU * i / FIELD_PYLON_COUNT;
+            float px = cx + (float) Math.cos(ang) * radius;
+            float pz = cz + (float) Math.sin(ang) * radius;
+            float bob = 0.5f + 0.5f * Mth.sin(time * 1.6f + i * 0.9f + seedId);
+            float h = FIELD_PYLON_HEIGHT * (0.45f + 0.65f * bob);
+            float alpha = (0.5f + 0.3f * bob) * animAlpha;
+            cagePillar(b, m, px, cy + h, pz, px, cy, pz, FIELD_RING_HALF_WIDTH, core, mid, alpha);
+        }
+    }
+
+    // ==================== 几何 / billboard 基元 ====================
+
+    /** 画一个水平径向渐变圆盘（中心 alpha、边缘更淡），用作力场底色填充。 */
+    private static void disc(BufferBuilder b, Matrix4f m,
+                             float cx, float cy, float cz, float radius, int segments,
+                             float[] col, float centerAlpha) {
+        for (int i = 0; i < segments; i++) {
+            double a0 = (TAU * i) / segments;
+            double a1 = (TAU * (i + 1)) / segments;
+            float x0 = cx + radius * (float) Math.cos(a0);
+            float z0 = cz + radius * (float) Math.sin(a0);
+            float x1 = cx + radius * (float) Math.cos(a1);
+            float z1 = cz + radius * (float) Math.sin(a1);
+            b.vertex(m, cx, cy, cz).color(col[0], col[1], col[2], centerAlpha).endVertex();
+            b.vertex(m, x0, cy, z0).color(col[0], col[1], col[2], centerAlpha * 0.4f).endVertex();
+            b.vertex(m, x1, cy, z1).color(col[0], col[1], col[2], centerAlpha * 0.4f).endVertex();
+        }
+    }
+
+    /** 画一圈水平圆环（内外两侧渐隐的窄带）。 */
+    private static void ring(BufferBuilder b, Matrix4f m,
+                             float cx, float cy, float cz, float radius, int segments,
+                             float halfWidth, float[] col, float alpha) {
+        float rInner = Math.max(0f, radius - halfWidth);
+        float rOuter = radius + halfWidth;
+        for (int i = 0; i < segments; i++) {
+            double a0 = (TAU * i) / segments;
+            double a1 = (TAU * (i + 1)) / segments;
+            float ox0 = cx + rOuter * (float) Math.cos(a0);
+            float oz0 = cz + rOuter * (float) Math.sin(a0);
+            float ox1 = cx + rOuter * (float) Math.cos(a1);
+            float oz1 = cz + rOuter * (float) Math.sin(a1);
+            float ix0 = cx + rInner * (float) Math.cos(a0);
+            float iz0 = cz + rInner * (float) Math.sin(a0);
+            float ix1 = cx + rInner * (float) Math.cos(a1);
+            float iz1 = cz + rInner * (float) Math.sin(a1);
+
+            b.vertex(m, ox0, cy, oz0).color(col[0], col[1], col[2], alpha).endVertex();
+            b.vertex(m, ox1, cy, oz1).color(col[0], col[1], col[2], alpha).endVertex();
+            b.vertex(m, ix1, cy, iz1).color(col[0], col[1], col[2], alpha).endVertex();
+
+            b.vertex(m, ox0, cy, oz0).color(col[0], col[1], col[2], alpha).endVertex();
+            b.vertex(m, ix1, cy, iz1).color(col[0], col[1], col[2], alpha).endVertex();
+            b.vertex(m, ix0, cy, iz0).color(col[0], col[1], col[2], alpha).endVertex();
+        }
+    }
+
+    private static void emitSoftMote(BufferBuilder b, Matrix4f m,
+                                     float cx, float cy, float cz, float size,
+                                     float r, float g, float bl, float alpha,
+                                     float rightX, float rightY, float rightZ,
+                                     float upX, float upY, float upZ) {
+        float pex = 0f, pey = 0f, pez = 0f;
+        for (int i = 0; i <= DUST_SEGMENTS; i++) {
+            float ang = TAU * i / DUST_SEGMENTS;
+            float ca = (float) Math.cos(ang) * size;
+            float sa = (float) Math.sin(ang) * size;
+            float ex = cx + rightX * ca + upX * sa;
+            float ey = cy + rightY * ca + upY * sa;
+            float ez = cz + rightZ * ca + upZ * sa;
+            if (i > 0) {
+                b.vertex(m, cx, cy, cz).color(r, g, bl, alpha).endVertex();
+                b.vertex(m, pex, pey, pez).color(r, g, bl, 0f).endVertex();
+                b.vertex(m, ex, ey, ez).color(r, g, bl, 0f).endVertex();
+            }
+            pex = ex;
+            pey = ey;
+            pez = ez;
+        }
+    }
+
+    // ==================== 无分配伪随机（xorshift64） ====================
+
+    private static long seedFor(int entityId, int index) {
+        long s = (entityId * 0x9E3779B97F4A7C15L) ^ ((index + 1L) * 0x85EBCA6BL);
+        s ^= (s >>> 29);
+        return s == 0L ? 0x9E3779B97F4A7C15L : s;
+    }
+
+    private static long rngNext(long s) {
+        s ^= s << 13;
+        s ^= s >>> 7;
+        s ^= s << 17;
+        return s;
+    }
+
+    private static float rngFloat(long s) {
+        return ((s >>> 40) & 0xFFFFFFL) / (float) 0x1000000;
+    }
+
+    // ==================== 数学 / 颜色辅助 ====================
+
+    private static float frac(float x) {
+        return x - (float) Math.floor(x);
+    }
+
+    private static float easeOutCubic(float t) {
+        float inv = 1f - t;
+        return 1f - inv * inv * inv;
+    }
+
+    private static float smoothstep(float e0, float e1, float x) {
+        if (e1 <= e0) {
+            return x < e0 ? 0f : 1f;
+        }
+        float t = (x - e0) / (e1 - e0);
+        if (t < 0f) {
+            t = 0f;
+        } else if (t > 1f) {
+            t = 1f;
+        }
+        return t * t * (3f - 2f * t);
+    }
+
+    private static float clamp01(float v) {
+        if (v < 0f) {
+            return 0f;
+        }
+        return Math.min(v, 1f);
+    }
+
+    private static int lerpRgb(int from, int to, float t) {
+        if (t < 0f) {
+            t = 0f;
+        } else if (t > 1f) {
+            t = 1f;
+        }
+        int fr = (from >> 16) & 0xFF, fg = (from >> 8) & 0xFF, fb = from & 0xFF;
+        int tr = (to >> 16) & 0xFF, tg = (to >> 8) & 0xFF, tb = to & 0xFF;
+        int r = Math.round(fr + (tr - fr) * t);
+        int g = Math.round(fg + (tg - fg) * t);
+        int bl = Math.round(fb + (tb - fb) * t);
+        return (r << 16) | (g << 8) | bl;
+    }
+
+    private static float[] unpack(int color) {
+        return new float[]{
+                ((color >> 16) & 0xFF) / 255f,
+                ((color >> 8) & 0xFF) / 255f,
+                (color & 0xFF) / 255f
+        };
+    }
+}

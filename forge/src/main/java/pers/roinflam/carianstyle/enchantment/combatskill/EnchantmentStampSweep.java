@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -13,6 +14,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
+import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 import java.util.List;
 
@@ -42,8 +44,22 @@ import java.util.List;
  * <p>注意：本次仅新增命中数量上限，旋转动画、增伤公式、目标筛选逻辑均保持不变；
  * 3 格范围内常规战斗几乎不会超过上限，对正常玩法无可观察影响。</p>
  *
+ * <h3>v2.3 视觉</h3>
+ * <p>触发瞬间广播一发自绘环形刀光特效
+ * （{@link CarianStyleCombatArtEffects#spinSlash}——绕自身扫过 360° 的银白刀锋 + 琥珀扬尘环）。
+ * 此前玩家虽然真的转了一圈（{@link #performSpinAnimation}），但没有任何刀光，
+ * 旁观者只能看到一个人原地转圈、周围的怪莫名其妙掉血。</p>
+ * <p><b>视觉与判定严格对齐：</b>特效半径取
+ * {@link CarianStyleCombatArtEffects#spinSlash(ServerLevel, LivingEntity)} 的默认值 3.0 格，
+ * 与下方 {@code EntityUtil.getNearbyEntities(..., 3, ...)} 的实际 AOE 半径一致——
+ * 刀光扫到哪里就打到哪里，玩家可以据此走位。<b>若将来调整了 AOE 半径，
+ * 务必改用带 radius 的重载同步传入新值</b>，否则视觉会骗人。</p>
+ * <p>本次改动仅新增视觉，机制完全未动：旋转动画、增伤公式、目标筛选、命中上限全部保持原样；
+ * 特效为纯服务端广播，不生成实体、不触发任何事件。触发条件是「冲刺攻击」，
+ * 频率天然受控，不会刷屏。</p>
+ *
  * @author RoinFlam
- * @version 2.2
+ * @version 2.3
  */
 @AutoRegisterEnchantment(
         id = "stamp_sweep",
@@ -56,6 +72,13 @@ public class EnchantmentStampSweep extends EnchantmentBase {
 
     /** 单次冲刺斩最大命中目标数：防止密集怪物场景下无上限 AOE 触发大量受击事件链 */
     private static final int MAX_TARGETS = 20;
+
+    /**
+     * AOE 作用半径（格）。
+     * <p>v2.3：抽为常量，供伤害判定与视觉特效共用，避免两处各自写死导致以后改动漏改一处
+     * （视觉与判定不一致会让玩家误判走位）。</p>
+     */
+    private static final int SWEEP_RADIUS = 3;
 
     public EnchantmentStampSweep() {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
@@ -89,6 +112,16 @@ public class EnchantmentStampSweep extends EnchantmentBase {
             performSpinAnimation((ServerPlayer) attacker);
         }
 
+        // ⭐ v2.3 视觉：绕自身扫过一圈的银白刀光 + 扬尘环（纯服务端广播，不影响任何机制）
+        // 半径与下方 AOE 判定共用 SWEEP_RADIUS，保证「扫到哪里就打到哪里」
+        if (attacker.level() instanceof ServerLevel serverLevel) {
+            CarianStyleCombatArtEffects.spinSlash(
+                    serverLevel,
+                    attacker.getX(), attacker.getY(), attacker.getZ(),
+                    attacker.getYRot(), SWEEP_RADIUS
+            );
+        }
+
         // 计算额外伤害：原始伤害 × 10% × 等级
         float baseDamage = ctx.getDamage();
         float bonusDamage = baseDamage * effectiveLevel * 0.1f;
@@ -100,7 +133,7 @@ public class EnchantmentStampSweep extends EnchantmentBase {
         List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 attacker,
-                3,
+                SWEEP_RADIUS,
                 entity -> {
                     // 排除自己
                     if (entity.equals(attacker)) {

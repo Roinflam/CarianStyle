@@ -9,7 +9,6 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.event.RenderPlayerEvent;
 import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
-import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -26,8 +25,70 @@ import java.util.UUID;
 /**
  * 卡利亚风格模组 - 动态属性注册
  * 完全独立的效果系统，不依赖任何药水
+ *
+ * <h3>性能优化 v2.1（本次新增，效果行为基本不变，差异见下）</h3>
+ * <p>
+ * <b>问题：per-entity 事件处理器挂在全局事件总线上，却监听高频事件。</b>
+ * {@code DynamicAttributeInstance.setEventHandler} 会把每个实体的处理器
+ * 单独 {@code MinecraftForge.EVENT_BUS.register}。若处理器里监听的是
+ * {@code LivingEvent.LivingTickEvent}，就意味着：
+ * </p>
+ * <pre>
+ * 回调次数 = 持有该效果的实体数 × 区块内全部活体数 × 每 tick
+ * </pre>
+ * <p>
+ * 50 个实体带岩石剑、区块内 1000 个活体 → 每 tick 5 万次回调，
+ * 而其中 99.9% 只是做一次 UUID 比对就返回。原先的岩石剑（跳跃压制）与
+ * 隐身（清仇恨）都属于这种情况。
+ * </p>
+ * <p>
+ * <b>做法：</b>改用本框架<b>自带的</b> {@link DynamicAttribute#onTick} 回调机制。
+ * 该回调由 {@code DynamicAttributeManager.processEntityTick} 驱动，
+ * 只会对<b>真正持有该效果的实体</b>执行，且入口已有
+ * {@code ENTITY_ATTRIBUTES.isEmpty()} 与 {@code containsKey()} 双重快速退出。
+ * 两个 {@code LivingTickEvent} 监听器因此被完全移除。
+ * </p>
+ * <ul>
+ *     <li><b>岩石剑：</b>{@code CragbladeEventHandler} 整个删除，改为
+ *         {@code onTick(setJumped) + setTickInterval(1)}。原处理器本就没有客户端守卫，
+ *         但它调用的 {@code DynamicAttributeManager.has} 在客户端恒为 false
+ *         （效果数据只存在于服务端），因此实际只在服务端生效——与 onTick 完全一致，
+ *         跳跃压制的手感一模一样。</li>
+ *     <li><b>隐身：</b>处理器保留（仍需监听 {@code LivingChangeTargetEvent} 与
+ *         客户端渲染事件），但其中的 {@code LivingTickEvent} 被移除，
+ *         清仇恨改为 {@code onTick + setTickInterval(}{@value #STEALTH_AGGRO_CLEAR_INTERVAL}{@code )}。</li>
+ * </ul>
+ *
+ * <h3>关于隐身清仇恨频率的行为差异（唯一一处，已做补偿）</h3>
+ * <p>
+ * 优化前，{@code EnchantmentConcealingVeil} 潜行时每 tick 施加一次隐身，
+ * 而旧版 {@code apply} 会整体重建实例 → 事件处理器被重建 → {@code hasInitialized}
+ * 复位 → <b>每约 2 tick 就执行一次 32 格范围的清仇恨查询</b>。
+ * 这既是重复劳动，也伴随着客户端同步包的反复收发（见
+ * {@code DynamicAttributeManager} v2.2 的说明）。
+ * </p>
+ * <p>
+ * 优化后改为固定每 {@value #STEALTH_AGGRO_CLEAR_INTERVAL} tick（0.5 秒）清一次，
+ * 频率降为约 1/10。<b>为什么不影响体验：</b>隐身效果本身在
+ * {@code LivingChangeTargetEvent} 上以 HIGHEST 优先级拦截了所有「把隐身者设为目标」的尝试，
+ * 因此进入隐身后<b>没有任何生物能重新锁定你</b>；清仇恨只负责处理「进入隐身前就已锁定你」
+ * 的那批生物，清一次即可，0.5 秒的周期复查纯属冗余保险。
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.1
  */
 public class DynamicAttributes {
+
+    /**
+     * 隐身状态下清除周边仇恨的间隔（tick）。
+     * <p>10 tick = 0.5 秒。取值理由见类注释「关于隐身清仇恨频率的行为差异」。
+     * 调小更灵敏但更耗，调大更省；由于目标锁定本身已被事件拦截，该值不影响实际隐身效果。</p>
+     */
+    private static final int STEALTH_AGGRO_CLEAR_INTERVAL = 10;
+
+    /** 隐身状态下清除仇恨的搜索半径（格） */
+    private static final double STEALTH_CLEAR_AGGRO_RANGE = 32.0;
 
     // ========== 基础增益效果 ==========
 
@@ -71,13 +132,18 @@ public class DynamicAttributes {
      * - 护甲+10%×等级
      * - 韧性+10%×等级
      * - 无法跳跃
+     * <p>
+     * v2.1：跳跃压制由原来的 per-entity {@code LivingTickEvent} 处理器
+     * 改为框架自带的 onTick 回调（每 tick 触发），只对持有该效果的实体执行。
+     * </p>
      */
     public static final DynamicAttribute CRAGBLADE = new DynamicAttribute("carianstyle_cragblade")
             .addModifier(Attributes.ATTACK_DAMAGE, 0.1, AttributeModifier.Operation.MULTIPLY_TOTAL)
             .addModifier(Attributes.KNOCKBACK_RESISTANCE, 0.1, AttributeModifier.Operation.MULTIPLY_TOTAL)
             .addModifier(Attributes.ARMOR, 0.1, AttributeModifier.Operation.MULTIPLY_TOTAL)
             .addModifier(Attributes.ARMOR_TOUGHNESS, 0.1, AttributeModifier.Operation.MULTIPLY_TOTAL)
-            .withEventHandler(CragbladeEventHandler::new);
+            .onTick(context -> EntityLivingUtil.setJumped(context.getEntity()))
+            .setTickInterval(1);
 
     // ========== 负面效果 ==========
 
@@ -105,10 +171,17 @@ public class DynamicAttributes {
      * 隐身效果
      * - 玩家模型不渲染（隐形）
      * - 生物无法将此实体设为攻击目标
-     * - 添加效果时清除周围32格所有生物的仇恨
+     * - 周期性清除周围32格所有生物的仇恨
      * - 客户端同步渲染：序列号4
+     * <p>
+     * v2.1：清仇恨由原来的 per-entity {@code LivingTickEvent} 处理器
+     * 改为框架自带的 onTick 回调（每 {@value #STEALTH_AGGRO_CLEAR_INTERVAL} tick 触发）。
+     * 事件处理器保留，仍负责拦截目标锁定与客户端渲染。
+     * </p>
      */
     public static final DynamicAttribute STEALTH = new DynamicAttribute("carianstyle_stealth")
+            .onTick(context -> clearNearbyAggroTowards(context.getEntity()))
+            .setTickInterval(STEALTH_AGGRO_CLEAR_INTERVAL)
             .withEventHandler(StealthEventHandler::new);
 
     // ========== 火焰燃烧效果 ==========
@@ -163,33 +236,48 @@ public class DynamicAttributes {
                 .onRemoved(ClientSyncEffectHelper::onAttributeRemoved);
     }
 
-    // ========== 命名内部类：事件处理器 ==========
+    // ========== 共享工具方法 ==========
 
     /**
-     * 岩石剑效果的事件处理器
-     * 阻止实体跳跃
+     * 清除周围生物对指定实体的仇恨。
+     * <p>
+     * v2.1：由 {@code StealthEventHandler} 的实例方法提为静态方法，
+     * 供 {@link #STEALTH} 的 onTick 回调直接调用。逻辑与原实现一字未改。
+     * </p>
+     *
+     * @param target 需要被“遗忘”的目标实体
      */
-    private static class CragbladeEventHandler {
-        private final UUID boundEntityId;
-
-        public CragbladeEventHandler(LivingEntity entity) {
-            this.boundEntityId = entity.getUUID();
+    private static void clearNearbyAggroTowards(LivingEntity target) {
+        if (target.level().isClientSide()) {
+            return;
         }
 
-        @SubscribeEvent
-        public void onLivingUpdate(LivingEvent.LivingTickEvent event) {
-            if (!event.getEntity().getUUID().equals(boundEntityId)) return;
+        AABB searchBox = new AABB(
+                target.getX() - STEALTH_CLEAR_AGGRO_RANGE,
+                target.getY() - STEALTH_CLEAR_AGGRO_RANGE,
+                target.getZ() - STEALTH_CLEAR_AGGRO_RANGE,
+                target.getX() + STEALTH_CLEAR_AGGRO_RANGE,
+                target.getY() + STEALTH_CLEAR_AGGRO_RANGE,
+                target.getZ() + STEALTH_CLEAR_AGGRO_RANGE
+        );
 
-            LivingEntity livingEntity = event.getEntity();
-            if (DynamicAttributeManager.has(livingEntity, DynamicAttributes.CRAGBLADE)) {
-                EntityLivingUtil.setJumped(livingEntity);
-            }
+        List<Mob> nearbyMobs = target.level().getEntitiesOfClass(
+                Mob.class,
+                searchBox,
+                mob -> mob.getTarget() != null && mob.getTarget().equals(target)
+        );
+
+        for (Mob mob : nearbyMobs) {
+            mob.setTarget(null);
         }
     }
+
+    // ========== 命名内部类：事件处理器 ==========
 
     /**
      * 沙布里里的嚎叫效果的事件处理器
      * 减少治疗量
+     * <p>只监听低频的 {@code LivingHealEvent}，无需改造。</p>
      */
     private static class HowlShabririEventHandler {
         private final UUID boundEntityId;
@@ -215,6 +303,7 @@ public class DynamicAttributes {
     /**
      * 癫痫火焰燃烧效果的事件处理器
      * 大幅减少治疗量(90%)
+     * <p>只监听低频的 {@code LivingHealEvent}，无需改造。</p>
      */
     private static class EpilepsyFireEventHandler {
         private final UUID boundEntityId;
@@ -237,28 +326,18 @@ public class DynamicAttributes {
 
     /**
      * 隐身效果的事件处理器
+     * <p>
+     * v2.1：原先的 {@code LivingTickEvent} 监听（首次 tick 清仇恨）已移除，
+     * 改由 {@link #STEALTH} 的 onTick 回调周期执行——详见类注释。
+     * 本处理器现仅保留两项：拦截生物锁定目标、客户端隐藏玩家渲染。
+     * 二者都是低频事件，挂在全局总线上没有性能问题。
+     * </p>
      */
     private static class StealthEventHandler {
-        private static final double CLEAR_AGGRO_RANGE = 32.0;
         private final UUID boundEntityId;
-        private boolean hasInitialized = false;
 
         public StealthEventHandler(LivingEntity entity) {
             this.boundEntityId = entity.getUUID();
-        }
-
-        /**
-         * 首次Tick时清除周围仇恨
-         */
-        @SubscribeEvent
-        public void onLivingTick(LivingEvent.LivingTickEvent event) {
-            if (!event.getEntity().getUUID().equals(boundEntityId)) return;
-            if (event.getEntity().level().isClientSide()) return;
-
-            if (!hasInitialized) {
-                hasInitialized = true;
-                clearNearbyAggroTowards(event.getEntity());
-            }
         }
 
         /**
@@ -285,30 +364,6 @@ public class DynamicAttributes {
             // 检查被渲染的玩家是否在隐身列表中（序列号4）
             if (ClientSyncEffectManager.shouldRenderEffect(4, event.getEntity().getId())) {
                 event.setCanceled(true);
-            }
-        }
-
-        /**
-         * 清除周围生物对指定实体的仇恨
-         */
-        private void clearNearbyAggroTowards(LivingEntity target) {
-            AABB searchBox = new AABB(
-                    target.getX() - CLEAR_AGGRO_RANGE,
-                    target.getY() - CLEAR_AGGRO_RANGE,
-                    target.getZ() - CLEAR_AGGRO_RANGE,
-                    target.getX() + CLEAR_AGGRO_RANGE,
-                    target.getY() + CLEAR_AGGRO_RANGE,
-                    target.getZ() + CLEAR_AGGRO_RANGE
-            );
-
-            List<Mob> nearbyMobs = target.level().getEntitiesOfClass(
-                    Mob.class,
-                    searchBox,
-                    mob -> mob.getTarget() != null && mob.getTarget().equals(target)
-            );
-
-            for (Mob mob : nearbyMobs) {
-                mob.setTarget(null);
             }
         }
     }

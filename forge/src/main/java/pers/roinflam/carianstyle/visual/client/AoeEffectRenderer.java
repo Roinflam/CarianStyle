@@ -1,13 +1,7 @@
 package pers.roinflam.carianstyle.visual.client;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.BufferUploader;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.Tesselator;
-import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
@@ -24,26 +18,31 @@ import java.util.List;
 /**
  * 定点 AOE 自绘渲染器（纯客户端）。
  * <p>
- * 与光环 {@code AuraGroundRenderer} 采用同款管线：订阅 {@link RenderLevelStageEvent} 的
- * {@code AFTER_TRANSLUCENT_BLOCKS} 阶段，用 {@link Tesselator} + {@link DefaultVertexFormat#POSITION_COLOR}
- * + {@code GameRenderer::getPositionColorShader} 纯顶点绘制——无贴图、无原版粒子。
+ * 与光环 {@link AuraGroundRenderer} 采用同款管线：订阅 {@link RenderLevelStageEvent} 的
+ * {@code AFTER_TRANSLUCENT_BLOCKS} 阶段，用 {@code POSITION_COLOR} 纯顶点绘制——无贴图、无原版粒子。
  * </p>
  * <p>
  * 多数演出为<b>水平地面法阵</b>；而<b>猩红罗妮亚 {@link #drawScarletBloom}</b> 为还原玛莲妮亚的
- * 「猩红艾奥尼亚」开花，额外绘制一朵<b>竖直 3D 立体绽放花</b>（{@link #drawAeoniaFlower}）：
- * 四层曼陀罗/兰花式层叠花瓣 + 花蕊 + 花心白热球，花瓣为真 3D 几何（沿向上弯曲脊线展开的曲面带，
- * 纯顶点色靠「根深尖亮」模拟体积），随进度从花苞聚拢 → 缓慢绽放（覆盖约 1.5 秒拉取无敌前摇）→
- * 猛地盛放 → 爆发喷腐败 → 外翻凋谢下沉。地面法阵保留作花根光环。其余演出（含癫火 {@link #drawFrenziedFlame}）
- * 保持平面。
+ * 「猩红艾奥尼亚」开花，额外绘制一朵<b>竖直 3D 立体绽放花</b>（{@link #drawAeoniaFlower}）。其余演出
+ * （含癫火 {@link #drawFrenziedFlame}）保持平面。
  * </p>
  * <p>
- * <b>注意：</b>特效起播时刻取决于附魔实现类中调用
- * {@code CarianStyleBurstParticles.scarletBloom(...)} 的位置，不在本渲染器内。
+ * <b>龙雷红色闪电 {@link #drawRedLightning}（v4）：</b>另一类<b>竖直</b>演出——还原艾尔登法环「龙雷」的
+ * 红色雷击：一道自天而降的红色之字电柱劈在目标脚下，白热核 + 红辉光 + 浓红外晕三层电流，沿途分出数条
+ * 短分叉，落地处掀起红色冲击环与地面强闪，整体瞬间炸亮后缓慢庄重明灭、较慢消散。电柱每段用「十字双面」
+ * 绘制（沿世界 X、Z 轴各一个四边形），从任意水平视角皆可见、无需 billboard。外形由管理器创建时确定的
+ * 固定种子决定，每道闪电形态各异、同一道闪电在其生命周期内形态稳定。古龙雷击等高频重复降雷由管理器的
+ * 「同位置合并」收敛为一道持续的雷，避免叠加成「鬼畜」。
  * </p>
  * <p>
- * <b>空缓冲兜底：</b>{@link #emitDegenerateTriangle} 在 {@code begin()} 后无条件追加一个零面积、
- * 全透明退化三角形，保证 {@code begin/end} 间永不空（避免 progress≈0 时整批零顶点在 Mohist 等
- * 环境下打断世界渲染）。
+ * <b>v5（性能，视觉零变化）：</b>接入 {@link VisualBatch}——不再自行设置 / 恢复 GL 状态、
+ * 不再自行 {@code begin/end} 顶点缓冲，改为向共享缓冲写顶点，由 {@link VisualBatch} 在本帧末
+ * 统一提交（本模组七个世界渲染器合并为一次 GL 状态切换与一次 draw call）。
+ * <b>空缓冲兜底</b>（零面积全透明退化三角形）原先由本类在自己的 {@code begin()} 后追加，
+ * 现已上移至 {@link VisualBatch} 统一处理，本类不再需要。
+ * 本渲染器不做范围实体查询（数据来自 {@link AoeEffectManager} 的存活特效列表），故不涉及
+ * {@link SharedEntityQuery}；仅在绑定跟随实体时按 id 精确查一次实体，与优化前一致。
+ * 距离裁剪、进度映射、分发顺序与全部几何参数均未改动。
  * </p>
  *
  * @author RoinFlam
@@ -74,11 +73,44 @@ public final class AoeEffectRenderer {
     private static final int FRENZY_WHITE = 0xFFF4C0;
     private static final int GENERIC_BLUE = 0xCFE0FF;
 
+    // ===== 龙雷红色闪电配色（0xRRGGBB）=====
+    /** 龙雷电柱核心：近白热（仅微带红），原作龙雷核心极亮发白 */
+    private static final int LIGHTNING_CORE = 0xFFF0F0;
+    /** 龙雷电柱中层辉光：亮红 */
+    private static final int LIGHTNING_GLOW = 0xFF2A36;
+    /** 龙雷电柱外层光晕 / 落地冲击 / 分叉末端：浓深红 */
+    private static final int LIGHTNING_DEEP = 0xC81022;
+
+    // ===== 龙雷红色闪电几何参数 =====
+    /** 闪电柱总高度（格，自落地点向上延伸） */
+    private static final double LIGHTNING_HEIGHT = 28.0;
+    /** 主干段数 */
+    private static final int LIGHTNING_SEGMENTS = 18;
+    /** 每段水平蜿蜒幅度（格，越大电柱越曲折） */
+    private static final double LIGHTNING_WANDER = 0.65;
+    /** 主干水平最大偏移（格，限制电柱不漂离落地点太远） */
+    private static final double LIGHTNING_MAX_OFFSET = 3.0;
+    /** 电柱核心半宽（格，白热炽核） */
+    private static final double LIGHTNING_CORE_HALF = 0.16;
+    /** 电柱中层辉光半宽（格，红色主体，包裹核心） */
+    private static final double LIGHTNING_GLOW_HALF = 0.52;
+    /** 电柱外层光晕半宽（格，浓红体量光晕，最宽最淡） */
+    private static final double LIGHTNING_HALO_HALF = 1.05;
+    /** 分叉数量 */
+    private static final int LIGHTNING_BRANCHES = 6;
+    /** 每条分叉段数 */
+    private static final int LIGHTNING_BRANCH_SEGMENTS = 5;
+    /** 分叉每段步长（格） */
+    private static final double LIGHTNING_BRANCH_STEP = 1.7;
+
     private AoeEffectRenderer() {
     }
 
     /**
      * 渲染回调：遍历全部存活特效，按类型分发到对应自绘演出。
+     * <p>
+     * v5：GL 状态与顶点缓冲由 {@link VisualBatch} 统一管理；本方法只负责裁剪与写顶点。
+     * </p>
      *
      * @param event 渲染阶段事件
      */
@@ -95,13 +127,19 @@ public final class AoeEffectRenderer {
         if (mc.level == null) {
             return;
         }
+        // 共享批次未开启：直接跳过
+        BufferBuilder builder = VisualBatch.builder();
+        if (builder == null) {
+            return;
+        }
+        Vec3 cam = VisualBatch.cameraPosition();
+        if (cam == null) {
+            return;
+        }
 
-        Vec3 cam = event.getCamera().getPosition();
         long now = System.currentTimeMillis();
         double cullSqr = CULL * CULL;
 
-        // 性能早退：本帧若不存在 progress∈(0,1) 且在裁剪范围内的特效，直接跳过 GL 状态设置与 begin/end。
-        // 注意：anyVisible=true 并不保证下方循环一定产生顶点；空缓冲兜底由退化三角形负责（见下）。
         boolean anyVisible = false;
         for (AoeEffectManager.AoeEffect fx : list) {
             double dx = fx.x - cam.x;
@@ -121,28 +159,10 @@ public final class AoeEffectRenderer {
             return;
         }
 
-        Matrix4f matrix = event.getPoseStack().last().pose();
-        Tesselator tesselator = Tesselator.getInstance();
-        BufferBuilder builder = tesselator.getBuilder();
+        Matrix4f matrix = VisualBatch.matrix();
+        float partial = VisualBatch.partialTick();
 
-        // GL 状态：普通 alpha 混合、关闭深度写入、保留深度测试、双面绘制（与光环一致）。
-        // 立体花同样在此批内绘制：关闭深度写入避免花瓣彼此遮挡产生硬边，双面绘制让花瓣正反皆可见。
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.disableCull();
-        RenderSystem.depthMask(false);
-        RenderSystem.enableDepthTest();
-        RenderSystem.setShader(GameRenderer::getPositionColorShader);
-
-        builder.begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
-        // 空缓冲兜底：无条件先追加一个零面积、全透明退化三角形（详见类注释与该方法注释）。
-        emitDegenerateTriangle(builder, matrix);
-        // 跟随特效需要实体的插值实时位置；partialTick 用于平滑（与世界渲染同步）
-        float partial = event.getPartialTick();
         for (AoeEffectManager.AoeEffect fx : list) {
-            // 解析特效中心：跟随实体（entityId>=0）则取实体插值实时位置并回写缓存坐标；
-            // 实体不存在 / 已死则回退到缓存坐标（最后已知位置，死亡演出尾段残留原地）；
-            // 定点特效（entityId=-1）直接用缓存坐标（恒为发包坐标）
             double fxX = fx.x;
             double fxY = fx.y;
             double fxZ = fx.z;
@@ -153,7 +173,6 @@ public final class AoeEffectRenderer {
                     fxX = pos.x;
                     fxY = pos.y;
                     fxZ = pos.z;
-                    // 回写缓存，供实体随后死亡 / 移除时继续在原地播放剩余演出
                     fx.x = fxX;
                     fx.y = fxY;
                     fx.z = fxZ;
@@ -165,45 +184,30 @@ public final class AoeEffectRenderer {
             if (dx * dx + dy * dy + dz * dz > cullSqr) {
                 continue;
             }
-            // 进度改用 manager 的分段映射：死亡演出蓄能段恒对齐 30tick 爆发、加长只拉长凋谢余波；
-            // 其余类型为线性。progressFor 已夹取到 [0,1]，无需再 clamp。
             float progress = AoeEffectManager.progressFor(fx, now);
             double rx = fxX - cam.x;
             double ry = fxY - cam.y + Y_OFFSET;
             double rz = fxZ - cam.z;
-            dispatch(builder, matrix, fx.type, rx, ry, rz, fx.radius, progress);
-        }
-        BufferUploader.drawWithShader(builder.end());
-
-        // 恢复 GL 状态
-        RenderSystem.depthMask(true);
-        RenderSystem.enableCull();
-        RenderSystem.disableBlend();
-    }
-
-    /**
-     * 追加一个零面积、全透明的退化三角形（三个顶点重合于相机原点、alpha=0），保证缓冲永不空。
-     *
-     * @param b 顶点构建器
-     * @param m 位姿矩阵
-     */
-    private static void emitDegenerateTriangle(BufferBuilder b, Matrix4f m) {
-        for (int i = 0; i < 3; i++) {
-            b.vertex(m, 0f, 0f, 0f).color(0f, 0f, 0f, 0f).endVertex();
+            // fx.seed 为该特效创建时确定的固定外形种子（仅红色闪电用到），整段生命周期恒定，
+            // 即便红闪被「同位置合并」反复续命也不跳变外形。
+            dispatch(builder, matrix, fx.type, rx, ry, rz, fx.radius, progress, fx.seed);
         }
     }
 
     /**
      * 按类型分发到具体演出。
+     *
+     * @param seed 该特效的固定外形种子（创建时确定、生命周期不变，当前仅红色闪电使用）
      */
     private static void dispatch(BufferBuilder b, Matrix4f m, int type,
-                                 double cx, double cy, double cz, double radius, float p) {
+                                 double cx, double cy, double cz, double radius, float p, long seed) {
         switch (type) {
             case AoeEffectPacket.TYPE_CAUSALITY -> drawCausality(b, m, cx, cy, cz, radius, p);
             case AoeEffectPacket.TYPE_FROST_QUAKE -> drawFrostQuake(b, m, cx, cy, cz, radius, p);
             case AoeEffectPacket.TYPE_REPULSION -> drawRepulsion(b, m, cx, cy, cz, radius, p);
             case AoeEffectPacket.TYPE_SCARLET_BLOOM -> drawScarletBloom(b, m, cx, cy, cz, radius, p);
             case AoeEffectPacket.TYPE_FRENZIED_FLAME -> drawFrenziedFlame(b, m, cx, cy, cz, radius, p);
+            case AoeEffectPacket.TYPE_RED_LIGHTNING -> drawRedLightning(b, m, cx, cy, cz, radius, p, seed);
             default -> drawGeneric(b, m, cx, cy, cz, radius, p);
         }
     }
@@ -303,17 +307,7 @@ public final class AoeEffectRenderer {
     }
 
     /**
-     * 猩红艾奥尼亚（还原玛莲妮亚开花，含竖直 3D 立体绽放花）：
-     * <ol>
-     *     <li><b>地面法阵底座</b>(0~0.56)：血雾底盘 + 六边结界框 + 双向旋转符文环 + 腐败涟漪 + 星屑，
-     *         作花根光环（较弱，不抢花的戏）；</li>
-     *     <li><b>立体绽放花</b>(全程)：{@link #drawAeoniaFlower} 四层曼陀罗花瓣 + 花蕊 + 花心球，
-     *         随 {@code open} 从花苞 → 缓慢绽放（覆盖约 1.5s 拉取无敌蓄能前摇）→ 盛放 → 外翻凋谢下沉；
-     *         盛放主点 p≈0.42 正好对应附魔 30tick(1.5s) 的第二阶段爆发瞬间；</li>
-     *     <li><b>盛放白热</b>(0.40~0.52)：花心白热球爆亮；</li>
-     *     <li><b>爆发腐败</b>(0.42~0.74)：从花根喷出的多重地面炸裂环 + 放射爆纹 + 地面强闪；</li>
-     *     <li><b>凋谢余波</b>(0.65~1.0)：地面血晕消退 + 余波细环 + 星屑下沉。</li>
-     * </ol>
+     * 猩红艾奥尼亚（还原玛莲妮亚开花，含竖直 3D 立体绽放花）。
      */
     private static void drawScarletBloom(BufferBuilder b, Matrix4f m,
                                          double cx, double cy, double cz, double radius, float p) {
@@ -321,28 +315,23 @@ public final class AoeEffectRenderer {
         float[] deep = unpack(SCARLET_DEEP);
         float[] hot = unpack(SCARLET_HOT);
         double hw = lineHalf(radius);
-        // 开场即满：前 0.015（约 60ms）内快速拉满，避免首帧硬跳，本质是"瞬间出现"
         float appear = clamp01(p / 0.015f);
-        float rot = p * 0.35f * TAU; // 花与法阵缓慢同向自转
+        float rot = p * 0.35f * TAU;
 
-        // —— 绽放/拔起/凋谢参数 ——
-        // open：0=花苞聚拢竖直，1=全开，>1=外翻下垂（凋谢）
-        // 盛放主点 p≈0.42（3600ms 时长下约 1512ms），对齐附魔 30tick 第二阶段爆发
         float open;
         if (p < 0.40f) {
-            open = lerp(0.08f, 0.72f, (float) easeOutCubic(p / 0.40f)); // 缓慢绽放（1.5s 蓄能期）
+            open = lerp(0.08f, 0.72f, (float) easeOutCubic(p / 0.40f));
         } else if (p < 0.44f) {
-            open = lerp(0.72f, 1.0f, (p - 0.40f) / 0.04f);              // 猛地盛放
+            open = lerp(0.72f, 1.0f, (p - 0.40f) / 0.04f);
         } else {
-            open = 1.0f + 0.6f * smoothstep(0.44f, 1.0f, p);            // 持续外翻下垂
+            open = 1.0f + 0.6f * smoothstep(0.44f, 1.0f, p);
         }
-        float riseH = clamp01(p / 0.04f);                              // 拔起
+        float riseH = clamp01(p / 0.04f);
         if (p > 0.62f) {
-            riseH *= (1f - 0.55f * smoothstep(0.62f, 1f, p));          // 凋谢下沉
+            riseH *= (1f - 0.55f * smoothstep(0.62f, 1f, p));
         }
         float flowerAlpha = appear * (1f - smoothstep(0.65f, 1.0f, p));
 
-        // ===== A. 地面法阵底座（0~0.62，减弱版，作花根光环）=====
         float baseA = appear * (1f - smoothstep(0.48f, 0.56f, p));
         if (baseA > 0f) {
             float pulse = 0.7f + 0.3f * (float) Math.sin(p * 12.0);
@@ -361,17 +350,14 @@ public final class AoeEffectRenderer {
             starField(b, m, cx, cz, cy, radius * 0.95, 16, p, (float) (radius * 0.022 + 0.035), red, 0.4f * baseA);
         }
 
-        // ===== B. 立体绽放花（主角，全程）=====
         drawAeoniaFlower(b, m, cx, cy, cz, radius, open, riseH, flowerAlpha, rot);
 
-        // ===== C. 盛放白热（0.40~0.52）：花心白热球爆亮 =====
         if (p >= 0.40f && p < 0.52f) {
             float kf = clamp01((p - 0.40f) / 0.04f) * (1f - smoothstep(0.46f, 0.52f, p));
             double coreH = radius * 0.95 * riseH * 0.16;
             drawOrb(b, m, cx, cy + coreH, cz, radius * (0.10 + 0.18 * kf), mix(red, hot, 0.7f), 0.9f * appear);
         }
 
-        // ===== D. 爆发腐败（0.42~0.74）：从花根喷出的地面冲击 =====
         float burst = clamp01((p - 0.42f) / 0.30f);
         if (burst > 0f) {
             float bfade = 1f - burst;
@@ -393,7 +379,6 @@ public final class AoeEffectRenderer {
             }
         }
 
-        // ===== E. 凋谢余波（0.65~1.0）=====
         float ember = smoothstep(0.65f, 0.75f, p) * (1f - smoothstep(0.95f, 1f, p));
         if (ember > 0f) {
             double rr = radius * 2.2;
@@ -412,16 +397,7 @@ public final class AoeEffectRenderer {
     // ============================== 猩红艾奥尼亚 · 3D 立体花专用几何 ==============================
 
     /**
-     * 绘制整朵猩红艾奥尼亚之花：四层曼陀罗式层叠花瓣（外→内逐层更立、更短、更亮）+ 花蕊小瓣 + 花心白热球。
-     * <p>花瓣为真 3D 几何（{@link #drawPetal}），随 {@code open} 绽放：层间方位错开（内层插在外层花瓣
-     * 之间，模拟真花排布），整体随 {@code rot} 缓慢自转、{@code riseH} 控制高度（拔起/下沉）、
-     * {@code flowerAlpha} 控制整朵透明度（凋谢淡出）。</p>
-     *
-     * @param radius      特效半径（决定花的尺度）
-     * @param open        绽放程度（0 花苞 → 1 全开 → >1 外翻下垂）
-     * @param riseH       高度系数（0~1，拔起与凋谢下沉）
-     * @param flowerAlpha 整朵透明度系数
-     * @param rot         整体自转角（弧度）
+     * 绘制整朵猩红艾奥尼亚之花：四层曼陀罗式层叠花瓣 + 花蕊小瓣 + 花心白热球。
      */
     private static void drawAeoniaFlower(BufferBuilder b, Matrix4f m, double cx, double cy, double cz,
                                          double radius, float open, float riseH, float flowerAlpha, float rot) {
@@ -431,9 +407,8 @@ public final class AoeEffectRenderer {
         float[] deep = unpack(SCARLET_DEEP);
         float[] red = unpack(SCARLET);
         float[] hot = unpack(SCARLET_HOT);
-        double l = radius * 0.95 * riseH; // 花的高度量级
+        double l = radius * 0.95 * riseH;
 
-        // 四层花瓣：外→内（瓣数递减、更短、更立、更亮；方位逐层错开，内层插空）
         drawPetalLayer(b, m, cx, cy, cz, 8, l * 1.00, radius * 0.24, deg2rad(82), open, rot,
                 deep, red, red, flowerAlpha);
         drawPetalLayer(b, m, cx, cy, cz, 7, l * 0.78, radius * 0.21, deg2rad(64), open, rot + 0.34f,
@@ -442,28 +417,13 @@ public final class AoeEffectRenderer {
                 red, red, hot, flowerAlpha * 0.92f);
         drawPetalLayer(b, m, cx, cy, cz, 5, l * 0.38, radius * 0.14, deg2rad(34), open, rot + 0.95f,
                 red, hot, hot, flowerAlpha * 0.90f);
-        // 花蕊：一簇极短、近竖直的亮瓣（开合只取一半，使其始终较为聚拢）
         drawPetalLayer(b, m, cx, cy, cz, 6, l * 0.24, radius * 0.08, deg2rad(20), open * 0.5f, rot + 0.15f,
                 red, hot, hot, flowerAlpha);
-        // 花心白热球（盛放阶段另有更亮的爆亮球叠加，见 drawScarletBloom 的 C 段）
         drawOrb(b, m, cx, cy + l * 0.12, cz, radius * 0.06, mix(red, hot, 0.5f), 0.7f * flowerAlpha);
     }
 
     /**
      * 绘制一层花瓣：{@code petals} 片均布，方位以 {@code baseRot} 为起点。
-     * <p>花瓣根部与 Y+ 的夹角随 {@code open} 从花苞角（约 12°）插值到该层全开角 {@code fullAngle}
-     * （{@code open>1} 时自然超出 → 外翻下垂）；花瓣自身弧度（尖端外卷）也随 open 增强。</p>
-     *
-     * @param petals    花瓣数
-     * @param length    花瓣长度（沿脊线弧长）
-     * @param maxWidth  花瓣最大宽度
-     * @param fullAngle 全开时花瓣根部与 Y+ 的夹角（弧度）
-     * @param open      绽放程度
-     * @param baseRot   本层方位起始角（弧度，用于层间错开）
-     * @param deep      根部色
-     * @param mid       中部色
-     * @param tip       尖端色
-     * @param alphaMul  整层透明度系数
      */
     private static void drawPetalLayer(BufferBuilder b, Matrix4f m, double cx, double cy, double cz,
                                        int petals, double length, double maxWidth,
@@ -471,7 +431,7 @@ public final class AoeEffectRenderer {
                                        float[] deep, float[] mid, float[] tip, float alphaMul) {
         float budAngle = deg2rad(12);
         float baseAngle = budAngle + open * (fullAngle - budAngle);
-        float curlAngle = deg2rad(12) + deg2rad(28) * open; // 尖端外卷，越开越卷
+        float curlAngle = deg2rad(12) + deg2rad(28) * open;
         for (int i = 0; i < petals; i++) {
             float az = baseRot + TAU * i / petals;
             drawPetal(b, m, cx, cy, cz, az, baseAngle, curlAngle, length, maxWidth, deep, mid, tip, alphaMul);
@@ -480,17 +440,6 @@ public final class AoeEffectRenderer {
 
     /**
      * 绘制一片 3D 花瓣：沿一条「向上弯曲」的脊线积分采样，左右按宽度轮廓展开成三角形带曲面。
-     * <p>脊线在参数 u∈[0,1]（根→尖）处与 Y+ 的夹角为 {@code baseAngle + curlAngle·u}：
-     * 夹角 0 为竖直向上、90° 为水平外伸；沿脊线以固定步长积分得到每个截面的水平/竖直分量，
-     * 再绕方位角 {@code azimuth} 展开到世界 xz 平面。宽度方向取水平面内垂直于方位角的方向。
-     * 颜色沿 u 由根部 {@code deep} → 中部 {@code mid} → 尖端 {@code tip} 渐变，alpha 呈中段最实的
-     * 驼峰，从而在无光照的纯顶点色下模拟花瓣的体积与发光感。</p>
-     *
-     * @param azimuth   花瓣水平朝向角（弧度）
-     * @param baseAngle 根部脊线与 Y+ 的夹角（弧度）
-     * @param curlAngle 根→尖额外增加的夹角（弧度，正值使尖端外卷）
-     * @param length    花瓣长度（脊线弧长）
-     * @param maxWidth  花瓣最大宽度
      */
     private static void drawPetal(BufferBuilder b, Matrix4f m, double cx, double cy, double cz,
                                   float azimuth, float baseAngle, float curlAngle,
@@ -498,10 +447,8 @@ public final class AoeEffectRenderer {
                                   float[] deep, float[] mid, float[] tip, float alphaMul) {
         final int seg = 8;
         double cosA = Math.cos(azimuth), sinA = Math.sin(azimuth);
-        // 宽度方向（水平，垂直于方位角）
         double wx = -sinA, wz = cosA;
 
-        // 沿脊线积分得到每个截面的水平/竖直分量
         double[] hor = new double[seg + 1];
         double[] ver = new double[seg + 1];
         double h = 0, v = 0;
@@ -534,7 +481,6 @@ public final class AoeEffectRenderer {
             float a0 = petalAlpha(u0) * alphaMul;
             float a1 = petalAlpha(u1) * alphaMul;
 
-            // 两个三角形构成本段曲面（双面绘制已开启，正反皆可见）
             b.vertex(m, l0x, l0y, l0z).color(c0[0], c0[1], c0[2], a0).endVertex();
             b.vertex(m, r0x, r0y, r0z).color(c0[0], c0[1], c0[2], a0).endVertex();
             b.vertex(m, r1x, r1y, r1z).color(c1[0], c1[1], c1[2], a1).endVertex();
@@ -546,9 +492,7 @@ public final class AoeEffectRenderer {
     }
 
     /**
-     * 绘制一个小亮球（上下两个四棱锥拼成的八面体近似，中心轴点最亮、赤道点略暗），用作花心白热核。
-     *
-     * @param size 球半尺寸（格）
+     * 绘制一个小亮球（上下两个四棱锥拼成的八面体近似），用作花心白热核。
      */
     private static void drawOrb(BufferBuilder b, Matrix4f m, double cx, double cy, double cz,
                                 double size, float[] col, float alpha) {
@@ -562,33 +506,21 @@ public final class AoeEffectRenderer {
         for (int i = 0; i < 4; i++) {
             float[] a = eq[i];
             float[] d = eq[(i + 1) % 4];
-            // 上半锥面
             b.vertex(m, top[0], top[1], top[2]).color(r, g, bb, alpha).endVertex();
             b.vertex(m, a[0], a[1], a[2]).color(r, g, bb, alpha * 0.55f).endVertex();
             b.vertex(m, d[0], d[1], d[2]).color(r, g, bb, alpha * 0.55f).endVertex();
-            // 下半锥面
             b.vertex(m, bot[0], bot[1], bot[2]).color(r, g, bb, alpha).endVertex();
             b.vertex(m, d[0], d[1], d[2]).color(r, g, bb, alpha * 0.55f).endVertex();
             b.vertex(m, a[0], a[1], a[2]).color(r, g, bb, alpha * 0.55f).endVertex();
         }
     }
 
-    /**
-     * 花瓣宽度轮廓（u∈[0,1]，根 0 → 中部最宽 → 尖 0），用 {@code sin(π·u^0.65)} 得到根窄、中宽、尖收的叶形。
-     *
-     * @param u 沿花瓣长度的归一化参数
-     * @return 宽度系数（0~1）
-     */
+    /** 花瓣宽度轮廓（根窄、中宽、尖收的叶形）。 */
     private static double petalWidth(double u) {
         return Math.sin(Math.PI * Math.pow(u, 0.65));
     }
 
-    /**
-     * 花瓣颜色：根部 {@code deep} → 中部 {@code mid} → 尖端偏向 {@code tip}，模拟根深尖亮的体积感。
-     *
-     * @param u 沿花瓣长度的归一化参数
-     * @return [r,g,b]
-     */
+    /** 花瓣颜色：根部 deep → 中部 mid → 尖端偏向 tip。 */
     private static float[] petalColor(double u, float[] deep, float[] mid, float[] tip) {
         if (u < 0.5) {
             return mix(deep, mid, (float) (u / 0.5));
@@ -596,19 +528,13 @@ public final class AoeEffectRenderer {
         return mix(mid, tip, (float) ((u - 0.5) / 0.5) * 0.7f);
     }
 
-    /**
-     * 花瓣 alpha：中段最实的驼峰（根尖略透发光），用 {@code 0.5 + 0.45·sin(π·u)}。
-     *
-     * @param u 沿花瓣长度的归一化参数
-     * @return alpha 系数
-     */
+    /** 花瓣 alpha：中段最实的驼峰。 */
     private static float petalAlpha(double u) {
         return 0.5f + 0.45f * (float) Math.sin(Math.PI * u);
     }
 
     /**
-     * 癫火蔓延（大型多段平面演出，开场即满状态）：狂乱蓄能（满裂纹网+三层乱星+火星场）→ 顶点压缩
-     * → 双冲击环爆发 + 强闪 → 焦黑余烬。全程确定性正弦噪声抖动，不依赖随机数。
+     * 癫火蔓延（大型多段平面演出，开场即满状态）。
      */
     private static void drawFrenziedFlame(BufferBuilder b, Matrix4f m,
                                           double cx, double cy, double cz, double radius, float p) {
@@ -618,7 +544,6 @@ public final class AoeEffectRenderer {
         double hw = lineHalf(radius);
         float appear = clamp01(p / 0.015f);
 
-        // ===== A. 狂乱蓄能期（0~0.46，覆盖 1.5s 蓄能前摇）=====
         float pre = appear * (1f - smoothstep(0.40f, 0.46f, p));
         if (pre > 0f) {
             float spin = p * 5f * TAU;
@@ -658,7 +583,6 @@ public final class AoeEffectRenderer {
             spark(b, m, cx, cz, cy, (float) (radius * 0.12 + 0.05), mix(yellow, hot, 0.4f + 0.3f * flick), 0.8f * pre);
         }
 
-        // ===== B. 顶点压缩（0.38~0.46）=====
         if (p >= 0.38f && p < 0.46f) {
             float kf = clamp01((p - 0.38f) / 0.06f);
             float coreSize = (float) (radius * (0.12 + 0.28 * easeOutCubic(kf)));
@@ -666,7 +590,6 @@ public final class AoeEffectRenderer {
             rays(b, m, cx, cz, cy, radius * (1.0 - 0.6 * kf), radius * 0.2, 14, p * 2.5f, hw, hot, 0.1f, 0.6f * kf * appear);
         }
 
-        // ===== C. 大爆发冲击（0.42~0.70）：盛放主点 p≈0.42 对齐机制 30tick 爆发 =====
         float burst = clamp01((p - 0.42f) / 0.28f);
         if (burst > 0f) {
             float cfade = 1f - burst;
@@ -689,7 +612,6 @@ public final class AoeEffectRenderer {
             }
         }
 
-        // ===== D. 余烬（0.65~1.0）=====
         float emberOut = smoothstep(0.65f, 0.75f, p) * (1f - smoothstep(0.93f, 1f, p));
         if (emberOut > 0f) {
             int n = 18;
@@ -721,16 +643,222 @@ public final class AoeEffectRenderer {
         glowRing(b, m, cx, cz, cy, radius * 0.55 * expand, segmentsFor(radius), c, 0.40f * fade, 0.18f * fade, 0.05, 0.30);
     }
 
+    // ============================== 龙雷 · 红色闪电专属演出（竖直） ==============================
+
+    /**
+     * 古龙雷击 / 维克的龙雷：垂直红色之字闪电柱（含蜿蜒主干 + 分叉 + 落地红色冲击环）。
+     * <p>还原艾尔登法环「龙雷」的红色雷击意象：一道自天而降的红色电柱劈在目标脚下，
+     * 粉白红核 + 红辉光双层电流，沿途分出数条短分叉，落地处掀起红色冲击环与地面强闪；
+     * 整体瞬间炸亮后持续强烈明灭、较慢消散（约 1.4 秒），还原原作龙雷的巨大亮眼与余震重闪。
+     * 电柱外形由管理器在创建时确定的固定种子决定，
+     * 每道闪电形态各异、同一道闪电（含被「同位置合并」续命的）在整段生命周期内形态稳定，不逐帧 / 逐次抖动。</p>
+     * <p>电柱为竖直几何，每段用「十字双面」绘制（沿世界 X、Z 轴各一个四边形），
+     * 从任意水平视角都可见、无需 billboard 计算。{@code radius} 仅用于落地冲击环尺寸，
+     * 闪电柱粗细 / 高度由本类顶部的 {@code LIGHTNING_*} 常量控制。</p>
+     *
+     * @param seed 该闪电的固定外形种子（由管理器创建时生成、生命周期不变）
+     */
+    private static void drawRedLightning(BufferBuilder b, Matrix4f m,
+                                         double cx, double cy, double cz, double radius, float p, long seed) {
+        float intensity = lightningIntensity(p, seed);
+        if (intensity <= 0f) {
+            return;
+        }
+        float[] core = unpack(LIGHTNING_CORE);
+        float[] glow = unpack(LIGHTNING_GLOW);
+        float[] deep = unpack(LIGHTNING_DEEP);
+
+        // ===== 主电柱节点：自落地点向上蜿蜒（底部两段保持接地不偏移，使落点精确居中）=====
+        int segs = LIGHTNING_SEGMENTS;
+        double[] nx = new double[segs + 1];
+        double[] ny = new double[segs + 1];
+        double[] nz = new double[segs + 1];
+        long s = seed;
+        double walkX = 0, walkZ = 0;
+        for (int i = 0; i <= segs; i++) {
+            double frac = (double) i / segs;
+            if (i >= 2) {
+                s = rngNext(s);
+                walkX += rngUnit(s) * LIGHTNING_WANDER;
+                s = rngNext(s);
+                walkZ += rngUnit(s) * LIGHTNING_WANDER;
+                walkX = clampAbs(walkX, LIGHTNING_MAX_OFFSET);
+                walkZ = clampAbs(walkZ, LIGHTNING_MAX_OFFSET);
+            }
+            nx[i] = cx + walkX;
+            ny[i] = cy + LIGHTNING_HEIGHT * frac;
+            nz[i] = cz + walkZ;
+        }
+
+        // ===== 主干：三层叠绘（外层浓红光晕 → 中层亮红主体 → 白热炽核），顶端略淡没入天空 =====
+        for (int i = 0; i < segs; i++) {
+            float aTop = 1f - 0.40f * (float) i / segs;
+            lightningSegment(b, m, nx[i], ny[i], nz[i], nx[i + 1], ny[i + 1], nz[i + 1],
+                    LIGHTNING_HALO_HALF, deep, 0.30f * intensity, 0.30f * intensity * aTop);
+        }
+        for (int i = 0; i < segs; i++) {
+            float aTop = 1f - 0.35f * (float) i / segs;
+            lightningSegment(b, m, nx[i], ny[i], nz[i], nx[i + 1], ny[i + 1], nz[i + 1],
+                    LIGHTNING_GLOW_HALF, glow, 0.72f * intensity, 0.72f * intensity * aTop);
+        }
+        for (int i = 0; i < segs; i++) {
+            float aTop = 1f - 0.28f * (float) i / segs;
+            lightningSegment(b, m, nx[i], ny[i], nz[i], nx[i + 1], ny[i + 1], nz[i + 1],
+                    LIGHTNING_CORE_HALF, core, 1.0f * intensity, 1.0f * intensity * aTop);
+        }
+
+        // ===== 分叉：在中上部若干节点分出蜿蜒短支（逐段变细、淡出、收尖）=====
+        for (int k = 0; k < LIGHTNING_BRANCHES; k++) {
+            s = rngNext(s);
+            int anchor = 4 + (int) (rngFloat01(s) * (segs - 6));
+            if (anchor < 1 || anchor >= segs) {
+                continue;
+            }
+            s = rngNext(s);
+            drawLightningBranch(b, m, nx[anchor], ny[anchor], nz[anchor], s, intensity, core, glow);
+        }
+
+        // ===== 落地冲击：红色扩张环 + 适度地面强闪 + 白热落地核（尺寸收敛，更贴近原作）=====
+        // 主冲击环（随进度向外扩张，幅度收敛）
+        double rr = radius * (0.40 + 0.55 * easeOutCubic(clamp01(p / 0.70f)));
+        glowRing(b, m, cx, cz, cy, rr, segmentsFor(rr), glow, 0.85f * intensity, 0.5f * intensity, 0.12, 0.70);
+        glowRing(b, m, cx, cz, cy, rr * 0.70, segmentsFor(rr), deep, 0.6f * intensity, 0.32f * intensity, 0.09, 0.50);
+        // 第二道追赶环（错相扩张，连续冲击感，幅度收敛）
+        float w2 = clamp01((p - 0.10f) / 0.55f);
+        if (w2 > 0f && w2 < 1f) {
+            double rr2 = radius * 1.05 * easeOutCubic(w2);
+            glowRing(b, m, cx, cz, cy, rr2, segmentsFor(rr2), glow,
+                    0.45f * (1f - w2) * intensity, 0.22f * (1f - w2) * intensity, 0.07, 0.45);
+        }
+        // 地面血色铺底（持续红晕，范围收敛）
+        band(b, m, cx, cz, cy, 0.0, radius * 0.85, segmentsFor(radius),
+                deep[0], deep[1], deep[2], 0.0f, 0.16f * intensity);
+        // 开场白热强闪（落地瞬间炸亮，范围收敛）
+        if (p < 0.22f) {
+            float flash = (0.22f - p) / 0.22f;
+            band(b, m, cx, cz, cy, 0.0, radius * 0.95, segmentsFor(radius),
+                    core[0], core[1], core[2], 0.50f * flash, 0.0f);
+            glowRing(b, m, cx, cz, cy, radius * 0.70, segmentsFor(radius), core,
+                    0.65f * flash, 0.35f * flash, 0.14, 0.55);
+        }
+        // 落地白热核（随强度明灭的中心亮点）
+        spark(b, m, cx, cz, cy, (float) (radius * 0.16 + 0.22), core, 1.0f * intensity);
+    }
+
+    /**
+     * 绘制一条闪电分叉：从锚点出发的几段蜿蜒短支（随机水平方向 + 略偏向下），逐段变细、变暗、末端收尖。
+     *
+     * @param ax        锚点世界坐标 X
+     * @param ay        锚点世界坐标 Y
+     * @param az        锚点世界坐标 Z
+     * @param seed      分叉随机种子
+     * @param intensity 整体强度（继承主干）
+     * @param core      核心色
+     * @param glow      辉光色
+     */
+    private static void drawLightningBranch(BufferBuilder b, Matrix4f m,
+                                            double ax, double ay, double az,
+                                            long seed, float intensity, float[] core, float[] glow) {
+        int segs = LIGHTNING_BRANCH_SEGMENTS;
+        long s = seed;
+        s = rngNext(s);
+        double ang = rngFloat01(s) * TAU;        // 随机水平方向
+        s = rngNext(s);
+        double vy = (rngFloat01(s) - 0.3) * 0.9; // 竖直分量，略偏向下
+        double dirX = Math.cos(ang), dirZ = Math.sin(ang);
+        double step = LIGHTNING_BRANCH_STEP;
+
+        double px = ax, py = ay, pz = az;
+        for (int i = 0; i < segs; i++) {
+            s = rngNext(s);
+            double jitterX = rngUnit(s) * 0.4;
+            s = rngNext(s);
+            double jitterZ = rngUnit(s) * 0.4;
+            double qx = px + dirX * step + jitterX;
+            double qy = py + vy * step;
+            double qz = pz + dirZ * step + jitterZ;
+            float fade = 1f - (float) i / segs;   // 末端淡出
+            float a = intensity * fade;
+            lightningSegment(b, m, px, py, pz, qx, qy, qz, LIGHTNING_GLOW_HALF * 0.6, glow, 0.45f * a, 0.0f);
+            lightningSegment(b, m, px, py, pz, qx, qy, qz, LIGHTNING_CORE_HALF * 0.7, core, 0.85f * a, 0.1f * a);
+            px = qx;
+            py = qy;
+            pz = qz;
+        }
+    }
+
+    /**
+     * 竖直 / 任意朝向的「十字双面」线段：沿世界 X、Z 轴各画一个四边形，使线段从任意水平视角皆可见。
+     * <p>用于闪电电柱 / 分叉。两端 alpha 可不同（a1 起点、a2 终点）。双面绘制已开启，缠绕方向无所谓。</p>
+     *
+     * @param hw 线半宽（格）
+     */
+    private static void lightningSegment(BufferBuilder b, Matrix4f m,
+                                         double x1, double y1, double z1,
+                                         double x2, double y2, double z2,
+                                         double hw, float[] col, float a1, float a2) {
+        float r = col[0], g = col[1], bb = col[2];
+        // 面1：沿世界 X 轴加宽
+        quad(b, m,
+                x1 - hw, y1, z1, x1 + hw, y1, z1,
+                x2 + hw, y2, z2, x2 - hw, y2, z2,
+                r, g, bb, a1, a2);
+        // 面2：沿世界 Z 轴加宽
+        quad(b, m,
+                x1, y1, z1 - hw, x1, y1, z1 + hw,
+                x2, y2, z2 + hw, x2, y2, z2 - hw,
+                r, g, bb, a1, a2);
+    }
+
+    /**
+     * 画一个四边形（拆成两三角形）：顶点 a→b 用 alpha {@code aAB}，c→d 用 alpha {@code aCD}。
+     */
+    private static void quad(BufferBuilder b, Matrix4f m,
+                             double ax, double ay, double az, double bx, double by, double bz,
+                             double cxp, double cyp, double czp, double dx, double dy, double dz,
+                             float r, float g, float bb, float aAB, float aCD) {
+        b.vertex(m, (float) ax, (float) ay, (float) az).color(r, g, bb, aAB).endVertex();
+        b.vertex(m, (float) bx, (float) by, (float) bz).color(r, g, bb, aAB).endVertex();
+        b.vertex(m, (float) cxp, (float) cyp, (float) czp).color(r, g, bb, aCD).endVertex();
+
+        b.vertex(m, (float) ax, (float) ay, (float) az).color(r, g, bb, aAB).endVertex();
+        b.vertex(m, (float) cxp, (float) cyp, (float) czp).color(r, g, bb, aCD).endVertex();
+        b.vertex(m, (float) dx, (float) dy, (float) dz).color(r, g, bb, aCD).endVertex();
+    }
+
+    /**
+     * 闪电强度包络（还原原作龙雷：缓慢庄重明灭 + 慢消散，刻意低频以避免抽搐）。
+     * <ul>
+     *     <li>主体 body：前 60% 维持满亮，后 40% 平方渐隐——消散慢，能看清整个过程；</li>
+     *     <li>缓慢大明灭 pulse：整段约 2 次温和的明暗起伏（0.72~1.0），庄重而不闪烁抽搐。</li>
+     * </ul>
+     * <b>刻意不叠高频抖动</b>——上一版的高频 jitter 是「抽搐」的元凶，已移除。明灭节奏由 pulse 的
+     * 频率 {@code p * 6.3} 决定（一个完整 sin 周期取绝对值 ≈ 2 次明灭，很慢）；要更慢就调小该系数。
+     * seed 仅用于让不同闪电的明灭相位错开。
+     *
+     * @param p    归一化进度
+     * @param seed 闪电种子（错开明灭相位）
+     * @return 强度系数（0~1）
+     */
+    private static float lightningIntensity(float p, long seed) {
+        if (p >= 1f) {
+            return 0f;
+        }
+        float body;
+        if (p < 0.60f) {
+            body = 1f;
+        } else {
+            float t = (p - 0.60f) / 0.40f;
+            body = 1f - t * t;
+        }
+        float pulse = 0.72f + 0.28f * (float) Math.abs(Math.sin(p * 6.3 + (seed & 0x7)));
+        return body * pulse;
+    }
+
     // ============================== 几何基元（水平面） ==============================
 
     /**
-     * 发光圆环：外辉（向外渐隐）+ 内辉（向内渐隐）+ 核心亮带，三层叠出柔和光环。
-     *
-     * @param radius     环半径
-     * @param coreA      核心 alpha
-     * @param glowA      辉光峰值 alpha
-     * @param coreHalf   核心半宽（格）
-     * @param glowSpread 辉光向内外扩散宽度（格）
+     * 发光圆环：外辉 + 内辉 + 核心亮带，三层叠出柔和光环。
      */
     private static void glowRing(BufferBuilder b, Matrix4f m, double cx, double cz, double y,
                                  double radius, int segs, float[] col,
@@ -746,7 +874,7 @@ public final class AoeEffectRenderer {
     }
 
     /**
-     * 圆环带（annulus），内/外边缘可分别指定 alpha；{@code rInner=0} 时退化为从中心到外缘的渐变圆盘。
+     * 圆环带（annulus），内/外边缘可分别指定 alpha；{@code rInner=0} 时退化为渐变圆盘。
      */
     private static void band(BufferBuilder builder, Matrix4f m, double cx, double cz, double cy,
                              double rInner, double rOuter, int segments,
@@ -775,8 +903,6 @@ public final class AoeEffectRenderer {
 
     /**
      * 带宽度的线段（两点之间的细长四边形，两端 alpha 可不同）。水平面（y 固定）。
-     *
-     * @param hw 线半宽（格）
      */
     private static void line(BufferBuilder builder, Matrix4f m,
                              double x1, double z1, double x2, double z2, double y,
@@ -805,8 +931,6 @@ public final class AoeEffectRenderer {
 
     /**
      * 小菱形光点（火花），中心最亮、四角渐隐。水平面。
-     *
-     * @param size 半尺寸（格）
      */
     private static void spark(BufferBuilder builder, Matrix4f m, double px, double pz, double y,
                               float size, float[] col, float alpha) {
@@ -874,12 +998,6 @@ public final class AoeEffectRenderer {
 
     /**
      * 旋转符文刻度环：沿圆周均布的 count 个短径向小段（内端略暗、外端亮）。水平面。
-     *
-     * @param rStart   刻度内端半径
-     * @param length   刻度长度（格）
-     * @param count    刻度数量
-     * @param rotation 旋转角（弧度）
-     * @param hw       刻度线半宽
      */
     private static void tickRing(BufferBuilder b, Matrix4f m, double cx, double cz, double y,
                                  double rStart, double length, int count, float rotation, double hw,
@@ -895,13 +1013,7 @@ public final class AoeEffectRenderer {
     }
 
     /**
-     * 闪烁星屑场：count 个确定性分布（黄金角铺角度、黄金比小数铺半径）的小光点，各自正弦闪烁。水平面。
-     *
-     * @param radius    分布最大半径（格）
-     * @param count     星点数量
-     * @param time      驱动闪烁的时间量（一般传 progress）
-     * @param size      星点半尺寸（格）
-     * @param baseAlpha 基础亮度（再乘以各自闪烁系数）
+     * 闪烁星屑场：count 个确定性分布的小光点，各自正弦闪烁。水平面。
      */
     private static void starField(BufferBuilder b, Matrix4f m, double cx, double cz, double y,
                                   double radius, int count, float time, float size,
@@ -980,7 +1092,6 @@ public final class AoeEffectRenderer {
 
     /**
      * 两个 [r,g,b] 颜色按 t 线性插值（t∈[0,1]，0 取 a、1 取 b）。
-     * <p>用于濒死类低频特效的颜色过渡，每帧调用量有限，分配可忽略。
      */
     private static float[] mix(float[] a, float[] b, float t) {
         float u = clamp01(t);
@@ -998,5 +1109,57 @@ public final class AoeEffectRenderer {
                 ((color >> 8) & 0xFF) / 255f,
                 (color & 0xFF) / 255f
         };
+    }
+
+    // ============================== 闪电用无分配伪随机（xorshift64） ==============================
+
+    /**
+     * xorshift64 推进一步。
+     *
+     * @param s 当前状态（非 0）
+     * @return 下一状态
+     */
+    private static long rngNext(long s) {
+        s ^= s << 13;
+        s ^= s >>> 7;
+        s ^= s << 17;
+        return s;
+    }
+
+    /**
+     * 由状态取 [0,1) 浮点。
+     *
+     * @param s 已推进的状态
+     * @return [0,1)
+     */
+    private static float rngFloat01(long s) {
+        return ((s >>> 40) & 0xFFFFFFL) / (float) 0x1000000;
+    }
+
+    /**
+     * 由状态取 [-1,1) 浮点。
+     *
+     * @param s 已推进的状态
+     * @return [-1,1)
+     */
+    private static double rngUnit(long s) {
+        return rngFloat01(s) * 2.0 - 1.0;
+    }
+
+    /**
+     * 绝对值夹取到 ±max。
+     *
+     * @param v   输入
+     * @param max 上限（正）
+     * @return 夹取结果
+     */
+    private static double clampAbs(double v, double max) {
+        if (v > max) {
+            return max;
+        }
+        if (v < -max) {
+            return -max;
+        }
+        return v;
     }
 }

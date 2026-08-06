@@ -45,6 +45,14 @@ public final class AoeEffectManager {
     /** 当前存活特效列表（仅客户端主线程访问） */
     private static final List<AoeEffect> ACTIVE = new ArrayList<>();
 
+    /**
+     * 红色闪电「同位置合并」判定半径（格）的平方。
+     * <p>新落雷点与某存活红闪的水平距离在此范围内，即视为「同一道持续的雷」，只续命不新建——
+     * 用于消除古龙雷击等高频重复降雷在同一处叠加多道闪电造成的「鬼畜」跳变。要让相邻目标更容易
+     * 各自独立成一道就调小，要让同一目标移动时更不易分裂成多道就调大。</p>
+     */
+    private static final double RED_LIGHTNING_MERGE_DIST_SQR = 2.5 * 2.5;
+
     private AoeEffectManager() {
     }
 
@@ -69,18 +77,30 @@ public final class AoeEffectManager {
         public double z;
         /** 半径（格） */
         public final float radius;
-        /** 诞生墙钟时刻（毫秒） */
-        public final long birthMs;
+        /**
+         * 固定外形种子（当前仅红色闪电使用）。
+         * <p>由管理器在创建特效时生成、整段生命周期内不变——即便红闪因「同位置合并」被反复续命
+         * （重置 {@link #birthMs}），其外形也由本字段恒定决定，不会逐次跳变。</p>
+         */
+        public final long seed;
+        /**
+         * 诞生墙钟时刻（毫秒）。
+         * <p>红色闪电存在「同位置合并续命」：重复落雷到同一处时不新建特效，而是把已存在那道的本字段
+         * 重置为当前时刻以延长播放（表现为一道持续劈着的雷），故去掉 final。</p>
+         */
+        public long birthMs;
         /** 总时长（毫秒） */
         public final long durationMs;
 
-        AoeEffect(int type, int entityId, double x, double y, double z, float radius, long birthMs, long durationMs) {
+        AoeEffect(int type, int entityId, double x, double y, double z,
+                  float radius, long seed, long birthMs, long durationMs) {
             this.type = type;
             this.entityId = entityId;
             this.x = x;
             this.y = y;
             this.z = z;
             this.radius = radius;
+            this.seed = seed;
             this.birthMs = birthMs;
             this.durationMs = durationMs;
         }
@@ -102,6 +122,9 @@ public final class AoeEffectManager {
 
     /**
      * 创建一个特效（可绑定实体跟随，由网络包在客户端主线程调用）。
+     * <p><b>红色闪电特例：</b>古龙雷击等会每数 tick 对同一目标重复降雷，若每次都新建特效，同一处会
+     * 同时叠着多道形态各异的闪电并不断新生，视觉上呈高频「鬼畜」跳变。故红闪在新建前先尝试
+     * {@link #refreshNearbyRedLightning 同位置合并}：附近已有存活红闪时只续命、不新建。</p>
      *
      * @param type     特效类型
      * @param x        世界坐标 X（跟随特效用作初始 / 实体消失后的回退坐标）
@@ -112,14 +135,66 @@ public final class AoeEffectManager {
      */
     public static void spawn(int type, double x, double y, double z, float radius, int entityId) {
         long now = System.currentTimeMillis();
+        // 红色闪电同位置合并：避免高频重复降雷在同一处叠加多道闪电导致「鬼畜」
+        if (type == AoeEffectPacket.TYPE_RED_LIGHTNING && refreshNearbyRedLightning(x, y, z, now)) {
+            return;
+        }
         // v6.1：死亡演出（猩红立体花 / 癫火扩散）半径按 scaleFor 放大后再存储；
         // CULL 裁剪与渲染均使用放大后半径，全链一致，避免大花被误裁
         float scaledRadius = radius * scaleFor(type);
-        ACTIVE.add(new AoeEffect(type, entityId, x, y, z, scaledRadius, now, durationFor(type)));
+        ACTIVE.add(new AoeEffect(type, entityId, x, y, z, scaledRadius, makeSeed(now, x, z), now, durationFor(type)));
         // 上限保护：超出则丢弃最早的
         while (ACTIVE.size() > MAX_ACTIVE) {
             ACTIVE.remove(0);
         }
+    }
+
+    /**
+     * 红色闪电「同位置合并」：若落点附近已存在存活红闪，则把它更新到新落点并重置生命周期
+     * （续命，使其表现为一道持续劈着、缓慢明灭的雷），返回 {@code true} 表示本次应合并、不新建；
+     * 附近无存活红闪则返回 {@code false}（照常新建）。
+     * <p>其外形种子 {@link AoeEffect#seed} 在续命时<b>保持不变</b>，故反复续命也不会跳变外形。</p>
+     *
+     * @param x   新落点世界坐标 X
+     * @param y   新落点世界坐标 Y
+     * @param z   新落点世界坐标 Z
+     * @param now 当前墙钟（毫秒）
+     * @return 是否已合并到既有红闪（true 则调用方不应再新建）
+     */
+    private static boolean refreshNearbyRedLightning(double x, double y, double z, long now) {
+        for (int i = 0; i < ACTIVE.size(); i++) {
+            AoeEffect fx = ACTIVE.get(i);
+            if (fx.type != AoeEffectPacket.TYPE_RED_LIGHTNING) {
+                continue;
+            }
+            double dx = fx.x - x;
+            double dz = fx.z - z;
+            if (dx * dx + dz * dz <= RED_LIGHTNING_MERGE_DIST_SQR) {
+                fx.x = x;
+                fx.y = y;
+                fx.z = z;
+                fx.birthMs = now;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 生成一个非 0 的固定外形种子（散列自创建时刻与落点坐标）。
+     * <p>存入 {@link AoeEffect#seed} 后整段生命周期不变，使每道特效外形稳定、不同特效外形各异。</p>
+     *
+     * @param now 创建时墙钟（毫秒）
+     * @param x   落点世界坐标 X
+     * @param z   落点世界坐标 Z
+     * @return 非 0 种子
+     */
+    private static long makeSeed(long now, double x, double z) {
+        long bits = now * 1099511628211L
+                ^ Double.doubleToLongBits(x) * 31
+                ^ Double.doubleToLongBits(z) * 17;
+        bits ^= (bits >>> 33);
+        return bits == 0 ? 0x9E3779B97F4A7C15L : bits;
     }
 
     /**
@@ -153,6 +228,9 @@ public final class AoeEffectManager {
                 return 1000L;
             case AoeEffectPacket.TYPE_REPULSION:
                 return 520L;
+            case AoeEffectPacket.TYPE_RED_LIGHTNING:
+                // 龙雷红色闪电：还原原作——巨大亮眼、持续强烈明灭、消散较慢（线性映射，无分段）
+                return 1400L;
             case AoeEffectPacket.TYPE_SCARLET_BLOOM:
                 // 立体花总时长。配合 progressFor 的分段映射：前 1500ms（chargeUpMsFor）把 progress
                 // 推进到盛放主点 0.42（恒对齐附魔 30tick 第二阶段爆发），其后 3900ms 把 progress
