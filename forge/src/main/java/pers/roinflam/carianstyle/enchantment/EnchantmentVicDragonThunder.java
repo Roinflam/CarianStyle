@@ -1,9 +1,9 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.world.InteractionHand;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
@@ -18,28 +18,39 @@ import net.minecraftforge.fml.common.Mod;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
-import pers.roinflam.carianstyle.visual.effect.CarianStyleBurstParticles;
+import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
 
 /**
  * 古龙雷附魔（维克的龙雷）
- * <p>v2.3：LivingDamage双向入口接入怪物附魔触发开关</p>
  * <p>
- * 修改记录 v2.4（龙雷红色闪电）：
- * - 视觉改红：还原艾尔登法环「龙雷」的红色雷击意象，攻击端召唤的原版蓝白 {@code LightningBolt}
- *   替换为 {@link CarianStyleBurstParticles#redLightning} 自绘的红色之字闪电柱（含分叉 + 落地红色
- *   冲击），与古龙雷击（ancient_dragon_lightning）保持一致。
- * - 原版闪电采用 {@code setVisualOnly(true)}，本就只有「视觉 + 音效」无副作用，去掉后需手动补雷声，
- *   故新增 {@code LIGHTNING_BOLT_THUNDER}（雷鸣）+ {@code LIGHTNING_BOLT_IMPACT}（落地）两条音效。
- * - 仅替换攻击端的闪电视觉与配套音效；防御端（雷电伤害减免）、触发概率、伤害倍率等机制完全未动。
+ * 武器附魔，双向生效：<b>防御端</b>按等级减免雷电伤害（15%/级，满 100% 直接免疫）；
+ * <b>攻击端</b>按天气概率召唤红色龙雷追加伤害。
+ * </p>
+ *
+ * <h3>红色龙雷：去掉原版闪电后必须自己补雷声</h3>
+ * <p>
+ * 攻击端召唤的原版蓝白 {@code LightningBolt} 已替换为
+ * {@link CarianStyleEffects#redLightning}，与古龙雷击保持一致的红色雷击意象。
+ * </p>
+ * <p>
+ * 原版闪电用的是 {@code setVisualOnly(true)}，本就只有「视觉 + 音效」无副作用，
+ * 但<b>音效随它一起没了</b>。因此下方两条 {@code playSound}
+ * （雷鸣 + 落地）<b>必须保留</b>，否则只有画面没有声音。
+ * </p>
+ *
+ * <h3>天气倍率互斥判断</h3>
+ * <p>
+ * MC 中雷暴时 {@code isRaining()} 也返回 true，故触发概率与伤害倍率均为互斥判断：
+ * 雷暴 100% 概率 / 4x 伤害，下雨 {@code level*10}% / 2x，晴天 {@code level*5}% / 1x。
  * </p>
  *
  * @author RoinFlam
- * @version 2.4
+ * @version 3.0
  */
 @AutoRegisterEnchantment(
         id = "vic_dragon_thunder",
@@ -60,6 +71,11 @@ public class EnchantmentVicDragonThunder extends EnchantmentBase {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
+    /**
+     * 伤害事件监听：防御端做雷电减伤，攻击端概率召唤红色龙雷。
+     *
+     * @param evt 生物受到伤害事件
+     */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
         if (evt.getEntity().level().isClientSide) {
@@ -74,7 +90,7 @@ public class EnchantmentVicDragonThunder extends EnchantmentBase {
         }
 
         // 防御：雷电伤害减免（受击者视角）
-        // ⭐ v2.3：怪物附魔触发开关（受击者视角）
+        // 怪物附魔触发开关（受击者视角）
         if (!EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) {
             if (!evt.getSource().is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)
                     && "lightningBolt".equals(evt.getSource().getMsgId())) {
@@ -100,7 +116,7 @@ public class EnchantmentVicDragonThunder extends EnchantmentBase {
             return;
         }
 
-        // ⭐ v2.3：怪物附魔触发开关（攻击者视角）
+        // 怪物附魔触发开关（攻击者视角）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
 
         ItemStack attackerHeld = attacker.getItemInHand(InteractionHand.MAIN_HAND);
@@ -135,8 +151,8 @@ public class EnchantmentVicDragonThunder extends EnchantmentBase {
             double ly = victim.getY();
             double lz = victim.getZ();
 
-            // v2.4：原版蓝白闪电替换为红色自绘闪电（龙雷红色雷击意象，与古龙雷击一致）
-            CarianStyleBurstParticles.redLightning(serverLevel, lx, ly, lz);
+            // ⭐ 原版蓝白闪电替换为红色自绘闪电（龙雷红色雷击意象，与古龙雷击一致）
+            CarianStyleEffects.redLightning(serverLevel, lx, ly, lz);
 
             // 原版闪电去掉后需手动补雷声：雷鸣 + 落地，音高带轻微随机，避免机械重复
             serverLevel.playSound(null, lx, ly, lz,

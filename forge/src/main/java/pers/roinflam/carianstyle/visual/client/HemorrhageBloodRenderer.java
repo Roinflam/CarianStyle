@@ -61,6 +61,19 @@ import java.util.List;
  * 判定条件、精确平方距离裁剪、绘制顺序与全部几何参数均未改动。
  * </p>
  * <p>
+ * <b>v5（顶点量，近距离视觉零变化）：</b>接入 {@link VisualLod} 按距离与同屏拥挤度削减元素数量。
+ * 本渲染器是全模组顶点开销最大的一个——单个患者每帧 <b>948</b> 个顶点
+ * （血泊 120 + 血滴 624 + 垂落血线 36 + 血雾 168），心跳爆发窗口内达 <b>1512</b>。
+ * 其中血滴与血雾共 33 个柔光块，每块 {@link #DROP_SEGMENTS} 段 × 3 顶点 = 24，
+ * 单这一项就吃掉 792 个顶点。
+ * </p>
+ * <p>
+ * 现在这些数量按 {@link VisualLod#detail} 缩放：{@link VisualLod#FULL_DETAIL_RANGE} 格内
+ * 系数为 1.0，<b>与优化前逐像素一致</b>；远处与团战时逐步削减，40 格外单患者降至约 126 顶点
+ * （降幅 87%）。削减只会「少画尾部几个」，保留元素的随机种子不变、位置不变，
+ * 因此靠近时是逐渐多出几颗血滴，不会整片重新洗牌。
+ * </p>
+ * <p>
  * 渲染管线与 {@code ScarletRotMistRenderer} 同款：{@link RenderLevelStageEvent} 的
  * {@code AFTER_TRANSLUCENT_BLOCKS} 阶段，{@code POSITION_COLOR} 纯顶点绘制，无贴图、无原版粒子；
  * 顶点格式与着色器现由 {@link VisualBatch} 统一设置。
@@ -79,6 +92,18 @@ public final class HemorrhageBloodRenderer {
     private static final float Y_OFFSET = 0.02f;
     private static final int DROP_SEGMENTS = 8;
     private static final long START_MILLIS = System.currentTimeMillis();
+
+    // ===== v5 LOD 下限（低于这些值圆形会看出棱角 / 层次会塌掉）=====
+    /** 柔光血滴的最少分段数：4 段仍是个饱满的菱形柔光块，再低就露馅 */
+    private static final int DROP_SEGMENTS_MIN = 4;
+    /** 血泊圆盘的最少分段数 */
+    private static final int POOL_SEGMENTS_MIN = 8;
+    /** 脚下冲击闪光的最少分段数 */
+    private static final int FLASH_SEGMENTS_MIN = 8;
+    /** 血泊第二层（外圈淡红）的保留阈值：低于此值只画内层 */
+    private static final float POOL_OUTER_KEEP_THRESHOLD = 0.55f;
+    /** 血雾层的保留阈值 */
+    private static final float MIST_KEEP_THRESHOLD = 0.5f;
 
     // ===== 配色（0xRRGGBB）=====
     private static final int BLOOD_BRIGHT = 0xE0202F;
@@ -184,9 +209,15 @@ public final class HemorrhageBloodRenderer {
             double dx = ex - cam.x;
             double dy = ey - cam.y;
             double dz = ez - cam.z;
-            if (dx * dx + dy * dy + dz * dz > CULL_SQR) {
+            double distSqr = dx * dx + dy * dy + dz * dz;
+            if (distSqr > CULL_SQR) {
                 continue;
             }
+
+            // v5：本实体的细节系数（距离 × 同屏拥挤度）。12 格内恒为 1.0，视觉与优化前一致
+            float detail = VisualLod.detail(distSqr);
+            // 登记实例，供下一帧估算拥挤度（不影响本帧绘制）
+            VisualLod.countInstance();
 
             float width = entity.getBbWidth();
             float height = entity.getBbHeight();
@@ -195,13 +226,16 @@ public final class HemorrhageBloodRenderer {
             float ryFoot = (float) dy;
             float rz = (float) dz;
 
-            drawBloodPool(builder, matrix, rx, ryFoot + Y_OFFSET, rz, width, time, entity.getId());
+            drawBloodPool(builder, matrix, rx, ryFoot + Y_OFFSET, rz, width, time, entity.getId(), detail);
             drawDroplets(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId(),
-                    rightX, rightY, rightZ, upX, upY, upZ);
-            drawDrips(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId());
-            drawBurstRays(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId());
-            drawBloodMist(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId(),
-                    rightX, rightY, rightZ, upX, upY, upZ);
+                    rightX, rightY, rightZ, upX, upY, upZ, detail);
+            drawDrips(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId(), detail);
+            drawBurstRays(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId(), detail);
+            // 血雾是纯氛围层，远处完全看不出，低细节时整层跳过（省 168 顶点）
+            if (VisualLod.keepLayer(detail, MIST_KEEP_THRESHOLD)) {
+                drawBloodMist(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId(),
+                        rightX, rightY, rightZ, upX, upY, upZ, detail);
+            }
         }
     }
 
@@ -220,12 +254,18 @@ public final class HemorrhageBloodRenderer {
                 HemorrhageSyncHandler.HEMORRHAGE_SERIAL, entity.getId());
     }
 
-    /** 脚下血泊：两层渐变圆盘，随时间轻微呼吸。 */
+    /**
+     * 脚下血泊：两层渐变圆盘，随时间轻微呼吸。
+     * <p>v5：分段数按细节系数缩放（下限 {@link #POOL_SEGMENTS_MIN}），
+     * 低细节时外层整层跳过——外层本就是淡淡的一圈，远处完全看不出。</p>
+     */
     private static void drawBloodPool(BufferBuilder b, Matrix4f m,
                                       float cx, float cy, float cz, float width,
-                                      float time, int seedId) {
+                                      float time, int seedId, float detail) {
         float breath = 0.9f + 0.1f * Mth.sin(time * 1.1f + seedId * 0.4f);
-        for (int layer = 0; layer < POOL_LAYERS; layer++) {
+        int segments = VisualLod.scaleSegments(POOL_SEGMENTS, POOL_SEGMENTS_MIN, detail);
+        int layers = VisualLod.keepLayer(detail, POOL_OUTER_KEEP_THRESHOLD) ? POOL_LAYERS : 1;
+        for (int layer = 0; layer < layers; layer++) {
             float radius = width * (POOL_RADIUS_BASE + layer * POOL_RADIUS_STEP) * breath;
             float centerAlpha = POOL_BASE_ALPHA - layer * 0.14f;
             if (centerAlpha <= 0f || radius <= 0.05f) {
@@ -233,7 +273,7 @@ public final class HemorrhageBloodRenderer {
             }
             int col = layer == 0 ? BLOOD_DARK : BLOOD_MID;
             float[] c = unpack(col);
-            drawDisc(b, m, cx, cy, cz, radius, POOL_SEGMENTS, c[0], c[1], c[2], centerAlpha);
+            drawDisc(b, m, cx, cy, cz, radius, segments, c[0], c[1], c[2], centerAlpha);
         }
     }
 
@@ -245,17 +285,27 @@ public final class HemorrhageBloodRenderer {
                                      float cx, float cyFoot, float cz, float width, float height,
                                      float time, int seedId,
                                      float rightX, float rightY, float rightZ,
-                                     float upX, float upY, float upZ) {
+                                     float upX, float upY, float upZ, float detail) {
         float launchY = cyFoot + height * LAUNCH_HEIGHT_FACTOR;
 
         // 心跳脉冲窗口：命中窗口内额外多喷一批较大的血滴
         float pulsePhase = frac(time / PULSE_PERIOD + seedId * 0.13f);
         boolean pulseActive = pulsePhase < PULSE_WINDOW;
 
-        int count = BASE_DROPLETS + (pulseActive ? PULSE_EXTRA_DROPLETS : 0);
+        // v5：基础血滴与脉冲加量分别缩放。
+        // 注意必须分开缩放而不是缩放总数——脉冲血滴用的是另一套种子（i + 500）、
+        // 尺寸也另有倍率，混在一起按总数截断会把整批脉冲血滴切没，喷发感就废了。
+        int baseCount = VisualLod.scale(BASE_DROPLETS, detail);
+        int pulseCount = pulseActive ? VisualLod.scale(PULSE_EXTRA_DROPLETS, detail) : 0;
+        // 每颗柔光块的分段数同样缩放——这是本渲染器最大的顶点杠杆
+        int dropSegments = VisualLod.scaleSegments(DROP_SEGMENTS, DROP_SEGMENTS_MIN, detail);
+
+        int count = baseCount + pulseCount;
         for (int i = 0; i < count; i++) {
-            boolean isPulseDroplet = i >= BASE_DROPLETS;
-            long s = seedFor(seedId, isPulseDroplet ? (i + 500) : i);
+            boolean isPulseDroplet = i >= baseCount;
+            // 种子索引沿用「全细节下的原始下标」，保证缩放前后同一颗血滴的轨迹完全一致
+            int seedIndex = isPulseDroplet ? (i - baseCount + BASE_DROPLETS) : i;
+            long s = seedFor(seedId, isPulseDroplet ? (seedIndex + 500) : seedIndex);
             float phase = rngFloat(s);
             s = rngNext(s);
             float ang = rngFloat(s) * TAU;
@@ -291,7 +341,7 @@ public final class HemorrhageBloodRenderer {
             float size = DROPLET_SIZE * sizeRand * (isPulseDroplet ? PULSE_SIZE_MULT : 1f);
 
             emitSoftDrop(b, m, px, py + Y_OFFSET, pz, size, c[0], c[1], c[2], alpha,
-                    rightX, rightY, rightZ, upX, upY, upZ);
+                    rightX, rightY, rightZ, upX, upY, upZ, dropSegments);
         }
     }
 
@@ -303,7 +353,7 @@ public final class HemorrhageBloodRenderer {
      */
     private static void drawBurstRays(BufferBuilder b, Matrix4f m,
                                       float cx, float cyFoot, float cz, float width, float height,
-                                      float time, int seedId) {
+                                      float time, int seedId, float detail) {
         float pulsePhase = frac(time / PULSE_PERIOD + seedId * 0.13f);
         if (pulsePhase >= PULSE_WINDOW) {
             return;
@@ -316,7 +366,13 @@ public final class HemorrhageBloodRenderer {
         float[] hot = unpack(BLOOD_HOT);
         float[] dark = unpack(BLOOD_DARK);
 
-        for (int i = 0; i < PULSE_RAY_COUNT; i++) {
+        // v5：射线数量缩放。
+        // 注意这里不能简单地「只画前 N 条」——射线角度是 i * (TAU / PULSE_RAY_COUNT) 顺序排布的，
+        // 截断前 N 条会让迸溅只覆盖一段圆弧、变成朝一个方向喷。
+        // 改为按步长在整圈上均匀抽取，既保持原有角度、又始终是完整一圈。
+        int rayCount = VisualLod.scale(PULSE_RAY_COUNT, detail);
+        int rayStep = Math.max(1, PULSE_RAY_COUNT / rayCount);
+        for (int i = 0; i < PULSE_RAY_COUNT; i += rayStep) {
             long s = seedFor(seedId, i + 900);
             float ang = i * (TAU / PULSE_RAY_COUNT) + rngFloat(s) * 0.35f;
             float ox = cx + (float) Math.cos(ang) * len;
@@ -329,7 +385,8 @@ public final class HemorrhageBloodRenderer {
         if (p < 0.3f) {
             float flash = (0.3f - p) / 0.3f;
             float[] bright = unpack(BLOOD_FLASH);
-            drawDisc(b, m, cx, cyFoot + Y_OFFSET, cz, width * 1.6f * (0.4f + flash), 16,
+            drawDisc(b, m, cx, cyFoot + Y_OFFSET, cz, width * 1.6f * (0.4f + flash),
+                    VisualLod.scaleSegments(16, FLASH_SEGMENTS_MIN, detail),
                     bright[0], bright[1], bright[2], 0.45f * flash);
         }
     }
@@ -372,9 +429,12 @@ public final class HemorrhageBloodRenderer {
                                       float cx, float cyFoot, float cz, float width, float height,
                                       float time, int seedId,
                                       float rightX, float rightY, float rightZ,
-                                      float upX, float upY, float upZ) {
+                                      float upX, float upY, float upZ, float detail) {
         float chestY = cyFoot + height * LAUNCH_HEIGHT_FACTOR;
-        for (int i = 0; i < MIST_COUNT; i++) {
+        // v5：雾团数量与每团分段数同时缩放（雾团角度来自随机种子，取前 N 个即可，分布仍是散的）
+        int mistCount = VisualLod.scale(MIST_COUNT, detail);
+        int mistSegments = VisualLod.scaleSegments(DROP_SEGMENTS, DROP_SEGMENTS_MIN, detail);
+        for (int i = 0; i < mistCount; i++) {
             long s = seedFor(seedId, i + 1300);
             float baseAngle = rngFloat(s) * TAU;
             s = rngNext(s);
@@ -402,15 +462,19 @@ public final class HemorrhageBloodRenderer {
             float[] c = unpack(col);
 
             emitSoftDrop(b, m, px, py, pz, size, c[0], c[1], c[2], alpha,
-                    rightX, rightY, rightZ, upX, upY, upZ);
+                    rightX, rightY, rightZ, upX, upY, upZ, mistSegments);
         }
     }
 
-    /** 从躯干垂落的粗血线，循环下滑并在近地面淡出。 */
+    /**
+     * 从躯干垂落的粗血线，循环下滑并在近地面淡出。
+     * <p>v5：条数按细节系数缩放（角度来自随机种子，取前 N 条分布仍是散的）。</p>
+     */
     private static void drawDrips(BufferBuilder b, Matrix4f m,
                                   float cx, float cyFoot, float cz, float width, float height,
-                                  float time, int seedId) {
-        for (int i = 0; i < DRIP_COUNT; i++) {
+                                  float time, int seedId, float detail) {
+        int dripCount = VisualLod.scale(DRIP_COUNT, detail);
+        for (int i = 0; i < dripCount; i++) {
             long s = seedFor(seedId, i + 800);
             float phase = rngFloat(s);
             s = rngNext(s);
@@ -468,14 +532,22 @@ public final class HemorrhageBloodRenderer {
         }
     }
 
+    /**
+     * 面向相机的柔光圆点（中心不透明、边缘全透明的三角扇）。
+     *
+     * @param segments 分段数。v5 起由调用方按细节系数传入，
+     *                 下限 {@link #DROP_SEGMENTS_MIN}；全细节时即 {@link #DROP_SEGMENTS}。
+     *                 <b>这是本渲染器最大的顶点杠杆</b>——血滴与雾团合计 33 个柔光块，
+     *                 每块每段 3 个顶点，8 段降到 4 段即省下近 400 个顶点。
+     */
     private static void emitSoftDrop(BufferBuilder b, Matrix4f m,
                                      float cx, float cy, float cz, float size,
                                      float r, float g, float bl, float alpha,
                                      float rightX, float rightY, float rightZ,
-                                     float upX, float upY, float upZ) {
+                                     float upX, float upY, float upZ, int segments) {
         float pex = 0f, pey = 0f, pez = 0f;
-        for (int i = 0; i <= DROP_SEGMENTS; i++) {
-            float ang = TAU * i / DROP_SEGMENTS;
+        for (int i = 0; i <= segments; i++) {
+            float ang = TAU * i / segments;
             float ca = (float) Math.cos(ang) * size;
             float sa = (float) Math.sin(ang) * size;
             float ex = cx + rightX * ca + upX * sa;

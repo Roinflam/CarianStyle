@@ -68,9 +68,15 @@ import javax.annotation.Nullable;
  * 现统一由本类在 {@link #onBatchBegin} 计算一次并暴露出去，避免重复计算与重复的
  * {@code getUpVector()} / {@code getLeftVector()} 调用。
  * </p>
+ * <p>
+ * <b>细节层级：</b>合并 draw call 与共享查询之后，客户端剩下的瓶颈是<b>顶点量</b>。
+ * {@link VisualLod} 负责按距离与同屏拥挤度削减元素数量，其帧级状态由本类在
+ * {@link #onBatchBegin} 驱动（{@link VisualLod#beginFrame()}），各渲染器只需在循环内
+ * 取一次细节系数即可。
+ * </p>
  *
  * @author FlameForge
- * @version 1.0
+ * @version 1.1
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -135,6 +141,8 @@ public final class VisualBatch {
         }
 
         frameId++;
+        // 用上一帧的特效实例数算出本帧拥挤系数，并复位计数器（详见 VisualLod 类注释）
+        VisualLod.beginFrame();
 
         Camera camera = event.getCamera();
         cameraPosition = camera.getPosition();

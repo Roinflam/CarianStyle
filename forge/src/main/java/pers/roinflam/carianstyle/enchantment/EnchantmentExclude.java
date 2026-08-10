@@ -1,6 +1,5 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
@@ -15,12 +14,13 @@ import net.minecraftforge.fml.common.Mod;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.network.AoeEffectPacket;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
-import pers.roinflam.carianstyle.visual.effect.CarianStyleBurstParticles;
+import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
 
 import java.util.List;
 
@@ -29,14 +29,29 @@ import java.util.List;
  * <p>
  * 护腿附魔，受击时范围击退
  * 受到攻击时击退周围所有敌人
- * 范围 = 5 + (等级 - 1) × 0.75格
+ * 范围 = 5 + (等级 - 1) × 0.75 格
  * </p>
- * <p>v2.2：受击者视角入口接入怪物附魔触发开关</p>
- * <p>v2.3：新增受击触发时的白色气浪爆发粒子视觉（单数据包 sendParticles 广播，
- * 不新增网络包，不触碰任何击退/上限逻辑）。</p>
+ *
+ * <h3>特效：贴地的冲击环</h3>
+ * <p>
+ * 触发点广播 {@link AoeEffectPacket#TYPE_REPULSION}——
+ * 两道发光环从中心猛烈外推扩张并快速淡出的短促冲击波（约 520ms）。
+ * </p>
+ * <p>
+ * <b>中心 Y 必须取脚底</b>（由 {@link CarianStyleEffects#repulsion} 的实体重载自动处理）。
+ * 早期版本传的是半身高 {@code getY() + bbHeight * 0.5}——那个取法对「贴身球状爆发」
+ * 是合理的，但本演出实际是<b>两道水平地面光环</b>
+ * （见 {@code AoeEffectRenderer.drawRepulsion}，由 {@code glowRing} 绘制、y 固定），
+ * 于是环被画在腰部、悬在半空，既不符合「以自身为中心把周围推开」的地面冲击语义，
+ * 也和模组内其余地面法阵（因果律、冻结地震、光环等一律贴地）不一致。
+ * </p>
+ * <p>
+ * 渲染器侧另有 {@code Y_OFFSET = 0.02f} 的离地微抬用于避免与地形 z-fighting，
+ * 调用方无需额外补偿。
+ * </p>
  *
  * @author RoinFlam
- * @version 2.3
+ * @version 3.0
  */
 @AutoRegisterEnchantment(
         id = "exclude",
@@ -48,13 +63,21 @@ import java.util.List;
 @Mod.EventBusSubscriber
 public class EnchantmentExclude extends EnchantmentBase {
 
+    /** AOE 搜索半径硬上限（方块） */
     private static final double MAX_SEARCH_RADIUS = 10.0;
+
+    /** 单次触发最大命中目标数 */
     private static final int MAX_TARGETS = 20;
 
     public EnchantmentExclude() {
         super(EnchantmentCategory.ARMOR_LEGS, new EquipmentSlot[]{EquipmentSlot.LEGS});
     }
 
+    /**
+     * 受击事件监听：范围击退周围所有生物。
+     *
+     * @param evt 生物受到攻击事件
+     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingAttack(@NotNull LivingAttackEvent evt) {
         if (evt.getEntity().level().isClientSide) {
@@ -67,7 +90,7 @@ public class EnchantmentExclude extends EnchantmentBase {
 
         LivingEntity victim = evt.getEntity();
 
-        // ⭐ v2.2：怪物附魔触发开关（受击者视角）
+        // 怪物附魔触发开关（受击者视角）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
 
         Enchantment exclude = EnchantmentRegistry.getEnchantmentByClass(EnchantmentExclude.class);
@@ -94,14 +117,11 @@ public class EnchantmentExclude extends EnchantmentBase {
         double range = 5 + (totalLevel - 1) * 0.75;
         double searchRadius = Math.min(range, MAX_SEARCH_RADIUS);
 
-        // 视觉：受击触发范围击退时，在自身周围撒一团白色气浪（排斥反馈，单数据包）。
-        // 纯服务端 sendParticles 广播，粒子不触发任何事件，不影响下方击退逻辑
+        // ⭐ 受击触发范围击退时播放一发排斥冲击波（双环猛烈外推、约 520ms）。
+        // 传实体重载 → 内部取脚底坐标，冲击环贴地（详见类注释）。
+        // 纯服务端发包，不生成实体、不触发任何事件，不影响下方击退逻辑。
         if (victim.level() instanceof ServerLevel serverLevel) {
-            CarianStyleBurstParticles.burst(
-                    serverLevel,
-                    victim.getX(), victim.getY() + victim.getBbHeight() * 0.5, victim.getZ(),
-                    12, ParticleTypes.CLOUD, 0.4, 0.05
-            );
+            CarianStyleEffects.repulsion(serverLevel, victim);
         }
 
         List<LivingEntity> targets = EntityUtil.getNearbyEntities(
