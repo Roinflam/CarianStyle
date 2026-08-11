@@ -1,6 +1,8 @@
 package pers.roinflam.carianstyle.visual.client;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -8,6 +10,7 @@ import net.minecraftforge.fml.common.Mod;
 import pers.roinflam.carianstyle.network.AoeEffectPacket;
 import pers.roinflam.carianstyle.utils.Reference;
 
+import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,7 +28,37 @@ import java.util.List;
  * 「触发即满状态蓄能（覆盖约 1.5 秒拉取无敌前摇）→ 大爆发 → 长余波」编排，故较长。
  * </p>
  *
+ * <h3>v6.1 修复：死亡触发类附魔的特效在玩家复活后继续跟随</h3>
+ * <p>
+ * <b>现象：</b>猩红艾奥尼亚 / 癫火蔓延（俗称「大灭」）触发后，附魔会在 30tick 处把持有者杀死，
+ * 而特效总时长 5400ms，剩余约 3.9 秒的凋谢 / 余烬段本应留在死亡点原地播完。
+ * 但玩家一旦复活，特效会<b>瞬间吸附回复活后的玩家身上并跟着跑</b>，直到剩余时长走完。
+ * </p>
+ * <p>
+ * <b>根因：</b>Minecraft 玩家复活时<b>实体网络 ID 不变</b>——服务端
+ * {@code PlayerList.respawn} 里会 {@code serverplayer.setId(player.getId())}，
+ * 客户端 {@code ClientPacketListener.handleRespawn} 同样把新 {@code LocalPlayer} 的 id
+ * 设回旧值。而 {@link AoeEffectRenderer} 每帧都拿 {@code fx.entityId} 去
+ * {@code level.getEntity(id)} 重新解析实体，一旦解析到的实体重新 {@code isAlive()}，
+ * 就会继续跟随。于是死亡 → 特效脱离 → 复活 → 特效再次吸附，形成残留跟随。
+ * </p>
+ * <p>
+ * <b>修复：</b>{@link AoeEffect#entityId} 去掉 {@code final}，
+ * 在 {@link #onClientTick} 中每 tick 调用 {@link #detachDeadBindings}：
+ * 绑定实体一旦<b>死亡或卸载</b>，立即把 {@code entityId} 置为 {@link AoeEffectPacket#NO_ENTITY}
+ * <b>永久解绑</b>，此后再也不会重新解析实体。渲染器侧的
+ * {@code if (fx.entityId >= 0)} 分支自然不成立，直接走「最后已知坐标」路径，
+ * <b>渲染器无需任何改动</b>，凋谢 / 余烬段仍在死亡点原地播完，行为与设计一致。
+ * </p>
+ * <p>
+ * <b>为什么解绑是安全的：</b>渲染器在实体存活期间每帧都会把实时插值坐标写回
+ * {@code fx.x/y/z}，因此解绑瞬间 {@code fx} 里存的就是最后一帧的准确位置；
+ * 而实体临时离开视野（区块卸载）本来就走同一条「最后已知坐标」回退路径，
+ * 特效最长仅 5.4 秒、裁剪距离 96 格，不存在需要「离开后再回来重新吸附」的合理场景。
+ * </p>
+ *
  * @author RoinFlam
+ * @version 6.1
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
 public final class AoeEffectManager {
@@ -64,8 +97,16 @@ public final class AoeEffectManager {
     public static final class AoeEffect {
         /** 特效类型（见 {@link AoeEffectPacket}） */
         public final int type;
-        /** 绑定实体 id；{@link AoeEffectPacket#NO_ENTITY}(-1) 表示定点不跟随 */
-        public final int entityId;
+        /**
+         * 绑定实体 id；{@link AoeEffectPacket#NO_ENTITY}(-1) 表示定点不跟随。
+         * <p>
+         * <b>v6.1：去掉 final。</b>绑定实体死亡 / 卸载时，{@link #detachDeadBindings}
+         * 会把本字段改写为 {@link AoeEffectPacket#NO_ENTITY} 实现<b>永久解绑</b>，
+         * 防止玩家复活后（实体网络 id 不变）特效重新吸附并跟随移动，
+         * 详见类注释「v6.1 修复」小节。
+         * </p>
+         */
+        public int entityId;
         /**
          * 世界坐标。
          * <p>定点特效：恒为发包坐标。跟随特效：每帧由渲染器更新为实体的实时插值位置，作为
@@ -334,7 +375,11 @@ public final class AoeEffectManager {
     }
 
     /**
-     * 客户端 tick 末尾：推进并移除到期特效；离开世界时清空。
+     * 客户端 tick 末尾：解绑已死亡 / 已卸载的绑定实体，推进并移除到期特效；离开世界时清空。
+     * <p>
+     * v6.1：新增 {@link #detachDeadBindings} 调用，修复「大灭」触发期间死亡、复活后特效
+     * 重新吸附并跟着玩家跑的问题（详见类注释）。
+     * </p>
      *
      * @param event tick 事件
      */
@@ -343,15 +388,49 @@ public final class AoeEffectManager {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
-        if (Minecraft.getInstance().level == null) {
+        Level level = Minecraft.getInstance().level;
+        if (level == null) {
             ACTIVE.clear();
             return;
         }
         if (ACTIVE.isEmpty()) {
             return;
         }
+        // ⭐ v6.1：先解绑死亡 / 卸载的绑定实体，再做到期清理
+        detachDeadBindings(level);
         long now = System.currentTimeMillis();
         ACTIVE.removeIf(fx -> now - fx.birthMs >= fx.durationMs);
+    }
+
+    /**
+     * 把绑定实体已死亡 / 已卸载的特效<b>永久解绑</b>（{@code entityId} 置为
+     * {@link AoeEffectPacket#NO_ENTITY}）。
+     * <p>
+     * <b>为什么必须永久解绑而不是每帧判断存活：</b>Minecraft 玩家复活后实体网络 id 不变，
+     * 若渲染器每帧都拿 id 重新解析实体，死亡时特效脱离、复活时又会重新吸附，
+     * 表现为「大灭特效跟着复活后的玩家跑」。置为 {@link AoeEffectPacket#NO_ENTITY} 后，
+     * 渲染器的 {@code if (fx.entityId >= 0)} 分支不再成立，
+     * 直接使用 {@code fx.x/y/z}（实体存活期间由渲染器每帧写回的最后一帧插值坐标），
+     * 剩余的凋谢 / 余烬段留在死亡点原地播完，与设计一致。
+     * </p>
+     * <p>
+     * 实体临时离开视野（区块卸载）同样会触发解绑——这与原本的「最后已知坐标」回退路径行为一致；
+     * 且特效最长仅 5.4 秒、裁剪距离 96 格，不存在需要「离开后再回来重新吸附」的合理场景。
+     * </p>
+     *
+     * @param level 客户端世界（非 null）
+     */
+    private static void detachDeadBindings(@Nonnull Level level) {
+        for (int i = 0; i < ACTIVE.size(); i++) {
+            AoeEffect fx = ACTIVE.get(i);
+            if (fx.entityId == AoeEffectPacket.NO_ENTITY) {
+                continue;
+            }
+            Entity bound = level.getEntity(fx.entityId);
+            if (bound == null || !bound.isAlive()) {
+                fx.entityId = AoeEffectPacket.NO_ENTITY;
+            }
+        }
     }
 
     /**

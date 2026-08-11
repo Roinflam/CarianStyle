@@ -7,8 +7,10 @@ import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraftforge.event.entity.living.LivingEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.jetbrains.annotations.NotNull;
@@ -74,8 +76,28 @@ import java.util.List;
  * 中心 Y 取脚底（实体重载已自动处理），裂纹贴地铺开。
  * </p>
  *
+ * <h3>v3.1 修复：演出期间登出可以完全逃掉这次死亡</h3>
+ * <p>
+ * <b>问题：</b>本附魔的机制是「拦下致命伤 → 保留 30% 血 → 1.5 秒无敌演出 → 3 秒灼烧 → 自身死亡」。
+ * 若玩家在这段时间内退出游戏，两条补刀路径（每目标的循环任务、末尾的 66tick 任务）
+ * 都会因 {@link EntityLivingUtil#kill} 内部的 {@code isAlive()} 判断而空转——
+ * 离线玩家的 {@code ServerPlayer} 已被标记移除。
+ * 玩家重新登录时读档回来是「30% 血、活着、冷却照常走」，等于白嫖了一次免死。
+ * 猩红罗妮亚（{@code EnchantmentScarletLonia}）同理。
+ * </p>
+ * <p>
+ * <b>修复：</b>末尾补刀失败时登记 {@link #PENDING_DEATH_KEY} 标记，
+ * 由 {@link ServerEventHandler#onPlayerLoggedIn} 在玩家重新登录后延迟
+ * {@link #PENDING_DEATH_DELAY} tick 补上死亡。
+ * </p>
+ * <p>
+ * <b>已知局限：</b>{@link EnchantmentDataManager} 是纯内存存储，
+ * 若服务器在玩家登出后、重登前<b>重启</b>，标记随之丢失，这次死亡仍会被逃掉。
+ * 做成真正持久化需要走 NBT / Capability，改动面远超收益，故不处理。
+ * </p>
+ *
  * @author RoinFlam
- * @version 3.0
+ * @version 3.1
  */
 @AutoRegisterEnchantment(
         id = "epilepsy_spread",
@@ -91,6 +113,25 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
 
     /** 单次触发最大命中目标数：防止并发 SynchronizationTask 过载 */
     private static final int MAX_TARGETS = 24;
+
+    /**
+     * 「待补刀」标记键。
+     * <p>演出结束时若持有者已离线（补刀空转），登记此标记；
+     * 玩家重新登录后由 {@link ServerEventHandler} 补上死亡，详见类注释「v3.1 修复」小节。</p>
+     */
+    private static final String PENDING_DEATH_KEY = "epilepsy_spread_pending_death";
+
+    /**
+     * 「待补刀」标记的存活时长（tick）。
+     * <p>72000 tick = 1 小时。纯内存存储，服务器重启即失效（见类注释「已知局限」）。</p>
+     */
+    private static final int PENDING_DEATH_EXPIRY = 72000;
+
+    /**
+     * 重登补刀的延迟（tick）。
+     * <p>1 秒。等客户端完成进入世界的初始化再执行死亡，避免死亡画面在加载过程中弹出。</p>
+     */
+    private static final int PENDING_DEATH_DELAY = 20;
 
     public EnchantmentEpilepsySpread() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
@@ -223,7 +264,14 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
                     new SynchronizationTask(66) {
                         @Override
                         public void run() {
-                            EntityLivingUtil.kill(hurter, NewDamageSource.epilepsyFire(hurter.level()));
+                            // ⭐ v3.1：持有者若已离线，kill 会因 isAlive() 为 false 空转，
+                            // 这次死亡就被白嫖掉了。此处登记待补刀标记，重登时补上（详见类注释）。
+                            if (hurter.isAlive()) {
+                                EntityLivingUtil.kill(hurter, NewDamageSource.epilepsyFire(hurter.level()));
+                            } else if (hurter instanceof Player) {
+                                EnchantmentDataManager.setData(
+                                        PENDING_DEATH_KEY, hurter.getUUID(), true, PENDING_DEATH_EXPIRY);
+                            }
                             EnchantmentDataManager.removeData("epilepsy_spread_active", hurter.getUUID());
                         }
                     }.start();
@@ -270,6 +318,44 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
                     EntityLivingUtil.setJumped(entityLiving);
                 }
             }
+        }
+    }
+
+    /**
+     * 服务端：处理「演出期间登出逃掉死亡」的补刀（v3.1 新增）。
+     * <p>详见类注释「v3.1 修复」小节。</p>
+     */
+    @Mod.EventBusSubscriber
+    public static class ServerEventHandler {
+
+        /**
+         * 玩家重新登录时，若存在待补刀标记则延迟补上死亡。
+         *
+         * @param evt 玩家登录事件
+         */
+        @SubscribeEvent
+        public static void onPlayerLoggedIn(@NotNull PlayerEvent.PlayerLoggedInEvent evt) {
+            Player player = evt.getEntity();
+            if (player.level().isClientSide) {
+                return;
+            }
+
+            Boolean pending = EnchantmentDataManager.getData(PENDING_DEATH_KEY, player.getUUID());
+            if (pending == null || !pending) {
+                return;
+            }
+
+            // 先清标记再补刀：即使补刀因任何原因失败也不会陷入「每次登录都被杀」的死循环
+            EnchantmentDataManager.removeData(PENDING_DEATH_KEY, player.getUUID());
+
+            new SynchronizationTask(PENDING_DEATH_DELAY) {
+                @Override
+                public void run() {
+                    if (player.isAlive()) {
+                        EntityLivingUtil.kill(player, NewDamageSource.epilepsyFire(player.level()));
+                    }
+                }
+            }.start();
         }
     }
 

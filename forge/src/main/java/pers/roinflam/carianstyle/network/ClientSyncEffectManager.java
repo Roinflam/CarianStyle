@@ -26,6 +26,33 @@ import java.util.concurrent.ConcurrentHashMap;
  * - 客户端查询 O(n)：List 改为 Set，shouldRenderEffect 从 O(n) 降为 O(1)
  * </p>
  *
+ * <h3>v3.1 修复：实体死亡后特效残留（玩家复活后仍显示）</h3>
+ * <p>
+ * <b>现象：</b>切腹（俗称「大灭」）触发期间玩家被自己耗死，复活之后腹部刀痕、上升血刃碎片、
+ * 疾走涟漪等视觉<b>一直挂在身上不消失</b>，直到下一次正常触发并过期才恢复。
+ * 猩红腐败(5)、冻伤(7)、出血(8)、切腹(9)、睡眠(10)、噩兆(11) 这些
+ * <b>基于 MobEffect 的同步全部存在同一个问题</b>。
+ * </p>
+ * <p>
+ * <b>根因：</b>各 SyncHandler 靠 {@code MobEffectEvent.Added / Remove / Expired} 维护集合，
+ * 而<b>实体死亡时这三个事件一个都不会触发</b>——效果是随旧实体实例一起消失的，Forge 不会补发
+ * Remove/Expired。于是服务端集合里留下了该实体 ID。
+ * </p>
+ * <p>
+ * 唯一的兜底是 {@link #onServerTick} 里每 5 秒一次全量重同步的剪枝
+ * （{@code e == null || !e.isAlive()}），但 <b>Minecraft 玩家复活后实体网络 ID 不变</b>
+ * （{@code PlayerList.respawn} 里 {@code serverplayer.setId(player.getId())}），
+ * 复活后该 ID 又能解析到一个<b>存活</b>的实体，剪枝判定直接失效，
+ * 残留条目于是永久留在集合里，并被每次全量同步反复广播出去。
+ * </p>
+ * <p>
+ * <b>修复：</b>新增 {@link #removeAllForEntity}，由
+ * {@code ClientSyncEffectEventHandler} 在<b>死亡 / 复活 / 登出</b>三处调用，
+ * 把该实体从当前维度下的<b>全部序列号</b>中移除并增量广播。
+ * 死亡是主修复点；复活与登出是兜底——覆盖死亡事件被
+ * 满月 / 死诞者 / 时间逆转 拦截取消等路径下漏清的情况。
+ * </p>
+ *
  * <h3>定期重同步为什么要跳过空集合</h3>
  * <p>
  * {@link #onServerTick} 的 5 秒全量重同步早期<b>不管集合是否为空都照发</b>。
@@ -86,7 +113,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 且从未启用过的序列号不会产生无意义的空包。
  * </p>
  *
- * @version 3.0
+ * @version 3.1
  */
 @Mod.EventBusSubscriber
 public class ClientSyncEffectManager {
@@ -188,6 +215,47 @@ public class ClientSyncEffectManager {
     }
 
     /**
+     * 服务端：把某实体从<b>当前维度下的全部效果序列号</b>中移除（逐个增量广播）。
+     * <p>
+     * <b>用途：</b>修复「实体死亡后特效残留」——基于 MobEffect 的同步
+     * （猩红腐败 5 / 冻伤 7 / 出血 8 / 切腹 9 / 睡眠 10 / 噩兆 11）在实体死亡时
+     * <b>收不到任何 {@code MobEffectEvent.Remove / Expired}</b>，
+     * 因为效果是随旧实体实例一起消失的，Forge 不会补发事件。
+     * 而玩家复活后实体网络 ID 不变且重新存活，
+     * {@link #onServerTick} 里 {@code !e.isAlive()} 的剪枝也拦不住，
+     * 导致残留条目永久生效（详见类注释「v3.1 修复」小节）。
+     * </p>
+     * <p>
+     * 由 {@code ClientSyncEffectEventHandler} 在<b>死亡 / 复活 / 登出</b>三处调用。
+     * 对本就不在集合中的实体是无开销的空操作（{@code Set.remove} 返回 false 即不广播），
+     * 因此重复调用安全、可与 {@code DynamicAttributeManager.clearAll} 的移除回调叠加。
+     * </p>
+     * <p>
+     * <b>只处理实体当前所在维度：</b>跨维度的残留（例如在下界死亡、在主世界复活）
+     * 由旧维度的定期重同步剪枝自愈——那边 {@code level.getEntity(id)} 解析为 null，
+     * 会被正常剔除。
+     * </p>
+     *
+     * @param entity 目标实体
+     */
+    public static void removeAllForEntity(@Nonnull LivingEntity entity) {
+        if (entity.level().isClientSide) return;
+
+        Map<Integer, Set<Integer>> dimMap = SERVER_ACTIVATED_ENTITIES.get(entity.level().dimension());
+        if (dimMap == null || dimMap.isEmpty()) return;
+
+        ServerLevel level = (ServerLevel) entity.level();
+        int entityId = entity.getId();
+
+        for (Map.Entry<Integer, Set<Integer>> entry : dimMap.entrySet()) {
+            if (entry.getValue().remove(entityId)) {
+                broadcastDelta(level, entry.getKey(),
+                        ClientSyncEffectPacket.Action.REMOVE, entityId);
+            }
+        }
+    }
+
+    /**
      * 增量广播：只发送 1 个实体的 ADD/REMOVE
      *
      * @param level        服务端世界
@@ -252,6 +320,11 @@ public class ClientSyncEffectManager {
      * <b>跳过恒为空的序列号。</b>清理无效实体后，
      * 若集合为空且上一轮也为空则一个包都不发；
      * 若集合为空但上一轮非空，则补发一次空包做收尾修正。详见类注释。
+     * </p>
+     * <p>
+     * <b>注意：</b>此处的剪枝条件 {@code e == null || !e.isAlive()}
+     * <b>拦不住「死亡后复活」的场景</b>（复活后实体 ID 不变且重新存活），
+     * 那条路径必须由 {@link #removeAllForEntity} 在死亡时主动清除。
      * </p>
      *
      * @param event 服务端 tick 事件
