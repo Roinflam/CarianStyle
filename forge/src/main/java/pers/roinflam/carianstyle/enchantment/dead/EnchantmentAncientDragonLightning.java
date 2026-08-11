@@ -20,13 +20,14 @@ import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * 古龙雷电附魔
  * <p>
  * 死亡时触发：
- * - 对60格范围内的敌人降下闪电
+ * - 对 60 格范围内的敌人降下红色龙雷
  * - 根据天气加成伤害倍率
  * - 持续攻击直到敌人死亡
  * </p>
@@ -62,8 +63,50 @@ import java.util.List;
  * 其余演出类型不参与合并（详见 {@code refreshNearbyRedLightning}）。
  * </p>
  *
+ * <h3>v3.1 新增：命中目标数硬上限（{@link #MAX_TARGETS}）</h3>
+ * <p>
+ * <b>这是全模组最后一个没有目标数上限的 AOE 附魔。</b>其余附魔（猩红罗妮亚、癫火蔓延、
+ * 因果律、火焰吞噬等）早已各自补上 {@code MAX_TARGETS}，唯独本附魔一直是
+ * 「60 格范围内有多少打多少」，在实体密集场景（刷怪塔、村民聚集、大型基地）下会出问题：
+ * </p>
+ * <ol>
+ *   <li><b>并发任务无上限</b>——每个命中目标创建一个 {@code SynchronizationTask(40, 5)}
+ *       周期任务，持续最多 {@code 40 + 5 × level × 15} tick。300 个目标即 300 个并发任务，
+ *       全部进入 {@code SynchronizationTask} 的长期任务表（{@code ConcurrentHashMap}），
+ *       每 tick 全表遍历；</li>
+ *   <li><b>网络包爆炸</b>——每次落雷广播 1 个红闪特效包 + 2 个音效包。
+ *       落雷总次数由 {@code RandomUtil.randomList(level*100, 目标数)} 分配、
+ *       单目标封顶 {@code level*15}，目标越多总次数越接近 {@code level*100}；
+ *       但每次落雷的<b>三个包都要发给附近每个玩家</b>，目标数越多、落雷点越分散，
+ *       同一时刻的包量峰值越高；</li>
+ *   <li><b>客户端特效被挤掉</b>——红闪的同位置合并只覆盖 2.5 格，不同目标各自成一道。
+ *       客户端 {@code AoeEffectManager.MAX_ACTIVE} 为 64，超出后
+ *       {@code ACTIVE.remove(0)} 会挤掉最早的实例，表现为<b>闪电随机消失、闪烁</b>——
+ *       目标越多这个现象越严重，反而不如封顶后好看。</li>
+ * </ol>
+ * <p>
+ * 现封顶 {@value #MAX_TARGETS}：既远高于常规战斗场景（正常不会有 100 个敌人同时在 60 格内），
+ * 保留「大范围降雷」的设计意图，又能在密集场景下守住并发任务数、包量峰值与客户端特效名额。
+ * </p>
+ * <p>
+ * <b>注意：</b>{@code randomList} 的分配基数必须用<b>截断后的目标数</b>，否则
+ * {@code level*100} 的总量会被分配给不存在的目标，造成实际落雷次数远低于预期
+ * （封顶前 300 个目标每个平均 1 次，封顶后 100 个目标每个平均 3 次，总量不变、分布更集中）。
+ * </p>
+ * <p>
+ * <b>搜索半径 60 格保持不变</b>：本附魔仅在死亡时触发一次、且有 1800 tick 冷却，
+ * 单次范围查询的开销可接受；真正的风险在于「每个目标一个长期任务」，封目标数即可解决。
+ * </p>
+ *
+ * <h3>v3.1 新增：存活检查提前到发包之前</h3>
+ * <p>
+ * 原顺序是「发红闪 + 发两个音效 → 检查 {@code isAlive()} → 不存活则 cancel」，
+ * 意味着目标死亡 / 卸载后<b>仍会多发一轮三个包</b>（画面上是往一具尸体或空气里劈一道雷）。
+ * 现将存活检查提到发包之前，死亡目标立即 cancel、不再产生任何网络流量。
+ * </p>
+ *
  * @author RoinFlam
- * @version 3.0
+ * @version 3.1
  */
 @AutoRegisterEnchantment(
         id = "ancient_dragon_lightning",
@@ -73,6 +116,28 @@ import java.util.List;
         slots = {EquipmentSlot.CHEST}
 )
 public class EnchantmentAncientDragonLightning extends EnchantmentBase {
+
+    /**
+     * 单次触发最大命中目标数。
+     * <p>
+     * 每个目标会创建一个独立的周期任务并持续广播特效 / 音效包，
+     * 故必须封顶。取 {@value} 的理由见类注释「v3.1 新增：命中目标数硬上限」小节：
+     * 常规战斗远达不到该值（不影响正常体验），密集场景下则守住并发任务数、
+     * 网络包峰值与客户端 {@code AoeEffectManager.MAX_ACTIVE}(64) 的特效名额。
+     * </p>
+     * <p>
+     * <b>请勿放宽。</b>若确需更大范围的压制感，应调整 {@code level * 15} 的
+     * 单目标落雷次数上限，而不是放开目标数——前者只增加时长，后者会线性放大
+     * 并发任务与瞬时包量。
+     * </p>
+     */
+    private static final int MAX_TARGETS = 100;
+
+    /** AOE 搜索水平半径（格）。死亡一次性触发 + 1800 tick 冷却，该开销可接受 */
+    private static final int SEARCH_RADIUS = 60;
+
+    /** AOE 搜索垂直半径（格） */
+    private static final int SEARCH_HEIGHT = 15;
 
     public EnchantmentAncientDragonLightning() {
         super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
@@ -94,13 +159,28 @@ public class EnchantmentAncientDragonLightning extends EnchantmentBase {
 
         EnchantmentDataManager.setCooldown("ancient_dragon_lightning", hurter.getUUID(), 1800);
 
-        List<LivingEntity> entities = EntityUtil.getNearbyEntities(
+        List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 hurter,
-                60,
-                15,
+                SEARCH_RADIUS,
+                SEARCH_HEIGHT,
                 entityLivingBase -> !entityLivingBase.equals(hurter)
         );
+
+        if (nearbyEntities.isEmpty()) {
+            return;
+        }
+
+        // ⭐ v3.1：命中目标数硬上限。
+        // 必须在 randomList 之前截断——分配基数要用截断后的数量，
+        // 否则 level*100 的落雷总量会被摊给不存在的目标（详见类注释）。
+        // 复制成新列表而非用 subList 视图，避免持有原大列表的引用。
+        final List<LivingEntity> entities;
+        if (nearbyEntities.size() > MAX_TARGETS) {
+            entities = new ArrayList<>(nearbyEntities.subList(0, MAX_TARGETS));
+        } else {
+            entities = nearbyEntities;
+        }
 
         List<Integer> list = RandomUtil.randomList(level * 100, entities.size());
 
@@ -108,12 +188,25 @@ public class EnchantmentAncientDragonLightning extends EnchantmentBase {
             LivingEntity entityLivingBase = entities.get(i);
             int timeLightning = Math.min(list.get(i), level * 15);
 
+            // 分配到 0 次落雷的目标直接跳过，不创建空转任务
+            if (timeLightning <= 0) {
+                continue;
+            }
+
             new SynchronizationTask(40, 5) {
                 private int time = 0;
 
                 @Override
                 public void run() {
                     if (++time > timeLightning) {
+                        this.cancel();
+                        return;
+                    }
+
+                    // ⭐ v3.1：存活检查提前到发包之前。
+                    // 原实现先发一轮红闪 + 两个音效再检查，导致目标死亡 / 卸载后
+                    // 仍会往尸体或空气里多劈一道雷、多发三个包（详见类注释）。
+                    if (!entityLivingBase.isAlive()) {
                         this.cancel();
                         return;
                     }
@@ -137,11 +230,6 @@ public class EnchantmentAncientDragonLightning extends EnchantmentBase {
                         serverLevel.playSound(null, lx, ly, lz,
                                 SoundEvents.LIGHTNING_BOLT_IMPACT, SoundSource.WEATHER,
                                 0.5f, 1.0f + serverLevel.random.nextFloat() * 0.2f);
-                    }
-
-                    if (!entityLivingBase.isAlive()) {
-                        this.cancel();
-                        return;
                     }
 
                     entityLivingBase.invulnerableTime = 10;

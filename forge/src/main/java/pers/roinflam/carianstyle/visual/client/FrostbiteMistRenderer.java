@@ -29,41 +29,60 @@ import java.util.List;
  * （覆盖战斗中途才被施加冻伤的怪物，见 {@link FrostbiteSyncHandler} 类注释）。
  * </p>
  * <p>
- * <b>v4（补足"冒寒气"）：</b>上一版精简后只剩头部间歇喷出的呼吸雾团，太少太偶发，
- * 反馈是"看不出在冒寒气"。本版把间歇的头部呼吸换成 {@link #drawColdVapor}——贴身多点持续
- * 冒出的蒸汽状光点（拉长的水滴形，而非正圆，视觉上更像"蒸汽"而不是"漂浮的光点"），
- * 从躯干不同高度持续生成、缓慢上飘一小段就消散，而不是等 1.8 秒才喷一下。三个元素分工：
+ * <b>三个元素分工：</b>
  * <ol>
  *     <li><b>冰晶星</b>（{@link #drawIceCrystalStar}）——唯一的标志性主视觉：八角星 + 内
  *         六边形，任何角度都能一眼认出「冰」；带周期性脉冲（短暂增亮增大 + 中心闪光）；</li>
  *     <li><b>霜地</b>（{@link #drawFrostedGround}）——单层渐变圆盘 + 从冰晶星八个尖角方向
  *         延伸出去、与星形同步旋转的裂纹；</li>
- *     <li><b>冷蒸汽</b>（{@link #drawColdVapor}）——贴身持续冒出的蒸汽状光点，是「冒寒气」
- *         这一直观信号的主要来源，覆盖躯干各个高度而不只是头部一处。</li>
+ *     <li><b>冰雾 + 冷蒸汽</b>（{@link #drawFrostFog} / {@link #drawColdVapor}）——
+ *         前者是半径接近实体宽度一半的大号柔光雾块，缓慢漂移、彼此叠加，是「冒寒气」的主要来源；
+ *         后者是贴身持续冒出的细蒸汽丝，作为补充细节层。</li>
  * </ol>
  * </p>
  * <p>
- * <b>v5（补足体积感）：</b>反馈是 v4 之后仍然「没看到冰雾」——蒸汽丝尺寸太小、太细，
- * 实际游戏画面里读不出来。本版加入 {@link #drawFrostFog}：9 团半径接近实体宽度一半的
- * 大号柔光雾块，缓慢漂移、彼此叠加，覆盖躯干中下段，透明度更高、基本常驻而非明显的
- * 生成-消散周期，是「冒寒气」的主要来源；{@link #drawColdVapor} 的细丝降级为补充细节层。
- * </p>
- * <p>
- * <b>v6（性能，视觉零变化）：</b>接入 {@link VisualBatch} 与 {@link SharedEntityQuery}——
- * <ul>
- *     <li>不再自行设置 / 恢复 GL 状态、不再自行 {@code begin/end} 顶点缓冲，改为向
- *         {@link VisualBatch} 提供的共享缓冲写顶点，由其在本帧末统一提交（七个渲染器合并为一次
- *         GL 状态切换与一次 draw call）；</li>
- *     <li>不再自行做范围实体查询，改为遍历 {@link SharedEntityQuery} 的每帧共享列表，
- *         把原先的查询判定条件下沉为循环内的 {@code continue}（见 {@link #hasFrostbite}）。</li>
- * </ul>
- * 判定条件、精确平方距离裁剪、绘制顺序与全部几何参数均未改动。
- * </p>
- * <p>
  * 渲染管线与 {@code ScarletRotMistRenderer} 同款：{@link RenderLevelStageEvent} 的
- * {@code AFTER_TRANSLUCENT_BLOCKS} 阶段，{@code POSITION_COLOR} 纯顶点绘制，无贴图、无原版粒子；
- * 顶点格式与着色器现由 {@link VisualBatch} 统一设置。
+ * {@code AFTER_TRANSLUCENT_BLOCKS} 阶段，GL 状态与顶点缓冲由 {@link VisualBatch} 统一管理，
+ * 实体列表取自 {@link SharedEntityQuery} 的每帧共享查询，{@code POSITION_COLOR} 纯顶点绘制。
  * </p>
+ *
+ * <h3>v7（顶点量，近距离视觉零变化）：接入 {@link VisualLod}</h3>
+ * <p>
+ * 单个冻伤实体每帧的顶点量粗算：
+ * </p>
+ * <pre>
+ * 霜地圆盘（24 段 × 3）                    72
+ * 地面裂纹（8 条 × 6）                      48
+ * 冰晶星（八角星 48 + 六边形 36 + 闪光 54） 138
+ * 冰雾（9 团 × 10 段 × 3）                 270
+ * 冷蒸汽（18 丝 × 10 段 × 3）              540
+ * ─────────────────────────────────────────
+ * 合计                              ~1068 顶点 / 实体 / 帧
+ * </pre>
+ * <p>
+ * 冻伤是本模组<b>最容易群体挂载</b>的效果之一——星律附魔在夜间「造成或受到物理伤害」就叠冻伤、
+ * 亚杜拉的月光剑每次攻击对目标周围一圈敌人施加冻伤，一次挥砍就能让十几个实体同时带上。
+ * </p>
+ * <p>
+ * 现按 {@link VisualLod#detail} 缩放：{@link VisualLod#FULL_DETAIL_RANGE} 格内系数为 1.0，
+ * <b>与优化前逐像素一致</b>；40 格外单实体降至约 220 顶点。
+ * </p>
+ * <p>
+ * <b>削减策略：</b>
+ * </p>
+ * <ul>
+ *     <li><b>冰晶星完全不削</b>——八角星 + 内六边形共 84 顶点，是「这是冰不是别的」的唯一依据，
+ *         而且是<b>顶点性价比最高</b>的元素（84 顶点换来全部辨识度）。只把脉冲峰值那一下的
+ *         中心闪光圆盘按细节缩分段（那是锦上添花的柔光，不影响星形轮廓）；</li>
+ *     <li><b>冰雾与蒸汽按种子截断尾部</b>——位置由 {@code seedFor(entityId, i)} 决定，
+ *         保留元素的漂移轨迹完全不变；</li>
+ *     <li><b>蒸汽丝整层可跳过</b>——它本就是冰雾的「补充细节层」（见类内 v5 说明），
+ *         远处两者会糊成一片，低于 {@link #VAPOR_KEEP_THRESHOLD} 时只留大雾块
+ *         （省 540 顶点，占总量一半）；</li>
+ *     <li><b>裂纹按步长抽取</b>——裂纹角度是 {@code rot + i × (TAU / 8)} 均布的，
+ *         且刻意与冰晶星的八个尖角对齐，截断会让一半尖角失去延伸出去的裂纹、
+ *         破坏「星形向外裂开」的一体感，故按步长抽取保持对称。</li>
+ * </ul>
  *
  * @author FlameForge
  */
@@ -77,13 +96,23 @@ public final class FrostbiteMistRenderer {
     private static final float TAU = (float) (Math.PI * 2.0);
     /** 离地高度偏移，避免地面图形与地形 z-fighting */
     private static final float Y_OFFSET = 0.02f;
-    /** 蒸汽光点的billboard分段数 */
+    /** 蒸汽 / 雾团光点的 billboard 分段数 */
     private static final int MOTE_SEGMENTS = 10;
     /**
      * 渲染器起始墙钟毫秒（类加载时固定）。动画时间必须用「当前毫秒 - 此起始值」的差值再转 float，
      * 直接用 currentTimeMillis()/1000f 数值过大会导致 float 精度不足、动画卡死。
      */
     private static final long START_MILLIS = System.currentTimeMillis();
+
+    // ===== v7 LOD 下限与保留阈值 =====
+    /** 雾团 / 蒸汽光点的最少分段数：4 段仍是个饱满的菱形柔光块 */
+    private static final int MOTE_SEGMENTS_MIN = 4;
+    /** 霜地圆盘的最少分段数 */
+    private static final int GROUND_SEGMENTS_MIN = 8;
+    /** 冰晶星脉冲闪光圆盘的最少分段数 */
+    private static final int FLASH_SEGMENTS_MIN = 6;
+    /** 冷蒸汽层的保留阈值：它是冰雾的补充细节层，远处两者糊成一片 */
+    private static final float VAPOR_KEEP_THRESHOLD = 0.5f;
 
     // ===== 配色（0xRRGGBB）=====
     private static final int ICE_WHITE = 0xEAF6FF;
@@ -98,6 +127,8 @@ public final class FrostbiteMistRenderer {
     private static final float PULSE_PERIOD = 3.0f;
     /** 脉冲动画占周期的比例（其余时间只有常规呼吸） */
     private static final float PULSE_ACTIVE_RATIO = 0.25f;
+    /** 冰晶星脉冲峰值中心闪光的分段数 */
+    private static final int FLASH_SEGMENTS = 18;
 
     // ===== 霜地（单层圆盘 + 与冰晶星同步旋转的裂纹）=====
     private static final int GROUND_SEGMENTS = 24;
@@ -108,7 +139,7 @@ public final class FrostbiteMistRenderer {
     private static final float CRACK_ALPHA = 0.55f;
 
     // ===== 冷蒸汽（贴身持续冒出的细丝，"冒寒气"的细节层）=====
-    /** 同时存在的蒸汽光点数量（够密才能读出"持续冒气"而不是"偶尔飘一个"） */
+    /** 同时存在的蒸汽光点数量 */
     private static final int VAPOR_COUNT = 18;
     /** 单颗蒸汽从生成到消散的循环速度（每秒推进的归一化进度） */
     private static final float VAPOR_RISE_SPEED = 0.55f;
@@ -118,7 +149,7 @@ public final class FrostbiteMistRenderer {
     private static final float VAPOR_RISE_DIST_FACTOR = 0.35f;
     private static final float VAPOR_BASE_ALPHA = 0.8f;
 
-    // ===== 冰雾（v5 新增：真正有体积感的雾块，"冒寒气"的主要来源）=====
+    // ===== 冰雾（真正有体积感的雾块，"冒寒气"的主要来源）=====
     /** 同时存在的雾块数量（叠加出体积感，而不是稀疏的几个点） */
     private static final int FOG_COUNT = 9;
     /** 雾块半径系数（× 实体宽度），明显比蒸汽丝大得多，才能读出"雾"而不是"光点" */
@@ -134,10 +165,6 @@ public final class FrostbiteMistRenderer {
 
     /**
      * 世界渲染回调：在半透明方块之后，绘制相机附近所有冻伤生物的冰霜视觉。
-     * <p>
-     * v6：GL 状态与顶点缓冲由 {@link VisualBatch} 统一管理，实体列表取自
-     * {@link SharedEntityQuery} 的每帧共享查询；本方法只负责筛选与写顶点。
-     * </p>
      *
      * @param event 渲染阶段事件
      */
@@ -179,7 +206,7 @@ public final class FrostbiteMistRenderer {
         float time = (System.currentTimeMillis() - START_MILLIS) / 1000f;
 
         for (LivingEntity entity : candidates) {
-            // v6：原先作为查询谓词的判定，现下沉为循环内筛选（共享列表已保证 isAlive）
+            // 原先作为查询谓词的判定，现下沉为循环内筛选（共享列表已保证 isAlive）
             if (!hasFrostbite(entity, frostbite)) {
                 continue;
             }
@@ -191,9 +218,15 @@ public final class FrostbiteMistRenderer {
             double dx = ex - cam.x;
             double dy = ey - cam.y;
             double dz = ez - cam.z;
-            if (dx * dx + dy * dy + dz * dz > CULL_SQR) {
+            double distSqr = dx * dx + dy * dy + dz * dz;
+            if (distSqr > CULL_SQR) {
                 continue;
             }
+
+            // ⭐ v7：本实体的细节系数（距离 × 同屏拥挤度）。12 格内恒为 1.0，视觉与优化前一致
+            float detail = VisualLod.detail(distSqr);
+            // 登记实例，供下一帧估算拥挤度（不影响本帧绘制）
+            VisualLod.countInstance();
 
             float width = entity.getBbWidth();
             float height = entity.getBbHeight();
@@ -202,17 +235,20 @@ public final class FrostbiteMistRenderer {
             float ryGround = (float) dy + Y_OFFSET;
             float rz = (float) dz;
 
-            drawFrostedGround(builder, matrix, rx, ryGround, rz, width, time, entity.getId());
-            drawIceCrystalStar(builder, matrix, rx, ryGround, rz, width, time, entity.getId());
+            drawFrostedGround(builder, matrix, rx, ryGround, rz, width, time, entity.getId(), detail);
+            drawIceCrystalStar(builder, matrix, rx, ryGround, rz, width, time, entity.getId(), detail);
             drawFrostFog(builder, matrix, rx, (float) dy, rz, width, height, time, entity.getId(),
-                    rightX, rightY, rightZ, upX, upY, upZ);
-            drawColdVapor(builder, matrix, rx, (float) dy, rz, width, height, time, entity.getId(),
-                    rightX, rightY, rightZ, upX, upY, upZ);
+                    rightX, rightY, rightZ, upX, upY, upZ, detail);
+            // 冷蒸汽是冰雾的补充细节层，远处两者糊成一片，低细节时整层跳过（省约 540 顶点）
+            if (VisualLod.keepLayer(detail, VAPOR_KEEP_THRESHOLD)) {
+                drawColdVapor(builder, matrix, rx, (float) dy, rz, width, height, time, entity.getId(),
+                        rightX, rightY, rightZ, upX, upY, upZ, detail);
+            }
         }
     }
 
     /**
-     * 判断实体是否应显示冻伤视觉（双重冗余判定，与优化前的查询谓词逐条一致）。
+     * 判断实体是否应显示冻伤视觉（双重冗余判定）。
      *
      * @param entity    待判定实体
      * @param frostbite 冻伤效果对象（可能为 null）
@@ -227,14 +263,17 @@ public final class FrostbiteMistRenderer {
     }
 
     /**
-     * 冰晶星（主视觉）：脚下缓慢旋转的八角星 + 反向旋转的内六边形轮廓，沿用
-     * {@code AoeEffectRenderer#drawFrostQuake} 里「中心冰花」的形状语言。除常规呼吸外，
-     * 每 {@link #PULSE_PERIOD} 秒有一次短促的增亮增大 + 中心闪光，复用同一套星形几何实现，
-     * 不需要额外的独立爆发系统。
+     * 冰晶星（主视觉）：脚下缓慢旋转的八角星 + 反向旋转的内六边形轮廓。除常规呼吸外，
+     * 每 {@link #PULSE_PERIOD} 秒有一次短促的增亮增大 + 中心闪光。
+     * <p>
+     * <b>v7：星形本体完全不参与 LOD 削减。</b>八角星 + 内六边形共 84 顶点却承担全部辨识度，
+     * 是本渲染器顶点性价比最高的元素；只把脉冲峰值那一下的中心闪光圆盘按细节缩分段
+     * （那是锦上添花的柔光，不影响星形轮廓）。
+     * </p>
      */
     private static void drawIceCrystalStar(BufferBuilder b, Matrix4f m,
                                            float cx, float cy, float cz, float width,
-                                           float time, int seedId) {
+                                           float time, int seedId, float detail) {
         float rot = time * ICE_STAR_ROT_SPEED + seedId * 0.3f;
         float breath = 0.75f + 0.25f * Mth.sin(time * 1.4f + seedId);
 
@@ -258,28 +297,41 @@ public final class FrostbiteMistRenderer {
         // 脉冲峰值时的中心闪光，复用星形自身的透明度节奏，不新增独立系统
         if (pulseBoost > 0.55f) {
             float flash = (pulseBoost - 0.55f) / 0.45f;
-            drawDisc(b, m, cx, cy, cz, width * 0.55f, 18, white[0], white[1], white[2], 0.35f * flash);
+            int flashSegments = VisualLod.scaleSegments(FLASH_SEGMENTS, FLASH_SEGMENTS_MIN, detail);
+            drawDisc(b, m, cx, cy, cz, width * 0.55f, flashSegments,
+                    white[0], white[1], white[2], 0.35f * flash);
         }
     }
 
     /**
      * 霜地：单层渐变圆盘 + 从冰晶星八个尖角方向延伸出去、与星形同步旋转的裂纹——
-     * 裂纹与冰晶星共用同一个旋转相位，视觉上是「星形向外裂开」的一体图案，而不是两套
-     * 各自独立的放射图案。
+     * 裂纹与冰晶星共用同一个旋转相位，视觉上是「星形向外裂开」的一体图案。
+     * <p>
+     * <b>v7：圆盘缩分段；裂纹按步长抽取。</b>裂纹角度是 {@code rot + i × (TAU / 8)} 均布的，
+     * 且刻意与冰晶星的八个尖角对齐——截断前 N 条会让一半尖角失去延伸出去的裂纹、
+     * 破坏「星形向外裂开」的一体感，故必须按步长抽取以保持对称。
+     * </p>
      */
     private static void drawFrostedGround(BufferBuilder b, Matrix4f m,
                                           float cx, float cy, float cz, float width,
-                                          float time, int seedId) {
+                                          float time, int seedId, float detail) {
         float breath = 0.88f + 0.12f * Mth.sin(time * 1.0f + seedId * 0.5f);
         float radius = width * GROUND_RADIUS_FACTOR * breath;
         int col = lerpRgb(ICE_DEEP, ICE_BLUE, 0.5f + 0.5f * Mth.sin(time * 0.9f + seedId));
         float[] c = unpack(col);
-        drawDisc(b, m, cx, cy, cz, radius, GROUND_SEGMENTS, c[0], c[1], c[2], GROUND_ALPHA * breath);
+        int segments = VisualLod.scaleSegments(GROUND_SEGMENTS, GROUND_SEGMENTS_MIN, detail);
+        drawDisc(b, m, cx, cy, cz, radius, segments, c[0], c[1], c[2], GROUND_ALPHA * breath);
 
         // 裂纹从星尖方向延伸出去，与冰晶星共用同一旋转相位
         float rot = time * ICE_STAR_ROT_SPEED + seedId * 0.3f;
         float innerR = width * ICE_STAR_RADIUS_FACTOR * 0.95f;
-        for (int i = 0; i < CRACK_COUNT; i++) {
+
+        // ⭐ v7：均布裂纹按步长抽取，保持与八角星尖角的对称关系
+        int drawnCracks = VisualLod.scale(CRACK_COUNT, detail);
+        int step = Math.max(1, CRACK_COUNT / drawnCracks);
+
+        for (int i = 0; i < CRACK_COUNT; i += step) {
+            // 种子仍用原始下标 i，保证保留裂纹的长度与全细节时完全一致
             long s = seedFor(seedId, i + 50);
             float ang = rot + i * (TAU / CRACK_COUNT);
             float len = radius * (0.7f + 0.3f * rngFloat(s));
@@ -294,16 +346,21 @@ public final class FrostbiteMistRenderer {
 
     /**
      * 冰雾：多团比蒸汽丝大得多的柔光雾块，缓慢漂移、彼此叠加，营造真正的「体积感」——
-     * 这是「冒寒气」的主要来源，{@link #drawColdVapor} 的细丝作为补充细节层。雾块半径接近
-     * 实体宽度的一半，覆盖躯干中下段，透明度较高、持续常驻（不像蒸汽丝那样有明显的
-     * 生成-消散周期），确保远近距离下都能第一时间看出「这个人被雾气笼罩」。
+     * 这是「冒寒气」的主要来源，{@link #drawColdVapor} 的细丝作为补充细节层。
+     * <p>
+     * <b>v7：数量与分段数按细节系数缩放。</b>雾块位置由 {@code seedFor(entityId, i + 900)} 决定，
+     * 截断尾部时保留元素的漂移轨迹完全不变。
+     * </p>
      */
     private static void drawFrostFog(BufferBuilder b, Matrix4f m,
                                      float cx, float cyFoot, float cz, float width, float height,
                                      float time, int seedId,
                                      float rightX, float rightY, float rightZ,
-                                     float upX, float upY, float upZ) {
-        for (int i = 0; i < FOG_COUNT; i++) {
+                                     float upX, float upY, float upZ, float detail) {
+        int count = VisualLod.scale(FOG_COUNT, detail);
+        int segments = VisualLod.scaleSegments(MOTE_SEGMENTS, MOTE_SEGMENTS_MIN, detail);
+
+        for (int i = 0; i < count; i++) {
             long s = seedFor(seedId, i + 900);
             float baseAngle = rngFloat(s) * TAU;
             s = rngNext(s);
@@ -331,26 +388,32 @@ public final class FrostbiteMistRenderer {
             int col = lerpRgb(ICE_BLUE, ICE_WHITE, 0.5f + 0.5f * Mth.sin(time * 0.5f + i));
             float[] c = unpack(col);
 
-            // 复用蒸汽丝的billboard几何，sizeH=sizeV即退化为正圆雾块
+            // 复用蒸汽丝的 billboard 几何，sizeH=sizeV 即退化为正圆雾块
             emitVaporWisp(b, m, px, py, pz, size, size, c[0], c[1], c[2], alpha,
-                    rightX, rightY, rightZ, upX, upY, upZ);
+                    rightX, rightY, rightZ, upX, upY, upZ, segments);
         }
     }
 
     /**
      * 冷蒸汽：贴身持续冒出的蒸汽状光点（拉长的水滴形，而非正圆），是「冒寒气」的细节层——
-     * 生成点覆盖躯干从脚踝到头顶的不同高度（而不只是头部一处），各自独立循环生成、
-     * 缓慢短距离上飘后消散，与 {@link #drawFrostFog} 的大雾块搭配，一粗一细两个层次。
+     * 生成点覆盖躯干从脚踝到头顶的不同高度，各自独立循环生成、缓慢短距离上飘后消散。
+     * <p>
+     * <b>v7：数量与分段数按细节系数缩放；整层由调用方按 {@link #VAPOR_KEEP_THRESHOLD} 决定是否绘制。</b>
+     * 蒸汽位置由 {@code seedFor(entityId, i + 400)} 决定，截断尾部安全。
+     * </p>
      */
     private static void drawColdVapor(BufferBuilder b, Matrix4f m,
                                       float cx, float cyFoot, float cz, float width, float height,
                                       float time, int seedId,
                                       float rightX, float rightY, float rightZ,
-                                      float upX, float upY, float upZ) {
+                                      float upX, float upY, float upZ, float detail) {
         float radius = width * VAPOR_RADIUS_FACTOR;
         float riseDist = height * VAPOR_RISE_DIST_FACTOR;
 
-        for (int i = 0; i < VAPOR_COUNT; i++) {
+        int count = VisualLod.scale(VAPOR_COUNT, detail);
+        int segments = VisualLod.scaleSegments(MOTE_SEGMENTS, MOTE_SEGMENTS_MIN, detail);
+
+        for (int i = 0; i < count; i++) {
             long s = seedFor(seedId, i + 400);
             float phase = rngFloat(s);
             s = rngNext(s);
@@ -398,7 +461,7 @@ public final class FrostbiteMistRenderer {
             float sizeV = 0.13f * sizeRand * (1f + 0.4f * t);
 
             emitVaporWisp(b, m, px, py, pz, sizeH, sizeV, c[0], c[1], c[2], alpha,
-                    rightX, rightY, rightZ, upX, upY, upZ);
+                    rightX, rightY, rightZ, upX, upY, upZ, segments);
         }
     }
 
@@ -485,15 +548,19 @@ public final class FrostbiteMistRenderer {
      * 绘制一片面向相机的柔和「蒸汽」光点：billboard 平面内水平方向 {@code sizeH}、
      * 竖直方向 {@code sizeV} 独立指定，{@code sizeV > sizeH} 时呈拉长的椭圆，
      * 比正圆更贴合「蒸汽上飘拉丝」的观感。中心不透明、边缘渐隐为 0。
+     *
+     * @param segments 分段数。v7 起由调用方按细节系数传入，下限 {@link #MOTE_SEGMENTS_MIN}；
+     *                 全细节时即 {@link #MOTE_SEGMENTS}。雾团与蒸汽合计 27 个光点，
+     *                 是本渲染器的主要顶点杠杆。
      */
     private static void emitVaporWisp(BufferBuilder b, Matrix4f m,
                                       float cx, float cy, float cz, float sizeH, float sizeV,
                                       float r, float g, float bl, float alpha,
                                       float rightX, float rightY, float rightZ,
-                                      float upX, float upY, float upZ) {
+                                      float upX, float upY, float upZ, int segments) {
         float pex = 0f, pey = 0f, pez = 0f;
-        for (int i = 0; i <= MOTE_SEGMENTS; i++) {
-            float ang = TAU * i / MOTE_SEGMENTS;
+        for (int i = 0; i <= segments; i++) {
+            float ang = TAU * i / segments;
             float ca = (float) Math.cos(ang) * sizeH;
             float sa = (float) Math.sin(ang) * sizeV;
             float ex = cx + rightX * ca + upX * sa;

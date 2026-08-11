@@ -67,6 +67,63 @@ import java.util.Set;
  * 顶点格式与着色器现由 {@link VisualBatch} 统一设置。
  * </p>
  *
+ * <h3>v3（顶点量，近距离视觉零变化）：接入 {@link VisualLod}</h3>
+ * <p>
+ * 本渲染器的两类视觉<b>顶点量差了一个数量级</b>，必须分开看：
+ * </p>
+ * <pre>
+ * 个人压制视觉（每个受压制实体）：
+ *   向心浮尘（16 颗 × 8 段 × 3）           384
+ *   脚下挤压环（2 环 × 28 段 × 6）         336
+ *   收拢牢笼（8 柱 × 2 面 × 6）             96
+ *   ─────────────────────────────────────────
+ *   小计                                 ~816
+ *
+ * 施法者力场范围圈（每个施法者）：
+ *   塌陷环（4 环 × 48 段 × 6）            1152
+ *   边界主环（2 层 × 48 段 × 6）           576
+ *   边界压制柱（20 根 × 2 面 × 6）         240
+ *   底色填充（48 段 × 3）                  144
+ *   ─────────────────────────────────────────
+ *   小计                                ~2112
+ * </pre>
+ * <p>
+ * 力场圈单个就顶得上两个半三重黄金树祝福，是全模组<b>单个视觉对象顶点量最高的</b>。
+ * 好在它只属于正在施放力场的施法者，同屏数量通常是 0~2 个；而个人压制视觉则会
+ * 覆盖力场半径内的<b>所有</b>敌人，群体交战时数量可观。
+ * </p>
+ *
+ * <h4>力场圈的细节系数必须按「到边界的距离」算，不能按到中心的距离</h4>
+ * <p>
+ * 这是本次改造唯一需要偏离常规做法的地方。{@link #FIELD_RADIUS} 取自
+ * {@code EnchantmentGravitas.FIELD_RADIUS}，<b>可能大于 {@link VisualLod#FULL_DETAIL_RANGE}(12)</b>。
+ * 若照搬其它渲染器「按实体中心的平方距离算 detail」的写法，会出现这样的荒谬情况：
+ * </p>
+ * <pre>
+ * 玩家站在自己力场圈的内侧边缘
+ *   → 到圈心距离 ≈ 半径（比如 16 格）
+ *   → detail 按 16 格计算，被判定为"远"、大幅削减
+ *   → 但那圈线就在玩家脚边，削减清晰可见
+ * </pre>
+ * <p>
+ * 故力场圈改用<b>到圆环边界的近似距离</b>（{@code max(0, 到圈心距离 - 当前半径)}）来取 detail：
+ * 人站在圈边缘时该值为 0、detail 恒为 1.0，看到的是满细节；只有整个圈都离得很远时才削减。
+ * 这里需要一次 {@link Math#sqrt}，但力场圈同屏通常 0~2 个，开方成本可忽略。
+ * </p>
+ *
+ * <h4>其余削减策略</h4>
+ * <ul>
+ *     <li><b>牢笼立柱完全不削</b>——8 根柱共 96 顶点却是「重力压制」的核心立体形状，
+ *         且角度是 {@code TAU × i / 8} 均布的，减到 4 根就不成「笼」了。顶点性价比极高，削它是纯亏；</li>
+ *     <li><b>浮尘与挤压环按数量 + 分段双削</b>——这两项占个人压制视觉的 88%，是主要杠杆。
+ *         浮尘位置由 {@code seedFor(entityId, i)} 决定（角度纯随机、与下标无关），截断尾部安全；
+ *         挤压环的相位是 {@code i / count} 均布，但它是「一圈接一圈往内收」的循环动画、
+ *         没有固定方位，减环数只表现为「波与波之间隔得更开」，观感自然；</li>
+ *     <li><b>边界压制柱按步长抽取</b>——20 根柱的角度是 {@code rot + TAU × i / 20} 均布的，
+ *         截断前 N 根会让整圈栅栏<b>只剩一段圆弧上有柱子</b>、其余大半圈空着，
+ *         明显破坏「边界警示」的语义。故按步长抽取，保证始终铺满整圈。</li>
+ * </ul>
+ *
  * @author FlameForge
  */
 @OnlyIn(Dist.CLIENT)
@@ -79,6 +136,18 @@ public final class GravitasDistortionRenderer {
     private static final float TAU = (float) (Math.PI * 2.0);
     private static final float Y_OFFSET = 0.02f;
     private static final long START_MILLIS = System.currentTimeMillis();
+
+    // ===== v3 LOD 下限 =====
+    /** 脚下挤压环的最少分段数 */
+    private static final int RING_SEGMENTS_MIN = 10;
+    /** 浮尘柔光点的最少分段数：4 段仍是个饱满的菱形柔光块 */
+    private static final int DUST_SEGMENTS_MIN = 4;
+    /**
+     * 力场圈各环 / 填充盘的最少分段数。
+     * <p>比其它渲染器的下限高不少，因为力场圈半径大——多边形与真圆的偏离量正比于半径，
+     * 20 段在 16 格半径下偏离约 20cm，再低就能看出明显的多边形棱角了。</p>
+     */
+    private static final int FIELD_SEGMENTS_MIN = 20;
 
     // ===== 配色（0xRRGGBB）=====
     private static final int GRAVITY_DEEP = 0x1B1030;
@@ -159,6 +228,8 @@ public final class GravitasDistortionRenderer {
      * <p>
      * v2：GL 状态与顶点缓冲由 {@link VisualBatch} 统一管理，实体列表取自
      * {@link SharedEntityQuery} 的每帧共享查询（原先的两次范围查询改为对同一列表遍历两遍）。
+     * v3：两类视觉各自按 {@link VisualLod} 的细节系数削减顶点；力场圈的系数按到边界的距离取
+     * （详见类注释）。
      * </p>
      *
      * @param event 渲染阶段事件
@@ -246,9 +317,15 @@ public final class GravitasDistortionRenderer {
                 double dx = ex - cam.x;
                 double dy = ey - cam.y;
                 double dz = ez - cam.z;
-                if (dx * dx + dy * dy + dz * dz > CULL_SQR) {
+                double distSqr = dx * dx + dy * dy + dz * dz;
+                if (distSqr > CULL_SQR) {
                     continue;
                 }
+
+                // ⭐ v3：个人压制视觉尺寸与实体相当，按实体中心距离取细节系数即可
+                // （与其它渲染器一致）。12 格内恒为 1.0，视觉与优化前一致
+                float detail = VisualLod.detail(distSqr);
+                VisualLod.countInstance();
 
                 float width = entity.getBbWidth();
                 float height = entity.getBbHeight();
@@ -258,9 +335,9 @@ public final class GravitasDistortionRenderer {
                 float rz = (float) dz;
 
                 drawCrushingCage(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId());
-                drawSqueezeRings(builder, matrix, rx, ryFoot + Y_OFFSET, rz, width, time, entity.getId());
+                drawSqueezeRings(builder, matrix, rx, ryFoot + Y_OFFSET, rz, width, time, entity.getId(), detail);
                 drawInwardDust(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId(),
-                        rightX, rightY, rightZ, upX, upY, upZ);
+                        rightX, rightY, rightZ, upX, upY, upZ, detail);
             }
         }
 
@@ -306,15 +383,26 @@ public final class GravitasDistortionRenderer {
             double dx = wx - cam.x;
             double dy = wy - cam.y;
             double dz = wz - cam.z;
-            if (dx * dx + dy * dy + dz * dz > CULL_SQR) {
+            double distSqr = dx * dx + dy * dy + dz * dz;
+            if (distSqr > CULL_SQR) {
                 continue; // 太远：本帧不渲染，但保留状态，淡出计时继续
             }
+
+            // ⭐ v3：力场圈的细节系数必须按「到圆环边界的距离」取，不能按到圈心的距离。
+            // FIELD_RADIUS 可能大于 VisualLod.FULL_DETAIL_RANGE(12)，若按圈心距离算，
+            // 玩家站在圈内侧边缘时（到圈心 ≈ 半径）会被判定为"远"并大幅削减，
+            // 但那圈线其实就在脚边、削减清晰可见。改用到边界的近似距离后，
+            // 贴着圈边时该值为 0、detail 恒为 1.0。开方成本可忽略（同屏力场圈通常 0~2 个）。
+            float currentRadius = FIELD_RADIUS * radiusFactor;
+            double edgeDist = Math.max(0.0, Math.sqrt(distSqr) - currentRadius);
+            float detail = VisualLod.detail(edgeDist * edgeDist);
+            VisualLod.countInstance();
 
             float rx = (float) dx;
             float ry = (float) dy + Y_OFFSET;
             float rz = (float) dz;
 
-            drawFieldRange(builder, matrix, rx, ry, rz, time, entry.getKey(), radiusFactor, animAlpha);
+            drawFieldRange(builder, matrix, rx, ry, rz, time, entry.getKey(), radiusFactor, animAlpha, detail);
         }
     }
 
@@ -325,6 +413,11 @@ public final class GravitasDistortionRenderer {
      * 与 {@code AoeEffectRenderer#drawRedLightning} 的电柱建模手法一致——沿世界 X、Z 轴
      * 各展开一个四边形，任意水平视角皆可见），半径随 {@link #CAGE_RATE} 周期性收紧后瞬间重置，
      * 象征重力场持续把周围空间压向实体所在的一点。柱身顶部偏暗、底部偏亮，突出「向下汇聚」。
+     * <p>
+     * <b>v3：完全不参与 LOD 削减，故不接收 detail 参数。</b>
+     * 8 根柱共 96 顶点（仅占个人压制视觉的 12%）却是「重力压制」的核心立体形状；
+     * 且角度是 {@code TAU × i / 8} 均布的，减到 4 根就不成「笼」了。顶点性价比这么高，削它是纯亏。
+     * </p>
      */
     private static void drawCrushingCage(BufferBuilder b, Matrix4f m,
                                          float cx, float cyFoot, float cz, float width, float height,
@@ -381,13 +474,23 @@ public final class GravitasDistortionRenderer {
         b.vertex(m, dx, dy, dz).color(colBottom[0], colBottom[1], colBottom[2], alpha).endVertex();
     }
 
-    /** 脚下反复收缩的挤压环：从外向内收拢并淡出，循环播放，作为牢笼之外的地面氛围补充。 */
+    /**
+     * 脚下反复收缩的挤压环：从外向内收拢并淡出，循环播放，作为牢笼之外的地面氛围补充。
+     * <p>
+     * <b>v3：环数与分段数按细节系数双削。</b>环的相位是 {@code i / count} 均布的，
+     * 减少 count 会改变相位间隔——但它是「一圈接一圈往内收」的循环动画、没有固定方位，
+     * 减环只表现为「波与波之间隔得更开」，观感自然，无需按步长抽取。
+     * </p>
+     */
     private static void drawSqueezeRings(BufferBuilder b, Matrix4f m,
                                          float cx, float cy, float cz, float width,
-                                         float time, int seedId) {
+                                         float time, int seedId, float detail) {
         float outer = width * SQUEEZE_OUTER_FACTOR;
-        for (int i = 0; i < SQUEEZE_RING_COUNT; i++) {
-            float phase = (float) i / SQUEEZE_RING_COUNT;
+        int count = VisualLod.scale(SQUEEZE_RING_COUNT, detail);
+        int segments = VisualLod.scaleSegments(RING_SEGMENTS, RING_SEGMENTS_MIN, detail);
+
+        for (int i = 0; i < count; i++) {
+            float phase = (float) i / count;
             float t = frac(time * SQUEEZE_RATE + phase + seedId * 0.07f);
             float radius = outer * (1f - easeOutCubic(t));
             if (radius <= 0.06f) {
@@ -396,19 +499,29 @@ public final class GravitasDistortionRenderer {
             float alpha = SQUEEZE_ALPHA * (1f - t) * smoothstep(0f, 0.15f, t);
             int col = lerpRgb(GRAVITY_MID, GRAVITY_CORE, 1f - t);
             float[] c = unpack(col);
-            ring(b, m, cx, cy, cz, radius, RING_SEGMENTS, RING_HALF_WIDTH, c, alpha);
+            ring(b, m, cx, cy, cz, radius, segments, RING_HALF_WIDTH, c, alpha);
         }
     }
 
-    /** 向心汇聚的浮尘：从周围缓慢被吸向脚下中心点，抵达时淡出。 */
+    /**
+     * 向心汇聚的浮尘：从周围缓慢被吸向脚下中心点，抵达时淡出。
+     * <p>
+     * <b>v3：数量与分段数按细节系数双削。</b>浮尘是个人压制视觉里顶点量最大的一项（384，占 47%），
+     * 位置由 {@code seedFor(entityId, i)} 决定且角度纯随机（与下标无关），
+     * 截断尾部时保留浮尘的汇聚轨迹完全不变，靠近时是「逐渐多几粒尘」而非重新洗牌。
+     * </p>
+     */
     private static void drawInwardDust(BufferBuilder b, Matrix4f m,
                                        float cx, float cyFoot, float cz, float width, float height,
                                        float time, int seedId,
                                        float rightX, float rightY, float rightZ,
-                                       float upX, float upY, float upZ) {
+                                       float upX, float upY, float upZ, float detail) {
         float outerRadius = width * 1.4f;
         float riseSpan = height * 0.6f;
-        for (int i = 0; i < DUST_COUNT; i++) {
+        int count = VisualLod.scale(DUST_COUNT, detail);
+        int segments = VisualLod.scaleSegments(DUST_SEGMENTS, DUST_SEGMENTS_MIN, detail);
+
+        for (int i = 0; i < count; i++) {
             long s = seedFor(seedId, i);
             float phase = rngFloat(s);
             s = rngNext(s);
@@ -434,7 +547,7 @@ public final class GravitasDistortionRenderer {
             float size = DUST_SIZE * sizeRand;
 
             emitSoftMote(b, m, px, py, pz, size, c[0], c[1], c[2], alpha,
-                    rightX, rightY, rightZ, upX, upY, upZ);
+                    rightX, rightY, rightZ, upX, upY, upZ, segments);
         }
     }
 
@@ -445,13 +558,25 @@ public final class GravitasDistortionRenderer {
      * 地面警示环。{@code radiusFactor} / {@code animAlpha} 由调用方按「出现展开 / 消失收缩淡出」
      * 的动画状态传入，不再跟随同步状态瞬间出现/消失。由「淡色底色填充」+「边界主环（双层辉光）」+
      * 「持续向心收拢的塌陷环」+「沿边界起伏明灭的立体压制柱栅栏」四部分组成。
+     * <p>
+     * <b>v3：全部元素按细节系数缩放。</b>本方法是全模组单个视觉对象顶点量最高的（约 2112），
+     * 其中塌陷环一项就占 55%。注意 {@code detail} 由调用方按<b>到圆环边界的距离</b>算出
+     * （而非到圈心），因此玩家贴着圈边站时仍是满细节（详见类注释）。
+     * </p>
+     * <p>
+     * <b>边界压制柱必须按步长抽取。</b>20 根柱的角度是 {@code rot + TAU × i / 20} 均布的，
+     * 截断前 N 根会让整圈栅栏只剩一段圆弧上有柱子、其余大半圈空着，
+     * 明显破坏「边界警示」的语义。
+     * </p>
      *
      * @param radiusFactor 半径缩放系数（出现时 0→1 展开，消失时 1→0.6 收缩）
      * @param animAlpha    整体透明度系数（出现淡入、消失淡出）
+     * @param detail       细节系数（按到圆环边界的距离取，非到圈心）
      */
     private static void drawFieldRange(BufferBuilder b, Matrix4f m,
                                        float cx, float cy, float cz,
-                                       float time, int seedId, float radiusFactor, float animAlpha) {
+                                       float time, int seedId, float radiusFactor, float animAlpha,
+                                       float detail) {
         if (animAlpha <= 0.01f || radiusFactor <= 0.02f) {
             return;
         }
@@ -460,34 +585,44 @@ public final class GravitasDistortionRenderer {
         float[] mid = unpack(GRAVITY_MID);
         float[] core = unpack(GRAVITY_CORE);
 
+        // 力场圈半径大，分段下限比其它渲染器高（多边形偏离量正比于半径）
+        int fillSegments = VisualLod.scaleSegments(FIELD_FILL_SEGMENTS, FIELD_SEGMENTS_MIN, detail);
+        int ringSegments = VisualLod.scaleSegments(FIELD_RING_SEGMENTS, FIELD_SEGMENTS_MIN, detail);
+
         // 淡色底色填充：让整片受影响区域一眼可辨（否则大半径的环单独看太不明显）
         float fillBreath = 0.85f + 0.15f * Mth.sin(time * 0.7f + seedId * 0.3f);
-        disc(b, m, cx, cy, cz, radius, FIELD_FILL_SEGMENTS, deep, FIELD_FILL_ALPHA * fillBreath * animAlpha);
+        disc(b, m, cx, cy, cz, radius, fillSegments, deep, FIELD_FILL_ALPHA * fillBreath * animAlpha);
 
         // 边界主环：固定半径，随呼吸轻微明灭（内层实线 + 外层柔光）
         float breath = 0.8f + 0.2f * Mth.sin(time * 1.0f + seedId * 0.4f);
-        ring(b, m, cx, cy, cz, radius, FIELD_RING_SEGMENTS, FIELD_RING_HALF_WIDTH, mid,
+        ring(b, m, cx, cy, cz, radius, ringSegments, FIELD_RING_HALF_WIDTH, mid,
                 0.7f * breath * animAlpha);
-        ring(b, m, cx, cy, cz, radius, FIELD_RING_SEGMENTS, FIELD_RING_HALF_WIDTH * 3.2f, core,
+        ring(b, m, cx, cy, cz, radius, ringSegments, FIELD_RING_HALF_WIDTH * 3.2f, core,
                 0.24f * breath * animAlpha);
 
-        // 持续向心收拢的塌陷环：从边界向中心收拢并淡出，循环播放
-        for (int i = 0; i < FIELD_COLLAPSE_RING_COUNT; i++) {
-            float phase = (float) i / FIELD_COLLAPSE_RING_COUNT;
+        // 持续向心收拢的塌陷环：从边界向中心收拢并淡出，循环播放。
+        // 这是本方法顶点量最大的一项（占 55%），故数量也参与缩放；
+        // 与挤压环同理，它是循环推进的波、没有固定方位，减环数只表现为波间隔变大
+        int collapseCount = VisualLod.scale(FIELD_COLLAPSE_RING_COUNT, detail);
+        for (int i = 0; i < collapseCount; i++) {
+            float phase = (float) i / collapseCount;
             float t = frac(time * FIELD_COLLAPSE_RATE + phase + seedId * 0.09f);
             float collapseRadius = radius * (1f - t);
             if (collapseRadius <= 0.3f) {
                 continue;
             }
             float alpha = 0.5f * (1f - t) * smoothstep(0f, 0.1f, t) * animAlpha;
-            ring(b, m, cx, cy, cz, collapseRadius, FIELD_RING_SEGMENTS, FIELD_RING_HALF_WIDTH * 0.75f,
+            ring(b, m, cx, cy, cz, collapseRadius, ringSegments, FIELD_RING_HALF_WIDTH * 0.75f,
                     core, alpha);
         }
 
         // 边界压制柱栅栏：均布的立体短柱，高度随时间起伏明灭，替代纯平面刻度线，
-        // 给范围圈补上真正的立体轮廓
+        // 给范围圈补上真正的立体轮廓。
+        // ⭐ v3：均布角度按步长抽取，绝不能截断——否则整圈栅栏只剩一段圆弧上有柱子
         float rot = time * FIELD_PYLON_ROT_SPEED + seedId * 0.2f;
-        for (int i = 0; i < FIELD_PYLON_COUNT; i++) {
+        int drawnPylons = VisualLod.scale(FIELD_PYLON_COUNT, detail);
+        int pylonStep = Math.max(1, FIELD_PYLON_COUNT / drawnPylons);
+        for (int i = 0; i < FIELD_PYLON_COUNT; i += pylonStep) {
             double ang = rot + TAU * i / FIELD_PYLON_COUNT;
             float px = cx + (float) Math.cos(ang) * radius;
             float pz = cz + (float) Math.sin(ang) * radius;
@@ -545,14 +680,20 @@ public final class GravitasDistortionRenderer {
         }
     }
 
+    /**
+     * 绘制一颗面向相机的柔和圆形光点（径向渐变：中心 alpha、边缘 0）。
+     *
+     * @param segments 分段数。v3 起由调用方按细节系数传入，下限 {@link #DUST_SEGMENTS_MIN}；
+     *                 全细节时即 {@link #DUST_SEGMENTS}。浮尘是个人压制视觉的主要顶点杠杆。
+     */
     private static void emitSoftMote(BufferBuilder b, Matrix4f m,
                                      float cx, float cy, float cz, float size,
                                      float r, float g, float bl, float alpha,
                                      float rightX, float rightY, float rightZ,
-                                     float upX, float upY, float upZ) {
+                                     float upX, float upY, float upZ, int segments) {
         float pex = 0f, pey = 0f, pez = 0f;
-        for (int i = 0; i <= DUST_SEGMENTS; i++) {
-            float ang = TAU * i / DUST_SEGMENTS;
+        for (int i = 0; i <= segments; i++) {
+            float ang = TAU * i / segments;
             float ca = (float) Math.cos(ang) * size;
             float sa = (float) Math.sin(ang) * size;
             float ex = cx + rightX * ca + upX * sa;

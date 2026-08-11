@@ -63,6 +63,36 @@ import java.util.List;
  * 实体列表取自 {@link SharedEntityQuery} 的每帧共享查询，{@code POSITION_COLOR} 纯顶点绘制。
  * </p>
  *
+ * <h3>v2（顶点量，近距离视觉零变化）：接入 {@link VisualLod}</h3>
+ * <p>
+ * 单个噩兆实体每帧的顶点量粗算：
+ * </p>
+ * <pre>
+ * 诅咒断环（6 段 × 3 细分 × 6）            108
+ * 不祥浸染盘（24 段 × 3）                   72
+ * 污浊滴落（8 滴 × 6）                      48
+ * 身周黑荆棘（7 根 × 2 三角）               42
+ * ─────────────────────────────────────────
+ * 合计                               ~270 顶点 / 实体 / 帧
+ * </pre>
+ * <p>
+ * <b>本渲染器是全模组最轻的一个</b>——比出血的 948、黄金树祝福的 2000 低了整整一个数量级。
+ * 因此接入 {@link VisualLod} 的<b>主要目的是 {@link VisualLod#countInstance()}</b>：
+ * 拥挤度是全局共享的，只要还有渲染器不登记，{@code crowdFactor} 就会被系统性高估，
+ * 已接入的重量级渲染器就削减不足。它自己能省的那点顶点反而是次要的。
+ * </p>
+ * <p>
+ * 削减本身仍按 {@link VisualLod#detail} 走，{@link VisualLod#FULL_DETAIL_RANGE} 格内系数为 1.0，
+ * <b>与优化前逐像素一致</b>；40 格外单实体降至约 140 顶点。
+ * </p>
+ * <p>
+ * <b>荆棘完全不参与削减。</b>7 根刺一共才 42 顶点，却是「这是噩兆不是别的负面状态」的
+ * 唯一依据（本模组只有这里用尖刺造型），且角度是 {@code orbit + TAU × i / 7} 均布的——
+ * 削掉任意一根都会让环绕变得不对称。<b>顶点性价比这么高的元素，削它是纯亏。</b>
+ * 同理断环的 {@link #RING_DASHES} 也保持 6 段不变（断环的「断」本身就靠这 6 段的规律间隔表达，
+ * 抽掉一半会读成「碎环」而非「断环」），只缩每段弧内部的细分数。
+ * </p>
+ *
  * @author FlameForge
  */
 @OnlyIn(Dist.CLIENT)
@@ -75,6 +105,16 @@ public final class BadOmenRenderer {
     private static final float TAU = (float) (Math.PI * 2.0);
     private static final float Y_OFFSET = 0.02f;
     private static final long START_MILLIS = System.currentTimeMillis();
+
+    // ===== v2 LOD 下限 =====
+    /** 不祥浸染盘的最少分段数 */
+    private static final int POOL_SEGMENTS_MIN = 8;
+    /**
+     * 断环每段弧的最少细分数。
+     * <p>每段弧只占 {@code (TAU / 6) × 0.5 = 30°}，2 段细分近似 30° 圆弧已经足够平滑；
+     * 降到 1 会让弧退化成直线弦、断环看起来像折线六边形的碎片。</p>
+     */
+    private static final int RING_SUB_MIN = 2;
 
     // ===== 配色（0xRRGGBB）=====
     /** 诅咒墨黑：荆棘主体、污浊、浸染盘的主色。远看整体是「黑」而非「红」 */
@@ -113,6 +153,8 @@ public final class BadOmenRenderer {
     /** 断环旋转速度（负值＝逆向，与多数演出的顺向旋转相反，强化「反常」感） */
     private static final float RING_ROT_SPEED = -0.45f;
     private static final float RING_BASE_ALPHA = 0.7f;
+    /** 断环每段弧的细分数（控性能；v2 起按细节系数缩放，下限 {@link #RING_SUB_MIN}） */
+    private static final int RING_SUB = 3;
 
     // ===== 污浊滴落 =====
     /** 同时存在的污浊数量 */
@@ -178,9 +220,16 @@ public final class BadOmenRenderer {
             double dx = ex - cam.x;
             double dy = ey - cam.y;
             double dz = ez - cam.z;
-            if (dx * dx + dy * dy + dz * dz > CULL_SQR) {
+            double distSqr = dx * dx + dy * dy + dz * dz;
+            if (distSqr > CULL_SQR) {
                 continue;
             }
+
+            // ⭐ v2：本实体的细节系数（距离 × 同屏拥挤度）。12 格内恒为 1.0，视觉与优化前一致
+            float detail = VisualLod.detail(distSqr);
+            // 登记实例，供下一帧估算拥挤度。本渲染器接入 VisualLod 的首要意义就在这一行——
+            // 只要还有渲染器不登记，全局 crowdFactor 就会被系统性高估
+            VisualLod.countInstance();
 
             float width = entity.getBbWidth();
             float height = entity.getBbHeight();
@@ -189,10 +238,10 @@ public final class BadOmenRenderer {
             float ryFoot = (float) dy;
             float rz = (float) dz;
 
-            drawBlightPool(builder, matrix, rx, ryFoot + Y_OFFSET, rz, width, time, entity.getId());
-            drawOoze(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId());
+            drawBlightPool(builder, matrix, rx, ryFoot + Y_OFFSET, rz, width, time, entity.getId(), detail);
+            drawOoze(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId(), detail);
             drawThorns(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId());
-            drawCurseRing(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId());
+            drawCurseRing(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId(), detail);
         }
     }
 
@@ -224,6 +273,12 @@ public final class BadOmenRenderer {
      * <p>
      * 颜色由底部墨黑过渡到尖端血锈红——尖端那一点红是整套视觉里<b>唯一的暖色</b>，
      * 用来点出「诅咒」的恶意，同时保证远看主体仍是黑的、不与出血 / 切腹撞色。
+     * </p>
+     * <p>
+     * <b>v2：完全不参与 LOD 削减，故不接收 detail 参数。</b>
+     * 7 根刺一共才 42 顶点，却承担「这是噩兆」的全部辨识度；且角度是
+     * {@code orbit + TAU × i / THORN_COUNT} 均布的，削掉任意一根都会破坏环绕的对称性。
+     * 顶点性价比这么高的元素，削它是纯亏。
      * </p>
      */
     private static void drawThorns(BufferBuilder b, Matrix4f m,
@@ -315,11 +370,16 @@ public final class BadOmenRenderer {
      * 逆向旋转是刻意的——本模组其余带旋转的演出（法阵、光环、符文刻度）几乎都是顺向，
      * 反着转会带来微妙的「不对劲」感，正契合「噩兆」的语义。
      * </p>
+     * <p>
+     * <b>v2：只缩每段弧内部的细分数，{@link #RING_DASHES} 保持 6 段不变。</b>
+     * 断环的「断」正是靠这 6 段的规律间隔表达的——抽掉一半会读成「碎环」而非「断环」，
+     * 语义就变了。而每段弧只占 30°，细分从 3 降到 2 对弧线平滑度几乎无影响。
+     * </p>
      */
     private static void drawCurseRing(BufferBuilder b, Matrix4f m,
                                       float cx, float cyFoot, float cz,
                                       float width, float height,
-                                      float time, int seedId) {
+                                      float time, int seedId, float detail) {
         float ringY = cyFoot + height * RING_HEIGHT_FACTOR;
         float radius = width * RING_RADIUS_FACTOR;
         float rot = time * RING_ROT_SPEED + seedId * 0.3f;
@@ -332,7 +392,8 @@ public final class BadOmenRenderer {
 
         float rInner = radius * 0.86f;
         float rOuter = radius;
-        final int sub = 3; // 每段弧细分（控性能）
+        // v2：每段弧细分按细节系数缩放（下限 RING_SUB_MIN）
+        final int sub = VisualLod.scaleSegments(RING_SUB, RING_SUB_MIN, detail);
 
         for (int i = 0; i < RING_DASHES; i++) {
             float a0 = rot + TAU * i / RING_DASHES;
@@ -374,16 +435,22 @@ public final class BadOmenRenderer {
      * 自躯干向下滴落的黑色污浊：短竖线循环下沉，头端实、尾端渐隐，接近地面时整体淡出。
      * <p>方向<b>向下</b>是关键——出血是向外迸溅、切腹是向上蒸腾，噩兆必须往下沉，
      * 才能在三者同时挂载时靠运动方向区分开。</p>
+     * <p>
+     * <b>v2：数量按细节系数缩放。</b>污浊位置由 {@code seedFor(entityId, i + 600)} 决定
+     * （角度是纯随机、与下标无关），截断尾部时保留污浊的下落轨迹完全不变。
+     * </p>
      */
     private static void drawOoze(BufferBuilder b, Matrix4f m,
                                  float cx, float cyFoot, float cz,
                                  float width, float height,
-                                 float time, int seedId) {
+                                 float time, int seedId, float detail) {
         float startHeight = height * OOZE_START_HEIGHT_FACTOR;
         float[] black = unpack(OMEN_BLACK);
         float[] rust = unpack(OMEN_RUST);
 
-        for (int i = 0; i < OOZE_COUNT; i++) {
+        int count = VisualLod.scale(OOZE_COUNT, detail);
+
+        for (int i = 0; i < count; i++) {
             long s = seedFor(seedId, i + 600);
             float phase = rngFloat(s);
             s = rngNext(s);
@@ -418,15 +485,17 @@ public final class BadOmenRenderer {
     /**
      * 脚下的墨黑渐变盘：中心较实、边缘渐隐，缓慢呼吸。
      * <p>作用是压住整体重量，让荆棘看起来是「从被污染的地面长出来的」而非凭空插着。</p>
+     * <p>v2：分段数按细节系数缩放（下限 {@link #POOL_SEGMENTS_MIN}）。</p>
      */
     private static void drawBlightPool(BufferBuilder b, Matrix4f m,
                                        float cx, float cy, float cz, float width,
-                                       float time, int seedId) {
+                                       float time, int seedId, float detail) {
         float breath = 0.88f + 0.12f * Mth.sin(time * 0.75f + seedId * 0.45f);
         float radius = width * POOL_RADIUS_FACTOR * breath;
         int col = lerpRgb(OMEN_BLACK, OMEN_RUST, 0.18f + 0.12f * Mth.sin(time * 0.6f + seedId));
         float[] c = unpack(col);
-        drawDisc(b, m, cx, cy, cz, radius, POOL_SEGMENTS, c[0], c[1], c[2], POOL_BASE_ALPHA * breath);
+        int segments = VisualLod.scaleSegments(POOL_SEGMENTS, POOL_SEGMENTS_MIN, detail);
+        drawDisc(b, m, cx, cy, cz, radius, segments, c[0], c[1], c[2], POOL_BASE_ALPHA * breath);
     }
 
     // ==================== 几何基元 ====================

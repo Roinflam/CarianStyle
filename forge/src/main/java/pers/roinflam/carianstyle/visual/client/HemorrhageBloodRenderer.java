@@ -73,6 +73,51 @@ import java.util.List;
  * （降幅 87%）。削减只会「少画尾部几个」，保留元素的随机种子不变、位置不变，
  * 因此靠近时是逐渐多出几颗血滴，不会整片重新洗牌。
  * </p>
+ *
+ * <h3>v6（堆分配，视觉逐位一致）：颜色数组零分配化</h3>
+ * <p>
+ * v5 解决了顶点量，但留下了另一个热路径浪费：旧的 {@code unpack(int)} 把 {@code 0xRRGGBB}
+ * 拆成 {@code float[3]} 时<b>每次都 {@code new float[3]}</b>。本渲染器的调用密度是全模组最高的：
+ * </p>
+ * <pre>
+ * 喷溅血滴（26 基础 + 18 脉冲）每颗 lerpRgb→unpack   44
+ * 血雾（7 团）每团 lerpRgb→unpack                     7
+ * 垂落血线（6 条）verticalLine 内部 unpack            6
+ * 迸溅射线 hot / dark / flash                          3
+ * 血泊（2 层）                                          2
+ * ────────────────────────────────────────────────────
+ * 合计                              ~62 次 new float[3] / 实体 / 帧
+ * </pre>
+ * <p>
+ * 十个患者 × 60fps ≈ <b>每秒 3.7 万次小数组分配</b>，且每个数组的存活期只有紧随其后的几行。
+ * Eden 区回收单次很便宜，但这个量级会实打实推高客户端 GC 频率。
+ * </p>
+ * <p>
+ * 现改为两条路径（工具方法见 {@link VisualColor}）：
+ * </p>
+ * <ol>
+ *     <li><b>固定配色类加载时预解包一次</b>——{@link #C_BLOOD_BRIGHT} 等 {@code C_} 前缀常量，
+ *         此后永久复用。本渲染器的血泊、垂落血线、迸溅射线、冲击闪光全部只用固定色，
+ *         这一项就消掉了 11 次/帧；</li>
+ *     <li><b>动态插值色写入复用缓冲</b>——血滴与血雾的颜色随飞行进度变化，
+ *         改用 {@link VisualColor#lerpInto} 直接写进 {@link #SCRATCH_COLOR}，
+ *         省掉中间的 int 与新数组，消掉剩下的 51 次/帧。</li>
+ * </ol>
+ * <p>
+ * 至此本渲染器每帧颜色相关的堆分配为 <b>0</b>。
+ * </p>
+ * <p>
+ * <b>为什么本渲染器只需要一个复用缓冲：</b>血滴与血雾的颜色都是「算出来紧接着就
+ * {@code emitSoftDrop} 消费掉」，任一时刻只有一个动态色存活。
+ * 需要<b>两个动态色同时存活</b>的场景（例如渐变线段要同时持有起点色与终点色）必须用两个缓冲，
+ * 否则后写的会覆盖先写的、整条线退化成纯色——本渲染器的 {@link #rayLine} 两端用的是
+ * {@link #C_BLOOD_HOT} / {@link #C_BLOOD_DARK} 两个<b>常量</b>，不受影响。
+ * </p>
+ * <p>
+ * <b>视觉逐位一致：</b>{@link VisualColor#lerpInto} 刻意保留了旧 {@code lerpRgb} 在
+ * 0~255 整数域插值并 {@link Math#round} 的行为（详见其类注释），
+ * 因此输出与 v5 的每个颜色分量完全相同，不是「肉眼看不出」而是「数值相等」。
+ * </p>
  * <p>
  * 渲染管线与 {@code ScarletRotMistRenderer} 同款：{@link RenderLevelStageEvent} 的
  * {@code AFTER_TRANSLUCENT_BLOCKS} 阶段，{@code POSITION_COLOR} 纯顶点绘制，无贴图、无原版粒子；
@@ -111,6 +156,37 @@ public final class HemorrhageBloodRenderer {
     private static final int BLOOD_FLASH = 0xFF8090;
     private static final int BLOOD_MID = 0x8A0F18;
     private static final int BLOOD_DARK = 0x3A0508;
+
+    // ===== v6：预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
+    // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
+    // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
+    // 注：BLOOD_BRIGHT 没有对应的 C_ 常量——它只作为 lerpInto 的插值端点（以 int 传入），
+    // 从不单独作为一个成品颜色使用，预解包反而会变成未被引用的字段。
+    /** 迸溅射线内端的高亮血色 */
+    private static final float[] C_BLOOD_HOT = VisualColor.constant(BLOOD_HOT);
+    /** 脚下冲击闪光色 */
+    private static final float[] C_BLOOD_FLASH = VisualColor.constant(BLOOD_FLASH);
+    /** 中段血色（血泊外层、垂落血线） */
+    private static final float[] C_BLOOD_MID = VisualColor.constant(BLOOD_MID);
+    /** 氧化暗血色（血泊内层、射线外端、血滴末期） */
+    private static final float[] C_BLOOD_DARK = VisualColor.constant(BLOOD_DARK);
+
+    /**
+     * v6：动态插值色的复用缓冲（⚠ 写入后必须立即消费，不可跨调用留存）。
+     * <p>
+     * 仅用于血滴（{@link #drawDroplets}）与血雾（{@link #drawBloodMist}）——
+     * 这两处的颜色随飞行进度 / 脉冲相位实时变化，无法预解包。两者都是
+     * 「写入 → 紧接着 {@link #emitSoftDrop} 消费」，任一时刻只有一个动态色存活，
+     * 故<b>一个缓冲就够</b>。
+     * </p>
+     * <p>
+     * 若将来新增「两个动态色需要同时存活」的元素（典型如两端异色的渐变线段），
+     * <b>必须再加一个独立缓冲</b>，不能复用本字段——否则后写的会覆盖先写的。
+     * </p>
+     * <p>仅渲染线程访问，无并发问题。</p>
+     */
+    private static final float[] SCRATCH_COLOR = new float[VisualColor.RGB];
 
     // ===== 地面血泊 =====
     private static final int POOL_LAYERS = 2;
@@ -258,6 +334,7 @@ public final class HemorrhageBloodRenderer {
      * 脚下血泊：两层渐变圆盘，随时间轻微呼吸。
      * <p>v5：分段数按细节系数缩放（下限 {@link #POOL_SEGMENTS_MIN}），
      * 低细节时外层整层跳过——外层本就是淡淡的一圈，远处完全看不出。</p>
+     * <p>v6：两层用的都是固定色，直接取预解包常量，不再每层 {@code unpack} 一次。</p>
      */
     private static void drawBloodPool(BufferBuilder b, Matrix4f m,
                                       float cx, float cy, float cz, float width,
@@ -271,8 +348,8 @@ public final class HemorrhageBloodRenderer {
             if (centerAlpha <= 0f || radius <= 0.05f) {
                 continue;
             }
-            int col = layer == 0 ? BLOOD_DARK : BLOOD_MID;
-            float[] c = unpack(col);
+            // v6：常量颜色直接引用预解包数组（只读）
+            float[] c = layer == 0 ? C_BLOOD_DARK : C_BLOOD_MID;
             drawDisc(b, m, cx, cy, cz, radius, segments, c[0], c[1], c[2], centerAlpha);
         }
     }
@@ -280,6 +357,11 @@ public final class HemorrhageBloodRenderer {
     /**
      * 喷溅血滴：多颗沿抛物线飞出的柔光圆点，颜色由鲜红转暗，落地/飞散后淡出；
      * 另按 {@link #PULSE_PERIOD} 周期性加量，模拟心跳式的大喷发。
+     * <p>
+     * v6：每颗血滴的颜色随飞行进度 t 变化，是本渲染器分配最密集的一处（最多 44 次/帧）。
+     * 改用 {@link VisualColor#lerpInto} 直接写入 {@link #SCRATCH_COLOR}，
+     * 省掉中间 int 与新数组；写入后紧接着被 {@link #emitSoftDrop} 消费，符合复用缓冲的使用约束。
+     * </p>
      */
     private static void drawDroplets(BufferBuilder b, Matrix4f m,
                                      float cx, float cyFoot, float cz, float width, float height,
@@ -336,11 +418,12 @@ public final class HemorrhageBloodRenderer {
                 continue;
             }
 
-            int col = lerpRgb(BLOOD_BRIGHT, BLOOD_DARK, t);
-            float[] c = unpack(col);
+            // v6：无分配插值，写入复用缓冲后立即消费
+            VisualColor.lerpInto(SCRATCH_COLOR, BLOOD_BRIGHT, BLOOD_DARK, t);
             float size = DROPLET_SIZE * sizeRand * (isPulseDroplet ? PULSE_SIZE_MULT : 1f);
 
-            emitSoftDrop(b, m, px, py + Y_OFFSET, pz, size, c[0], c[1], c[2], alpha,
+            emitSoftDrop(b, m, px, py + Y_OFFSET, pz, size,
+                    SCRATCH_COLOR[0], SCRATCH_COLOR[1], SCRATCH_COLOR[2], alpha,
                     rightX, rightY, rightZ, upX, upY, upZ, dropSegments);
         }
     }
@@ -350,6 +433,12 @@ public final class HemorrhageBloodRenderer {
      * 外端 {@link #BLOOD_DARK} 迅速转暗，模拟血液甩出后氧化变暗），配合脚下同步的冲击闪光，
      * 让心跳喷发的瞬间比单纯的抛物线血滴更有打击感。与 {@link #drawDroplets} 复用同一个脉冲相位，
      * 故两者视觉上是同一次喷发的不同表现层，不会各自为政。
+     * <p>
+     * v6：射线两端与冲击闪光用的都是固定色，直接取预解包常量。
+     * <b>注意这里两个颜色是同时存活的</b>（{@link #rayLine} 需要内端色与外端色一起用），
+     * 但因为两者都是常量数组、互不干扰，无需复用缓冲——若将来改成动态插值色，
+     * 就必须用两个独立缓冲（详见 {@link #SCRATCH_COLOR} 注释）。
+     * </p>
      */
     private static void drawBurstRays(BufferBuilder b, Matrix4f m,
                                       float cx, float cyFoot, float cz, float width, float height,
@@ -363,8 +452,6 @@ public final class HemorrhageBloodRenderer {
         float len = width * 2.6f * easeOutCubic(Math.min(1f, p * 2.2f));
         float alpha = (1f - p) * 0.85f;
         float hw = Math.max(0.05f, width * 0.035f);
-        float[] hot = unpack(BLOOD_HOT);
-        float[] dark = unpack(BLOOD_DARK);
 
         // v5：射线数量缩放。
         // 注意这里不能简单地「只画前 N 条」——射线角度是 i * (TAU / PULSE_RAY_COUNT) 顺序排布的，
@@ -378,16 +465,17 @@ public final class HemorrhageBloodRenderer {
             float ox = cx + (float) Math.cos(ang) * len;
             float oz = cz + (float) Math.sin(ang) * len;
             // 射线略带下坠：外端略低于起点，制造甩溅弧线的错觉
-            rayLine(b, m, cx, cz, chestY, ox, oz, chestY - len * 0.2f, hw, hot, dark, alpha);
+            // v6：内外两端均为预解包常量（只读），无分配
+            rayLine(b, m, cx, cz, chestY, ox, oz, chestY - len * 0.2f, hw,
+                    C_BLOOD_HOT, C_BLOOD_DARK, alpha);
         }
 
         // 脚下冲击闪光：与射线同步爆发，短促高亮后迅速回落
         if (p < 0.3f) {
             float flash = (0.3f - p) / 0.3f;
-            float[] bright = unpack(BLOOD_FLASH);
             drawDisc(b, m, cx, cyFoot + Y_OFFSET, cz, width * 1.6f * (0.4f + flash),
                     VisualLod.scaleSegments(16, FLASH_SEGMENTS_MIN, detail),
-                    bright[0], bright[1], bright[2], 0.45f * flash);
+                    C_BLOOD_FLASH[0], C_BLOOD_FLASH[1], C_BLOOD_FLASH[2], 0.45f * flash);
         }
     }
 
@@ -424,6 +512,7 @@ public final class HemorrhageBloodRenderer {
      * 血雾：伤口（胸口）附近喷出的红色雾团，原理与冻伤 {@code FrostbiteMistRenderer#drawFrostFog}
      * 相同（大号柔光块叠加漂移），但更集中在伤口位置、颜色更红更暗，配合血滴 / 迸溅射线
      * 共同构成「真正在喷血」的观感，而不是零散的血点各自往外飞。
+     * <p>v6：雾团颜色随脉冲相位实时变化，同样改用 {@link VisualColor#lerpInto} 写入复用缓冲。</p>
      */
     private static void drawBloodMist(BufferBuilder b, Matrix4f m,
                                       float cx, float cyFoot, float cz, float width, float height,
@@ -458,10 +547,11 @@ public final class HemorrhageBloodRenderer {
             float alpha = MIST_BASE_ALPHA * pulse;
             float size = width * MIST_SIZE_FACTOR * sizeRand;
 
-            int col = lerpRgb(BLOOD_MID, BLOOD_BRIGHT, 0.4f + 0.4f * pulse);
-            float[] c = unpack(col);
+            // v6：无分配插值，写入复用缓冲后立即消费
+            VisualColor.lerpInto(SCRATCH_COLOR, BLOOD_MID, BLOOD_BRIGHT, 0.4f + 0.4f * pulse);
 
-            emitSoftDrop(b, m, px, py, pz, size, c[0], c[1], c[2], alpha,
+            emitSoftDrop(b, m, px, py, pz, size,
+                    SCRATCH_COLOR[0], SCRATCH_COLOR[1], SCRATCH_COLOR[2], alpha,
                     rightX, rightY, rightZ, upX, upY, upZ, mistSegments);
         }
     }
@@ -469,6 +559,7 @@ public final class HemorrhageBloodRenderer {
     /**
      * 从躯干垂落的粗血线，循环下滑并在近地面淡出。
      * <p>v5：条数按细节系数缩放（角度来自随机种子，取前 N 条分布仍是散的）。</p>
+     * <p>v6：血线用的是固定色，改为传入预解包常量，{@link #verticalLine} 不再内部 {@code unpack}。</p>
      */
     private static void drawDrips(BufferBuilder b, Matrix4f m,
                                   float cx, float cyFoot, float cz, float width, float height,
@@ -496,24 +587,33 @@ public final class HemorrhageBloodRenderer {
             float px = cx + (float) Math.cos(ang) * width * 0.32f;
             float pz = cz + (float) Math.sin(ang) * width * 0.32f;
 
-            verticalLine(b, m, px, pz, headY, tailY, DRIP_HALF_WIDTH, BLOOD_MID, alpha);
+            verticalLine(b, m, px, pz, headY, tailY, DRIP_HALF_WIDTH, C_BLOOD_MID, alpha);
         }
     }
 
+    /**
+     * 竖直血线（面向世界 X 轴的四边形），顶端实、底端渐隐为 0。
+     * <p>
+     * v6：颜色参数由 {@code int} 改为已解包的 {@code float[]}——原实现每条线都要
+     * {@code unpack} 一次（6 次/帧），而调用方传的始终是同一个固定色，
+     * 改由调用方传预解包常量后这里零分配。
+     * </p>
+     *
+     * @param col 已解包的颜色 {@code [r, g, b]}（本渲染器传 {@link #C_BLOOD_MID}）
+     */
     private static void verticalLine(BufferBuilder b, Matrix4f m,
                                      float x, float z, float yTop, float yBottom,
-                                     float hw, int col, float alpha) {
+                                     float hw, float[] col, float alpha) {
         if (yTop <= yBottom) {
             return;
         }
-        float[] c = unpack(col);
-        b.vertex(m, x - hw, yTop, z).color(c[0], c[1], c[2], alpha).endVertex();
-        b.vertex(m, x + hw, yTop, z).color(c[0], c[1], c[2], alpha).endVertex();
-        b.vertex(m, x + hw, yBottom, z).color(c[0], c[1], c[2], 0f).endVertex();
+        b.vertex(m, x - hw, yTop, z).color(col[0], col[1], col[2], alpha).endVertex();
+        b.vertex(m, x + hw, yTop, z).color(col[0], col[1], col[2], alpha).endVertex();
+        b.vertex(m, x + hw, yBottom, z).color(col[0], col[1], col[2], 0f).endVertex();
 
-        b.vertex(m, x - hw, yTop, z).color(c[0], c[1], c[2], alpha).endVertex();
-        b.vertex(m, x + hw, yBottom, z).color(c[0], c[1], c[2], 0f).endVertex();
-        b.vertex(m, x - hw, yBottom, z).color(c[0], c[1], c[2], 0f).endVertex();
+        b.vertex(m, x - hw, yTop, z).color(col[0], col[1], col[2], alpha).endVertex();
+        b.vertex(m, x + hw, yBottom, z).color(col[0], col[1], col[2], 0f).endVertex();
+        b.vertex(m, x - hw, yBottom, z).color(col[0], col[1], col[2], 0f).endVertex();
     }
 
     private static void drawDisc(BufferBuilder b, Matrix4f m,
@@ -583,7 +683,7 @@ public final class HemorrhageBloodRenderer {
         return ((s >>> 40) & 0xFFFFFFL) / (float) 0x1000000;
     }
 
-    // ==================== 数学 / 颜色辅助 ====================
+    // ==================== 数学辅助 ====================
 
     private static float frac(float x) {
         return x - (float) Math.floor(x);
@@ -605,27 +705,5 @@ public final class HemorrhageBloodRenderer {
             t = 1f;
         }
         return t * t * (3f - 2f * t);
-    }
-
-    private static int lerpRgb(int from, int to, float t) {
-        if (t < 0f) {
-            t = 0f;
-        } else if (t > 1f) {
-            t = 1f;
-        }
-        int fr = (from >> 16) & 0xFF, fg = (from >> 8) & 0xFF, fb = from & 0xFF;
-        int tr = (to >> 16) & 0xFF, tg = (to >> 8) & 0xFF, tb = to & 0xFF;
-        int r = Math.round(fr + (tr - fr) * t);
-        int g = Math.round(fg + (tg - fg) * t);
-        int bl = Math.round(fb + (tb - fb) * t);
-        return (r << 16) | (g << 8) | bl;
-    }
-
-    private static float[] unpack(int color) {
-        return new float[]{
-                ((color >> 16) & 0xFF) / 255f,
-                ((color >> 8) & 0xFF) / 255f,
-                (color & 0xFF) / 255f
-        };
     }
 }

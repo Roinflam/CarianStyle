@@ -52,16 +52,68 @@ import java.util.Set;
  * <p>
  * <b>v2（性能，视觉零变化）：</b>接入 {@link VisualBatch}——不再自行设置 / 恢复 GL 状态、
  * 不再自行 {@code begin/end} 顶点缓冲，改为向共享缓冲写顶点，由 {@link VisualBatch} 在本帧末
- * 统一提交（本模组七个世界渲染器合并为一次 GL 状态切换与一次 draw call）。
+ * 统一提交（本模组多个世界渲染器合并为一次 GL 状态切换与一次 draw call）。
  * 本渲染器不做范围实体查询（数据来自 {@link AuraScanner} 的 tick 级扫描），故不涉及
  * {@link SharedEntityQuery}。
  * <p>
  * <b>注意（迁移要点）：</b>{@code mc.level == null} 时清空 {@link #STATE} 的分支<b>必须放在
  * 取共享缓冲之前</b>——离开世界那一帧共享批次本就不会开启，若把清空逻辑排在取缓冲的判空之后，
  * 淡出状态会残留到下次进入世界，与新的实体网络 id 撞号后会闪出一两帧错误光环。
- * 状态机的刷新时序、淡入淡出计时与全部几何参数均未改动。
+ *
+ * <h3>v3 修复：动画时间源回绕导致光环永久不可见</h3>
+ * <p>
+ * <b>问题：</b>动画时间此前取自世界游戏刻并对 100 万取模：
+ * </p>
+ * <pre>
+ * float now = (float) (mc.level.getGameTime() % 1_000_000L) + partial;
+ * </pre>
+ * <p>
+ * 该值每 1,000,000 tick（约 <b>13.9 小时</b>游戏时间）从接近 100 万<b>瞬间跌回 0</b>。
+ * 跌回的那一帧，所有正在显示的光环其 {@link AuraState#appearTime} 仍停留在回绕前的大数值，
+ * 于是：
+ * </p>
+ * <pre>
+ * now - st.appearTime  →  0 - 999999  =  一个大负数
+ * eased = easeOutCubic(clamp(负数 / APPEAR_TICKS, 0, 1)) = 0
+ * radiusFactor = alpha = 0        // 完全不可见
+ * </pre>
+ * <p>
+ * 而该光环<b>仍在 {@code activeKeys} 之中</b>（附魔还穿在身上），
+ * 每帧都会被刷新回 {@code fadeStart = -1}（视为"仍激活"），
+ * 因此永远不会进入淡出分支、也就永远不会被移除重建——
+ * <b>光环会永久消失，直到玩家把装备脱下再穿上</b>（或重进世界）。
+ * 长时间不关的服务器上，多个玩家会在同一时刻集体"丢光环"，且没有任何报错。
+ * </p>
+ * <p>
+ * <b>顺带的精度问题：</b>float 只有 24 位有效尾数，在 1e6 量级下最小分辨间隔（ULP）已达
+ * <b>0.0625 tick</b>，而 {@code partial} 的取值范围本就是 0~1——也就是说接近回绕点时，
+ * 帧间插值 {@code partial} 提供的平滑度<b>大部分被精度截断吞掉</b>，动画会出现肉眼可辨的阶梯感。
+ * </p>
+ * <p>
+ * <b>修复：</b>改用墙钟差值（{@link #START_MILLIS}），与本模组其余全部渲染器
+ * （{@code SleepRenderer} / {@code IncisionRenderer} / {@code HemorrhageBloodRenderer} 等）
+ * 的做法完全一致。为保证<b>视觉零变化</b>，这里除以 {@link #MILLIS_PER_TICK}(50) 换算成
+ * <b>tick 单位</b>，因此下方全部时间常量（{@link #APPEAR_TICKS}、{@link #PULSE_SPEED}、
+ * {@link #RIPPLE_PERIOD_TICKS} 等）<b>一个都不用改</b>，动画速度与优化前完全相同。
+ * </p>
+ * <p>
+ * <b>行为差异（是改进）：</b>时间源由「世界游戏刻」变为「墙钟」，动画不再受服务端 TPS 影响——
+ * 服务器卡顿时光环旋转 / 呼吸不会跟着变慢，与本模组其余特效表现统一。
+ * 由于是纯客户端的视觉动画、不参与任何机制判定，该差异无副作用。
+ * </p>
+ * <p>
+ * <b>关于 partial：</b>墙钟本身即连续量，无需再叠加帧间插值，故 {@code now} 不再使用
+ * {@code partial}；但实体位置插值（{@code Mth.lerp(partial, entity.xo, entity.getX())}）
+ * <b>仍然保留</b>——那是位置平滑，与动画时间无关。
+ * </p>
+ * <p>
+ * <b>新的精度边界：</b>float 尾数 24 位，tick 单位下约 1677 万 tick（连续运行 <b>233 小时</b>）
+ * 之内 ULP ≤ 1；由于取的是<b>客户端进程启动以来</b>的时长（而非世界游戏刻），
+ * 实际很难触及，且即便触及也只是动画略显阶梯，<b>不会再出现光环永久消失</b>。
+ * </p>
  *
  * @author FlameForge
+ * @version 3
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -77,6 +129,22 @@ public final class AuraGroundRenderer {
     private static final double RENDER_CULL = 48.0;
     /** 离地高度偏移，避免与地面 z-fighting */
     private static final float Y_OFFSET = 0.02f;
+
+    /**
+     * 渲染器起始墙钟毫秒（类加载时固定）。
+     * <p>v3：动画时间改为「当前毫秒 - 此起始值」的差值，取代原先会回绕的
+     * {@code gameTime % 1_000_000}（详见类注释「v3 修复」小节）。
+     * 必须用差值而非 {@code System.currentTimeMillis()} 本身——后者数值约 1.7e12，
+     * 远超 float 有效精度，逐帧算出的时间会完全相同、动画彻底静止。</p>
+     */
+    private static final long START_MILLIS = System.currentTimeMillis();
+
+    /**
+     * 每游戏刻的毫秒数。
+     * <p>用于把墙钟毫秒差换算为 <b>tick 单位</b>的动画时间，从而让下方全部
+     * {@code *_TICKS} / {@code *_SPEED} 常量原样沿用、动画速度与修复前逐帧一致。</p>
+     */
+    private static final float MILLIS_PER_TICK = 50.0f;
 
     /**
      * 方形每边外扩余量（格）——近似 {@code getEntitiesOfClass} 碰撞箱相交带来的额外生效宽度。
@@ -149,8 +217,10 @@ public final class AuraGroundRenderer {
     }
 
     /**
-     * 逐光环动画状态记录（gametick 时间轴），支持出现展开与消失淡出。
+     * 逐光环动画状态记录（tick 时间轴），支持出现展开与消失淡出。
      * 键 = entityId 与 serialId 打包。仅渲染线程访问。
+     * <p>v3：时间轴由「世界游戏刻取模」改为「客户端墙钟差值（换算为 tick）」，
+     * 字段语义与单位不变，详见类注释。</p>
      */
     private static final Map<Long, AuraState> STATE = new HashMap<>();
 
@@ -161,9 +231,9 @@ public final class AuraGroundRenderer {
      * 这样即便光环已离开扫描结果（甚至实体已卸载），也能在原地把淡出动画播完。
      */
     private static final class AuraState {
-        /** 出现时刻（tick） */
+        /** 出现时刻（tick，墙钟换算） */
         float appearTime;
-        /** 开始消失的时刻（tick）；<0 表示仍激活（未开始淡出） */
+        /** 开始消失的时刻（tick，墙钟换算）；<0 表示仍激活（未开始淡出） */
         float fadeStart = -1f;
         /** 实体网络 id（淡出时优先按实体当前位置渲染） */
         int entityId;
@@ -196,9 +266,24 @@ public final class AuraGroundRenderer {
     }
 
     /**
+     * 取当前动画时间（tick 单位，墙钟驱动）。
+     * <p>
+     * v3：取代原先的 {@code (float)(gameTime % 1_000_000L) + partial}。
+     * 除以 {@link #MILLIS_PER_TICK} 换算为 tick，使下方所有时间常量无需改动、
+     * 动画速度与修复前完全一致（详见类注释「v3 修复」小节）。
+     * </p>
+     *
+     * @return 自渲染器加载以来的时长（tick）
+     */
+    private static float currentTime() {
+        return (System.currentTimeMillis() - START_MILLIS) / MILLIS_PER_TICK;
+    }
+
+    /**
      * 渲染回调。
      * <p>
      * v2：GL 状态与顶点缓冲由 {@link VisualBatch} 统一管理；本方法只负责状态机推进与写顶点。
+     * v3：动画时间源改为墙钟（{@link #currentTime()}），修复 13.9 小时回绕导致光环永久消失。
      * </p>
      *
      * @param event 渲染阶段事件
@@ -228,7 +313,9 @@ public final class AuraGroundRenderer {
         }
 
         float partial = VisualBatch.partialTick();
-        float now = (float) (mc.level.getGameTime() % 1_000_000L) + partial;
+        // ⭐ v3：墙钟驱动的动画时间（tick 单位）。
+        // 不再叠加 partial —— 墙钟本身即连续量；partial 仅保留用于下方的实体位置插值。
+        float now = currentTime();
 
         // ===== 1) 刷新本帧激活光环的状态（取消淡出、记录最新参数与世界坐标）=====
         Set<Long> activeKeys = new HashSet<>();
@@ -369,7 +456,7 @@ public final class AuraGroundRenderer {
      *
      * @param fillMul 填充呼吸亮度系数
      * @param lineMul 线条呼吸亮度系数
-     * @param now     当前时间（tick，含 partial），驱动追逐/涟漪/彗星相位
+     * @param now     当前时间（tick，墙钟驱动），驱动追逐/涟漪/彗星相位
      */
     private static void drawSquare(BufferBuilder builder, Matrix4f m, Prepared p,
                                    float fillMul, float lineMul, float now) {
@@ -538,6 +625,8 @@ public final class AuraGroundRenderer {
 
     /**
      * 绘制一个圆形光环（径向渐变填充 + 发光主环 + 旋转符文）。
+     *
+     * @param now 当前时间（tick，墙钟驱动）
      */
     private static void drawCircle(BufferBuilder builder, Matrix4f m, Prepared p,
                                    float fillMul, float lineMul, float runeRot, float now) {
@@ -784,7 +873,7 @@ public final class AuraGroundRenderer {
      * @param radius  圆半径（格）
      * @param style   样式
      * @param lineMul 呼吸亮度系数
-     * @param now     时间（tick，含 partial）
+     * @param now     时间（tick，墙钟驱动）
      */
     private static void drawRuneMotif(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
                                       double radius, RuneStyle style,

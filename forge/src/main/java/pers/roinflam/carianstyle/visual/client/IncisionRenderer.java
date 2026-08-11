@@ -29,7 +29,7 @@ import java.util.List;
  * <p>
  * 对应 {@link MobEffectIncision}：消耗 50% 最大生命进入 10 秒状态，期间每秒流失 12.5% 最大生命、
  * 移速 +120%（持续衰减至 +30%）、伤害 +40%、攻速 +80%、护甲 -75%、恢复 +60%，造成伤害回复 25%，
- * 击杀延长持续时间。机制上是「自残换爆发」的血战状态，此前完全没有任何视觉反馈。
+ * 击杀延长持续时间。机制上是「自残换爆发」的血战状态。
  * </p>
  * <p>
  * <b>判定采用双重冗余：</b>{@code entity.hasEffect(CarianStylePotion.INCISION.get())}
@@ -40,8 +40,8 @@ import java.util.List;
  * </p>
  * <p>
  * <b>与出血渲染器的视觉区分（关键设计约束）：</b>{@code HemorrhageBloodRenderer} 已经占用了
- * 「血泊 + 垂落血线 + 抛物线血滴 + 迸溅射线 + 血雾」这一整套语言。两者可能同时挂在同一实体上
- * （切腹自伤会掉血、也常伴随流血），若视觉雷同则完全无法分辨。故本渲染器刻意采用<b>反向</b>的语言：
+ * 「血泊 + 垂落血线 + 抛物线血滴 + 迸溅射线 + 血雾」这一整套语言。两者可能同时挂在同一实体上，
+ * 若视觉雷同则完全无法分辨。故本渲染器刻意采用<b>反向</b>的语言：
  * <ul>
  *     <li><b>方向相反</b>——出血是向下的（血泊沉积、血线垂落、血滴坠地）；切腹是向上的
  *         （血气上涌、碎片升腾、疾走外散）；</li>
@@ -53,24 +53,48 @@ import java.util.List;
  * <p>
  * <b>四个元素：</b>
  * <ol>
- *     <li><b>腹部横向刀痕</b>（{@link #drawGash}）——唯一的标志性主视觉，也是唯一的高亮元素。
- *         实体腹部高度处一条面向相机的水平发光横痕，两端收尖、中心最亮、随心跳脉动。
- *         「切腹」这一意象最不可能被认错的符号，任何距离任何角度都能一眼读出；</li>
+ *     <li><b>腹部横向刀痕</b>（{@link #drawGash}）——唯一的标志性主视觉，也是唯一的高亮元素；</li>
  *     <li><b>上升血刃碎片</b>（{@link #drawRisingShards}）——自刀痕处向上飘散的<b>细长菱形</b>碎片
- *         （刻意不用圆形柔光点，与出血的血滴区分），带自旋、向上加速、外散淡出，表达「血气上涌」；</li>
+ *         （刻意不用圆形柔光点，与出血的血滴区分）；</li>
  *     <li><b>疾走涟漪</b>（{@link #drawSprintRipples}）——脚下向外扩散的扁平环。
  *         <b>这是唯一与机制直接联动的元素</b>：强度读取 {@code MOVEMENT_SPEED} 上切腹修正器的实时数值
- *         （见 {@link #speedIntensity}），因此会跟着 +120%→+30% 的衰减一起变弱，
- *         玩家能从视觉上直接读出「爆发期快过去了」；</li>
- *     <li><b>躯干血气笼罩</b>（{@link #drawBodyHaze}）——贴身的大号暗红雾团，比出血的血雾更暗更闷，
- *         补足体积感，让整体读作「被自己的血气包裹」而不是零散的碎片。</li>
+ *         （见 {@link #speedIntensity}），因此会跟着 +120%→+30% 的衰减一起变弱；</li>
+ *     <li><b>躯干血气笼罩</b>（{@link #drawBodyHaze}）——贴身的大号暗红雾团，补足体积感。</li>
  * </ol>
  * </p>
+ *
+ * <h3>v2（顶点量，近距离视觉零变化）：接入 {@link VisualLod}</h3>
  * <p>
- * 渲染管线沿用本模组统一方案：{@link RenderLevelStageEvent} 的 {@code AFTER_TRANSLUCENT_BLOCKS}
- * 阶段，GL 状态与顶点缓冲由 {@link VisualBatch} 统一管理，实体列表取自 {@link SharedEntityQuery}
- * 的每帧共享查询，{@code POSITION_COLOR} 纯顶点绘制，无贴图、无原版粒子。
+ * 单个切腹实体每帧的顶点量粗算：
  * </p>
+ * <pre>
+ * 疾走涟漪（最多 3 环 × 28 段 × 6）      504
+ * 躯干血气（8 雾团 × 10 段 × 3）         240
+ * 上升血刃（最多 20 片 × 4 三角）        240
+ * 腹部刀痕（10 段 × 6）                   60
+ * ─────────────────────────────────────────
+ * 合计                              ~1044 顶点 / 实体 / 帧
+ * </pre>
+ * <p>
+ * 切腹是玩家主动开启的爆发状态，团战里往往<b>多人同时开</b>，且与出血、黄金树祝福大量共存。
+ * 现按 {@link VisualLod#detail} 缩放元素数量与分段数：
+ * {@link VisualLod#FULL_DETAIL_RANGE} 格内系数为 1.0，<b>与优化前逐像素一致</b>；
+ * 40 格外单实体降至约 200 顶点。
+ * </p>
+ * <p>
+ * <b>削减策略：</b>
+ * </p>
+ * <ul>
+ *     <li><b>刀痕不削数量、只削分段</b>——它是切腹唯一的辨识符号，且仅 60 顶点，
+ *         哪怕最低细节也必须完整可见，只把沿长度的细分从 10 段降到 4 段（轮廓略方，远处不可见）；</li>
+ *     <li><b>血刃碎片与雾团按种子截断尾部</b>——位置由 {@code seedFor(entityId, i)} 决定，
+ *         保留元素的轨迹完全不变，靠近时是「逐渐多出几片碎片」而非重新洗牌；</li>
+ *     <li><b>涟漪减圈数</b>——涟漪的相位是 {@code i / count} 均布的，减少 count 会改变相位间隔，
+ *         但涟漪本身就是「一圈接一圈往外推」的循环动画、没有固定方位，
+ *         减圈只表现为「波与波之间隔得更开」，观感自然；</li>
+ *     <li><b>血气雾团整层可跳过</b>——它是纯体积氛围层，远处完全糊成一片，
+ *         低于 {@link #HAZE_KEEP_THRESHOLD} 时整层不画（省 240 顶点，占总量近四分之一）。</li>
+ * </ul>
  *
  * @author FlameForge
  */
@@ -89,6 +113,16 @@ public final class IncisionRenderer {
      * 直接用 currentTimeMillis()/1000f 数值过大会导致 float 精度不足、动画卡死。
      */
     private static final long START_MILLIS = System.currentTimeMillis();
+
+    // ===== v2 LOD 下限与保留阈值 =====
+    /** 刀痕沿长度的最少细分段数：4 段轮廓略方，但两端收尖的形态仍然成立 */
+    private static final int GASH_SEGMENTS_MIN = 4;
+    /** 涟漪环的最少分段数 */
+    private static final int RIPPLE_SEGMENTS_MIN = 8;
+    /** 雾团柔光块的最少分段数 */
+    private static final int HAZE_SEGMENTS_MIN = 4;
+    /** 躯干血气层的保留阈值：纯体积氛围层，远处完全糊成一片 */
+    private static final float HAZE_KEEP_THRESHOLD = 0.5f;
 
     // ===== 配色（0xRRGGBB）=====
     /** 刀痕核心：亮血红，全渲染器唯一的高亮色，确保标志物在任何背景下都能读出 */
@@ -213,9 +247,15 @@ public final class IncisionRenderer {
             double dx = ex - cam.x;
             double dy = ey - cam.y;
             double dz = ez - cam.z;
-            if (dx * dx + dy * dy + dz * dz > CULL_SQR) {
+            double distSqr = dx * dx + dy * dy + dz * dz;
+            if (distSqr > CULL_SQR) {
                 continue;
             }
+
+            // ⭐ v2：本实体的细节系数（距离 × 同屏拥挤度）。12 格内恒为 1.0，视觉与优化前一致
+            float detail = VisualLod.detail(distSqr);
+            // 登记实例，供下一帧估算拥挤度（不影响本帧绘制）
+            VisualLod.countInstance();
 
             float width = entity.getBbWidth();
             float height = entity.getBbHeight();
@@ -228,13 +268,16 @@ public final class IncisionRenderer {
             float burst = speedIntensity(entity);
 
             drawSprintRipples(builder, matrix, rx, ryFoot + Y_OFFSET, rz, width, time,
-                    entity.getId(), burst);
-            drawBodyHaze(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId(),
-                    rightX, rightY, rightZ, upX, upY, upZ);
+                    entity.getId(), burst, detail);
+            // 血气雾团是纯体积氛围层，远处完全糊成一片，低细节时整层跳过（省约 240 顶点）
+            if (VisualLod.keepLayer(detail, HAZE_KEEP_THRESHOLD)) {
+                drawBodyHaze(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId(),
+                        rightX, rightY, rightZ, upX, upY, upZ, detail);
+            }
             drawRisingShards(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId(),
-                    burst, rightX, rightY, rightZ, upX, upY, upZ);
+                    burst, rightX, rightY, rightZ, upX, upY, upZ, detail);
             drawGash(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId(),
-                    rightX, rightY, rightZ, upX, upY, upZ);
+                    rightX, rightY, rightZ, upX, upY, upZ, detail);
         }
     }
 
@@ -261,11 +304,6 @@ public final class IncisionRenderer {
      * 直到下限 +0.3（+30%）。属性修正器会随实体同步到客户端，因此客户端可以直接读出当前值，
      * 换算成 0~1 的强度：刚触发为 1.0，衰减到底为 0.0。
      * </p>
-     * <p>
-     * 这样疾走涟漪与血刃碎片的强度会跟着机制一起衰减，玩家能从视觉上直接读出「爆发期还剩多少」，
-     * 而不是靠一个跟机制无关的固定动画。修正器读不到时回退为 {@link #SPEED_INTENSITY_FALLBACK}，
-     * 保证视觉不会整体消失。
-     * </p>
      *
      * @param entity 目标实体
      * @return 爆发强度（0~1）
@@ -289,13 +327,18 @@ public final class IncisionRenderer {
     /**
      * 绘制腹部横向发光刀痕：面向相机的水平长条，厚度沿长度按正弦包络收束（两端收尖、中段最厚），
      * 中心用高亮的 {@link #INCISION_GASH}、向两端过渡到暗红并淡出为 0。整体随心跳脉动明灭。
-     * <p>这是本渲染器唯一的高亮元素，也是「切腹」意象的核心符号；其余三个元素都是围绕它的氛围层。</p>
+     * <p>这是本渲染器唯一的高亮元素，也是「切腹」意象的核心符号。</p>
+     * <p>
+     * <b>v2：只削分段、不削存在。</b>刀痕仅 60 顶点却承担全部辨识度，因此无论细节多低都完整绘制，
+     * 只把沿长度的细分从 {@link #GASH_SEGMENTS} 降到下限 {@link #GASH_SEGMENTS_MIN}
+     * （轮廓略方，但「两端收尖的横痕」这一形态完全成立）。
+     * </p>
      */
     private static void drawGash(BufferBuilder b, Matrix4f m,
                                  float cx, float cyFoot, float cz, float width, float height,
                                  float time, int seedId,
                                  float rightX, float rightY, float rightZ,
-                                 float upX, float upY, float upZ) {
+                                 float upX, float upY, float upZ, float detail) {
         float gashY = cyFoot + height * GASH_HEIGHT_FACTOR;
         // 心跳脉动：短促强跳 + 常驻底亮，模拟血脉搏动
         float beat = Mth.sin(time * GASH_PULSE_SPEED + seedId * 0.7f);
@@ -304,19 +347,21 @@ public final class IncisionRenderer {
         float halfThick = height * GASH_HALF_THICK_FACTOR * (0.85f + 0.3f * pulse);
         float alpha = GASH_BASE_ALPHA * pulse;
 
+        int segments = VisualLod.scaleSegments(GASH_SEGMENTS, GASH_SEGMENTS_MIN, detail);
+
         float[] hot = unpack(INCISION_GASH);
         float[] blood = unpack(INCISION_BLOOD);
 
         float prevOffset = -halfLen;
         float prevThick = 0f;
-        for (int i = 0; i <= GASH_SEGMENTS; i++) {
-            float u = (float) i / GASH_SEGMENTS;          // 0~1 沿长度
+        for (int i = 0; i <= segments; i++) {
+            float u = (float) i / segments;               // 0~1 沿长度
             float offset = -halfLen + u * 2f * halfLen;   // 长度方向偏移
             float thick = halfThick * (float) Math.sin(Math.PI * u); // 两端收尖
 
             if (i > 0) {
                 // 颜色：中段热、两端暗；alpha：中段实、两端 0
-                float uPrev = (float) (i - 1) / GASH_SEGMENTS;
+                float uPrev = (float) (i - 1) / segments;
                 float[] cPrev = gashColor(uPrev, hot, blood);
                 float[] cCur = gashColor(u, hot, blood);
                 float aPrev = alpha * gashAlpha(uPrev);
@@ -397,13 +442,18 @@ public final class IncisionRenderer {
      * <p>刻意使用<b>尖锐的细长菱形</b>而非圆形柔光点——出血渲染器的血滴已经占用了圆形语言，
      * 用菱形碎片才能在两者同时挂载时区分开，也更贴合「血刃」而非「血滴」的语义。</p>
      * <p>数量随 {@code burst}（爆发强度）增减：刚触发时最密，衰减到底时约剩一半。</p>
+     * <p>
+     * <b>v2：数量再乘细节系数。</b>碎片位置由 {@code seedFor(entityId, i + 100)} 决定，
+     * 截断尾部时保留元素的种子与轨迹完全不变，靠近时是「逐渐多出几片碎片」而非重新洗牌。
+     * </p>
      */
     private static void drawRisingShards(BufferBuilder b, Matrix4f m,
                                          float cx, float cyFoot, float cz, float width, float height,
                                          float time, int seedId, float burst,
                                          float rightX, float rightY, float rightZ,
-                                         float upX, float upY, float upZ) {
-        int count = Math.max(1, Math.round(SHARD_COUNT * (0.5f + 0.5f * burst)));
+                                         float upX, float upY, float upZ, float detail) {
+        int burstCount = Math.max(1, Math.round(SHARD_COUNT * (0.5f + 0.5f * burst)));
+        int count = VisualLod.scale(burstCount, detail);
         float startY = cyFoot + height * GASH_HEIGHT_FACTOR;
         float riseHeight = height * SHARD_RISE_HEIGHT_FACTOR;
         float spread = width * SHARD_SPREAD_FACTOR;
@@ -466,6 +516,8 @@ public final class IncisionRenderer {
     /**
      * 绘制一片面向相机的细长菱形「血刃碎片」：长轴为短轴的约 3 倍，可绕视线方向旋转。
      * 中心不透明、四个顶点渐隐为 0。
+     * <p><b>轮廓固定 4 点，不参与 LOD 缩放</b>——菱形已是最简形状，
+     * 碎片的削减完全通过「减少片数」实现。</p>
      *
      * @param size 短轴半长（长轴为其 3 倍）
      * @param rot  在 billboard 平面内的旋转角（弧度）
@@ -507,14 +559,21 @@ public final class IncisionRenderer {
      * （{@link #speedIntensity} 读出的移速修正器实时值）驱动。切腹刚触发时移速 +120%，
      * 涟漪密集明亮、扩散快；随着修正器衰减到 +30%，涟漪逐渐稀疏黯淡，玩家能直接从脚下看出
      * 「爆发期快过去了」，而不必去盯 buff 栏的读秒。</p>
+     * <p>
+     * <b>v2：环数与分段数再乘细节系数。</b>涟漪的相位是 {@code i / count} 均布的，
+     * 减少 count 会改变相位间隔——但涟漪本身是「一圈接一圈往外推」的循环动画、没有固定方位，
+     * 减圈只表现为「波与波之间隔得更开」，观感自然，无需按步长抽取。
+     * </p>
      */
     private static void drawSprintRipples(BufferBuilder b, Matrix4f m,
                                           float cx, float cy, float cz, float width,
-                                          float time, int seedId, float burst) {
+                                          float time, int seedId, float burst, float detail) {
         if (burst <= 0.02f) {
             return;
         }
-        int count = Math.max(1, Math.round(RIPPLE_COUNT * (0.4f + 0.6f * burst)));
+        int burstCount = Math.max(1, Math.round(RIPPLE_COUNT * (0.4f + 0.6f * burst)));
+        int count = VisualLod.scale(burstCount, detail);
+        int segments = VisualLod.scaleSegments(RIPPLE_SEGMENTS, RIPPLE_SEGMENTS_MIN, detail);
         float maxRadius = width * RIPPLE_MAX_RADIUS_FACTOR * (0.6f + 0.4f * burst);
         // 扩散速度随爆发强度提升，强化「疾走」的观感
         float rate = RIPPLE_RATE * (0.7f + 0.6f * burst);
@@ -535,7 +594,7 @@ public final class IncisionRenderer {
                 continue;
             }
             float[] col = mix(blood, dark, t);
-            ring(b, m, cx, cy, cz, radius, RIPPLE_SEGMENTS, RIPPLE_HALF_WIDTH, col, alpha);
+            ring(b, m, cx, cy, cz, radius, segments, RIPPLE_HALF_WIDTH, col, alpha);
         }
     }
 
@@ -544,18 +603,24 @@ public final class IncisionRenderer {
     /**
      * 贴身的大号暗红雾团：缓慢漂移、彼此叠加，覆盖躯干中上段。
      * <p>与出血血雾的区别在于色调更暗更闷（{@link #INCISION_DARK} 参与混合）、位置更贴身，
-     * 读作「被自己蒸腾的血气包裹」而不是「伤口在往外喷」。作用是给整体补足体积感，
-     * 避免只剩刀痕与零散碎片显得单薄。</p>
+     * 读作「被自己蒸腾的血气包裹」而不是「伤口在往外喷」。作用是给整体补足体积感。</p>
+     * <p>
+     * <b>v2：数量与分段数再乘细节系数；整层由调用方按 {@link #HAZE_KEEP_THRESHOLD} 决定是否绘制。</b>
+     * 雾团位置由 {@code seedFor(entityId, i + 700)} 决定，截断尾部安全。
+     * </p>
      */
     private static void drawBodyHaze(BufferBuilder b, Matrix4f m,
                                      float cx, float cyFoot, float cz, float width, float height,
                                      float time, int seedId,
                                      float rightX, float rightY, float rightZ,
-                                     float upX, float upY, float upZ) {
+                                     float upX, float upY, float upZ, float detail) {
         float[] blood = unpack(INCISION_BLOOD);
         float[] dark = unpack(INCISION_DARK);
 
-        for (int i = 0; i < HAZE_COUNT; i++) {
+        int count = VisualLod.scale(HAZE_COUNT, detail);
+        int segments = VisualLod.scaleSegments(HAZE_SEGMENTS, HAZE_SEGMENTS_MIN, detail);
+
+        for (int i = 0; i < count; i++) {
             long s = seedFor(seedId, i + 700);
             float baseAngle = rngFloat(s) * TAU;
             s = rngNext(s);
@@ -582,7 +647,7 @@ public final class IncisionRenderer {
             float[] col = mix(dark, blood, 0.35f + 0.4f * pulse);
 
             emitSoftMote(b, m, px, py, pz, size, col[0], col[1], col[2], alpha,
-                    rightX, rightY, rightZ, upX, upY, upZ);
+                    rightX, rightY, rightZ, upX, upY, upZ, segments);
         }
     }
 
@@ -616,15 +681,20 @@ public final class IncisionRenderer {
         }
     }
 
-    /** 绘制一颗面向相机的柔和圆形光点（径向渐变：中心 alpha、边缘 0）。 */
+    /**
+     * 绘制一颗面向相机的柔和圆形光点（径向渐变：中心 alpha、边缘 0）。
+     *
+     * @param segments 分段数。v2 起由调用方按细节系数传入，下限 {@link #HAZE_SEGMENTS_MIN}；
+     *                 全细节时即 {@link #HAZE_SEGMENTS}。
+     */
     private static void emitSoftMote(BufferBuilder b, Matrix4f m,
                                      float cx, float cy, float cz, float size,
                                      float r, float g, float bl, float alpha,
                                      float rightX, float rightY, float rightZ,
-                                     float upX, float upY, float upZ) {
+                                     float upX, float upY, float upZ, int segments) {
         float pex = 0f, pey = 0f, pez = 0f;
-        for (int i = 0; i <= HAZE_SEGMENTS; i++) {
-            float ang = TAU * i / HAZE_SEGMENTS;
+        for (int i = 0; i <= segments; i++) {
+            float ang = TAU * i / segments;
             float ca = (float) Math.cos(ang) * size;
             float sa = (float) Math.sin(ang) * size;
             float ex = cx + rightX * ca + upX * sa;

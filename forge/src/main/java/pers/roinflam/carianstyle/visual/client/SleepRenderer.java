@@ -58,6 +58,36 @@ import java.util.List;
  * 实体列表取自 {@link SharedEntityQuery} 的每帧共享查询，{@code POSITION_COLOR} 纯顶点绘制。
  * </p>
  *
+ * <h3>v2（顶点量，近距离视觉零变化）：接入 {@link VisualLod}</h3>
+ * <p>
+ * 单个沉睡实体每帧的顶点量粗算：
+ * </p>
+ * <pre>
+ * 催眠螺旋（48 折线段 × 6 + 中心柔光 12）  300
+ * 白花瓣（10 片 × 6 三角）                 180
+ * 沉眠雾盘（24 段 × 3）                     72
+ * ─────────────────────────────────────────
+ * 合计                               ~552 顶点 / 实体 / 帧
+ * </pre>
+ * <p>
+ * <b>本渲染器是本批三个里最轻的</b>，单独看削减收益有限——接入 {@link VisualLod} 的
+ * <b>首要目的其实是 {@link VisualLod#countInstance()}</b>：拥挤度是全局共享的，
+ * 只要还有渲染器不登记，{@code crowdFactor} 就会被系统性高估，
+ * 已接入的重量级渲染器（黄金树祝福、腐败女神）就削减不足。补齐这一环比它自己省的那点顶点重要。
+ * </p>
+ * <p>
+ * 削减本身仍按 {@link VisualLod#detail} 走，{@link VisualLod#FULL_DETAIL_RANGE} 格内系数为 1.0，
+ * <b>与优化前逐像素一致</b>；40 格外单实体降至约 190 顶点。
+ * </p>
+ * <p>
+ * <b>螺旋可以直接减段数（与均布圆环不同，这里不需要步长抽取）。</b>
+ * 螺旋是一条连续折线，{@code u = i / segments} 无论 {@code segments} 取多少都完整覆盖 0→1，
+ * {@code theta = totalAngle × u + rot} 也始终转满 {@link #SPIRAL_TURNS} 圈——
+ * 减段数只让折线更粗糙，<b>不会改变螺旋的形状、圈数或起止位置</b>。
+ * 这与根须、符文刻度那类「{@code i × (TAU / 总数)} 均布」的元素有本质区别，后者减总数会改变方位。
+ * 但段数太少会明显棱角化（2.25 圈 20 段 ≈ 每圈 9 段），故设下限 {@link #SPIRAL_SEGMENTS_MIN}。
+ * </p>
+ *
  * @author FlameForge
  */
 @OnlyIn(Dist.CLIENT)
@@ -70,6 +100,16 @@ public final class SleepRenderer {
     private static final float TAU = (float) (Math.PI * 2.0);
     private static final float Y_OFFSET = 0.02f;
     private static final long START_MILLIS = System.currentTimeMillis();
+
+    // ===== v2 LOD 下限 =====
+    /**
+     * 螺旋折线的最少段数。
+     * <p>螺旋共 {@link #SPIRAL_TURNS}(2.25) 圈，20 段 ≈ 每圈 9 段——再少就会从「平滑螺线」
+     * 退化成肉眼可辨的多边形折线，而螺旋是睡眠唯一的标志符号，不能牺牲形状。</p>
+     */
+    private static final int SPIRAL_SEGMENTS_MIN = 20;
+    /** 沉眠雾盘的最少分段数 */
+    private static final int MIST_SEGMENTS_MIN = 8;
 
     // ===== 配色（0xRRGGBB）=====
     /** 花瓣乳白：托莉娜白花的主色 */
@@ -171,9 +211,16 @@ public final class SleepRenderer {
             double dx = ex - cam.x;
             double dy = ey - cam.y;
             double dz = ez - cam.z;
-            if (dx * dx + dy * dy + dz * dz > CULL_SQR) {
+            double distSqr = dx * dx + dy * dy + dz * dz;
+            if (distSqr > CULL_SQR) {
                 continue;
             }
+
+            // ⭐ v2：本实体的细节系数（距离 × 同屏拥挤度）。12 格内恒为 1.0，视觉与优化前一致
+            float detail = VisualLod.detail(distSqr);
+            // 登记实例，供下一帧估算拥挤度。本渲染器接入 VisualLod 的首要意义就在这一行——
+            // 只要还有渲染器不登记，全局 crowdFactor 就会被系统性高估
+            VisualLod.countInstance();
 
             float width = entity.getBbWidth();
             float height = entity.getBbHeight();
@@ -182,10 +229,10 @@ public final class SleepRenderer {
             float ryFoot = (float) dy;
             float rz = (float) dz;
 
-            drawSlumberMist(builder, matrix, rx, ryFoot + Y_OFFSET, rz, width, time, entity.getId());
+            drawSlumberMist(builder, matrix, rx, ryFoot + Y_OFFSET, rz, width, time, entity.getId(), detail);
             drawPetals(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId(),
-                    rightX, rightY, rightZ, upX, upY, upZ);
-            drawHypnoticSpiral(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId());
+                    rightX, rightY, rightZ, upX, upY, upZ, detail);
+            drawHypnoticSpiral(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId(), detail);
         }
     }
 
@@ -216,11 +263,17 @@ public final class SleepRenderer {
      * <p>
      * 高度取实体头顶再往上一点，且<b>随呼吸极缓慢上下浮动</b>，避免像贴图一样死板。
      * </p>
+     * <p>
+     * <b>v2：段数按细节系数缩放（下限 {@link #SPIRAL_SEGMENTS_MIN}）。</b>
+     * 螺旋是连续折线而非均布圆环，{@code u = i / segments} 无论段数多少都完整覆盖 0→1、
+     * 转满 {@link #SPIRAL_TURNS} 圈，因此<b>直接减段数是安全的</b>——只是折线更粗糙，
+     * 形状、圈数、起止位置全部不变。中心那点柔光锚点仅 12 顶点，不参与削减。
+     * </p>
      */
     private static void drawHypnoticSpiral(BufferBuilder b, Matrix4f m,
                                            float cx, float cyFoot, float cz,
                                            float width, float height,
-                                           float time, int seedId) {
+                                           float time, int seedId, float detail) {
         // 极缓慢的整体旋转 + 各实体错相
         float rot = time * SPIRAL_ROT_SPEED + seedId * 0.7f;
         // 极缓慢的上下浮动
@@ -231,12 +284,14 @@ public final class SleepRenderer {
         float[] mist = unpack(SLEEP_MIST);
         float[] petal = unpack(SLEEP_PETAL);
 
+        int segments = VisualLod.scaleSegments(SPIRAL_SEGMENTS, SPIRAL_SEGMENTS_MIN, detail);
+
         float totalAngle = TAU * SPIRAL_TURNS;
         float prevX = cx;
         float prevZ = cz;
 
-        for (int i = 1; i <= SPIRAL_SEGMENTS; i++) {
-            float u = (float) i / SPIRAL_SEGMENTS;   // 0=中心, 1=外端
+        for (int i = 1; i <= segments; i++) {
+            float u = (float) i / segments;   // 0=中心, 1=外端
             float theta = totalAngle * u + rot;
             float r = maxRadius * u;
             float x = cx + r * (float) Math.cos(theta);
@@ -247,7 +302,7 @@ public final class SleepRenderer {
             float alpha = SPIRAL_BASE_ALPHA * (1f - u * 0.75f);
             float[] col = mix(petal, mist, u);
 
-            float uPrev = (float) (i - 1) / SPIRAL_SEGMENTS;
+            float uPrev = (float) (i - 1) / segments;
             float alphaPrev = SPIRAL_BASE_ALPHA * (1f - uPrev * 0.75f);
             float[] colPrev = mix(petal, mist, uPrev);
 
@@ -257,7 +312,7 @@ public final class SleepRenderer {
             prevZ = z;
         }
 
-        // 螺旋中心的一点柔光，作为视觉锚点
+        // 螺旋中心的一点柔光，作为视觉锚点。仅 12 顶点，不做削减
         spark(b, m, cx, cz, spiralY, width * 0.12f + 0.05f, petal, 0.65f);
     }
 
@@ -269,20 +324,27 @@ public final class SleepRenderer {
      * 花瓣用 billboard 六边形轮廓近似（而非正圆），带缓慢自旋，呼应睡眠女神托莉娜的白花意象。
      * 下落速度只有本模组其它上升 / 飘落类元素的几分之一——「慢」是睡眠的核心语言。
      * </p>
+     * <p>
+     * <b>v2：数量按细节系数缩放。</b>花瓣位置由 {@code seedFor(entityId, i + 200)} 决定，
+     * 截断尾部时保留花瓣的下落轨迹完全不变，靠近时是「逐渐多飘下几片」而非重新洗牌。
+     * 花瓣轮廓固定 6 点（{@link #emitPetal}），不参与缩放——再少就不成花瓣形了。
+     * </p>
      */
     private static void drawPetals(BufferBuilder b, Matrix4f m,
                                    float cx, float cyFoot, float cz,
                                    float width, float height,
                                    float time, int seedId,
                                    float rightX, float rightY, float rightZ,
-                                   float upX, float upY, float upZ) {
+                                   float upX, float upY, float upZ, float detail) {
         float startHeight = height * PETAL_START_HEIGHT_FACTOR;
         float spread = width * PETAL_SPREAD_FACTOR;
 
         float[] petal = unpack(SLEEP_PETAL);
         float[] mist = unpack(SLEEP_MIST);
 
-        for (int i = 0; i < PETAL_COUNT; i++) {
+        int count = VisualLod.scale(PETAL_COUNT, detail);
+
+        for (int i = 0; i < count; i++) {
             long s = seedFor(seedId, i + 200);
             float phase = rngFloat(s);
             s = rngNext(s);
@@ -338,15 +400,17 @@ public final class SleepRenderer {
      * 脚下的淡蓝灰雾盘：中心稍实、边缘渐隐，以近乎察觉不到的速度呼吸。
      * <p>作用是给整体压住重量——只有螺旋与花瓣两个悬浮元素会显得轻飘，
      * 加一层贴地的雾才有「沉下去了」的分量感。</p>
+     * <p>v2：分段数按细节系数缩放（下限 {@link #MIST_SEGMENTS_MIN}）。</p>
      */
     private static void drawSlumberMist(BufferBuilder b, Matrix4f m,
                                         float cx, float cy, float cz, float width,
-                                        float time, int seedId) {
+                                        float time, int seedId, float detail) {
         float breath = 0.9f + 0.1f * Mth.sin(time * MIST_BREATH_SPEED + seedId * 0.6f);
         float radius = width * MIST_RADIUS_FACTOR * breath;
         int col = lerpRgb(SLEEP_DEEP, SLEEP_MIST, 0.5f + 0.5f * Mth.sin(time * 0.3f + seedId));
         float[] c = unpack(col);
-        drawDisc(b, m, cx, cy, cz, radius, MIST_SEGMENTS, c[0], c[1], c[2], MIST_BASE_ALPHA * breath);
+        int segments = VisualLod.scaleSegments(MIST_SEGMENTS, MIST_SEGMENTS_MIN, detail);
+        drawDisc(b, m, cx, cy, cz, radius, segments, c[0], c[1], c[2], MIST_BASE_ALPHA * breath);
     }
 
     // ==================== 几何基元 ====================
@@ -354,6 +418,8 @@ public final class SleepRenderer {
     /**
      * 绘制一片面向相机的花瓣：billboard 平面内用 6 个轮廓点近似出圆润的椭圆花瓣形，
      * 支持绕视线方向旋转。中心不透明、边缘渐隐为 0。
+     * <p><b>轮廓点数固定为 6，不参与 LOD 缩放</b>——再少就不成花瓣形了，
+     * 花瓣的削减完全通过「减少片数」实现。</p>
      *
      * @param size 花瓣半尺寸
      * @param rot  在 billboard 平面内的旋转角（弧度）
