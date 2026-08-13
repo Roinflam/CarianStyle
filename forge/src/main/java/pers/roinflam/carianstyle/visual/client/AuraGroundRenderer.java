@@ -112,8 +112,64 @@ import java.util.Set;
  * 实际很难触及，且即便触及也只是动画略显阶梯，<b>不会再出现光环永久消失</b>。
  * </p>
  *
+ * <h3>v4（顶点量，近距离视觉零变化）：接入 {@link VisualLod}</h3>
+ * <p>
+ * 单个圆形光环每帧的顶点量粗算（以最大的圣域 16 格为例）：
+ * </p>
+ * <pre>
+ * 外辉光 + 内辉光 + 主环核心（3 × 48 段 × 6）      864
+ * 圆形涟漪（2 环 × 48 段 × 6）                     576
+ * 外缘符文刻度（40 条 × 6）                        240
+ * 母题 motifHoly（16 射线 + 十字 + 8 芒尖）        204
+ * 径向渐变填充（32 段 × 3）                         96
+ * 边框彗星（2 × 3 尾点 × 12）                       72
+ * ─────────────────────────────────────────────
+ * 合计                                       ~2050 顶点 / 光环 / 帧
+ * </pre>
+ * <p>
+ * 圣域是<b>群体增益</b>光环（举盾即为 16 格内全部友方提供减伤与护盾），
+ * 团战中十人同时举盾并不罕见——2 万顶点，且这些圈会大面积重叠。
+ * 由于全部是关深度写入的半透明叠加，重叠区域的 overdraw 是实打实的填充率开销。
+ * </p>
+ * <p>
+ * 现全部元素按 {@link VisualLod#detail} 缩放；同时补上此前缺失的
+ * {@link VisualLod#countInstance()}——本渲染器不登记实例会让全局 {@code crowdFactor}
+ * 被系统性低估，已接入 LOD 的实体类渲染器在团战时削减不足。
+ * </p>
+ *
+ * <h4>细节系数必须按「到圆环边界的距离」取</h4>
+ * <p>
+ * 与 {@code GravitasDistortionRenderer} 的力场圈完全同源的问题：
+ * 圣域半径 16 格，<b>大于 {@link VisualLod#FULL_DETAIL_RANGE}(12)</b>。
+ * 若照搬「按光环中心的平方距离取 detail」，会出现：
+ * </p>
+ * <pre>
+ * 玩家站在自己圣域圈的内侧边缘
+ *   → 到圈心距离 ≈ 16 格
+ *   → detail 被判定为"远"、大幅削减
+ *   → 但那圈发光边界就在脚边，削减清晰可见
+ * </pre>
+ * <p>
+ * 故改用<b>到圆环边界的近似距离</b>（{@code max(0, 到圈心距离 - 当前半径)}）：
+ * 人站在圈内或贴着圈边时该值为 0、detail 恒为 1.0，只有整个圈都离得很远时才削减。
+ * 这里需要一次 {@link Math#sqrt}，但同屏光环数量通常是个位数，开方成本可忽略。
+ * </p>
+ *
+ * <h4>削减策略</h4>
+ * <ul>
+ *     <li><b>环的分段数是首要杠杆</b>——三层主环 + 涟漪合计占七成顶点。下限
+ *         {@link #RING_SEGMENTS_MIN}(24) 比实体渲染器高不少：多边形与真圆的偏离量正比于半径，
+ *         而光环半径可达 16 格（24 段时偏离约 14cm，在远处不可察）；</li>
+ *     <li><b>角度均布的元素按步长抽取，绝不能截断</b>——符文刻度、母题射线、断环、
+ *         栅条的角度都是 {@code i × (TAU / 总数)}，截断前 N 个会让整圈只剩一段圆弧上有内容，
+ *         法阵会明显"缺一块"；</li>
+ *     <li><b>星形 / 多边形母题完全不削</b>——卡利亚六芒星、圣域十字圣徽每个只有 30~40 顶点，
+ *         却是「这是哪个光环」的唯一辨识依据；</li>
+ *     <li><b>彗星与火花整层可跳过</b>——都是极小的装饰光点，远处完全看不出。</li>
+ * </ul>
+ *
  * @author FlameForge
- * @version 3
+ * @version 4
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -151,6 +207,36 @@ public final class AuraGroundRenderer {
      * 真实值随目标碰撞箱半宽变化（玩家约 0.3、多数生物约 0.4~0.5），取折中值。
      */
     private static final double EDGE_MARGIN = 0.5;
+
+    // ===== v4 LOD 下限与保留阈值 =====
+
+    /**
+     * 圆形径向渐变填充的最少分段数。
+     * <p>填充盘是中心→边缘的低 alpha 渐变、无描边线，多边形化最不易察觉，故下限可比环低。</p>
+     */
+    private static final int FILL_SEGMENTS_MIN = 16;
+
+    /**
+     * 环 / 涟漪类基元的最少分段数。
+     * <p>
+     * 比实体渲染器的下限（8~10）高不少：多边形与真圆的偏离量正比于半径，
+     * 而光环半径可达 16 格（圣域）。24 段在 16 格半径下偏离约 14cm，
+     * 在削减生效的距离上不可察；再低就能看出明显棱角了。
+     * </p>
+     */
+    private static final int RING_SEGMENTS_MIN = 24;
+
+    /**
+     * 装饰光点层（四角火花 / 边框彗星 / 母题芒尖）的保留阈值。
+     * <p>这些都是尺寸极小的菱形光点，远处完全看不出，却各占几十上百顶点。</p>
+     */
+    private static final float SPARKLE_KEEP_THRESHOLD = 0.45f;
+
+    /**
+     * 边框彗星层的保留阈值。
+     * <p>彗星带 3 个渐隐尾点，是纯动效装饰；比火花更早跳过（它还多占 3 倍顶点）。</p>
+     */
+    private static final float COMET_KEEP_THRESHOLD = 0.5f;
 
     /** 方形区域底色 alpha（平铺） */
     private static final float SQUARE_FILL_ALPHA = 0.13f;
@@ -253,9 +339,11 @@ public final class AuraGroundRenderer {
 
     /**
      * 准备好渲染的一个光环（坐标已转为相对相机；尺寸已含动画与边缘余量；alpha 为整体淡入淡出系数）。
+     *
+     * @param detail 本帧细节系数（v4 新增，按到圆环边界的距离取，详见类注释）
      */
     private record Prepared(int serialId, double rx, double ry, double rz, int color, double radius,
-                            AuraDisplayRegistry.AuraShape shape, double alpha) {
+                            AuraDisplayRegistry.AuraShape shape, double alpha, float detail) {
     }
 
     /**
@@ -284,6 +372,7 @@ public final class AuraGroundRenderer {
      * <p>
      * v2：GL 状态与顶点缓冲由 {@link VisualBatch} 统一管理；本方法只负责状态机推进与写顶点。
      * v3：动画时间源改为墙钟（{@link #currentTime()}），修复 13.9 小时回绕导致光环永久消失。
+     * v4：新增细节系数计算（按到圆环边界的距离）与同屏实例登记。
      * </p>
      *
      * @param event 渲染阶段事件
@@ -395,7 +484,8 @@ public final class AuraGroundRenderer {
             double dx = lerpX - cam.x;
             double dy = lerpY - cam.y;
             double dz = lerpZ - cam.z;
-            if (dx * dx + dy * dy + dz * dz > cullSqr) {
+            double distSqr = dx * dx + dy * dy + dz * dz;
+            if (distSqr > cullSqr) {
                 continue; // 太远：本帧不渲染，但保留状态，淡出计时继续
             }
 
@@ -418,10 +508,19 @@ public final class AuraGroundRenderer {
                 continue;
             }
 
+            // ⭐ v4：细节系数必须按「到圆环边界的距离」取，不能按到圈心的距离。
+            // 圣域半径 16 格 > VisualLod.FULL_DETAIL_RANGE(12)，按圈心算会导致
+            // 玩家站在自己圈的边缘时被判定为"远"并削减，而那圈线其实就在脚边（详见类注释）。
+            double edgeDist = Math.max(0.0, Math.sqrt(distSqr) - animatedReach);
+            float detail = VisualLod.detail(edgeDist * edgeDist);
+            // ⭐ v4：登记同屏实例。本渲染器此前不登记，导致全局 crowdFactor 被系统性低估，
+            // 已接入 LOD 的实体类渲染器在团战时削减不足
+            VisualLod.countInstance();
+
             prepared.add(new Prepared(
                     st.serialId,
                     centerWorldX - cam.x, lerpY - cam.y, centerWorldZ - cam.z,
-                    st.color, animatedReach, st.shape, alpha));
+                    st.color, animatedReach, st.shape, alpha, detail));
         }
 
         if (prepared.isEmpty()) {
@@ -442,9 +541,9 @@ public final class AuraGroundRenderer {
             float af = fillMul * (float) p.alpha();
             float al = lineMul * (float) p.alpha();
             if (p.shape() == AuraDisplayRegistry.AuraShape.SQUARE) {
-                drawSquare(builder, matrix, p, af, al, now);
+                drawSquare(builder, matrix, p, af, al, now, p.detail());
             } else {
-                drawCircle(builder, matrix, p, af, al, runeRot, now);
+                drawCircle(builder, matrix, p, af, al, runeRot, now, p.detail());
             }
         }
     }
@@ -453,13 +552,19 @@ public final class AuraGroundRenderer {
 
     /**
      * 绘制一个方形光环（填充 + 发光边 + 四角追逐 + 方形涟漪 + 边框彗星）。
+     * <p>
+     * v4 削减：涟漪条数缩减；四角火花与边框彗星按保留阈值整层跳过。
+     * <b>底色填充、三层发光边、四角位置本身完全不削</b>——方形只有 4 条边、4 个角，
+     * 削掉任何一个都不再是「方形」；且三层边加起来才 72 顶点，是精确边界的唯一表达。
+     * </p>
      *
      * @param fillMul 填充呼吸亮度系数
      * @param lineMul 线条呼吸亮度系数
      * @param now     当前时间（tick，墙钟驱动），驱动追逐/涟漪/彗星相位
+     * @param detail  本帧细节系数
      */
     private static void drawSquare(BufferBuilder builder, Matrix4f m, Prepared p,
-                                   float fillMul, float lineMul, float now) {
+                                   float fillMul, float lineMul, float now, float detail) {
         double cx = p.rx(), cy = p.ry(), cz = p.rz();
         double half = p.radius();
         float[] col = unpack(p.color());
@@ -469,9 +574,11 @@ public final class AuraGroundRenderer {
         // 区域底色
         addSquareFill(builder, m, cx, cy, cz, half, r, g, b, SQUARE_FILL_ALPHA * fillMul);
 
-        // 从中心向外扩散的方形涟漪
-        for (int i = 0; i < RIPPLE_COUNT; i++) {
-            float phase = frac(now / RIPPLE_PERIOD_TICKS + (float) i / RIPPLE_COUNT);
+        // 从中心向外扩散的方形涟漪。相位为 i/count 均布的循环波，没有固定方位，
+        // 减条数只表现为「波与波之间隔得更开」，观感自然，无需按步长抽取
+        int rippleCount = VisualLod.scale(RIPPLE_COUNT, detail);
+        for (int i = 0; i < rippleCount; i++) {
+            float phase = frac(now / RIPPLE_PERIOD_TICKS + (float) i / rippleCount);
             double rippleHalf = half * phase;
             if (rippleHalf < 0.3) {
                 continue;
@@ -491,22 +598,26 @@ public final class AuraGroundRenderer {
         addSquareEdges(builder, m, cx, cy, cz, half,
                 -CORE_HALF, CORE_HALF, br, bg, bb, CORE_ALPHA * lineMul, CORE_ALPHA * lineMul);
 
-        // 四角追逐火花：四个角依次明灭
-        double xMin = cx - half, xMax = cx + half;
-        double zMin = cz - half, zMax = cz + half;
-        double[][] corners = {{xMin, zMin}, {xMax, zMin}, {xMax, zMax}, {xMin, zMax}};
-        for (int i = 0; i < 4; i++) {
-            float phase = 0.45f + 0.55f * (0.5f + 0.5f * Mth.sin(now * CORNER_CHASE_SPEED + i * HALF_PI));
-            float a = CORNER_ALPHA * lineMul * phase;
-            addSpark(builder, m, corners[i][0], cy, corners[i][1], CORNER_SIZE, br, bg, bb, a);
+        // 四角追逐火花：四个角依次明灭。纯装饰光点，远处看不出，低细节时整层跳过
+        if (VisualLod.keepLayer(detail, SPARKLE_KEEP_THRESHOLD)) {
+            double xMin = cx - half, xMax = cx + half;
+            double zMin = cz - half, zMax = cz + half;
+            double[][] corners = {{xMin, zMin}, {xMax, zMin}, {xMax, zMax}, {xMin, zMax}};
+            for (int i = 0; i < 4; i++) {
+                float phase = 0.45f + 0.55f * (0.5f + 0.5f * Mth.sin(now * CORNER_CHASE_SPEED + i * HALF_PI));
+                float a = CORNER_ALPHA * lineMul * phase;
+                addSpark(builder, m, corners[i][0], cy, corners[i][1], CORNER_SIZE, br, bg, bb, a);
+            }
         }
 
         // 沿边框巡游的彗星光点
-        for (int i = 0; i < COMET_COUNT; i++) {
-            float t = frac(now / COMET_PERIOD_TICKS + (float) i / COMET_COUNT);
-            double[] off = perimeterPoint(half, t);
-            addSpark(builder, m, cx + off[0], cy, cz + off[1], COMET_SIZE,
-                    br, bg, bb, COMET_ALPHA * lineMul);
+        if (VisualLod.keepLayer(detail, COMET_KEEP_THRESHOLD)) {
+            for (int i = 0; i < COMET_COUNT; i++) {
+                float t = frac(now / COMET_PERIOD_TICKS + (float) i / COMET_COUNT);
+                double[] off = perimeterPoint(half, t);
+                addSpark(builder, m, cx + off[0], cy, cz + off[1], COMET_SIZE,
+                        br, bg, bb, COMET_ALPHA * lineMul);
+            }
         }
     }
 
@@ -587,6 +698,7 @@ public final class AuraGroundRenderer {
 
     /**
      * 在某点绘制一个小菱形光点（四角火花 / 边框彗星共用），中心最亮、四角渐隐。
+     * <p>仅 12 顶点，不参与分段缩放；是否绘制由调用方按保留阈值决定。</p>
      *
      * @param size 半尺寸（格）
      */
@@ -621,36 +733,42 @@ public final class AuraGroundRenderer {
         builder.vertex(m, xMin, y, zMax).color(r, g, b, alpha).endVertex();
     }
 
-    // ==================== 圆形绘制（备用） ====================
+    // ==================== 圆形绘制 ====================
 
     /**
      * 绘制一个圆形光环（径向渐变填充 + 发光主环 + 旋转符文）。
+     * <p>
+     * v4 削减：填充盘与三层主环、涟漪的分段数缩放（<b>占本方法七成顶点，是首要杠杆</b>）；
+     * 涟漪条数缩减；外缘符文刻度按步长抽取（均布角度）；彗星层按保留阈值整层跳过。
+     * </p>
      *
-     * @param now 当前时间（tick，墙钟驱动）
+     * @param now    当前时间（tick，墙钟驱动）
+     * @param detail 本帧细节系数
      */
     private static void drawCircle(BufferBuilder builder, Matrix4f m, Prepared p,
-                                   float fillMul, float lineMul, float runeRot, float now) {
+                                   float fillMul, float lineMul, float runeRot, float now, float detail) {
         double cx = p.rx(), cy = p.ry(), cz = p.rz();
         double radius = p.radius();
         float[] col = unpack(p.color());
         float r = col[0], g = col[1], b = col[2];
         float br = brighten(r), bg = brighten(g), bb = brighten(b);
-        int ringSeg = ringSegments(radius);
+        int ringSeg = ringSegments(radius, detail);
 
         // 径向渐变填充
-        addGradientDisc(builder, m, cx, cy, cz, radius, fillSegments(radius),
+        addGradientDisc(builder, m, cx, cy, cz, radius, fillSegments(radius, detail),
                 r, g, b, CIRCLE_FILL_ALPHA_CENTER * fillMul, CIRCLE_FILL_ALPHA_RIM * fillMul);
 
-        // 从中心向外扩散的圆形涟漪
-        for (int i = 0; i < RIPPLE_COUNT; i++) {
-            float phase = frac(now / RIPPLE_PERIOD_TICKS + (float) i / RIPPLE_COUNT);
+        // 从中心向外扩散的圆形涟漪（相位均布的循环波，减条数只是波间隔变大）
+        int rippleCount = VisualLod.scale(RIPPLE_COUNT, detail);
+        for (int i = 0; i < rippleCount; i++) {
+            float phase = frac(now / RIPPLE_PERIOD_TICKS + (float) i / rippleCount);
             double rr = radius * phase;
             if (rr < 0.3) {
                 continue;
             }
             float a = (1f - phase) * RIPPLE_ALPHA * lineMul;
             addBand(builder, m, cx, cy, cz, rr - RIPPLE_HALF_WIDTH, rr + RIPPLE_HALF_WIDTH,
-                    ringSegments(rr), br, bg, bb, a, a);
+                    ringSegments(rr, detail), br, bg, bb, a, a);
         }
 
         // 外辉光
@@ -669,23 +787,28 @@ public final class AuraGroundRenderer {
             runeCount++;
         }
         addRunes(builder, m, cx, cy, cz, radius + CORE_HALF + 0.05, 0.26, runeCount, runeRot,
-                br, bg, bb, RUNE_ALPHA * lineMul);
+                br, bg, bb, RUNE_ALPHA * lineMul, detail);
 
         // 各光环专属符文母题（取自艾尔登法环原作意象；元素数量固定，不随半径膨胀以控性能）
         drawRuneMotif(builder, m, cx, cy, cz, radius, styleFor(p.serialId()),
-                br, bg, bb, lineMul, now);
+                br, bg, bb, lineMul, now, detail);
 
-        // 沿主环绕行的彗星光点（带渐隐拖尾）
-        for (int i = 0; i < COMET_COUNT; i++) {
-            float base = frac(now / COMET_PERIOD_TICKS + (float) i / COMET_COUNT);
-            for (int t = 0; t < COMET_TRAIL; t++) {
-                float ph = base - t * COMET_TRAIL_STEP;
-                double ang = Math.PI * 2.0 * ph;
-                double px = cx + radius * Math.cos(ang);
-                double pz = cz + radius * Math.sin(ang);
-                float a = COMET_ALPHA * lineMul * (1f - (float) t / COMET_TRAIL);
-                float sz = COMET_SIZE * (1f - 0.18f * t);
-                addSpark(builder, m, px, cy, pz, sz, br, bg, bb, a);
+        // 沿主环绕行的彗星光点（带渐隐拖尾）。纯动效装饰，远处看不出，低细节时整层跳过
+        if (VisualLod.keepLayer(detail, COMET_KEEP_THRESHOLD)) {
+            // 尾点是相位递减序列，截断保留头部（最亮那个），衰减曲线不变
+            int trail = VisualLod.scale(COMET_TRAIL, detail);
+            for (int i = 0; i < COMET_COUNT; i++) {
+                float base = frac(now / COMET_PERIOD_TICKS + (float) i / COMET_COUNT);
+                for (int t = 0; t < trail; t++) {
+                    float ph = base - t * COMET_TRAIL_STEP;
+                    double ang = Math.PI * 2.0 * ph;
+                    double px = cx + radius * Math.cos(ang);
+                    double pz = cz + radius * Math.sin(ang);
+                    // 分母仍用原始 COMET_TRAIL，保证保留尾点的亮度与全细节时逐点一致
+                    float a = COMET_ALPHA * lineMul * (1f - (float) t / COMET_TRAIL);
+                    float sz = COMET_SIZE * (1f - 0.18f * t);
+                    addSpark(builder, m, px, cy, pz, sz, br, bg, bb, a);
+                }
             }
         }
     }
@@ -712,6 +835,9 @@ public final class AuraGroundRenderer {
 
     /**
      * 追加一个圆环带（annulus），内/外边缘可分别指定 alpha。
+     * <p><b>本渲染器的首要顶点杠杆</b>：单次调用即 {@code segments × 6} 顶点，
+     * 而每个圆形光环有三层主环 + 若干涟漪。调用方应传入
+     * {@link #ringSegments(double, float)} 的结果。</p>
      */
     private static void addBand(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
                                 double rInner, double rOuter, int segments,
@@ -740,14 +866,21 @@ public final class AuraGroundRenderer {
 
     /**
      * 追加一圈旋转符文刻度（沿圆周均布的短径向小段）。
+     * <p><b>v4：按细节系数步长抽取</b>——角度是 {@code (TAU × k / count) + rotation} 均布的，
+     * 若截断前 N 条，整圈刻度会只剩一段圆弧、法阵明显「缺一块」。
+     * 步长抽取时角度基准仍用<b>原始 count</b>，保证保留刻度的方位与全细节时完全一致。</p>
+     *
+     * @param detail 本帧细节系数
      */
     private static void addRunes(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
                                  double rStart, double length, int count, float rotation,
-                                 float r, float g, float b, float alpha) {
+                                 float r, float g, float b, float alpha, float detail) {
         float y = (float) cy;
         double rEnd = rStart + length;
         float halfW = 0.03f;
-        for (int k = 0; k < count; k++) {
+        int drawn = VisualLod.scale(count, detail);
+        int step = Math.max(1, count / drawn);
+        for (int k = 0; k < count; k += step) {
             double base = (Math.PI * 2 * k) / count + rotation;
             double aL = base - halfW;
             double aR = base + halfW;
@@ -805,7 +938,7 @@ public final class AuraGroundRenderer {
     }
 
     /**
-     * 圆形填充分段数。
+     * 圆形填充分段数（全细节基准值）。
      * <p><b>保守优化（视觉无损）：</b>系数 3→2、上限 96→48。半径 ≤10 的光环仍取下限 32
      * （与优化前完全一致）；仅 16 格的圣域由 48 段降为 32 段。填充盘是中心→边缘的低 alpha
      * 渐变、无描边线，分段下降几乎不可察。
@@ -815,7 +948,18 @@ public final class AuraGroundRenderer {
     }
 
     /**
-     * 圆形环线分段数。
+     * 带细节层级的圆形填充分段数（v4 新增）。
+     *
+     * @param radius 半径（格）
+     * @param detail 本帧细节系数
+     * @return 缩放后的分段数，下限 {@link #FILL_SEGMENTS_MIN}
+     */
+    private static int fillSegments(double radius, float detail) {
+        return VisualLod.scaleSegments(fillSegments(radius), FILL_SEGMENTS_MIN, detail);
+    }
+
+    /**
+     * 圆形环线分段数（全细节基准值）。
      * <p><b>保守优化（视觉无损）：</b>系数 5→3、上限 110→64。半径 ≤8 的光环仍取下限 48
      * （像素级一致）；仅半径最大的圣域（16 格）由 80 段降为 48 段——其多边形与真圆的最大偏离
      * 约 3.4cm（{@code R(1-cos(180°/48))}），在 32 格直径的发光法阵上肉眼不可见，
@@ -823,6 +967,21 @@ public final class AuraGroundRenderer {
      */
     private static int ringSegments(double radius) {
         return Mth.clamp((int) (radius * 3), 48, 64);
+    }
+
+    /**
+     * 带细节层级的圆形环线分段数（v4 新增）。
+     * <p>
+     * 下限取 {@link #RING_SEGMENTS_MIN}(24)，比实体渲染器的 8~10 高不少——
+     * 多边形与真圆的偏离量正比于半径，而光环半径可达 16 格。
+     * </p>
+     *
+     * @param radius 半径（格）
+     * @param detail 本帧细节系数
+     * @return 缩放后的分段数
+     */
+    private static int ringSegments(double radius, float detail) {
+        return VisualLod.scaleSegments(ringSegments(radius), RING_SEGMENTS_MIN, detail);
     }
 
     // ==================== 专属符文母题（取自艾尔登法环原作意象） ====================
@@ -874,15 +1033,16 @@ public final class AuraGroundRenderer {
      * @param style   样式
      * @param lineMul 呼吸亮度系数
      * @param now     时间（tick，墙钟驱动）
+     * @param detail  本帧细节系数
      */
     private static void drawRuneMotif(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
                                       double radius, RuneStyle style,
-                                      float r, float g, float b, float lineMul, float now) {
+                                      float r, float g, float b, float lineMul, float now, float detail) {
         switch (style) {
-            case CARIAN -> motifCarian(builder, m, cx, cy, cz, radius, r, g, b, lineMul, now);
-            case WARD -> motifWard(builder, m, cx, cy, cz, radius, r, g, b, lineMul, now);
-            case COSMIC -> motifCosmic(builder, m, cx, cy, cz, radius, r, g, b, lineMul, now);
-            case HOLY -> motifHoly(builder, m, cx, cy, cz, radius, r, g, b, lineMul, now);
+            case CARIAN -> motifCarian(builder, m, cx, cy, cz, radius, r, g, b, lineMul, now, detail);
+            case WARD -> motifWard(builder, m, cx, cy, cz, radius, r, g, b, lineMul, now, detail);
+            case COSMIC -> motifCosmic(builder, m, cx, cy, cz, radius, r, g, b, lineMul, now, detail);
+            case HOLY -> motifHoly(builder, m, cx, cy, cz, radius, r, g, b, lineMul, now, detail);
             default -> {
                 // PLAIN：外缘刻度环已表现，无额外母题
             }
@@ -891,9 +1051,12 @@ public final class AuraGroundRenderer {
 
     /**
      * 卡利亚辉石母题：内六边形 + 六芒星（两叠三角）+ 顶点水晶碎光，缓慢顺时针旋转。
+     * <p>v4：六边形与六芒星共 72 顶点却是本光环的唯一辨识依据，<b>完全不削</b>；
+     * 仅 6 颗水晶碎光按保留阈值整层跳过。</p>
      */
     private static void motifCarian(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
-                                    double radius, float r, float g, float b, float lineMul, float now) {
+                                    double radius, float r, float g, float b, float lineMul,
+                                    float now, float detail) {
         double rot = now * 0.012;
         float a = 0.70f * lineMul;
         double hw = Math.max(0.05, radius * 0.012);
@@ -902,28 +1065,35 @@ public final class AuraGroundRenderer {
         // 六芒星（6 顶点，连接步距 2 → 两叠三角）
         addStarPolygon(builder, m, cx, cy, cz, radius * 0.62, 6, 2, rot, hw, r, g, b, a);
         // 顶点水晶碎光
-        for (int i = 0; i < 6; i++) {
-            double ang = rot + Math.PI * 2 * i / 6.0;
-            double px = cx + radius * 0.62 * Math.cos(ang);
-            double pz = cz + radius * 0.62 * Math.sin(ang);
-            addSpark(builder, m, px, cy, pz, (float) (radius * 0.035 + 0.06), r, g, b, a);
+        if (VisualLod.keepLayer(detail, SPARKLE_KEEP_THRESHOLD)) {
+            for (int i = 0; i < 6; i++) {
+                double ang = rot + Math.PI * 2 * i / 6.0;
+                double px = cx + radius * 0.62 * Math.cos(ang);
+                double pz = cz + radius * 0.62 * Math.sin(ang);
+                addSpark(builder, m, px, cy, pz, (float) (radius * 0.035 + 0.06), r, g, b, a);
+            }
         }
     }
 
     /**
      * 托普斯结界母题：双层反向旋转断环 + 径向栅条，构成屏障网格。
+     * <p>v4：两层断环的段数与径向栅条数量均按步长抽取（都是均布角度，截断会让结界网只剩一段圆弧）。</p>
      */
     private static void motifWard(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
-                                  double radius, float r, float g, float b, float lineMul, float now) {
+                                  double radius, float r, float g, float b, float lineMul,
+                                  float now, float detail) {
         double rot = now * 0.020;
         float a = 0.60f * lineMul;
         // 双层反向断环
-        addDashedRing(builder, m, cx, cy, cz, radius * 0.42, radius * 0.50, 10, 0.55, rot, r, g, b, a);
-        addDashedRing(builder, m, cx, cy, cz, radius * 0.62, radius * 0.70, 14, 0.45, -rot * 1.2, r, g, b, a * 0.85f);
-        // 径向栅条
+        addDashedRing(builder, m, cx, cy, cz, radius * 0.42, radius * 0.50, 10, 0.55, rot, r, g, b, a, detail);
+        addDashedRing(builder, m, cx, cy, cz, radius * 0.62, radius * 0.70, 14, 0.45, -rot * 1.2,
+                r, g, b, a * 0.85f, detail);
+        // 径向栅条：均布角度，按步长抽取
         double hw = Math.max(0.05, radius * 0.014);
-        int bars = 12;
-        for (int i = 0; i < bars; i++) {
+        final int bars = 12;
+        int drawnBars = VisualLod.scale(bars, detail);
+        int barStep = Math.max(1, bars / drawnBars);
+        for (int i = 0; i < bars; i += barStep) {
             double ang = rot * 0.5 + Math.PI * 2 * i / bars;
             double ix = cx + radius * 0.50 * Math.cos(ang), iz = cz + radius * 0.50 * Math.sin(ang);
             double ox = cx + radius * 0.62 * Math.cos(ang), oz = cz + radius * 0.62 * Math.sin(ang);
@@ -933,37 +1103,48 @@ public final class AuraGroundRenderer {
 
     /**
      * 塞乐恩宇宙母题：放射光线（长短交替、尖端渐隐，缓慢逆旋）+ 闪烁星空。
+     * <p>v4：放射光线按步长抽取（均布角度）；星屑数量缩减
+     * （黄金角螺旋的前 N 个本身即均匀铺满，截断安全）。</p>
      */
     private static void motifCosmic(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
-                                    double radius, float r, float g, float b, float lineMul, float now) {
+                                    double radius, float r, float g, float b, float lineMul,
+                                    float now, float detail) {
         double rot = -now * 0.010;
         float a = 0.60f * lineMul;
         double hw = Math.max(0.04, radius * 0.010);
-        addRays(builder, m, cx, cy, cz, radius * 0.12, radius * 0.70, radius * 0.45, 12, rot, hw, r, g, b, a);
+        addRays(builder, m, cx, cy, cz, radius * 0.12, radius * 0.70, radius * 0.45, 12, rot, hw,
+                r, g, b, a, detail);
         addStarField(builder, m, cx, cy, cz, radius * 0.80, 14, now, (float) (radius * 0.025 + 0.05),
-                r, g, b, 0.85f * lineMul);
+                r, g, b, 0.85f * lineMul, detail);
     }
 
     /**
      * 黄金树圣域母题：长短交替金色光芒（缓慢顺旋）+ 中央十字圣徽 + 芒尖金光，整体随圣光脉动。
+     * <p>v4：16 条光芒按步长抽取（均布，且长短交替——步长为偶数时会全取到长芒，
+     * 故步长强制取奇数以保留长短交替的节奏）；<b>中央十字圣徽只有 12 顶点却是圣域的核心标志，
+     * 完全不削</b>；8 个芒尖金光按保留阈值整层跳过。</p>
      */
     private static void motifHoly(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
-                                  double radius, float r, float g, float b, float lineMul, float now) {
+                                  double radius, float r, float g, float b, float lineMul,
+                                  float now, float detail) {
         double rot = now * 0.008;
         float pulse = 0.55f + 0.45f * (0.5f + 0.5f * Mth.sin(now * 0.06f));
         float a = 0.75f * lineMul * pulse;
         double hw = Math.max(0.05, radius * 0.013);
         // 长短交替金色光芒
-        addRays(builder, m, cx, cy, cz, radius * 0.18, radius * 0.72, radius * 0.50, 16, rot, hw, r, g, b, a);
-        // 中央十字圣徽
+        addRays(builder, m, cx, cy, cz, radius * 0.18, radius * 0.72, radius * 0.50, 16, rot, hw,
+                r, g, b, a, detail);
+        // 中央十字圣徽：仅 12 顶点，是圣域的核心标志，不参与削减
         double cl = radius * 0.30;
         addLine(builder, m, cx - cl, cz, cx + cl, cz, cy, hw * 1.4, r, g, b, a, a);
         addLine(builder, m, cx, cz - cl, cx, cz + cl, cy, hw * 1.4, r, g, b, a, a);
         // 芒尖金光（取偶数光芒尖端）
-        for (int i = 0; i < 16; i += 2) {
-            double ang = rot + Math.PI * 2 * i / 16.0;
-            double px = cx + radius * 0.72 * Math.cos(ang), pz = cz + radius * 0.72 * Math.sin(ang);
-            addSpark(builder, m, px, cy, pz, (float) (radius * 0.025 + 0.05), r, g, b, a);
+        if (VisualLod.keepLayer(detail, SPARKLE_KEEP_THRESHOLD)) {
+            for (int i = 0; i < 16; i += 2) {
+                double ang = rot + Math.PI * 2 * i / 16.0;
+                double px = cx + radius * 0.72 * Math.cos(ang), pz = cz + radius * 0.72 * Math.sin(ang);
+                addSpark(builder, m, px, cy, pz, (float) (radius * 0.025 + 0.05), r, g, b, a);
+            }
         }
     }
 
@@ -1002,6 +1183,7 @@ public final class AuraGroundRenderer {
 
     /**
      * 绘制一个正多边形外框（N 条边首尾相连）。
+     * <p>边数很少（6），共 36 顶点，是母题的辨识核心，<b>不参与 LOD 削减</b>。</p>
      *
      * @param sides    边数
      * @param rotation 旋转角（弧度）
@@ -1025,6 +1207,7 @@ public final class AuraGroundRenderer {
 
     /**
      * 绘制星形多边形：把 points 个顶点按步距 step 互连（如 points=6,step=2 即六芒星两叠三角）。
+     * <p>共 36 顶点，是母题的辨识核心，<b>不参与 LOD 削减</b>。</p>
      *
      * @param hw 线半宽
      */
@@ -1042,13 +1225,26 @@ public final class AuraGroundRenderer {
 
     /**
      * 绘制放射光线：count 条由内向外的径向线，偶/奇数交替使用 rOuter / rOuterAlt，尖端 alpha 渐隐。
+     * <p>
+     * <b>v4：按细节系数步长抽取，且步长强制取奇数。</b>角度是 {@code rotation + TAU × i / count}
+     * 均布的，截断会让光芒只朝一侧喷；而步长若取偶数，{@code i % 2} 会恒为同一值，
+     * <b>长短交替的节奏会退化成全长或全短</b>——圣域母题正是靠这个交替来表现「圣光芒」的，
+     * 故这里额外把步长调整为奇数。
+     * </p>
      *
-     * @param hw 线半宽
+     * @param hw     线半宽
+     * @param detail 本帧细节系数
      */
     private static void addRays(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
                                 double rInner, double rOuter, double rOuterAlt, int count, double rotation,
-                                double hw, float r, float g, float b, float alpha) {
-        for (int i = 0; i < count; i++) {
+                                double hw, float r, float g, float b, float alpha, float detail) {
+        int drawn = VisualLod.scale(count, detail);
+        int step = Math.max(1, count / drawn);
+        // 步长取偶数会让 i % 2 恒定、长短交替消失，故强制调整为奇数
+        if (step > 1 && (step & 1) == 0) {
+            step--;
+        }
+        for (int i = 0; i < count; i += step) {
             double ang = rotation + (Math.PI * 2 * i) / count;
             double ro = (i % 2 == 0) ? rOuter : rOuterAlt;
             double ix = cx + rInner * Math.cos(ang), iz = cz + rInner * Math.sin(ang);
@@ -1059,16 +1255,21 @@ public final class AuraGroundRenderer {
 
     /**
      * 绘制断环（虚线圆环）：dashes 段弧，每段占该格 fillRatio 比例，其余留空。
+     * <p><b>v4：段数按细节系数步长抽取</b>（均布角度）。每段内部的细分 {@code sub} 本就只有 2，
+     * 不再缩减——降到 1 会让弧退化成直线弦、断环变成折线碎片。</p>
      *
      * @param fillRatio 每段实心占比（0~1）
      * @param rotation  旋转角（弧度）
+     * @param detail    本帧细节系数
      */
     private static void addDashedRing(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
                                       double rInner, double rOuter, int dashes, double fillRatio, double rotation,
-                                      float r, float g, float b, float alpha) {
-        final int sub = 2; // 每段弧细分（控性能）
+                                      float r, float g, float b, float alpha, float detail) {
+        final int sub = 2; // 每段弧细分（控性能；本就是 2，不再缩减）
         float yf = (float) cy;
-        for (int i = 0; i < dashes; i++) {
+        int drawn = VisualLod.scale(dashes, detail);
+        int step = Math.max(1, dashes / drawn);
+        for (int i = 0; i < dashes; i += step) {
             double a0 = rotation + (Math.PI * 2 * i) / dashes;
             double a1 = a0 + (Math.PI * 2 / dashes) * fillRatio;
             double prevOx = 0, prevOz = 0, prevIx = 0, prevIz = 0;
@@ -1095,14 +1296,21 @@ public final class AuraGroundRenderer {
 
     /**
      * 绘制闪烁星空：count 个确定性分布的小星点（黄金角排布，半径错落），各自正弦闪烁。
+     * <p>
+     * <b>v4：按细节系数直接减数量（截断尾部）。</b>分布用黄金角螺旋
+     * （{@code ang = i × 2.399963}）+ 黄金比小数半径，<b>前 N 个本身即均匀铺满整个圆面</b>，
+     * 这是黄金角螺旋的固有性质，故截断安全、不会出现「只剩中心一撮」的塌陷。
+     * </p>
      *
      * @param size      星点半尺寸（格）
      * @param baseAlpha 基础亮度（再乘以闪烁系数）
+     * @param detail    本帧细节系数
      */
     private static void addStarField(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
                                      double radius, int count, float now, float size,
-                                     float r, float g, float b, float baseAlpha) {
-        for (int i = 0; i < count; i++) {
+                                     float r, float g, float b, float baseAlpha, float detail) {
+        int drawn = VisualLod.scale(count, detail);
+        for (int i = 0; i < drawn; i++) {
             // 确定性伪随机：黄金角铺角度，黄金比小数铺半径，分布均匀且稳定
             double ang = i * 2.399963;
             double frac = (i * 0.6180339) - Math.floor(i * 0.6180339);

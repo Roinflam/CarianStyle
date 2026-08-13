@@ -84,7 +84,55 @@ import java.util.List;
  *         破坏「星形向外裂开」的一体感，故按步长抽取保持对称。</li>
  * </ul>
  *
+ * <h3>v8（堆分配，视觉逐位一致）：颜色数组零分配化</h3>
+ * <p>
+ * v7 解决了顶点量，但本渲染器还剩一处纯浪费：旧实现的 {@code unpack(color)}
+ * <b>每次调用都 {@code new float[3]}</b>。逐处清点：
+ * </p>
+ * <pre>
+ * 冷蒸汽（18 丝 × 1 次 lerpRgb→unpack）      18
+ * 冰雾（9 团 × 1 次 lerpRgb→unpack）           9
+ * 地面裂纹（8 条，line() 内部各 unpack 一次）  8
+ * 冰晶星（white / blue 各解包一次）             2
+ * 霜地圆盘（lerpRgb→unpack）                    1
+ * ──────────────────────────────────────────
+ * 合计                     ~38 次 new float[3] / 实体 / 帧
+ * </pre>
+ * <p>
+ * 单看不多，但<b>冻伤是全模组最容易「一大片实体同时带上」的效果</b>——
+ * 亚杜拉的月光剑一次挥砍就给目标周围一圈敌人各加一层，星律在夜间更是受击就叠。
+ * 15 个冻伤实体 × 60fps ≈ <b>每秒 3.4 万次</b>朝生夕死的小数组分配，
+ * 而这恰恰发生在群战、客户端最需要帧率的时候。
+ * </p>
+ * <p>
+ * 现改为两条路径（工具见 {@link VisualColor}）：
+ * </p>
+ * <ol>
+ *     <li><b>三个主题色类加载时预解包一次</b>（{@code C_} 前缀常量），此后永久复用；</li>
+ *     <li><b>动态插值色写入复用缓冲</b>——{@link #SCRATCH}。</li>
+ * </ol>
+ * <p>
+ * <b>为什么本渲染器只需要一个缓冲：</b>雾团、蒸汽、霜地圆盘的颜色都是
+ * 「算出来紧接着就被一次绘制调用消费掉」，任一时刻只有一个动态色存活。
+ * 需要<b>两个动态色同时存活</b>的场景（螺旋、刀痕那种两端异色的渐变线段）才必须用双缓冲——
+ * 本渲染器的 {@link #lineF} 虽然接受两端 alpha，但<b>两端共用同一个颜色数组</b>，不受影响。
+ * </p>
+ * <p>
+ * <b>顺带清理：</b>原先的 {@code line(..., int col, ...)} 包装方法只有一处调用（地面裂纹），
+ * 且传的恒是常量 {@link #ICE_WHITE}，其存在的唯一意义就是内部替调用方 {@code unpack} 一次。
+ * 现直接调 {@link #lineF} 并传只读常量，该包装方法予以删除。
+ * {@code lerpRgb} 与 {@code unpack} 同样已无调用点，一并删除，
+ * 避免后续有人误用而重新引入分配。
+ * </p>
+ * <p>
+ * <b>视觉逐位一致：</b>{@link VisualColor#lerpInto} 保留了旧 {@code lerpRgb} 在 0~255 整数域
+ * 插值并 {@link Math#round} 取整的行为，{@link VisualColor#constant} 与旧 {@code unpack}
+ * 是同一个 {@code /255f} 公式，因此输出的每个颜色分量与 v7 完全相同——
+ * 不是「肉眼看不出」而是「数值相等」。
+ * </p>
+ *
  * @author FlameForge
+ * @version 8
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -118,6 +166,34 @@ public final class FrostbiteMistRenderer {
     private static final int ICE_WHITE = 0xEAF6FF;
     private static final int ICE_BLUE = 0x8FD4FF;
     private static final int ICE_DEEP = 0x2E5C82;
+
+    // ===== v8：预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
+    // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
+    // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
+    //
+    // 注意：ICE_DEEP 只作为 lerpInto 的插值端点（以 int 传入）出现、从不单独使用，
+    // 故没有对应的 C_ 常量——预解包它反而会变成未被引用的字段。
+    /** 冰白（八角星 / 裂纹 / 中心闪光） */
+    private static final float[] C_ICE_WHITE = VisualColor.constant(ICE_WHITE);
+    /** 冰蓝（内六边形轮廓） */
+    private static final float[] C_ICE_BLUE = VisualColor.constant(ICE_BLUE);
+
+    /**
+     * v8：动态插值色的复用缓冲（⚠ 写入后必须立即消费，不可跨调用留存）。
+     * <p>
+     * 用于霜地圆盘、冰雾雾团、冷蒸汽这三处随时间 / 逐元素变化的颜色。
+     * 三者不会同时活跃（{@link #drawFrostedGround} / {@link #drawFrostFog} /
+     * {@link #drawColdVapor} 是顺序调用、互不嵌套），且各自都是
+     * 「写入 → 紧接着被一次绘制调用消费」，故一个缓冲即可。
+     * </p>
+     * <p>
+     * <b>若将来新增「两个动态色需要同时存活」的元素</b>（典型如两端异色的渐变线段），
+     * 必须再加一个独立缓冲，不能复用本字段——否则后写的会覆盖先写的。
+     * </p>
+     * <p>仅渲染线程访问，无并发问题。</p>
+     */
+    private static final float[] SCRATCH = new float[VisualColor.RGB];
 
     // ===== 冰晶星（主视觉，含周期性脉冲）=====
     private static final float ICE_STAR_ROT_SPEED = 0.15f;
@@ -270,6 +346,7 @@ public final class FrostbiteMistRenderer {
      * 是本渲染器顶点性价比最高的元素；只把脉冲峰值那一下的中心闪光圆盘按细节缩分段
      * （那是锦上添花的柔光，不影响星形轮廓）。
      * </p>
+     * <p>v8：两个配色改用只读常量，本方法零分配。</p>
      */
     private static void drawIceCrystalStar(BufferBuilder b, Matrix4f m,
                                            float cx, float cy, float cz, float width,
@@ -285,8 +362,8 @@ public final class FrostbiteMistRenderer {
         float radius = width * ICE_STAR_RADIUS_FACTOR * (1f + 0.18f * pulseBoost);
         float hw = Math.max(0.03f, width * 0.018f) * (1f + 0.3f * pulseBoost);
         float alphaMul = breath * (1f + 0.5f * pulseBoost);
-        float[] white = unpack(ICE_WHITE);
-        float[] blue = unpack(ICE_BLUE);
+        final float[] white = C_ICE_WHITE;
+        final float[] blue = C_ICE_BLUE;
 
         // 八角星（点数8、步距3，两叠三角效果，即"雪花"轮廓）
         starPolygon(b, m, cx, cz, cy, radius, 8, 3, rot, hw, white, ICE_STAR_ALPHA * alphaMul);
@@ -311,16 +388,24 @@ public final class FrostbiteMistRenderer {
      * 且刻意与冰晶星的八个尖角对齐——截断前 N 条会让一半尖角失去延伸出去的裂纹、
      * 破坏「星形向外裂开」的一体感，故必须按步长抽取以保持对称。
      * </p>
+     * <p>
+     * v8：圆盘颜色写入 {@link #SCRATCH} 后立即被 {@link #drawDisc} 消费；
+     * 裂纹的颜色恒为常量 {@link #C_ICE_WHITE}，故不再走原先那个「内部替调用方 unpack 一次」
+     * 的 {@code line(int col)} 包装（该方法已删除），直接调 {@link #lineF}。
+     * 二者时序上先后不重叠，共用一个缓冲安全。
+     * </p>
      */
     private static void drawFrostedGround(BufferBuilder b, Matrix4f m,
                                           float cx, float cy, float cz, float width,
                                           float time, int seedId, float detail) {
         float breath = 0.88f + 0.12f * Mth.sin(time * 1.0f + seedId * 0.5f);
         float radius = width * GROUND_RADIUS_FACTOR * breath;
-        int col = lerpRgb(ICE_DEEP, ICE_BLUE, 0.5f + 0.5f * Mth.sin(time * 0.9f + seedId));
-        float[] c = unpack(col);
+        // v8：无分配插值（0~255 域取整，与旧 lerpRgb → unpack 链路逐位一致）
+        VisualColor.lerpInto(SCRATCH, ICE_DEEP, ICE_BLUE,
+                0.5f + 0.5f * Mth.sin(time * 0.9f + seedId));
         int segments = VisualLod.scaleSegments(GROUND_SEGMENTS, GROUND_SEGMENTS_MIN, detail);
-        drawDisc(b, m, cx, cy, cz, radius, segments, c[0], c[1], c[2], GROUND_ALPHA * breath);
+        drawDisc(b, m, cx, cy, cz, radius, segments,
+                SCRATCH[0], SCRATCH[1], SCRATCH[2], GROUND_ALPHA * breath);
 
         // 裂纹从星尖方向延伸出去，与冰晶星共用同一旋转相位
         float rot = time * ICE_STAR_ROT_SPEED + seedId * 0.3f;
@@ -340,7 +425,8 @@ public final class FrostbiteMistRenderer {
             float iz = cz + (float) Math.sin(ang) * innerR;
             float ox = cx + (float) Math.cos(ang) * len;
             float oz = cz + (float) Math.sin(ang) * len;
-            line(b, m, ix, iz, ox, oz, cy, CRACK_HALF_WIDTH, ICE_WHITE, CRACK_ALPHA * flick, 0f);
+            // v8：裂纹恒为冰白常量，直接传只读数组，不再经由 unpack
+            lineF(b, m, ix, iz, ox, oz, cy, CRACK_HALF_WIDTH, C_ICE_WHITE, CRACK_ALPHA * flick, 0f);
         }
     }
 
@@ -351,6 +437,7 @@ public final class FrostbiteMistRenderer {
      * <b>v7：数量与分段数按细节系数缩放。</b>雾块位置由 {@code seedFor(entityId, i + 900)} 决定，
      * 截断尾部时保留元素的漂移轨迹完全不变。
      * </p>
+     * <p>v8：每团的颜色写入 {@link #SCRATCH} 后立即被 {@link #emitVaporWisp} 消费，零分配。</p>
      */
     private static void drawFrostFog(BufferBuilder b, Matrix4f m,
                                      float cx, float cyFoot, float cz, float width, float height,
@@ -385,11 +472,13 @@ public final class FrostbiteMistRenderer {
             float alpha = FOG_BASE_ALPHA * pulse;
             float size = width * FOG_SIZE_FACTOR * sizeRand;
 
-            int col = lerpRgb(ICE_BLUE, ICE_WHITE, 0.5f + 0.5f * Mth.sin(time * 0.5f + i));
-            float[] c = unpack(col);
+            // v8：无分配插值，写入复用缓冲后立即消费
+            VisualColor.lerpInto(SCRATCH, ICE_BLUE, ICE_WHITE,
+                    0.5f + 0.5f * Mth.sin(time * 0.5f + i));
 
             // 复用蒸汽丝的 billboard 几何，sizeH=sizeV 即退化为正圆雾块
-            emitVaporWisp(b, m, px, py, pz, size, size, c[0], c[1], c[2], alpha,
+            emitVaporWisp(b, m, px, py, pz, size, size,
+                    SCRATCH[0], SCRATCH[1], SCRATCH[2], alpha,
                     rightX, rightY, rightZ, upX, upY, upZ, segments);
         }
     }
@@ -400,6 +489,10 @@ public final class FrostbiteMistRenderer {
      * <p>
      * <b>v7：数量与分段数按细节系数缩放；整层由调用方按 {@link #VAPOR_KEEP_THRESHOLD} 决定是否绘制。</b>
      * 蒸汽位置由 {@code seedFor(entityId, i + 400)} 决定，截断尾部安全。
+     * </p>
+     * <p>
+     * v8：每丝的颜色写入 {@link #SCRATCH} 后立即被 {@link #emitVaporWisp} 消费，零分配。
+     * 本方法是本渲染器分配最密集的一处（18 次 / 实体 / 帧）。
      * </p>
      */
     private static void drawColdVapor(BufferBuilder b, Matrix4f m,
@@ -454,13 +547,14 @@ public final class FrostbiteMistRenderer {
                 continue;
             }
 
-            int col = lerpRgb(ICE_BLUE, ICE_WHITE, 0.3f + 0.4f * t);
-            float[] c = unpack(col);
+            // v8：无分配插值，写入复用缓冲后立即消费
+            VisualColor.lerpInto(SCRATCH, ICE_BLUE, ICE_WHITE, 0.3f + 0.4f * t);
             float sizeH = 0.06f * sizeRand;
             // 越往上拉得越长，模拟蒸汽消散拉丝的观感
             float sizeV = 0.13f * sizeRand * (1f + 0.4f * t);
 
-            emitVaporWisp(b, m, px, py, pz, sizeH, sizeV, c[0], c[1], c[2], alpha,
+            emitVaporWisp(b, m, px, py, pz, sizeH, sizeV,
+                    SCRATCH[0], SCRATCH[1], SCRATCH[2], alpha,
                     rightX, rightY, rightZ, upX, upY, upZ, segments);
         }
     }
@@ -513,13 +607,17 @@ public final class FrostbiteMistRenderer {
         }
     }
 
-    private static void line(BufferBuilder b, Matrix4f m,
-                             float x1, float z1, float x2, float z2, float y,
-                             float hw, int col, float a1, float a2) {
-        lineF(b, m, x1, z1, x2, z2, y, hw, unpack(col), a1, a2);
-    }
-
-    /** 两端 alpha 可分别指定的线段（浮点颜色版，供裂纹、冰花等直接传入解析好的 float[] 颜色）。 */
+    /**
+     * 两端 alpha 可分别指定的线段（浮点颜色版）。
+     * <p>
+     * <b>注意：</b>两端<b>共用同一个颜色数组</b>，只有 alpha 不同——
+     * 这正是本渲染器只需一个 {@link #SCRATCH} 缓冲、无须像螺旋 / 刀痕那样做双缓冲的原因。
+     * </p>
+     * <p>
+     * v8：原先还有一个 {@code line(..., int col, ...)} 包装方法，内部替调用方 {@code unpack} 一次；
+     * 由于其唯一调用点（地面裂纹）传的恒是常量，该包装已删除，调用方直接传只读数组。
+     * </p>
+     */
     private static void lineF(BufferBuilder b, Matrix4f m,
                               float x1, float z1, float x2, float z2, float y,
                               float hw, float[] c, float a1, float a2) {
@@ -596,31 +694,14 @@ public final class FrostbiteMistRenderer {
         return ((s >>> 40) & 0xFFFFFFL) / (float) 0x1000000;
     }
 
-    // ==================== 数学 / 颜色辅助 ====================
+    // ==================== 数学辅助 ====================
+    // v8 说明：原先的 lerpRgb(int, int, float) 与 unpack(int) 已删除——
+    // 二者是本类此前唯一的堆分配来源（unpack 每次 new float[3]），
+    // 现全部由 VisualColor 的 constant() / lerpInto() 取代。
+    // 若后续新增元素需要动态配色，请一律走 VisualColor.lerpInto(dst, from, to, t) + 复用缓冲，
+    // 不要重新引入返回新数组的写法。
 
     private static float frac(float x) {
         return x - (float) Math.floor(x);
-    }
-
-    private static int lerpRgb(int from, int to, float t) {
-        if (t < 0f) {
-            t = 0f;
-        } else if (t > 1f) {
-            t = 1f;
-        }
-        int fr = (from >> 16) & 0xFF, fg = (from >> 8) & 0xFF, fb = from & 0xFF;
-        int tr = (to >> 16) & 0xFF, tg = (to >> 8) & 0xFF, tb = to & 0xFF;
-        int r = Math.round(fr + (tr - fr) * t);
-        int g = Math.round(fg + (tg - fg) * t);
-        int bl = Math.round(fb + (tb - fb) * t);
-        return (r << 16) | (g << 8) | bl;
-    }
-
-    private static float[] unpack(int color) {
-        return new float[]{
-                ((color >> 16) & 0xFF) / 255f,
-                ((color >> 8) & 0xFF) / 255f,
-                (color & 0xFF) / 255f
-        };
     }
 }

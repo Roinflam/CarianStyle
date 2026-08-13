@@ -90,7 +90,51 @@ import java.util.List;
  * 根须的二级支根）——这些在远处本就看不出，却占着不小的顶点量。
  * </p>
  *
+ * <h3>v9（堆分配，视觉逐位一致）：颜色数组零分配化</h3>
+ * <p>
+ * v8 把顶点量压下去了，但还剩一处纯浪费：旧实现的 {@code unpack(color)}
+ * <b>每次调用都 {@code new float[3]}</b>。三重祝福满配时本渲染器的调用密度：
+ * </p>
+ * <pre>
+ * 上升金叶（最多 21 片 × 1 次 unpack）        21
+ * 飘落金叶（最多 14 片 × 1 次 unpack）        14
+ * 脚下光晕（主题色 + 深金各一次）              2
+ * 胸口光辉（主题色 + 纯白各一次）              2
+ * 根须 / 符文环 / 十字圣徽（各一次）            3
+ * 立誓光核 / 庇护护盾 / 星芒 / 神圣脉冲         4
+ * ──────────────────────────────────────────
+ * 合计                   ~46 次 new float[3] / 实体 / 帧
+ * </pre>
+ * <p>
+ * 单看不多，但这三个祝福的触发条件是「攻击或被攻击」——团战里几乎人人都挂着。
+ * 10 人混战 × 60fps 即<b>每秒 2.8 万次</b>朝生夕死的小数组分配，
+ * 而它们的生命周期短到活不过一次 minor GC 的间隔，纯粹是在给分配器添堵。
+ * </p>
+ * <p>
+ * 现改为两条路径（工具见 {@link VisualColor}）：
+ * </p>
+ * <ol>
+ *     <li><b>三个纯常量色类加载时预解包一次</b>（{@code C_} 前缀），此后永久复用。
+ *         注意 {@link #HOLY_GOLD} <b>没有</b>对应的 {@code C_} 常量——它从不单独使用，
+ *         永远是作为 {@link #lerpRgb} / {@link VisualColor#lerpInto} 的插值起点出现的；</li>
+ *     <li><b>动态插值色写入复用缓冲</b>——{@link #SCRATCH}。</li>
+ * </ol>
+ * <p>
+ * <b>为什么这里一个缓冲就够（与 {@code SleepRenderer} / {@code IncisionRenderer} 不同）：</b>
+ * 那两个渲染器的螺旋与刀痕需要<b>同时</b>持有线段两端的两个<b>不同的动态色</b>，
+ * 故必须用双缓冲滚动交换。本渲染器则没有这种场景——{@link #lineF} 虽然接受两端 alpha，
+ * 但两端<b>共用同一个颜色数组</b>；其余每处都是「算一个色 → 立刻画完 → 不再用」。
+ * 唯一需要留意的是 {@link #drawRootVeins}：主题色写入 {@link #SCRATCH} 后要横跨整个根须循环，
+ * 期间 {@link #drawRootBranch}（含递归支根）只读不写，因此安全。
+ * </p>
+ * <p>
+ * <b>视觉逐位一致：</b>{@link VisualColor#lerpInto} 保留了旧 {@code lerpRgb → unpack} 链路
+ * 在 0~255 整数域插值并 {@link Math#round} 取整的行为，输出的每个颜色分量与 v8 完全相同——
+ * 不是「肉眼看不出」而是「数值相等」。
+ * </p>
+ *
  * @author FlameForge
+ * @version 9
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -126,6 +170,37 @@ public final class GoldenTreeBlessingRenderer {
     private static final int HOLY_DEEP = 0xB8791A;
     /** 庇护护盾专用冷白色，与主体金色区分 */
     private static final int HOLY_SHIELD = 0xF2F7FF;
+
+    // ===== v9：预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
+    // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
+    // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
+    //
+    // 注意：HOLY_GOLD 没有对应的 C_ 常量。它从不单独使用，永远是作为插值起点
+    // （lerpRgb / VisualColor.lerpInto 的 from 参数）出现的，那两个方法接收的是 int 而非 float[]。
+    /** 神圣白（符文环 / 十字圣徽 / 立誓光核 / 星芒 / 神圣脉冲 / 胸口核心高光） */
+    private static final float[] C_HOLY_WHITE = VisualColor.constant(HOLY_WHITE);
+    /** 深金（脚下光晕的内层暗盘） */
+    private static final float[] C_HOLY_DEEP = VisualColor.constant(HOLY_DEEP);
+    /** 护盾冷白（庇护双环专用，与主体金色区分） */
+    private static final float[] C_HOLY_SHIELD = VisualColor.constant(HOLY_SHIELD);
+
+    /**
+     * v9：动态插值色的复用缓冲（⚠ 写入后必须立即消费，不可跨调用留存）。
+     * <p>
+     * 用于全部随 {@code activeCount} / 时间变化的主题色：脚下光晕主色、根须主色、
+     * 胸口光辉主色、上升金叶逐片色、飘落金叶逐片色。这些不会同时活跃
+     * （各 draw 方法顺序调用、互不嵌套），故<b>一个缓冲即可</b>——
+     * 本渲染器没有「两个动态色同时存活」的场景，详见类注释「为什么这里一个缓冲就够」。
+     * </p>
+     * <p>
+     * <b>唯一需要留意的是 {@link #drawRootVeins}</b>：主题色写入后要横跨整个根须循环，
+     * 期间 {@link #drawRootBranch}（含递归支根）只读不写，因此安全。
+     * 若将来在该循环内新增任何写 {@link #SCRATCH} 的逻辑，必须改用双缓冲。
+     * </p>
+     * <p>仅渲染线程访问，无并发问题。</p>
+     */
+    private static final float[] SCRATCH = new float[VisualColor.RGB];
 
     // ===== 脚下金色光晕 =====
     private static final int HALO_SEGMENTS = 28;
@@ -339,6 +414,8 @@ public final class GoldenTreeBlessingRenderer {
      * 脚下金色光晕：径向渐变圆盘（两层），缓慢呼吸。半径/透明度随 {@code activeCount} 小幅放大，
      * 主题色随 {@code activeCount} 从纯金向纯白过渡（象征祝福纯度更高）。
      * <p>v8：分段数按细节系数缩放（下限 {@link #HALO_SEGMENTS_MIN}）。</p>
+     * <p>v9：主题色写入 {@link #SCRATCH} 后立即被首个 {@code drawDisc} 消费；
+     * 内层暗盘直接用只读常量 {@link #C_HOLY_DEEP}，两者不冲突。</p>
      */
     private static void drawGoldenHalo(BufferBuilder b, Matrix4f m,
                                        float cx, float cy, float cz, float width,
@@ -350,13 +427,12 @@ public final class GoldenTreeBlessingRenderer {
 
         int segments = VisualLod.scaleSegments(HALO_SEGMENTS, HALO_SEGMENTS_MIN, detail);
 
-        int primary = lerpRgb(HOLY_GOLD, HOLY_WHITE, purityFactor(activeCount));
-        float[] gold = unpack(primary);
-        drawDisc(b, m, cx, cy, cz, radius, segments, gold[0], gold[1], gold[2],
+        // v9：无分配插值（0~255 域取整，与旧 lerpRgb → unpack 链路逐位一致）
+        VisualColor.lerpInto(SCRATCH, HOLY_GOLD, HOLY_WHITE, purityFactor(activeCount));
+        drawDisc(b, m, cx, cy, cz, radius, segments, SCRATCH[0], SCRATCH[1], SCRATCH[2],
                 clamp01(HALO_BASE_ALPHA * stackAlphaMul));
 
-        float[] deep = unpack(HOLY_DEEP);
-        drawDisc(b, m, cx, cy, cz, radius * 0.55f, segments, deep[0], deep[1], deep[2],
+        drawDisc(b, m, cx, cy, cz, radius * 0.55f, segments, C_HOLY_DEEP[0], C_HOLY_DEEP[1], C_HOLY_DEEP[2],
                 clamp01(HALO_BASE_ALPHA * stackAlphaMul * 0.55f));
     }
 
@@ -369,6 +445,11 @@ public final class GoldenTreeBlessingRenderer {
      * 若只画前 N 条会全部挤在同一侧；步长抽取则保留元素的方位不变、且始终铺满整圈。
      * 折线段数按细节缩放，低细节时不再画二级支根。
      * </p>
+     * <p>
+     * <b>v9：主题色写入 {@link #SCRATCH} 后横跨整个根须循环。</b>
+     * 这是本渲染器唯一「缓冲需要长期存活」的地方——{@link #drawRootBranch}（含递归支根）
+     * 只读不写，因此安全。若将来在该循环内新增任何写 {@link #SCRATCH} 的逻辑，必须改用双缓冲。
+     * </p>
      */
     private static void drawRootVeins(BufferBuilder b, Matrix4f m,
                                       float cx, float cy, float cz, float width,
@@ -378,8 +459,8 @@ public final class GoldenTreeBlessingRenderer {
         float alpha = clamp01((ROOT_BASE_ALPHA + (activeCount - 1) * ROOT_STACK_ALPHA_STEP)
                 * (0.75f + 0.25f * Mth.sin(time * 0.7f + seedId)));
         float hw = Math.max(0.02f, width * 0.012f);
-        int primary = lerpRgb(HOLY_GOLD, HOLY_WHITE, purityFactor(activeCount));
-        float[] gold = unpack(primary);
+        // v9：无分配插值。SCRATCH 在下方整个循环期间保持有效（循环内只读不写）
+        VisualColor.lerpInto(SCRATCH, HOLY_GOLD, HOLY_WHITE, purityFactor(activeCount));
 
         // ⭐ v8：均布角度必须按步长抽取，不能截断前 N 条（详见类注释）
         int drawnCount = VisualLod.scale(mainCount, detail);
@@ -394,13 +475,15 @@ public final class GoldenTreeBlessingRenderer {
             long s = seedFor(seedId, i + 2000);
             float baseAngle = i * (TAU / mainCount) + rngFloat(s) * 0.4f;
             s = rngNext(s);
-            drawRootBranch(b, m, cx, cz, cy, baseAngle, maxLen, depth, hw, gold, alpha, s, rootSegments);
+            drawRootBranch(b, m, cx, cz, cy, baseAngle, maxLen, depth, hw, SCRATCH, alpha, s, rootSegments);
         }
     }
 
     /**
      * 绘制一条根须（主干为带轻微随机弯曲的折线，中段可能分出一条更细更暗的支根）。
      * 支根通过 {@code depth} 控制最多递归一层，避免顶点数失控。
+     * <p><b>本方法及其递归调用只读取 {@code col}，绝不写入</b>——
+     * 调用方传入的是 {@link #SCRATCH}，写入会破坏尚未画完的根须。</p>
      *
      * @param segments 本条根须的折线段数（由调用方按细节系数缩放后传入）
      */
@@ -436,6 +519,7 @@ public final class GoldenTreeBlessingRenderer {
     /**
      * 脚下缓慢旋转的金色符文刻度环，转速与亮度随 {@code activeCount} 小幅提升。
      * <p>v8：刻度按步长抽取（均布角度，不能截断）。</p>
+     * <p>v9：改用只读常量 {@link #C_HOLY_WHITE}，零分配。</p>
      */
     private static void drawRuneRing(BufferBuilder b, Matrix4f m,
                                      float cx, float cy, float cz, float width,
@@ -444,7 +528,6 @@ public final class GoldenTreeBlessingRenderer {
         float speedMul = 1f + (activeCount - 1) * 0.3f;
         float rot = time * RUNE_ROT_SPEED * speedMul + seedId * 0.3f;
         float alpha = clamp01(RUNE_BASE_ALPHA + (activeCount - 1) * RUNE_STACK_ALPHA_STEP);
-        float[] c = unpack(HOLY_WHITE);
         float hw = Math.max(0.022f, width * 0.01f);
 
         // ⭐ v8：均布刻度按步长抽取，保证仍铺满整圈
@@ -457,7 +540,7 @@ public final class GoldenTreeBlessingRenderer {
             float iz = cz + (float) Math.sin(base) * radius * 0.85f;
             float ox = cx + (float) Math.cos(base) * radius;
             float oz = cz + (float) Math.sin(base) * radius;
-            line(b, m, ix, iz, ox, oz, cy, hw, c, alpha);
+            line(b, m, ix, iz, ox, oz, cy, hw, C_HOLY_WHITE, alpha);
         }
     }
 
@@ -465,6 +548,7 @@ public final class GoldenTreeBlessingRenderer {
      * 脚下中央十字圣徽：沿用「圣域」的十字圣徽母题（两条垂直相交的粗线），随心跳缓慢明灭；
      * 长度、粗细、亮度随 {@code activeCount} 小幅提升，是三个祝福共享的核心标志性图案。
      * <p>v8：仅 12 个顶点，是全渲染器最廉价也最具辨识度的元素，<b>不做任何 LOD 削减</b>。</p>
+     * <p>v9：改用只读常量 {@link #C_HOLY_WHITE}，零分配。</p>
      */
     private static void drawCrossEmblem(BufferBuilder b, Matrix4f m,
                                         float cx, float cy, float cz, float width,
@@ -473,16 +557,17 @@ public final class GoldenTreeBlessingRenderer {
         float len = width * (0.36f + (activeCount - 1) * 0.06f);
         float hw = Math.max(0.032f, width * 0.016f) * (1f + (activeCount - 1) * 0.15f);
         float alpha = clamp01((0.55f + (activeCount - 1) * 0.12f) * pulse);
-        float[] c = unpack(HOLY_WHITE);
 
-        line(b, m, cx - len, cz, cx + len, cz, cy, hw, c, alpha);
-        line(b, m, cx, cz - len, cx, cz + len, cy, hw, c, alpha);
+        line(b, m, cx - len, cz, cx + len, cz, cy, hw, C_HOLY_WHITE, alpha);
+        line(b, m, cx, cz - len, cx, cz + len, cy, hw, C_HOLY_WHITE, alpha);
     }
 
     /**
      * 胸口神圣光辉：由内而外三层叠加的柔光——外层大而淡、中层小而亮、核心一点纯白——
      * 集中在角色胸口位置，表达「这个人本身正被神圣之力笼罩、由内而外发光」。
      * <p>v8：分段数缩放；低细节时跳过最外层（大而淡，远处完全看不出，却与其余两层等顶点量）。</p>
+     * <p>v9：主题色写入 {@link #SCRATCH} 供外 / 中两层使用，核心高光直接用只读常量
+     * {@link #C_HOLY_WHITE}，两者不冲突。</p>
      */
     private static void drawRadiantGlow(BufferBuilder b, Matrix4f m,
                                         float cx, float cyFoot, float cz, float width, float height,
@@ -496,20 +581,19 @@ public final class GoldenTreeBlessingRenderer {
 
         int segments = VisualLod.scaleSegments(MOTE_SEGMENTS, MOTE_SEGMENTS_MIN, detail);
 
-        int primary = lerpRgb(HOLY_GOLD, HOLY_WHITE, 0.4f + purityFactor(activeCount) * 0.4f);
-        float[] gold = unpack(primary);
-        float[] white = unpack(HOLY_WHITE);
+        // v9：无分配插值。SCRATCH 在外层与中层之间保持有效（其间无其它写入）
+        VisualColor.lerpInto(SCRATCH, HOLY_GOLD, HOLY_WHITE, 0.4f + purityFactor(activeCount) * 0.4f);
 
         // 外层：大而淡，铺垫整体光晕范围。远处看不出，低细节时跳过
         if (VisualLod.keepLayer(detail, GLOW_OUTER_KEEP_THRESHOLD)) {
-            emitSoftMote(b, m, cx, chestY, cz, size, gold[0], gold[1], gold[2], alpha * 0.45f,
+            emitSoftMote(b, m, cx, chestY, cz, size, SCRATCH[0], SCRATCH[1], SCRATCH[2], alpha * 0.45f,
                     rightX, rightY, rightZ, upX, upY, upZ, segments);
         }
         // 中层：更小更亮，收拢焦点
-        emitSoftMote(b, m, cx, chestY, cz, size * 0.55f, gold[0], gold[1], gold[2], alpha * 0.8f,
+        emitSoftMote(b, m, cx, chestY, cz, size * 0.55f, SCRATCH[0], SCRATCH[1], SCRATCH[2], alpha * 0.8f,
                 rightX, rightY, rightZ, upX, upY, upZ, segments);
         // 核心：一点纯白高光，是"由内而外发光"的视觉锚点
-        emitSoftMote(b, m, cx, chestY, cz, size * 0.22f, white[0], white[1], white[2], alpha,
+        emitSoftMote(b, m, cx, chestY, cz, size * 0.22f, C_HOLY_WHITE[0], C_HOLY_WHITE[1], C_HOLY_WHITE[2], alpha,
                 rightX, rightY, rightZ, upX, upY, upZ, segments);
     }
 
@@ -518,6 +602,13 @@ public final class GoldenTreeBlessingRenderer {
      * 同时数量与亮度随 {@code activeCount} 小幅提升。
      * <p>v8：数量按细节系数缩放。金叶位置由 {@code seedFor(entityId, i)} 决定，
      * 截断尾部时保留元素的种子与轨迹完全不变，靠近时是「逐渐多出几片叶子」。</p>
+     * <p>
+     * <b>v9：本方法是全渲染器最密集的颜色计算点（最多 21 片 × 1 次）。</b>
+     * 每片的颜色写入 {@link #SCRATCH} 后立即被 {@link #emitLeafMote} 消费，零分配。
+     * 注意 {@code primary} <b>仍必须是 int</b>——它是循环内每片插值的<b>起点</b>，
+     * 而 {@link VisualColor#lerpInto} 的 {@code from} 参数接收的正是 int，故这里保留
+     * {@link #lerpRgb} 不动。
+     * </p>
      */
     private static void drawRisingMotes(BufferBuilder b, Matrix4f m,
                                         float cx, float cyFoot, float cz, float width, float height,
@@ -529,6 +620,7 @@ public final class GoldenTreeBlessingRenderer {
         float alphaMul = 1f + (activeCount - 1) * MOTE_STACK_ALPHA_STEP;
         float riseHeight = height * RISE_HEIGHT_FACTOR;
         float spread = width * SPREAD_FACTOR;
+        // 保留为 int：这是下方循环内逐片插值的起点，lerpInto 的 from 参数即接收 int
         int primary = lerpRgb(HOLY_GOLD, HOLY_WHITE, purityFactor(activeCount));
 
         for (int i = 0; i < count; i++) {
@@ -569,12 +661,12 @@ public final class GoldenTreeBlessingRenderer {
             float pz = cz + (float) Math.sin(ang) * curRad;
             float py = cyFoot + t * riseHeight + Y_OFFSET;
 
-            int col = lerpRgb(primary, HOLY_WHITE, t);
-            float[] c = unpack(col);
+            // v9：无分配插值，写入复用缓冲后立即消费
+            VisualColor.lerpInto(SCRATCH, primary, HOLY_WHITE, t);
             float size = MOTE_SIZE * sizeRand * (1.1f - 0.3f * t);
             float rot = time * LEAF_SPIN_SPEED + spinPhase;
 
-            emitLeafMote(b, m, px, py, pz, size, rot, c[0], c[1], c[2], alpha,
+            emitLeafMote(b, m, px, py, pz, size, rot, SCRATCH[0], SCRATCH[1], SCRATCH[2], alpha,
                     rightX, rightY, rightZ, upX, upY, upZ);
         }
     }
@@ -584,6 +676,7 @@ public final class GoldenTreeBlessingRenderer {
      * 还原「黄金树周围落叶飘散」的经典法环意象——与脚下上升的叶片方向相反、一升一降，
      * 让整体更有层次。数量随 {@code activeCount} 小幅增加。
      * <p>v8：数量按细节系数缩放；整层由调用方按 {@link #DESCENDING_KEEP_THRESHOLD} 决定是否绘制。</p>
+     * <p>v9：每片的颜色写入 {@link #SCRATCH} 后立即被 {@link #emitLeafMote} 消费，零分配。</p>
      */
     private static void drawDescendingMotes(BufferBuilder b, Matrix4f m,
                                             float cx, float cyFoot, float cz, float width, float height,
@@ -631,13 +724,13 @@ public final class GoldenTreeBlessingRenderer {
 
             float twinkle = 0.6f + 0.4f * Mth.sin(time * 3f + i * 1.1f);
             float alpha = clamp01(0.45f * env * twinkle);
-            int col = lerpRgb(HOLY_GOLD, HOLY_WHITE, 0.3f + 0.4f * twinkle);
-            float[] c = unpack(col);
+            // v9：无分配插值，写入复用缓冲后立即消费
+            VisualColor.lerpInto(SCRATCH, HOLY_GOLD, HOLY_WHITE, 0.3f + 0.4f * twinkle);
             float size = 0.075f * sizeRand;
             // 飘落的叶片翻转比升起的更慢，更有"打着转飘下来"的感觉
             float rot = time * (LEAF_SPIN_SPEED * 0.5f) + spinPhase;
 
-            emitLeafMote(b, m, px, py, pz, size, rot, c[0], c[1], c[2], alpha,
+            emitLeafMote(b, m, px, py, pz, size, rot, SCRATCH[0], SCRATCH[1], SCRATCH[2], alpha,
                     rightX, rightY, rightZ, upX, upY, upZ);
         }
     }
@@ -645,6 +738,7 @@ public final class GoldenTreeBlessingRenderer {
     /**
      * 立誓：胸口处随心跳节奏脉动的白金光核。
      * <p>v8：分段数缩放。仅 1 个柔光块，是立誓的唯一专属标志，不做整层跳过。</p>
+     * <p>v9：改用只读常量 {@link #C_HOLY_WHITE}，零分配。</p>
      */
     private static void drawVowCore(BufferBuilder b, Matrix4f m,
                                     float cx, float cyFoot, float cz, float height,
@@ -655,15 +749,15 @@ public final class GoldenTreeBlessingRenderer {
         float pulse = 0.6f + 0.4f * Mth.sin(time * VOW_PULSE_SPEED + seedId);
         float size = 0.15f + 0.05f * pulse;
         float alpha = 0.5f + 0.3f * pulse;
-        float[] c = unpack(HOLY_WHITE);
         int segments = VisualLod.scaleSegments(MOTE_SEGMENTS, MOTE_SEGMENTS_MIN, detail);
-        emitSoftMote(b, m, cx, chestY, cz, size, c[0], c[1], c[2], alpha,
+        emitSoftMote(b, m, cx, chestY, cz, size, C_HOLY_WHITE[0], C_HOLY_WHITE[1], C_HOLY_WHITE[2], alpha,
                 rightX, rightY, rightZ, upX, upY, upZ, segments);
     }
 
     /**
      * 庇护：环绕身周的护盾双环微光（近白冷调，与主体金色区分开来）。
      * <p>v8：环分段数缩放（下限 {@link #RING_SEGMENTS_MIN}）。</p>
+     * <p>v9：改用只读常量 {@link #C_HOLY_SHIELD}，零分配。</p>
      */
     private static void drawProtectionShield(BufferBuilder b, Matrix4f m,
                                              float cx, float cyFoot, float cz, float width, float height,
@@ -671,9 +765,8 @@ public final class GoldenTreeBlessingRenderer {
         float midY = cyFoot + height * 0.5f;
         float pulse = 0.5f + 0.5f * Mth.sin(time * SHIELD_PULSE_SPEED + seedId * 0.8f);
         float radius = width * 0.7f + 0.05f * pulse;
-        float[] c = unpack(HOLY_SHIELD);
         int segments = VisualLod.scaleSegments(SHIELD_SEGMENTS, RING_SEGMENTS_MIN, detail);
-        ringVertical(b, m, cx, cz, midY, radius, segments, 0.04f, c, clamp01(0.32f * pulse + 0.14f));
+        ringVertical(b, m, cx, cz, midY, radius, segments, 0.04f, C_HOLY_SHIELD, clamp01(0.32f * pulse + 0.14f));
     }
 
     /**
@@ -681,6 +774,7 @@ public final class GoldenTreeBlessingRenderer {
      * 用来补足细节亮度、提升精致感。数量随 {@code activeCount} 小幅增加。
      * <p>v8：数量与分段数均缩放；整层由调用方按 {@link #SPARKLE_KEEP_THRESHOLD} 决定是否绘制。
      * 星芒是均布公转的，故同样按步长抽取而非截断。</p>
+     * <p>v9：改用只读常量 {@link #C_HOLY_WHITE}，零分配。</p>
      */
     private static void drawSparkles(BufferBuilder b, Matrix4f m,
                                      float cx, float cy, float cz, float width,
@@ -690,7 +784,6 @@ public final class GoldenTreeBlessingRenderer {
         float radius = width * HALO_RADIUS_FACTOR * 0.95f;
         float rot = time * SPARKLE_ORBIT_SPEED + seedId * 0.4f;
         int baseCount = SPARKLE_COUNT + (activeCount - 1) * SPARKLE_STACK_STEP;
-        float[] c = unpack(HOLY_WHITE);
         int segments = VisualLod.scaleSegments(MOTE_SEGMENTS, MOTE_SEGMENTS_MIN, detail);
 
         int drawnCount = VisualLod.scale(baseCount, detail);
@@ -702,7 +795,8 @@ public final class GoldenTreeBlessingRenderer {
             float pz = cz + (float) Math.sin(ang) * radius;
             float twinkle = 0.4f + 0.6f * (0.5f + 0.5f * Mth.sin(time * 5f + i * 1.3f + seedId));
             float size = 0.045f + 0.025f * twinkle;
-            emitSoftMote(b, m, px, cy + 0.05f, pz, size, c[0], c[1], c[2], 0.75f * twinkle,
+            emitSoftMote(b, m, px, cy + 0.05f, pz, size,
+                    C_HOLY_WHITE[0], C_HOLY_WHITE[1], C_HOLY_WHITE[2], 0.75f * twinkle,
                     rightX, rightY, rightZ, upX, upY, upZ, segments);
         }
     }
@@ -711,11 +805,11 @@ public final class GoldenTreeBlessingRenderer {
      * 立誓 + 恩惠 + 庇护三重同时生效时的额外「神圣脉冲」：脚下周期性向外扩张并快速淡出的
      * 冲击波光环，首波额外叠加一圈长短交替的光芒射线，用于强调「三重祝福」这一叠加状态。
      * <p>v8：环分段数缩放；射线按步长抽取（均布角度，截断会只喷向一侧）。</p>
+     * <p>v9：改用只读常量 {@link #C_HOLY_WHITE}，零分配。</p>
      */
     private static void drawRadiantPulse(BufferBuilder b, Matrix4f m,
                                          float cx, float cy, float cz, float width,
                                          float time, int seedId, float detail) {
-        float[] c = unpack(HOLY_WHITE);
         int segments = VisualLod.scaleSegments(HALO_SEGMENTS, RING_SEGMENTS_MIN, detail);
 
         for (int i = 0; i < PULSE_WAVE_COUNT; i++) {
@@ -726,7 +820,7 @@ public final class GoldenTreeBlessingRenderer {
             if (alpha <= 0.01f || radius <= 0.05f) {
                 continue;
             }
-            ringVertical(b, m, cx, cz, cy, radius, segments, 0.07f, c, alpha);
+            ringVertical(b, m, cx, cz, cy, radius, segments, 0.07f, C_HOLY_WHITE, alpha);
 
             // 长短交替光芒：仅首波叠加射线，强化「神圣爆发」的观感
             if (i == 0) {
@@ -738,7 +832,7 @@ public final class GoldenTreeBlessingRenderer {
                     double ang = TAU * r / PULSE_RAY_COUNT + seedId * 0.3f;
                     float ox = cx + (float) Math.cos(ang) * rayLen;
                     float oz = cz + (float) Math.sin(ang) * rayLen;
-                    line(b, m, cx, cz, ox, oz, cy, hw, c, alpha * 0.6f);
+                    line(b, m, cx, cz, ox, oz, cy, hw, C_HOLY_WHITE, alpha * 0.6f);
                 }
             }
         }
@@ -794,7 +888,11 @@ public final class GoldenTreeBlessingRenderer {
         lineF(b, m, x1, z1, x2, z2, y, hw, col, alpha, alpha);
     }
 
-    /** 两端 alpha 可分别指定的线段（浮点颜色版，供根须等需要逐段渐隐的场景使用）。 */
+    /**
+     * 两端 alpha 可分别指定的线段（浮点颜色版，供根须等需要逐段渐隐的场景使用）。
+     * <p><b>注意：</b>两端<b>共用同一个颜色数组</b>，只有 alpha 不同——
+     * 这正是本渲染器只需一个 {@link #SCRATCH} 缓冲、无须像螺旋 / 刀痕那样做双缓冲的原因。</p>
+     */
     private static void lineF(BufferBuilder b, Matrix4f m,
                               float x1, float z1, float x2, float z2, float y,
                               float hw, float[] col, float a1, float a2) {
@@ -929,12 +1027,26 @@ public final class GoldenTreeBlessingRenderer {
      * 偏向纯白（{@link #HOLY_WHITE}），象征祝福叠得越满、能量越纯粹。
      *
      * @param activeCount 同时生效的祝福数量（1~3）
-     * @return 0~1 的插值系数，供 {@link #lerpRgb} 使用
+     * @return 0~1 的插值系数，供 {@link #lerpRgb} / {@link VisualColor#lerpInto} 使用
      */
     private static float purityFactor(int activeCount) {
         return clamp01((activeCount - 1) * 0.35f);
     }
 
+    /**
+     * 在 0~255 整数域对两个 0xRRGGBB 做线性插值并取整，返回打包后的 int。
+     * <p>
+     * <b>v9 保留说明：</b>其余调用点都已改为 {@link VisualColor#lerpInto}（直接出 float[]，零分配），
+     * 但 {@link #drawRisingMotes} 里的 {@code primary} <b>必须是 int</b>——它是循环内逐片插值的
+     * <b>起点</b>，而 {@link VisualColor#lerpInto} 的 {@code from} 参数接收的正是 int，
+     * 故本方法仍被需要。它每帧每实体只调用一次、且不分配任何对象。
+     * </p>
+     *
+     * @param from 起点色（0xRRGGBB）
+     * @param to   终点色（0xRRGGBB）
+     * @param t    插值系数（自动夹取到 0~1）
+     * @return 插值结果（0xRRGGBB）
+     */
     private static int lerpRgb(int from, int to, float t) {
         t = clamp01(t);
         int fr = (from >> 16) & 0xFF, fg = (from >> 8) & 0xFF, fb = from & 0xFF;
@@ -943,13 +1055,5 @@ public final class GoldenTreeBlessingRenderer {
         int g = Math.round(fg + (tg - fg) * t);
         int bl = Math.round(fb + (tb - fb) * t);
         return (r << 16) | (g << 8) | bl;
-    }
-
-    private static float[] unpack(int color) {
-        return new float[]{
-                ((color >> 16) & 0xFF) / 255f,
-                ((color >> 8) & 0xFF) / 255f,
-                (color & 0xFF) / 255f
-        };
     }
 }

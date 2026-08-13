@@ -88,7 +88,47 @@ import java.util.List;
  * 但段数太少会明显棱角化（2.25 圈 20 段 ≈ 每圈 9 段），故设下限 {@link #SPIRAL_SEGMENTS_MIN}。
  * </p>
  *
+ * <h3>v3（堆分配，视觉逐位一致）：颜色数组零分配化</h3>
+ * <p>
+ * v2 解决了顶点量，但本渲染器还藏着<b>全模组最密集的一处小对象分配</b>：
+ * 旧实现里 {@code mix(a, b, t)} 与 {@code unpack(color)} <b>每次调用都 {@code new float[3]}</b>，
+ * 而催眠螺旋的绘制循环里<b>每段要调两次</b>（本段末端色 + 上段末端色）：
+ * </p>
+ * <pre>
+ * 催眠螺旋（48 段 × 2 次 mix）              96
+ * 白花瓣（10 片 × 1 次 mix）                10
+ * 螺旋起手的 petal / mist 解包               2
+ * 沉眠雾盘（lerpRgb → unpack）               1
+ * ────────────────────────────────────────
+ * 合计                     ~109 次 new float[3] / 实体 / 帧
+ * </pre>
+ * <p>
+ * 睡眠虽不像出血那样人人都挂，但催眠烟雾 / 托莉娜箭在群战中可同时睡住多个目标；
+ * 5 个沉睡实体 × 60fps 已是<b>每秒 3.3 万次</b>朝生夕死的小数组分配。
+ * </p>
+ * <p>
+ * 现改为两条路径（工具见 {@link VisualColor}）：
+ * </p>
+ * <ol>
+ *     <li><b>三个主题色类加载时预解包一次</b>（{@code C_} 前缀常量），此后永久复用；</li>
+ *     <li><b>动态插值色写入复用缓冲</b>——{@link #SCRATCH_A} / {@link #SCRATCH_B}。</li>
+ * </ol>
+ * <p>
+ * <b>螺旋为什么需要两个缓冲、且要滚动交换：</b>{@link #lineGradient} 需要<b>同时</b>持有
+ * 线段两端的颜色（起点色与终点色），这正是 {@link VisualColor} 类注释里点名的
+ * 「两个动态色同时存活」场景——若两次都写同一个缓冲，后写的会覆盖先写的、整条螺旋退化成纯色。
+ * 更进一步，由于「本段的末端色 == 下一段的起点色」，这里采用<b>滚动交换</b>：
+ * 每段只算一次新颜色，用完把两个缓冲的引用对调。这样 96 次插值降为 48 次，
+ * 且每段的两端颜色仍然各自正确。
+ * </p>
+ * <p>
+ * <b>视觉逐位一致：</b>{@link VisualColor#mixInto} 与旧的 {@code mix} 都是在归一化域直接线性插值，
+ * {@link VisualColor#lerpInto} 则保留了旧 {@code lerpRgb} 在 0~255 整数域插值并取整的行为，
+ * 因此输出与 v2 的每个颜色分量完全相同——不是「肉眼看不出」而是「数值相等」。
+ * </p>
+ *
  * @author FlameForge
+ * @version 3
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -118,6 +158,36 @@ public final class SleepRenderer {
     private static final int SLEEP_MIST = 0xBFC8DE;
     /** 沉眠暗蓝灰：雾盘外缘与螺旋末端的暗部 */
     private static final int SLEEP_DEEP = 0x6E7695;
+
+    // ===== v3：预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
+    // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
+    // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
+    /** 花瓣乳白（螺旋内端 / 花瓣起点 / 中心柔光） */
+    private static final float[] C_SLEEP_PETAL = VisualColor.constant(SLEEP_PETAL);
+    /** 催眠淡蓝灰（螺旋外端 / 花瓣末期） */
+    private static final float[] C_SLEEP_MIST = VisualColor.constant(SLEEP_MIST);
+
+    /**
+     * v3：动态插值色的复用缓冲 A（⚠ 写入后必须立即消费，不可跨调用留存）。
+     * <p>
+     * 用于：螺旋的滚动双缓冲之一、花瓣颜色、雾盘颜色。这三处不会同时活跃
+     * （{@link #drawSlumberMist} / {@link #drawPetals} / {@link #drawHypnoticSpiral}
+     * 是顺序调用、互不嵌套），故可共用。
+     * </p>
+     * <p>仅渲染线程访问，无并发问题。</p>
+     */
+    private static final float[] SCRATCH_A = new float[VisualColor.RGB];
+
+    /**
+     * v3：动态插值色的复用缓冲 B（⚠ 同上）。
+     * <p>
+     * <b>专供 {@link #drawHypnoticSpiral} 与 {@link #SCRATCH_A} 配对使用</b>——
+     * {@link #lineGradient} 需要同时持有线段两端的颜色，一个缓冲不够
+     * （详见类注释「螺旋为什么需要两个缓冲」）。
+     * </p>
+     */
+    private static final float[] SCRATCH_B = new float[VisualColor.RGB];
 
     // ===== 头顶催眠螺旋 =====
     /** 螺旋悬浮高度系数（× 实体高度）：略高于头顶 */
@@ -269,6 +339,13 @@ public final class SleepRenderer {
      * 转满 {@link #SPIRAL_TURNS} 圈，因此<b>直接减段数是安全的</b>——只是折线更粗糙，
      * 形状、圈数、起止位置全部不变。中心那点柔光锚点仅 12 顶点，不参与削减。
      * </p>
+     * <p>
+     * <b>v3：颜色改用滚动双缓冲，每段只插值一次。</b>本方法是全模组最密集的颜色计算点
+     * （旧实现每段 2 次 {@code new float[3]}）。由于「本段末端色 == 下一段起点色」，
+     * 算完一段后把 {@link #SCRATCH_A} / {@link #SCRATCH_B} 的引用对调即可复用，
+     * 插值次数减半、分配归零。<b>两个缓冲缺一不可</b>——{@link #lineGradient}
+     * 要同时读两端颜色，共用一个会让整条螺旋退化成纯色。
+     * </p>
      */
     private static void drawHypnoticSpiral(BufferBuilder b, Matrix4f m,
                                            float cx, float cyFoot, float cz,
@@ -281,14 +358,18 @@ public final class SleepRenderer {
         float spiralY = cyFoot + height * SPIRAL_HEIGHT_FACTOR + bob;
         float maxRadius = width * SPIRAL_RADIUS_FACTOR;
 
-        float[] mist = unpack(SLEEP_MIST);
-        float[] petal = unpack(SLEEP_PETAL);
-
         int segments = VisualLod.scaleSegments(SPIRAL_SEGMENTS, SPIRAL_SEGMENTS_MIN, detail);
 
         float totalAngle = TAU * SPIRAL_TURNS;
         float prevX = cx;
         float prevZ = cz;
+
+        // ⭐ v3 滚动双缓冲：prevCol 持有上一段末端色，curCol 持有本段末端色。
+        // 每段只做一次插值，段末把两个引用对调——本段末端色即成为下一段的起点色。
+        float[] prevCol = SCRATCH_A;
+        float[] curCol = SCRATCH_B;
+        // 循环外先算出 u=0（螺旋内端）的颜色，作为第一段的起点色
+        VisualColor.mixInto(prevCol, C_SLEEP_PETAL, C_SLEEP_MIST, 0f);
 
         for (int i = 1; i <= segments; i++) {
             float u = (float) i / segments;   // 0=中心, 1=外端
@@ -300,20 +381,24 @@ public final class SleepRenderer {
             // 由内向外：线变细、变淡、由乳白转蓝灰
             float hw = SPIRAL_HALF_WIDTH * (1f - u * 0.45f);
             float alpha = SPIRAL_BASE_ALPHA * (1f - u * 0.75f);
-            float[] col = mix(petal, mist, u);
+            VisualColor.mixInto(curCol, C_SLEEP_PETAL, C_SLEEP_MIST, u);
 
             float uPrev = (float) (i - 1) / segments;
             float alphaPrev = SPIRAL_BASE_ALPHA * (1f - uPrev * 0.75f);
-            float[] colPrev = mix(petal, mist, uPrev);
 
-            lineGradient(b, m, prevX, prevZ, x, z, spiralY, hw, colPrev, alphaPrev, col, alpha);
+            lineGradient(b, m, prevX, prevZ, x, z, spiralY, hw, prevCol, alphaPrev, curCol, alpha);
+
+            // 交换缓冲：本段末端色成为下一段的起点色，省掉一次插值
+            float[] tmp = prevCol;
+            prevCol = curCol;
+            curCol = tmp;
 
             prevX = x;
             prevZ = z;
         }
 
-        // 螺旋中心的一点柔光，作为视觉锚点。仅 12 顶点，不做削减
-        spark(b, m, cx, cz, spiralY, width * 0.12f + 0.05f, petal, 0.65f);
+        // 螺旋中心的一点柔光，作为视觉锚点。仅 12 顶点，不做削减；用只读常量色
+        spark(b, m, cx, cz, spiralY, width * 0.12f + 0.05f, C_SLEEP_PETAL, 0.65f);
     }
 
     // ==================== 托莉娜白花瓣 ====================
@@ -329,6 +414,10 @@ public final class SleepRenderer {
      * 截断尾部时保留花瓣的下落轨迹完全不变，靠近时是「逐渐多飘下几片」而非重新洗牌。
      * 花瓣轮廓固定 6 点（{@link #emitPetal}），不参与缩放——再少就不成花瓣形了。
      * </p>
+     * <p>
+     * <b>v3：颜色写入 {@link #SCRATCH_A} 后立即被 {@link #emitPetal} 消费，零分配。</b>
+     * 本方法与螺旋不嵌套（顺序调用），故可安全复用同一缓冲。
+     * </p>
      */
     private static void drawPetals(BufferBuilder b, Matrix4f m,
                                    float cx, float cyFoot, float cz,
@@ -338,9 +427,6 @@ public final class SleepRenderer {
                                    float upX, float upY, float upZ, float detail) {
         float startHeight = height * PETAL_START_HEIGHT_FACTOR;
         float spread = width * PETAL_SPREAD_FACTOR;
-
-        float[] petal = unpack(SLEEP_PETAL);
-        float[] mist = unpack(SLEEP_MIST);
 
         int count = VisualLod.scale(PETAL_COUNT, detail);
 
@@ -385,11 +471,13 @@ public final class SleepRenderer {
                 continue;
             }
 
-            float[] col = mix(petal, mist, t * 0.5f);
+            // v3：无分配插值，写入复用缓冲后立即消费
+            VisualColor.mixInto(SCRATCH_A, C_SLEEP_PETAL, C_SLEEP_MIST, t * 0.5f);
             float size = PETAL_SIZE * sizeRand;
             float rot = time * PETAL_SPIN_SPEED + spinPhase;
 
-            emitPetal(b, m, px, py, pz, size, rot, col[0], col[1], col[2], alpha,
+            emitPetal(b, m, px, py, pz, size, rot,
+                    SCRATCH_A[0], SCRATCH_A[1], SCRATCH_A[2], alpha,
                     rightX, rightY, rightZ, upX, upY, upZ);
         }
     }
@@ -401,16 +489,20 @@ public final class SleepRenderer {
      * <p>作用是给整体压住重量——只有螺旋与花瓣两个悬浮元素会显得轻飘，
      * 加一层贴地的雾才有「沉下去了」的分量感。</p>
      * <p>v2：分段数按细节系数缩放（下限 {@link #MIST_SEGMENTS_MIN}）。</p>
+     * <p>v3：颜色改用 {@link VisualColor#lerpInto} 写入复用缓冲，省掉中间 int 与新数组；
+     * 取整行为与旧的 {@code lerpRgb → unpack} 链路逐位一致。</p>
      */
     private static void drawSlumberMist(BufferBuilder b, Matrix4f m,
                                         float cx, float cy, float cz, float width,
                                         float time, int seedId, float detail) {
         float breath = 0.9f + 0.1f * Mth.sin(time * MIST_BREATH_SPEED + seedId * 0.6f);
         float radius = width * MIST_RADIUS_FACTOR * breath;
-        int col = lerpRgb(SLEEP_DEEP, SLEEP_MIST, 0.5f + 0.5f * Mth.sin(time * 0.3f + seedId));
-        float[] c = unpack(col);
+        // v3：无分配插值（0~255 域取整，与旧 lerpRgb 逐位一致）
+        VisualColor.lerpInto(SCRATCH_A, SLEEP_DEEP, SLEEP_MIST,
+                0.5f + 0.5f * Mth.sin(time * 0.3f + seedId));
         int segments = VisualLod.scaleSegments(MIST_SEGMENTS, MIST_SEGMENTS_MIN, detail);
-        drawDisc(b, m, cx, cy, cz, radius, segments, c[0], c[1], c[2], MIST_BASE_ALPHA * breath);
+        drawDisc(b, m, cx, cy, cz, radius, segments,
+                SCRATCH_A[0], SCRATCH_A[1], SCRATCH_A[2], MIST_BASE_ALPHA * breath);
     }
 
     // ==================== 几何基元 ====================
@@ -455,6 +547,9 @@ public final class SleepRenderer {
 
     /**
      * 带宽度的水平线段，<b>两端颜色与 alpha 均可分别指定</b>（螺旋需要沿弧长做色彩梯度）。
+     * <p><b>注意：</b>本方法会<b>同时读取</b> {@code col1} 与 {@code col2}，
+     * 因此调用方必须保证这两个数组不是同一个缓冲——这正是
+     * {@link #drawHypnoticSpiral} 使用双缓冲的原因。</p>
      *
      * @param hw 线半宽（格）
      */
@@ -536,44 +631,9 @@ public final class SleepRenderer {
         return ((s >>> 40) & 0xFFFFFFL) / (float) 0x1000000;
     }
 
-    // ==================== 数学 / 颜色辅助 ====================
+    // ==================== 数学辅助 ====================
 
     private static float frac(float x) {
         return x - (float) Math.floor(x);
-    }
-
-    private static float clamp01(float v) {
-        if (v < 0f) {
-            return 0f;
-        }
-        return Math.min(v, 1f);
-    }
-
-    /** 两个 [r,g,b] 颜色按 t 线性插值（t 自动夹取到 0~1）。 */
-    private static float[] mix(float[] a, float[] b, float t) {
-        float u = clamp01(t);
-        return new float[]{
-                a[0] + (b[0] - a[0]) * u,
-                a[1] + (b[1] - a[1]) * u,
-                a[2] + (b[2] - a[2]) * u
-        };
-    }
-
-    private static int lerpRgb(int from, int to, float t) {
-        t = clamp01(t);
-        int fr = (from >> 16) & 0xFF, fg = (from >> 8) & 0xFF, fb = from & 0xFF;
-        int tr = (to >> 16) & 0xFF, tg = (to >> 8) & 0xFF, tb = to & 0xFF;
-        int r = Math.round(fr + (tr - fr) * t);
-        int g = Math.round(fg + (tg - fg) * t);
-        int bl = Math.round(fb + (tb - fb) * t);
-        return (r << 16) | (g << 8) | bl;
-    }
-
-    private static float[] unpack(int color) {
-        return new float[]{
-                ((color >> 16) & 0xFF) / 255f,
-                ((color >> 8) & 0xFF) / 255f,
-                (color & 0xFF) / 255f
-        };
     }
 }

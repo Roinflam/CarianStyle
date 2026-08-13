@@ -57,14 +57,51 @@ import java.util.List;
  * 特效最长仅 5.4 秒、裁剪距离 96 格，不存在需要「离开后再回来重新吸附」的合理场景。
  * </p>
  *
+ * <h3>v6.2 性能：存活上限由 64 下调至 40</h3>
+ * <p>
+ * <b>为什么原先是 64：</b>该上限设立时，客户端渲染尚无任何细节层级裁剪，
+ * 它是防止「特效无限堆积」的<b>唯一</b>兜底，因此取得比较宽松。
+ * </p>
+ * <p>
+ * <b>为什么现在可以下调：</b>{@link AoeEffectRenderer} 已接入 {@link VisualLod}，
+ * 远处与同屏拥挤时会按细节系数削减顶点。但 LOD 削的是<b>单个特效的顶点量</b>，
+ * 削不掉「同屏 64 个独立特效」本身带来的固定开销——每个特效仍要各自走一遍
+ * 距离裁剪、进度映射、类型分发与几何生成的调用链。二者是互补关系，不是替代关系。
+ * </p>
+ * <p>
+ * <b>40 这个值的依据：</b>能跑满上限的只有古龙雷击一种场景——它对
+ * {@code MAX_TARGETS}(100) 个目标各自降雷，而红闪的「同位置合并」只覆盖 2.5 格，
+ * 目标分散时会各成一道。但那种场景下，玩家视野里同时能分辨出的雷本就只有十几道，
+ * 第 40 道之后的完全是视觉噪声。其余全部演出（因果律、冻结地震、排斥、立体花、癫火）
+ * 都是「一次触发一个特效」且带冷却，同屏几乎不可能超过个位数，因此这次下调
+ * <b>只影响古龙雷击的极端爆发，对其余任何演出零影响</b>。
+ * </p>
+ * <p>
+ * <b>丢弃策略未变：</b>超出上限时移除<b>最早的</b>（{@code ACTIVE.remove(0)}）。
+ * 对红闪而言，最早那道也是最接近消散的，丢弃它的观感损失最小。
+ * </p>
+ * <p>
+ * <b>调参提示：</b>若将来新增「短时间内会大量并发」的演出类型，应优先考虑给该类型
+ * 加同位置合并（参照 {@link #refreshNearbyRedLightning}），而不是回头调大本上限——
+ * 合并能同时省下渲染开销与视觉噪声，调大上限只会两者都增加。
+ * </p>
+ *
  * @author RoinFlam
- * @version 6.1
+ * @version 6.2
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
 public final class AoeEffectManager {
 
-    /** 存活特效上限（极端情况下防止无限堆积） */
-    private static final int MAX_ACTIVE = 64;
+    /**
+     * 存活特效上限（极端情况下防止无限堆积）。
+     * <p>
+     * v6.2：由 64 下调至 {@value}。渲染端已接入 {@link VisualLod} 按距离 / 拥挤度削减顶点，
+     * 但那削不掉「同屏 N 个独立特效」的固定调用开销，故仍需一个偏紧的上限配合。
+     * 取值依据与影响范围详见类注释「v6.2 性能」小节——简言之，
+     * 只有古龙雷击的极端爆发能触及此值，其余演出同屏不超过个位数。
+     * </p>
+     */
+    private static final int MAX_ACTIVE = 40;
 
     /**
      * 死亡演出（猩红立体花 SCARLET_BLOOM / 癫火扩散 FRENZIED_FLAME）整体尺寸放大倍数。
@@ -184,7 +221,7 @@ public final class AoeEffectManager {
         // CULL 裁剪与渲染均使用放大后半径，全链一致，避免大花被误裁
         float scaledRadius = radius * scaleFor(type);
         ACTIVE.add(new AoeEffect(type, entityId, x, y, z, scaledRadius, makeSeed(now, x, z), now, durationFor(type)));
-        // 上限保护：超出则丢弃最早的
+        // 上限保护：超出则丢弃最早的（对红闪而言最早那道也最接近消散，观感损失最小）
         while (ACTIVE.size() > MAX_ACTIVE) {
             ACTIVE.remove(0);
         }

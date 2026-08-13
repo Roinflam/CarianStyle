@@ -113,7 +113,52 @@ import java.util.concurrent.ConcurrentHashMap;
  * 且从未启用过的序列号不会产生无意义的空包。
  * </p>
  *
- * @version 3.1
+ * <h3>v3.2 性能：广播由「逐玩家发送」改为「按维度一次发送」（行为完全等价）</h3>
+ * <p>
+ * <b>问题：</b>本类此前所有的广播都是这个形状——
+ * </p>
+ * <pre>
+ * for (ServerPlayer player : level.players()) {
+ *     NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -&gt; player), packet);
+ * }
+ * </pre>
+ * <p>
+ * {@code PacketDistributor.PLAYER.with(...)} 每次调用都要新建一个
+ * <b>捕获 {@code player} 的 lambda</b> 与一个 {@code PacketTarget} 对象。
+ * 也就是说，<b>每广播一次就分配 2 × 在线人数个临时对象</b>：60 人同维度即 120 个。
+ * </p>
+ * <p>
+ * 更麻烦的是这条路径相当热。{@link #broadcastDelta} 由冻伤 / 出血 / 猩红腐败 / 睡眠 / 噩兆
+ * 等各 SyncHandler 在<b>每次效果增删时</b>调用，而这些效果恰恰是群体战斗中高频反复施加的
+ * （月光剑一次挥砍就给目标周围一圈敌人各加一层冻伤，每个都是一次 ADD 广播）。
+ * 20 个实体同时被上冻伤 = 20 次广播 × 120 = <b>2400 个临时对象</b>，
+ * 而这一切只是为了发同一个包。
+ * </p>
+ * <p>
+ * <b>修复方式：</b>改用 {@link PacketDistributor#DIMENSION}——它接收一个
+ * {@code Supplier<ResourceKey<Level>>}，内部走
+ * {@code server.getPlayerList().broadcastAll(packet, dimension)}，
+ * 语义与「遍历 {@code level.players()} 逐个发送」<b>完全一致</b>
+ * （原版该方法同样是筛出该维度内的全部玩家逐个发包），
+ * 但调用方这一侧的分配从 {@code 2 × N} 降为 <b>2 个</b>（一个 lambda + 一个 PacketTarget）。
+ * </p>
+ * <p>
+ * <b>顺带做的两处 PacketTarget 复用：</b>
+ * </p>
+ * <ul>
+ *     <li>{@link #removeAllForEntity} —— 循环内可能对多个序列号各发一个包，
+ *         现改为<b>惰性创建一次</b>共用。绝大多数实体死亡时并不在任何集合里
+ *         （普通怪物从未中过这些效果），此时一个对象都不会分配；</li>
+ *     <li>{@link #syncDimensionToPlayer} —— 一次要对至多 11 个序列号各发一个包给<b>同一名玩家</b>，
+ *         此前每个包都重建一次 target，现提到循环外复用。该方法虽是低频路径，
+ *         但玩家登录 / 切维度时往往伴随大量其它加载工作，能省则省。</li>
+ * </ul>
+ * <p>
+ * {@code PacketTarget} 本身<b>不持有任何与消息相关的状态</b>（它只是
+ * {@code Consumer<Packet<?>>} + 分发器的组合），因此跨多个包复用是安全的。
+ * </p>
+ *
+ * @version 3.2
  */
 @Mod.EventBusSubscriber
 public class ClientSyncEffectManager {
@@ -235,6 +280,11 @@ public class ClientSyncEffectManager {
      * 由旧维度的定期重同步剪枝自愈——那边 {@code level.getEntity(id)} 解析为 null，
      * 会被正常剔除。
      * </p>
+     * <p>
+     * <b>v3.2：</b>广播目标改为按维度一次性发送，且在循环中<b>惰性创建一次</b>后复用。
+     * 绝大多数实体死亡时并不在任何集合里（普通怪物从未中过这些效果），
+     * 此时不会分配任何对象。
+     * </p>
      *
      * @param entity 目标实体
      */
@@ -247,16 +297,43 @@ public class ClientSyncEffectManager {
         ServerLevel level = (ServerLevel) entity.level();
         int entityId = entity.getId();
 
+        // v3.2：惰性创建，命中零个序列号时（最常见）不产生任何分配
+        PacketDistributor.PacketTarget target = null;
+
         for (Map.Entry<Integer, Set<Integer>> entry : dimMap.entrySet()) {
             if (entry.getValue().remove(entityId)) {
-                broadcastDelta(level, entry.getKey(),
-                        ClientSyncEffectPacket.Action.REMOVE, entityId);
+                if (target == null) {
+                    target = dimensionTarget(level);
+                }
+                NetworkHandler.CHANNEL.send(target, ClientSyncEffectPacket.delta(
+                        entry.getKey(), ClientSyncEffectPacket.Action.REMOVE, entityId));
             }
         }
     }
 
     /**
+     * 构建「该维度全部玩家」的广播目标（v3.2 新增）。
+     * <p>
+     * 取代此前「遍历 {@code level.players()} 逐个 {@code PacketDistributor.PLAYER.with(...)}」
+     * 的写法：Forge 内部同样是筛出该维度玩家逐个发包，行为完全等价，
+     * 但调用方的临时对象分配从 {@code 2 × 在线人数} 降为 2 个（详见类注释「v3.2 性能」小节）。
+     * </p>
+     * <p>
+     * 先把 {@code dimension} 取出为局部变量再由 lambda 捕获，避免 lambda 捕获整个
+     * {@code level} 引用（那会让一个短命的 PacketTarget 意外持有 ServerLevel）。
+     * </p>
+     *
+     * @param level 服务端世界
+     * @return 该维度全部玩家的广播目标
+     */
+    private static PacketDistributor.PacketTarget dimensionTarget(@Nonnull ServerLevel level) {
+        ResourceKey<Level> dimension = level.dimension();
+        return PacketDistributor.DIMENSION.with(() -> dimension);
+    }
+
+    /**
      * 增量广播：只发送 1 个实体的 ADD/REMOVE
+     * <p>v3.2：由逐玩家发送改为按维度一次发送。</p>
      *
      * @param level        服务端世界
      * @param serialNumber 效果序列号
@@ -266,9 +343,7 @@ public class ClientSyncEffectManager {
     private static void broadcastDelta(@Nonnull ServerLevel level, int serialNumber,
                                        ClientSyncEffectPacket.Action action, int entityId) {
         ClientSyncEffectPacket packet = ClientSyncEffectPacket.delta(serialNumber, action, entityId);
-        for (ServerPlayer player : level.players()) {
-            NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
-        }
+        NetworkHandler.CHANNEL.send(dimensionTarget(level), packet);
     }
 
     /**
@@ -277,6 +352,10 @@ public class ClientSyncEffectManager {
      * <b>遍历 {@link #KNOWN_SERIALS} 而非新维度的 dimMap。</b>
      * 新维度对某序列号没有数据时会发一个<b>空包</b>，强制覆盖客户端缓存，
      * 从而清除旧维度残留的实体 ID（详见类注释）。
+     * </p>
+     * <p>
+     * <b>v3.2：</b>目标是同一名玩家，故 {@code PacketTarget} 提到循环外<b>只建一次</b>并复用，
+     * 而不是为至多 11 个包各建一次。
      * </p>
      *
      * @param player 目标玩家
@@ -289,6 +368,9 @@ public class ClientSyncEffectManager {
 
         ResourceKey<Level> dimension = player.level().dimension();
         Map<Integer, Set<Integer>> dimMap = SERVER_ACTIVATED_ENTITIES.get(dimension);
+
+        // v3.2：全部包都发给同一名玩家，target 只建一次
+        PacketDistributor.PacketTarget target = PacketDistributor.PLAYER.with(() -> player);
 
         for (int serialNumber : KNOWN_SERIALS) {
             Set<Integer> entityIds = (dimMap == null) ? null : dimMap.get(serialNumber);
@@ -307,7 +389,7 @@ public class ClientSyncEffectManager {
             }
 
             ClientSyncEffectPacket packet = ClientSyncEffectPacket.fullSync(serialNumber, payload);
-            NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
+            NetworkHandler.CHANNEL.send(target, packet);
         }
     }
 
@@ -325,6 +407,11 @@ public class ClientSyncEffectManager {
      * <b>注意：</b>此处的剪枝条件 {@code e == null || !e.isAlive()}
      * <b>拦不住「死亡后复活」的场景</b>（复活后实体 ID 不变且重新存活），
      * 那条路径必须由 {@link #removeAllForEntity} 在死亡时主动清除。
+     * </p>
+     * <p>
+     * <b>v3.2：</b>广播由逐玩家发送改为按维度一次发送，且该维度的 {@code PacketTarget}
+     * <b>惰性创建一次</b>后供本轮全部序列号复用——和平时期多数维度一个包都不发，
+     * 此时连 target 都不会创建。
      * </p>
      *
      * @param event 服务端 tick 事件
@@ -351,6 +438,10 @@ public class ClientSyncEffectManager {
             Set<Integer> lastNonEmpty = LAST_NON_EMPTY
                     .computeIfAbsent(dimEntry.getKey(), k -> ConcurrentHashMap.newKeySet());
 
+            // v3.2：本维度本轮的广播目标，惰性创建一次后复用；
+            // 若本轮该维度一个包都不发（和平时期的常态），则完全不分配
+            PacketDistributor.PacketTarget target = null;
+
             Map<Integer, Set<Integer>> serialMap = dimEntry.getValue();
             for (Map.Entry<Integer, Set<Integer>> entry : serialMap.entrySet()) {
                 int serialNumber = entry.getKey();
@@ -374,12 +465,12 @@ public class ClientSyncEffectManager {
                     lastNonEmpty.add(serialNumber);
                 }
 
+                if (target == null) {
+                    target = dimensionTarget(level);
+                }
                 ClientSyncEffectPacket packet = ClientSyncEffectPacket.fullSync(
                         serialNumber, new ArrayList<>(entityIds));
-                for (ServerPlayer player : level.players()) {
-                    NetworkHandler.CHANNEL.send(
-                            PacketDistributor.PLAYER.with(() -> player), packet);
-                }
+                NetworkHandler.CHANNEL.send(target, packet);
             }
         }
     }

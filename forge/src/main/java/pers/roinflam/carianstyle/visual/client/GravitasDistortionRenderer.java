@@ -124,7 +124,43 @@ import java.util.Set;
  *         明显破坏「边界警示」的语义。故按步长抽取，保证始终铺满整圈。</li>
  * </ul>
  *
+ * <h3>v4（堆分配，视觉逐位一致）：颜色数组零分配化</h3>
+ * <p>
+ * v3 之后剩下的是旧 {@code unpack(color)} 的堆分配（<b>每次调用都 {@code new float[3]}</b>）：
+ * </p>
+ * <pre>
+ * 向心浮尘（16 颗 × 1 次 lerpRgb→unpack）    16
+ * 收拢牢笼（mid / core 各解包一次）            2
+ * 脚下挤压环（2 环 × 1 次 lerpRgb→unpack）     2
+ * 力场范围圈（deep / mid / core 各一次）        3
+ * ──────────────────────────────────────────
+ * 合计            ~20 次（个人）+ 3 次（力场）/ 帧
+ * </pre>
+ * <p>
+ * 重力的施加面是<b>范围性</b>的——{@code EnchantmentGravitas} 一次触发就给 12 格内
+ * 全部生物挂上压制效果，因此同屏受压制实体数量往往不是个位数。
+ * 20 个受压制实体 × 60fps ≈ <b>每秒 2.4 万次</b>小数组分配。
+ * </p>
+ * <p>
+ * 现改为两条路径（工具见 {@link VisualColor}）：三个主题色类加载时预解包为 {@code C_} 常量；
+ * 两处真正随时间 / 逐元素变化的插值色写入 {@link #SCRATCH}。
+ * </p>
+ * <p>
+ * <b>为什么本渲染器只需要一个缓冲：</b>挤压环与浮尘的颜色都是
+ * 「算出来紧接着就被一次绘制调用消费掉」，任一时刻只有一个动态色存活。
+ * 而 {@link #cagePillar} / {@link #cageQuad} 虽然<b>同时</b>持有顶部色与底部色，
+ * 但那两个现在<b>都是只读常量</b>（力场柱传 {@code core}/{@code mid}，
+ * 牢笼柱传 {@code mid}/{@code core}），彼此不会互相覆盖——
+ * 只有当两端都是动态色时才必须开双缓冲。
+ * </p>
+ * <p>
+ * <b>视觉逐位一致：</b>{@link VisualColor#lerpInto} 保留了旧 {@code lerpRgb} 在 0~255 整数域
+ * 插值并 {@link Math#round} 取整的行为，{@link VisualColor#constant} 与旧 {@code unpack}
+ * 是同一个 {@code /255f} 公式，输出的每个颜色分量与 v3 数值相等。
+ * </p>
+ *
  * @author FlameForge
+ * @version 4
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -153,6 +189,32 @@ public final class GravitasDistortionRenderer {
     private static final int GRAVITY_DEEP = 0x1B1030;
     private static final int GRAVITY_MID = 0x5A3AB0;
     private static final int GRAVITY_CORE = 0xC7B4FF;
+
+    // ===== v4：预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
+    // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
+    // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
+    /** 重力深紫（力场底色填充；同时作为浮尘插值的起点端） */
+    private static final float[] C_GRAVITY_DEEP = VisualColor.constant(GRAVITY_DEEP);
+    /** 重力中紫（牢笼柱顶部 / 力场主环 / 压制柱底部） */
+    private static final float[] C_GRAVITY_MID = VisualColor.constant(GRAVITY_MID);
+    /** 重力亮紫（牢笼柱底部 / 力场辉光 / 塌陷环 / 压制柱顶部） */
+    private static final float[] C_GRAVITY_CORE = VisualColor.constant(GRAVITY_CORE);
+
+    /**
+     * v4：动态插值色的复用缓冲（⚠ 写入后必须立即消费，不可跨调用留存）。
+     * <p>
+     * 仅用于两处随时间 / 逐元素变化的颜色：{@link #drawSqueezeRings} 的逐环收缩渐变、
+     * {@link #drawInwardDust} 的逐粒汇聚渐变。二者顺序调用、互不嵌套，
+     * 且都是「写入 → 紧接着被一次绘制调用消费」，故一个缓冲即可。
+     * </p>
+     * <p>
+     * <b>{@link #cagePillar} 刻意不使用本缓冲</b>——牢笼柱与力场压制柱的两端色
+     * 都是只读常量，无需动态计算，也就绕开了「两个动态色同时存活」这个坑（详见类注释）。
+     * </p>
+     * <p>仅渲染线程访问，无并发问题。</p>
+     */
+    private static final float[] SCRATCH = new float[VisualColor.RGB];
 
     // ===== 头顶收拢牢笼（个人压制视觉的核心立体形状）=====
     private static final int CAGE_PILLAR_COUNT = 8;
@@ -418,6 +480,7 @@ public final class GravitasDistortionRenderer {
      * 8 根柱共 96 顶点（仅占个人压制视觉的 12%）却是「重力压制」的核心立体形状；
      * 且角度是 {@code TAU × i / 8} 均布的，减到 4 根就不成「笼」了。顶点性价比这么高，削它是纯亏。
      * </p>
+     * <p>v4：两个配色改用只读常量，本方法零分配。</p>
      */
     private static void drawCrushingCage(BufferBuilder b, Matrix4f m,
                                          float cx, float cyFoot, float cz, float width, float height,
@@ -428,8 +491,8 @@ public final class GravitasDistortionRenderer {
         float outer = width * CAGE_OUTER_FACTOR;
         float radius = outer * (1f - 0.65f * easeOutCubic(t));
         float alpha = 0.5f + 0.35f * Mth.sin(t * (float) Math.PI);
-        float[] mid = unpack(GRAVITY_MID);
-        float[] core = unpack(GRAVITY_CORE);
+        final float[] mid = C_GRAVITY_MID;
+        final float[] core = C_GRAVITY_CORE;
 
         for (int i = 0; i < CAGE_PILLAR_COUNT; i++) {
             double ang = TAU * i / CAGE_PILLAR_COUNT + seedId * 0.2f;
@@ -448,6 +511,9 @@ public final class GravitasDistortionRenderer {
     /**
      * 一根竖直牢笼柱：十字双面（沿世界 X、Z 轴各一个四边形），顶部用 {@code colTop} 且更暗淡，
      * 底部用 {@code colBottom} 且更亮，表现「重压自上而下汇聚」。
+     * <p><b>注意：</b>本方法会同时读取 {@code colTop} 与 {@code colBottom}，
+     * 调用方须保证二者不是同一个可写缓冲。当前两个调用点（牢笼柱、力场压制柱）
+     * 传的都是只读常量，安全。</p>
      */
     private static void cagePillar(BufferBuilder b, Matrix4f m,
                                    float x1, float y1, float z1, float x2, float y2, float z2,
@@ -481,6 +547,7 @@ public final class GravitasDistortionRenderer {
      * 减少 count 会改变相位间隔——但它是「一圈接一圈往内收」的循环动画、没有固定方位，
      * 减环只表现为「波与波之间隔得更开」，观感自然，无需按步长抽取。
      * </p>
+     * <p>v4：逐环颜色写入 {@link #SCRATCH} 后立即被 {@link #ring} 消费，零分配。</p>
      */
     private static void drawSqueezeRings(BufferBuilder b, Matrix4f m,
                                          float cx, float cy, float cz, float width,
@@ -497,9 +564,9 @@ public final class GravitasDistortionRenderer {
                 continue;
             }
             float alpha = SQUEEZE_ALPHA * (1f - t) * smoothstep(0f, 0.15f, t);
-            int col = lerpRgb(GRAVITY_MID, GRAVITY_CORE, 1f - t);
-            float[] c = unpack(col);
-            ring(b, m, cx, cy, cz, radius, segments, RING_HALF_WIDTH, c, alpha);
+            // v4：无分配插值（0~255 域取整，与旧 lerpRgb → unpack 链路逐位一致）
+            VisualColor.lerpInto(SCRATCH, GRAVITY_MID, GRAVITY_CORE, 1f - t);
+            ring(b, m, cx, cy, cz, radius, segments, RING_HALF_WIDTH, SCRATCH, alpha);
         }
     }
 
@@ -509,6 +576,10 @@ public final class GravitasDistortionRenderer {
      * <b>v3：数量与分段数按细节系数双削。</b>浮尘是个人压制视觉里顶点量最大的一项（384，占 47%），
      * 位置由 {@code seedFor(entityId, i)} 决定且角度纯随机（与下标无关），
      * 截断尾部时保留浮尘的汇聚轨迹完全不变，靠近时是「逐渐多几粒尘」而非重新洗牌。
+     * </p>
+     * <p>
+     * <b>v4：本方法是本渲染器分配最密集的一处</b>（16 次 / 实体 / 帧）。
+     * 逐粒颜色写入 {@link #SCRATCH} 后立即被 {@link #emitSoftMote} 消费，零分配。
      * </p>
      */
     private static void drawInwardDust(BufferBuilder b, Matrix4f m,
@@ -542,11 +613,12 @@ public final class GravitasDistortionRenderer {
                 continue;
             }
 
-            int col = lerpRgb(GRAVITY_DEEP, GRAVITY_CORE, 1f - t);
-            float[] c = unpack(col);
+            // v4：无分配插值，写入复用缓冲后立即消费
+            VisualColor.lerpInto(SCRATCH, GRAVITY_DEEP, GRAVITY_CORE, 1f - t);
             float size = DUST_SIZE * sizeRand;
 
-            emitSoftMote(b, m, px, py, pz, size, c[0], c[1], c[2], alpha,
+            emitSoftMote(b, m, px, py, pz, size,
+                    SCRATCH[0], SCRATCH[1], SCRATCH[2], alpha,
                     rightX, rightY, rightZ, upX, upY, upZ, segments);
         }
     }
@@ -568,6 +640,7 @@ public final class GravitasDistortionRenderer {
      * 截断前 N 根会让整圈栅栏只剩一段圆弧上有柱子、其余大半圈空着，
      * 明显破坏「边界警示」的语义。
      * </p>
+     * <p>v4：三个配色改用只读常量，本方法零分配。</p>
      *
      * @param radiusFactor 半径缩放系数（出现时 0→1 展开，消失时 1→0.6 收缩）
      * @param animAlpha    整体透明度系数（出现淡入、消失淡出）
@@ -581,9 +654,9 @@ public final class GravitasDistortionRenderer {
             return;
         }
         float radius = FIELD_RADIUS * radiusFactor;
-        float[] deep = unpack(GRAVITY_DEEP);
-        float[] mid = unpack(GRAVITY_MID);
-        float[] core = unpack(GRAVITY_CORE);
+        final float[] deep = C_GRAVITY_DEEP;
+        final float[] mid = C_GRAVITY_MID;
+        final float[] core = C_GRAVITY_CORE;
 
         // 力场圈半径大，分段下限比其它渲染器高（多边形偏离量正比于半径）
         int fillSegments = VisualLod.scaleSegments(FIELD_FILL_SEGMENTS, FIELD_SEGMENTS_MIN, detail);
@@ -730,6 +803,11 @@ public final class GravitasDistortionRenderer {
     }
 
     // ==================== 数学 / 颜色辅助 ====================
+    // v4 说明：原先的 lerpRgb(int, int, float) 与 unpack(int) 已删除——
+    // 二者是本类此前唯一的堆分配来源（unpack 每次 new float[3]），
+    // 现全部由 VisualColor 的 constant() / lerpInto() 取代。
+    // 若后续新增元素需要动态配色，请一律走 VisualColor.lerpInto(dst, from, to, t) + 复用缓冲，
+    // 不要重新引入返回新数组的写法。
 
     private static float frac(float x) {
         return x - (float) Math.floor(x);
@@ -758,27 +836,5 @@ public final class GravitasDistortionRenderer {
             return 0f;
         }
         return Math.min(v, 1f);
-    }
-
-    private static int lerpRgb(int from, int to, float t) {
-        if (t < 0f) {
-            t = 0f;
-        } else if (t > 1f) {
-            t = 1f;
-        }
-        int fr = (from >> 16) & 0xFF, fg = (from >> 8) & 0xFF, fb = from & 0xFF;
-        int tr = (to >> 16) & 0xFF, tg = (to >> 8) & 0xFF, tb = to & 0xFF;
-        int r = Math.round(fr + (tr - fr) * t);
-        int g = Math.round(fg + (tg - fg) * t);
-        int bl = Math.round(fb + (tb - fb) * t);
-        return (r << 16) | (g << 8) | bl;
-    }
-
-    private static float[] unpack(int color) {
-        return new float[]{
-                ((color >> 16) & 0xFF) / 255f,
-                ((color >> 8) & 0xFF) / 255f,
-                (color & 0xFF) / 255f
-        };
     }
 }

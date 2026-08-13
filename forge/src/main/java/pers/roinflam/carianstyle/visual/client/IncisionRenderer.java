@@ -96,7 +96,41 @@ import java.util.List;
  *         低于 {@link #HAZE_KEEP_THRESHOLD} 时整层不画（省 240 顶点，占总量近四分之一）。</li>
  * </ul>
  *
+ * <h3>v3（堆分配，视觉逐位一致）：颜色数组零分配化</h3>
+ * <p>
+ * v2 之后仍有一处纯浪费：旧实现的 {@code mix(a, b, t)} 与 {@code unpack(color)}
+ * <b>每次调用都 {@code new float[3]}</b>。本渲染器的调用密度：
+ * </p>
+ * <pre>
+ * 刀痕（10 段 × 2 次 gashColor→mix）        20
+ * 上升血刃（最多 20 片 × 1 次 mix）          20
+ * 躯干血气（8 团 × 1 次 mix）                 8
+ * 疾走涟漪（最多 3 环 × 1 次 mix）            3
+ * 各方法开头的 unpack 常量解包                9
+ * ────────────────────────────────────────
+ * 合计                    ~60 次 new float[3] / 实体 / 帧
+ * </pre>
+ * <p>
+ * 切腹是团战中多人同开的爆发状态，5 人同时开启即<b>每秒 1.8 万次</b>朝生夕死的小数组分配。
+ * </p>
+ * <p>
+ * 现改为两条路径（工具见 {@link VisualColor}）：三个主题色类加载时预解包为 {@code C_} 常量；
+ * 动态插值色写入 {@link #SCRATCH_A} / {@link #SCRATCH_B}。
+ * </p>
+ * <p>
+ * <b>刀痕为什么需要两个缓冲、且要滚动交换：</b>{@link #emitBillboardQuad} 需要<b>同时</b>
+ * 持有带状四边形两端的颜色，这正是 {@link VisualColor} 类注释里点名的「两个动态色同时存活」
+ * 场景——若两次都写同一个缓冲，后写的会覆盖先写的、整条刀痕退化成纯色。
+ * 又因「本段的末端色 == 下一段的起点色」，这里采用<b>滚动交换</b>：每段只算一次新颜色，
+ * 用完把两个缓冲的引用对调，20 次插值降为 10 次。
+ * </p>
+ * <p>
+ * <b>视觉逐位一致：</b>{@link VisualColor#mixInto} 与旧的 {@code mix} 都是在归一化域直接线性插值，
+ * 输出的每个颜色分量与 v2 完全相同——不是「肉眼看不出」而是「数值相等」。
+ * </p>
+ *
  * @author FlameForge
+ * @version 3
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -131,6 +165,37 @@ public final class IncisionRenderer {
     private static final int INCISION_BLOOD = 0xA01824;
     /** 近黑红：雾团外缘、地面涟漪的深色端 */
     private static final int INCISION_DARK = 0x2A0408;
+
+    // ===== v3：预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
+    // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
+    // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
+    /** 刀痕高亮色（刀痕中段、血刃初生） */
+    private static final float[] C_INCISION_GASH = VisualColor.constant(INCISION_GASH);
+    /** 氧化暗红（刀痕两端、血刃中期、涟漪起点、雾团亮部） */
+    private static final float[] C_INCISION_BLOOD = VisualColor.constant(INCISION_BLOOD);
+    /** 近黑红（血刃末期、涟漪终点、雾团暗部） */
+    private static final float[] C_INCISION_DARK = VisualColor.constant(INCISION_DARK);
+
+    /**
+     * v3：动态插值色的复用缓冲 A（⚠ 写入后必须立即消费，不可跨调用留存）。
+     * <p>
+     * 用于：刀痕的滚动双缓冲之一、血刃碎片色、涟漪色、雾团色。这几处不会同时活跃
+     * （四个 draw 方法顺序调用、互不嵌套），故可共用。
+     * </p>
+     * <p>仅渲染线程访问，无并发问题。</p>
+     */
+    private static final float[] SCRATCH_A = new float[VisualColor.RGB];
+
+    /**
+     * v3：动态插值色的复用缓冲 B（⚠ 同上）。
+     * <p>
+     * <b>专供 {@link #drawGash} 与 {@link #SCRATCH_A} 配对使用</b>——
+     * {@link #emitBillboardQuad} 需要同时持有带状四边形两端的颜色，一个缓冲不够
+     * （详见类注释「刀痕为什么需要两个缓冲」）。
+     * </p>
+     */
+    private static final float[] SCRATCH_B = new float[VisualColor.RGB];
 
     // ===== 腹部横向刀痕（核心标志）=====
     /** 刀痕高度系数（× 实体高度）。取腹部而非胸口，贴合「切腹」意象 */
@@ -333,6 +398,12 @@ public final class IncisionRenderer {
      * 只把沿长度的细分从 {@link #GASH_SEGMENTS} 降到下限 {@link #GASH_SEGMENTS_MIN}
      * （轮廓略方，但「两端收尖的横痕」这一形态完全成立）。
      * </p>
+     * <p>
+     * <b>v3：颜色改用滚动双缓冲，每段只插值一次。</b>由于「本段末端色 == 下一段起点色」，
+     * 算完一段后把 {@link #SCRATCH_A} / {@link #SCRATCH_B} 的引用对调即可复用。
+     * <b>两个缓冲缺一不可</b>——{@link #emitBillboardQuad} 要同时读两端颜色，
+     * 共用一个会让整条刀痕退化成纯色。
+     * </p>
      */
     private static void drawGash(BufferBuilder b, Matrix4f m,
                                  float cx, float cyFoot, float cz, float width, float height,
@@ -349,8 +420,11 @@ public final class IncisionRenderer {
 
         int segments = VisualLod.scaleSegments(GASH_SEGMENTS, GASH_SEGMENTS_MIN, detail);
 
-        float[] hot = unpack(INCISION_GASH);
-        float[] blood = unpack(INCISION_BLOOD);
+        // ⭐ v3 滚动双缓冲：prevCol 持有上一段末端色，curCol 持有本段末端色。
+        // 循环外先算出 u=0（左端点）的颜色，作为第一段的起点色。
+        float[] prevCol = SCRATCH_A;
+        float[] curCol = SCRATCH_B;
+        gashColorInto(prevCol, 0f);
 
         float prevOffset = -halfLen;
         float prevThick = 0f;
@@ -362,15 +436,19 @@ public final class IncisionRenderer {
             if (i > 0) {
                 // 颜色：中段热、两端暗；alpha：中段实、两端 0
                 float uPrev = (float) (i - 1) / segments;
-                float[] cPrev = gashColor(uPrev, hot, blood);
-                float[] cCur = gashColor(u, hot, blood);
+                gashColorInto(curCol, u);
                 float aPrev = alpha * gashAlpha(uPrev);
                 float aCur = alpha * gashAlpha(u);
 
                 emitBillboardQuad(b, m, cx, gashY, cz,
                         prevOffset, prevThick, offset, thick,
-                        cPrev, aPrev, cCur, aCur,
+                        prevCol, aPrev, curCol, aCur,
                         rightX, rightY, rightZ, upX, upY, upZ);
+
+                // 交换缓冲：本段末端色成为下一段的起点色，省掉一次插值
+                float[] tmp = prevCol;
+                prevCol = curCol;
+                curCol = tmp;
             }
             prevOffset = offset;
             prevThick = thick;
@@ -378,17 +456,17 @@ public final class IncisionRenderer {
     }
 
     /**
-     * 刀痕颜色包络：中段取高亮 {@code hot}，向两端过渡到暗红 {@code blood}。
+     * 刀痕颜色包络：中段取高亮 {@link #C_INCISION_GASH}，向两端过渡到暗红
+     * {@link #C_INCISION_BLOOD}，结果写入调用方提供的缓冲。
+     * <p>v3：由「返回新数组」改为「写入缓冲」，消除刀痕循环里每段两次的堆分配。</p>
      *
-     * @param u     沿长度的归一化位置（0~1）
-     * @param hot   中段高亮色
-     * @param blood 两端暗色
-     * @return 该位置的颜色
+     * @param dst 目标缓冲（⚠ 不可传入 {@code C_} 常量数组）
+     * @param u   沿长度的归一化位置（0~1）
      */
-    private static float[] gashColor(float u, float[] hot, float[] blood) {
+    private static void gashColorInto(float[] dst, float u) {
         // 距离中心的归一化距离（0=中心，1=端点）
         float d = Math.abs(u - 0.5f) * 2f;
-        return mix(hot, blood, d * d);
+        VisualColor.mixInto(dst, C_INCISION_GASH, C_INCISION_BLOOD, d * d);
     }
 
     /**
@@ -405,6 +483,9 @@ public final class IncisionRenderer {
      * 在 billboard 平面内绘制一段「带状四边形」：沿相机右向量偏移 {@code offset}、
      * 沿相机上向量正负各扩 {@code thick}，两端可分别指定颜色与 alpha。
      * <p>用于把刀痕拼成一条厚度渐变的发光横条。</p>
+     * <p><b>注意：</b>本方法会<b>同时读取</b> {@code col0} 与 {@code col1}，
+     * 因此调用方必须保证这两个数组不是同一个缓冲——这正是
+     * {@link #drawGash} 使用双缓冲的原因。</p>
      */
     private static void emitBillboardQuad(BufferBuilder b, Matrix4f m,
                                           float cx, float cy, float cz,
@@ -446,6 +527,9 @@ public final class IncisionRenderer {
      * <b>v2：数量再乘细节系数。</b>碎片位置由 {@code seedFor(entityId, i + 100)} 决定，
      * 截断尾部时保留元素的种子与轨迹完全不变，靠近时是「逐渐多出几片碎片」而非重新洗牌。
      * </p>
+     * <p>
+     * <b>v3：颜色写入 {@link #SCRATCH_A} 后立即被 {@link #emitShard} 消费，零分配。</b>
+     * </p>
      */
     private static void drawRisingShards(BufferBuilder b, Matrix4f m,
                                          float cx, float cyFoot, float cz, float width, float height,
@@ -457,10 +541,6 @@ public final class IncisionRenderer {
         float startY = cyFoot + height * GASH_HEIGHT_FACTOR;
         float riseHeight = height * SHARD_RISE_HEIGHT_FACTOR;
         float spread = width * SHARD_SPREAD_FACTOR;
-
-        float[] hot = unpack(INCISION_GASH);
-        float[] blood = unpack(INCISION_BLOOD);
-        float[] dark = unpack(INCISION_DARK);
 
         for (int i = 0; i < count; i++) {
             long s = seedFor(seedId, i + 100);
@@ -503,12 +583,18 @@ public final class IncisionRenderer {
             float pz = cz + (float) Math.sin(ang) * curRad;
             float py = startY + rise * riseHeight;
 
-            // 颜色：初生偏亮（贴近刀痕），上升过程转暗红再转近黑红
-            float[] col = (t < 0.4f) ? mix(hot, blood, t / 0.4f) : mix(blood, dark, (t - 0.4f) / 0.6f);
+            // 颜色：初生偏亮（贴近刀痕），上升过程转暗红再转近黑红。
+            // v3：无分配插值，写入复用缓冲后立即消费
+            if (t < 0.4f) {
+                VisualColor.mixInto(SCRATCH_A, C_INCISION_GASH, C_INCISION_BLOOD, t / 0.4f);
+            } else {
+                VisualColor.mixInto(SCRATCH_A, C_INCISION_BLOOD, C_INCISION_DARK, (t - 0.4f) / 0.6f);
+            }
             float size = SHARD_SIZE * sizeRand * (1f - 0.35f * t);
             float rot = time * SHARD_SPIN_SPEED * spinDir + spinPhase;
 
-            emitShard(b, m, px, py, pz, size, rot, col[0], col[1], col[2], alpha,
+            emitShard(b, m, px, py, pz, size, rot,
+                    SCRATCH_A[0], SCRATCH_A[1], SCRATCH_A[2], alpha,
                     rightX, rightY, rightZ, upX, upY, upZ);
         }
     }
@@ -564,6 +650,9 @@ public final class IncisionRenderer {
      * 减少 count 会改变相位间隔——但涟漪本身是「一圈接一圈往外推」的循环动画、没有固定方位，
      * 减圈只表现为「波与波之间隔得更开」，观感自然，无需按步长抽取。
      * </p>
+     * <p>
+     * <b>v3：颜色写入 {@link #SCRATCH_A} 后立即被 {@link #ring} 消费，零分配。</b>
+     * </p>
      */
     private static void drawSprintRipples(BufferBuilder b, Matrix4f m,
                                           float cx, float cy, float cz, float width,
@@ -578,9 +667,6 @@ public final class IncisionRenderer {
         // 扩散速度随爆发强度提升，强化「疾走」的观感
         float rate = RIPPLE_RATE * (0.7f + 0.6f * burst);
 
-        float[] blood = unpack(INCISION_BLOOD);
-        float[] dark = unpack(INCISION_DARK);
-
         for (int i = 0; i < count; i++) {
             float phase = (float) i / count;
             float t = frac(time * rate + phase + seedId * 0.11f);
@@ -593,8 +679,9 @@ public final class IncisionRenderer {
             if (alpha <= 0.01f) {
                 continue;
             }
-            float[] col = mix(blood, dark, t);
-            ring(b, m, cx, cy, cz, radius, segments, RIPPLE_HALF_WIDTH, col, alpha);
+            // v3：无分配插值，写入复用缓冲后立即消费
+            VisualColor.mixInto(SCRATCH_A, C_INCISION_BLOOD, C_INCISION_DARK, t);
+            ring(b, m, cx, cy, cz, radius, segments, RIPPLE_HALF_WIDTH, SCRATCH_A, alpha);
         }
     }
 
@@ -608,15 +695,15 @@ public final class IncisionRenderer {
      * <b>v2：数量与分段数再乘细节系数；整层由调用方按 {@link #HAZE_KEEP_THRESHOLD} 决定是否绘制。</b>
      * 雾团位置由 {@code seedFor(entityId, i + 700)} 决定，截断尾部安全。
      * </p>
+     * <p>
+     * <b>v3：颜色写入 {@link #SCRATCH_A} 后立即被 {@link #emitSoftMote} 消费，零分配。</b>
+     * </p>
      */
     private static void drawBodyHaze(BufferBuilder b, Matrix4f m,
                                      float cx, float cyFoot, float cz, float width, float height,
                                      float time, int seedId,
                                      float rightX, float rightY, float rightZ,
                                      float upX, float upY, float upZ, float detail) {
-        float[] blood = unpack(INCISION_BLOOD);
-        float[] dark = unpack(INCISION_DARK);
-
         int count = VisualLod.scale(HAZE_COUNT, detail);
         int segments = VisualLod.scaleSegments(HAZE_SEGMENTS, HAZE_SEGMENTS_MIN, detail);
 
@@ -644,9 +731,11 @@ public final class IncisionRenderer {
             float alpha = HAZE_BASE_ALPHA * pulse;
             float size = width * HAZE_SIZE_FACTOR * sizeRand;
 
-            float[] col = mix(dark, blood, 0.35f + 0.4f * pulse);
+            // v3：无分配插值，写入复用缓冲后立即消费
+            VisualColor.mixInto(SCRATCH_A, C_INCISION_DARK, C_INCISION_BLOOD, 0.35f + 0.4f * pulse);
 
-            emitSoftMote(b, m, px, py, pz, size, col[0], col[1], col[2], alpha,
+            emitSoftMote(b, m, px, py, pz, size,
+                    SCRATCH_A[0], SCRATCH_A[1], SCRATCH_A[2], alpha,
                     rightX, rightY, rightZ, upX, upY, upZ, segments);
         }
     }
@@ -730,7 +819,7 @@ public final class IncisionRenderer {
         return ((s >>> 40) & 0xFFFFFFL) / (float) 0x1000000;
     }
 
-    // ==================== 数学 / 颜色辅助 ====================
+    // ==================== 数学辅助 ====================
 
     private static float frac(float x) {
         return x - (float) Math.floor(x);
@@ -759,24 +848,5 @@ public final class IncisionRenderer {
             return 0f;
         }
         return Math.min(v, 1f);
-    }
-
-    /** 两个 [r,g,b] 颜色按 t 线性插值（t 自动夹取到 0~1）。 */
-    private static float[] mix(float[] a, float[] b, float t) {
-        float u = clamp01(t);
-        return new float[]{
-                a[0] + (b[0] - a[0]) * u,
-                a[1] + (b[1] - a[1]) * u,
-                a[2] + (b[2] - a[2]) * u
-        };
-    }
-
-    /** 0xRRGGBB 拆为 [r,g,b]（0~1）。 */
-    private static float[] unpack(int color) {
-        return new float[]{
-                ((color >> 16) & 0xFF) / 255f,
-                ((color >> 8) & 0xFF) / 255f,
-                (color & 0xFF) / 255f
-        };
     }
 }
