@@ -9,6 +9,7 @@ import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -29,8 +30,23 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
  * 卡利亚报复附魔
  * <p>v2.2：LivingAttack格挡反击入口接入怪物附魔触发开关</p>
  *
+ * <h3>v3.0：剑阵跟随持盾者</h3>
+ * <p>
+ * <b>生成位置本来就是对的</b>——三把剑以 {@code holder} 为中心呈 120° 三角布置，
+ * 符合原作「格挡瞬间在身前弹出辉剑」的表现，本次没有改动几何。
+ * </p>
+ * <p>
+ * 改的是两点：
+ * </p>
+ * <ol>
+ *     <li>挂上 {@link EntityGlintblades#setHoverAnchor(Vec3)}，悬浮的 40~50 tick 里
+ *         剑跟着持盾者走。举盾格挡本就是个会边挡边挪的动作，剑钉在原地会立刻穿帮；</li>
+ *     <li>攻击剑的发射点改用持盾者的<b>实时</b>位置推算。原实现捕获的是生成时的
+ *         {@code posX/posY/posZ}，持盾者移动后剑会从身后凭空飞出。</li>
+ * </ol>
+ *
  * @author RoinFlam
- * @version 2.2
+ * @version 3.0
  */
 @AutoRegisterEnchantment(
         id = "carian_retaliation",
@@ -45,6 +61,12 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentCarianRetaliation extends EnchantmentBase {
+
+    /** 剑环半径（格），与原实现一致 */
+    private static final double RING_RADIUS = 1.5;
+
+    /** 剑环离持盾者脚底的高度（格），与原实现一致 */
+    private static final double RING_HEIGHT = 0.5;
 
     public EnchantmentCarianRetaliation() {
         super(CarianStyleEnchantments.getCustomEnchantmentCategory("SHIELD"),
@@ -105,29 +127,47 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
         final float baseDamage = evt.getAmount();
 
         for (int i = 0; i < 3; i++) {
-            int delay = 40 + i * 5;
+            final int delay = 40 + i * 5;
 
             double angle = (i * 120) * Math.PI / 180.0;
-            double radius = 1.5;
-            double posX = holder.getX() + Math.cos(angle) * radius;
-            double posY = holder.getY() + 0.5;
-            double posZ = holder.getZ() + Math.sin(angle) * radius;
+            // v3.0：相对持盾者的局部偏移（原实现在这里直接算成了绝对坐标）
+            final double offsetX = Math.cos(angle) * RING_RADIUS;
+            final double offsetY = RING_HEIGHT;
+            final double offsetZ = Math.sin(angle) * RING_RADIUS;
 
             EntityGlintblades showBlade = new EntityGlintblades(holder, attacker)
                     .setDeadTick(delay)
-                    .setSize(1.0f);
-            showBlade.setPos(posX, posY, posZ);
+                    .setSize(1.0f)
+                    .setHoverAnchor(new Vec3(offsetX, offsetY, offsetZ));
+            // 生成位置由 followAnchor 在首个 tick 立刻校正，这里给个初值即可
+            showBlade.setPos(holder.getX() + offsetX, holder.getY() + offsetY, holder.getZ() + offsetZ);
             holder.level().addFreshEntity(showBlade);
 
             new SynchronizationTask(delay) {
                 @Override
                 public void run() {
-                    if (!attacker.isAlive() || attacker.isRemoved()) {
+                    // 持盾者没了就取消：发射点相对他算出，人不在无处可发
+                    if (!holder.isAlive() || holder.isRemoved()) {
                         return;
                     }
 
+                    // v4.1：攻击者死了也照样发射，朝其死亡地点飞完全程
+                    Vec3 aimPoint = new Vec3(
+                            attacker.getX(),
+                            attacker.getY() + attacker.getEyeHeight() * 0.8,
+                            attacker.getZ());
+
+                    // v4.1：按持盾者的实时位置与朝向把局部偏移旋转到世界坐标
+                    float yawRad = (float) Math.toRadians(holder.getYRot());
+                    double sin = Math.sin(yawRad);
+                    double cos = Math.cos(yawRad);
+                    double launchX = holder.getX() + (-cos) * offsetX + (-sin) * offsetZ;
+                    double launchY = holder.getY() + offsetY;
+                    double launchZ = holder.getZ() + (-sin) * offsetX + cos * offsetZ;
+
                     EntityGlintblades attackBlade = new EntityGlintblades(holder, attacker)
                             .setSize(1.0f)
+                            .setAimPoint(aimPoint)
                             .setDamage(baseDamage * effectiveLevel * 0.2f)
                             .setDamageSource(holder.damageSources().thrown(null, holder))
                             .setTrackingStrength(0.15f)
@@ -135,7 +175,7 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
 
                     DamageSourceUtil.setMagicDamage(attackBlade.getDamageSource());
 
-                    attackBlade.setPos(posX, posY, posZ);
+                    attackBlade.setPos(launchX, launchY, launchZ);
                     attackBlade.shoot(1.2f);
                     holder.level().addFreshEntity(attackBlade);
                 }
