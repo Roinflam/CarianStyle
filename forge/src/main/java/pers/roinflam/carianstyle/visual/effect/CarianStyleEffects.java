@@ -1,3 +1,5 @@
+// 文件：CarianStyleEffects.java
+// 路径：forge/src/main/java/pers/roinflam/carianstyle/visual/effect/CarianStyleEffects.java
 package pers.roinflam.carianstyle.visual.effect;
 
 import net.minecraft.server.level.ServerLevel;
@@ -52,6 +54,21 @@ import javax.annotation.Nullable;
  *         对服务端 tick 的开销可视为零。因此在任何伤害 / 死亡触发点插入特效都是安全的。</li>
  * </ol>
  *
+ * <h3>定点还是跟随？</h3>
+ * <p>
+ * 这是新增演出时唯一需要认真想一想的选择，判据只有一条：
+ * <b>这个演出是「一瞬间的事」还是「持续几秒的状态」？</b>
+ * </p>
+ * <ul>
+ *     <li><b>瞬时反馈用定点</b>——因果律、冻结地震、排斥、龙雷、神圣净化。
+ *         这类演出表达「就在这个位置发生了什么」，锁死坐标才有打击感；
+ *         跟随反而会让爆闪跟着被击退的目标飘走，把「砍实了」的手感冲淡；</li>
+ *     <li><b>持续状态用跟随</b>——猩红立体花、癫火扩散、满月月华。
+ *         这类演出要笼罩持有者数秒，期间人会移动 / 被击退 / 主动跑位，
+ *         定点会导致「人跑出了自己的光柱」。跟随由客户端每帧取实体插值位置，
+ *         实体中途死亡 / 卸载则自动回退到最后已知坐标播完剩余演出。</li>
+ * </ul>
+ *
  * <h3>如何新增一种全新演出</h3>
  * <p>
  * 若现有演出都不合适，需要新增一套（例如「金色爆裂」），按顺序改这 4 处，
@@ -66,9 +83,13 @@ import javax.annotation.Nullable;
  *     <li>{@code AoeEffectRenderer.dispatch} —— 追加 case，并新增对应的 {@code drawXxx} 方法；</li>
  *     <li>本类 —— 追加一个语义化静态方法转发到 {@link #send}。</li>
  * </ol>
+ * <p>
+ * <b>⚠ 第 3 步漏了不会崩溃，但会静默走 {@code default} 分支画成通用蓝白双环</b>
+ * （{@link #generic}），因此改完务必进游戏确认一次实际效果。
+ * </p>
  *
  * @author FlameForge
- * @version 1.0
+ * @version 2.0
  */
 public final class CarianStyleEffects {
 
@@ -96,6 +117,20 @@ public final class CarianStyleEffects {
 
     /** 龙雷红色闪电默认半径（格）：仅决定落地冲击环大小，电柱粗细 / 高度由渲染器常量控制 */
     public static final float RED_LIGHTNING_RADIUS = 4.5f;
+
+    /**
+     * 满月月华默认半径（格）。
+     * <p>决定脚下回春环与月光池的尺寸；头顶月轮与月华柱的高度由渲染器常量控制。
+     * 取 3.5 是为了让光池刚好比人形略大一圈，读作「被月光笼罩」而非「站在一个大法阵里」。</p>
+     */
+    public static final float MOON_BLESSING_RADIUS = 3.5f;
+
+    /**
+     * 神圣净化默认半径（格）。
+     * <p>决定净化环与地面圣徽的尺寸。取 2.2 是因为这是<b>单体</b>技的命中反馈，
+     * 范围做大了会被误读成 AOE、让玩家以为周围的亡灵也吃到了伤害。</p>
+     */
+    public static final float SACRED_PURGE_RADIUS = 2.2f;
 
     private CarianStyleEffects() {
     }
@@ -237,6 +272,99 @@ public final class CarianStyleEffects {
      */
     public static void redLightning(@Nonnull ServerLevel level, double x, double y, double z, float radius) {
         send(level, null, x, y, z, radius, AoeEffectPacket.TYPE_RED_LIGHTNING);
+    }
+
+    // ============================================================
+    //                      满月月华（濒死复活）
+    // ============================================================
+
+    /**
+     * 满月月华：头顶浮现月轮 → 一道月华柱自上而下笼罩全身 → 脚下每秒一圈<b>向内收拢</b>的
+     * 回春环 → 月尘持续上升。约 5000ms，<b>跟随持有者</b>。
+     * <p>
+     * 用于 {@code EnchantmentFullMoon} 的濒死复活：阻止死亡、残血保命、随后 10 秒
+     * （持有暗月时 20 秒）每秒回 0.5% 最大生命。
+     * </p>
+     * <p>
+     * <b>回春环刻意做成向内收拢</b>——本模组其余全部环形演出都是向外扩散（爆发、冲击、排斥），
+     * 反向收拢在视觉上直接读作「能量在往身上汇聚」，与「回血」的语义一致，
+     * 且同屏叠加时一眼就能和那些爆发类演出区分开。
+     * </p>
+     * <p>
+     * <b>务必用跟随而非定点</b>：复活后玩家往往立刻被继续攻击、被击退或主动跑位，
+     * 定点会导致「人跑出了自己的光柱」（详见类注释「定点还是跟随」）。
+     * </p>
+     * <p>
+     * <b>时长不与机制强行对齐。</b>机制回血 10~20 秒，而演出只有 5 秒——
+     * 覆盖最戏剧化的前半段即可，全程铺满反而拖沓，且会长时间遮挡玩家自己的视野
+     * （复活后正是最需要看清周围的时候）。
+     * </p>
+     *
+     * @param level  服务端世界
+     * @param holder 复活的持有者（特效跟随其实时位置）
+     */
+    public static void moonBlessing(@Nonnull ServerLevel level, @Nonnull LivingEntity holder) {
+        moonBlessing(level, holder, holder.getX(), holder.getY(), holder.getZ(), MOON_BLESSING_RADIUS);
+    }
+
+    /**
+     * 满月月华（自定义坐标与半径）。
+     *
+     * @param level  服务端世界
+     * @param holder 绑定实体（特效跟随其实时位置）；传 {@code null} 则锁定为下方坐标
+     * @param x      中心 X（实体消失后的回退坐标）
+     * @param y      中心 Y（<b>脚底</b>，月华柱由此向上延伸、回春环贴地）
+     * @param z      中心 Z
+     * @param radius 半径（格）：决定回春环与月光池尺寸
+     */
+    public static void moonBlessing(@Nonnull ServerLevel level, @Nullable Entity holder,
+                                    double x, double y, double z, float radius) {
+        send(level, holder, x, y, z, radius, AoeEffectPacket.TYPE_MOON_BLESSING);
+    }
+
+    // ============================================================
+    //                    神圣净化（击中亡灵）
+    // ============================================================
+
+    /**
+     * 神圣净化：目标处金色十字光刃爆开 → 净化环向外扩散 → 金色光尘升天 → 地面圣徽余辉。
+     * 约 700ms，<b>定点</b>。
+     * <p>
+     * 用于 {@code EnchantmentSacredBlade} 击中亡灵：额外伤害 + 吸血 + 永久削弱目标。
+     * </p>
+     * <p>
+     * <b>只在命中亡灵时调用。</b>神圣刀刃对非亡灵是 -80% 伤害的巨大负收益，
+     * 那种情况下放净化特效会误导玩家以为打出了强力一击。
+     * </p>
+     * <p>
+     * <b>用定点而非跟随</b>：这是「打中那一下」的瞬时反馈（仅 700ms），
+     * 锁在命中坐标才有打击感；跟随会让爆闪跟着被击退的目标飘走
+     * （详见类注释「定点还是跟随」）。
+     * </p>
+     * <p>
+     * <b>发包频率提示：</b>本演出的触发点位于每次命中都会走的伤害回调中，
+     * 刷亡灵怪塔时会比较密集。客户端侧由 {@code AoeEffectManager.MAX_ACTIVE}(40)
+     * 的存活上限兜底，超出时丢弃最早的那个，不会无限堆积。
+     * </p>
+     *
+     * @param level  服务端世界
+     * @param victim 被净化的亡灵（取其脚底坐标作为爆闪中心）
+     */
+    public static void sacredPurge(@Nonnull ServerLevel level, @Nonnull LivingEntity victim) {
+        sacredPurge(level, victim.getX(), victim.getY(), victim.getZ(), SACRED_PURGE_RADIUS);
+    }
+
+    /**
+     * 神圣净化（裸坐标 + 自定义半径）。
+     *
+     * @param level  服务端世界
+     * @param x      中心 X
+     * @param y      中心 Y（脚底）
+     * @param z      中心 Z
+     * @param radius 半径（格）：决定净化环与地面圣徽尺寸
+     */
+    public static void sacredPurge(@Nonnull ServerLevel level, double x, double y, double z, float radius) {
+        send(level, null, x, y, z, radius, AoeEffectPacket.TYPE_SACRED_PURGE);
     }
 
     // ============================================================

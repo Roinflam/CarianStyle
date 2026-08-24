@@ -10,7 +10,7 @@ import java.util.function.Supplier;
  * 定点 / 跟随 AOE 自绘特效触发包（S2C，服务端 -> 客户端）。
  * <p>
  * 这是为「无 MobEffect 的瞬时 AOE 效果」单独铺设的轻量触发链：服务端在附魔触发点
- * 调用 {@link pers.roinflam.carianstyle.visual.effect.CarianStyleBurstParticles}，由其
+ * 调用 {@link pers.roinflam.carianstyle.visual.effect.CarianStyleEffects}，由其
  * 通过本包把「效果类型 + 世界坐标 + 半径 + 绑定实体 id」广播给附近客户端；客户端收到后创建一个带
  * 生命周期的自绘几何特效（纯顶点绘制，无贴图、无原版粒子）。
  * </p>
@@ -31,8 +31,26 @@ import java.util.function.Supplier;
  * 冲击环）。该类型为定点特效（不跟随），通过 5 参构造发包即可。
  * </p>
  *
+ * <h3>v4：新增满月月华（7）与神圣净化（8）</h3>
+ * <p>
+ * 两者都走既有链路，未改动任何字段与编解码格式，因此<b>新旧端的包结构完全兼容</b>。
+ * </p>
+ * <ul>
+ *     <li>{@link #TYPE_MOON_BLESSING} —— 满月（{@code EnchantmentFullMoon}）濒死复活时的回血演出。
+ *         <b>跟随实体</b>：复活后玩家会移动 / 被击退，月轮与月华柱必须贴身，否则会看到人跑出光柱。
+ *         用 6 参构造并传入持有者 id；</li>
+ *     <li>{@link #TYPE_SACRED_PURGE} —— 神圣刀刃（{@code EnchantmentSacredBlade}）击中亡灵时的
+ *         净化爆闪。<b>定点</b>：这是「打中那一下」的瞬时反馈（仅 700ms），锁在命中坐标即可，
+ *         跟随反而会让爆闪跟着被击退的目标飘、削弱打击感。用 5 参构造。</li>
+ * </ul>
+ * <p>
+ * <b>⚠ 新增类型时只能在末尾追加常量，数值不可插队</b>——{@link #encode} 用
+ * {@code writeByte} 写类型，新旧端对同一数值的解读必须一致，插队会导致所有后续类型错位。
+ * 当前已用到 8，{@code byte} 的容量（最多 127）远未触及。
+ * </p>
+ *
  * @author RoinFlam
- * @version 3.0
+ * @version 4.0
  */
 public class AoeEffectPacket {
 
@@ -51,6 +69,16 @@ public class AoeEffectPacket {
     public static final int TYPE_GENERIC = 5;
     /** 龙雷红色闪电：竖直红色之字电柱 + 分叉 + 落地红色冲击（古龙雷击 / 维克的龙雷专用） */
     public static final int TYPE_RED_LIGHTNING = 6;
+    /**
+     * 满月月华：头顶月轮 + 自上而下的月华柱 + 脚下向内收拢的回春环 + 月尘上升。
+     * <p>满月濒死复活时的回血演出，<b>跟随持有者</b>（详见类注释 v4 小节）。</p>
+     */
+    public static final int TYPE_MOON_BLESSING = 7;
+    /**
+     * 神圣净化：金色十字光刃爆闪 + 净化环 + 升天光尘。
+     * <p>神圣刀刃击中亡灵时的瞬时反馈，<b>定点</b>（详见类注释 v4 小节）。</p>
+     */
+    public static final int TYPE_SACRED_PURGE = 8;
 
     /** 「不跟随」哨兵值：entityId 为该值时特效锁死在发包坐标 */
     public static final int NO_ENTITY = -1;

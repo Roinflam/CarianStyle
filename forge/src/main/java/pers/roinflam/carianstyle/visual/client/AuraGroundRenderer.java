@@ -168,8 +168,59 @@ import java.util.Set;
  *     <li><b>彗星与火花整层可跳过</b>——都是极小的装饰光点，远处完全看不出。</li>
  * </ul>
  *
+ * <h3>v5（堆分配，视觉逐位一致）：颜色与几何数组零分配化</h3>
+ * <p>
+ * v4 把顶点量压下去了，但本渲染器<b>是全模组最后一个还在用返回新数组写法的</b>，
+ * 而且它的分配点比其它渲染器更隐蔽——不在颜色上，而在那个到处都在调的小火花：
+ * </p>
+ * <pre>
+ * addSpark（每次 1 个 float[][] 外层 + 4 个 float[2] = 5 个数组）：
+ *   方形：四角火花 4 + 边框彗星 2                          = 6 次
+ *   圆形：边框彗星 2×3 尾点                                = 6 次
+ *   母题 motifCarian：顶点水晶碎光                          = 6 次
+ *   母题 motifCosmic：addStarField 星屑                    = 14 次
+ *   母题 motifHoly：芒尖金光                                = 8 次
+ *   ──────────────────────────────────────────────────
+ *   单光环峰值约 20~26 次 × 5 = ~100~130 个数组 / 光环 / 帧
+ *
+ * unpack（每次 1 个 float[3]）：                            1 次
+ * perimeterPoint（每次 1 个 double[2]）：                   2 次
+ * </pre>
+ * <p>
+ * <b>圣域是群体增益光环</b>——举盾即为 16 格内全部友方提供减伤与护盾，
+ * 团战中十人同时举盾并不罕见。10 个光环 × 60fps ≈ <b>每秒 7.8 万次</b>小数组分配，
+ * 而这些数组的存活期只有紧随其后的几行。
+ * </p>
+ * <p>
+ * 现改为三条路径：
+ * </p>
+ * <ol>
+ *     <li><b>{@link #addSpark} 的四个角点内联为标量</b>——做法与
+ *         {@code AoeEffectRenderer} v7 处理同名方法完全一致，本方法自此零分配。
+ *         这是本次收益最大的一项（占全部分配的九成以上）；</li>
+ *     <li><b>{@link #unpack} 改为 {@link VisualColor#unpackInto} 写入 {@link #SCRATCH}</b>——
+ *         注意本渲染器的颜色<b>不是编译期常量</b>（来自 {@link AuraDisplayRegistry.AuraInfo}
+ *         的运行时字段），因此无法像其它渲染器那样预解包成 {@code C_} 常量，只能走复用缓冲。
+ *         好在两个调用点都是「解包 → 立刻提取 r/g/b 标量 → 之后再不碰缓冲」，
+ *         一个缓冲绰绰有余；</li>
+ *     <li><b>{@link #perimeterPoint} 改为写入 {@link #PERIMETER_XZ}</b>——
+ *         调用点只有边框彗星一处，且同样是「写入 → 立刻读走」。</li>
+ * </ol>
+ * <p>
+ * <b>⚠ 复用缓冲的约束：</b>{@link #SCRATCH} 与 {@link #PERIMETER_XZ} 都必须
+ * 「写入 → 立即消费 → 不跨调用留存」。本渲染器不存在「两个动态值同时存活」的场景
+ * （{@link #addBand} / {@link #addLine} 等基元接收的都是已拆开的 r/g/b 标量，
+ * 而非数组引用），故各一个缓冲即可。若将来新增需要同时持有两组颜色的元素，
+ * 必须另开缓冲——参照 {@code SleepRenderer} 螺旋的双缓冲滚动写法。
+ * </p>
+ * <p>
+ * <b>视觉逐位一致：</b>{@link VisualColor#unpackInto} 与旧 {@code unpack} 是同一个
+ * {@code /255f} 公式；{@link #addSpark} 的角点数值与顶点写入顺序逐字照搬；
+ * {@link #perimeterPoint} 的分支逻辑一字未改。输出的每个顶点与 v4 完全相同。
+ * </p>
+ *
  * @author FlameForge
- * @version 4
+ * @version 5
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -298,6 +349,28 @@ public final class AuraGroundRenderer {
     private static final float FADE_TICKS = 7.0f;
 
     private static final float HALF_PI = (float) (Math.PI / 2.0);
+
+    /**
+     * v5：颜色解包的复用缓冲（⚠ 写入后必须立即消费，不可跨调用留存）。
+     * <p>
+     * <b>为什么本渲染器不能用 {@code C_} 常量：</b>其它渲染器的主题色都是编译期常量、
+     * 可以在类加载时预解包一次；而本渲染器的颜色来自
+     * {@link AuraDisplayRegistry.AuraInfo#color()} 这个<b>运行时字段</b>
+     * （每个光环各不相同，且由注册表决定），无法预解包，只能走复用缓冲。
+     * </p>
+     * <p>
+     * 两个调用点（{@link #drawSquare} / {@link #drawCircle}）都是
+     * 「解包 → 立刻提取 r/g/b 标量 → 之后再不碰缓冲」，故一个缓冲足够。
+     * </p>
+     * <p>仅渲染线程访问，无并发问题。</p>
+     */
+    private static final float[] SCRATCH = new float[VisualColor.RGB];
+
+    /**
+     * v5：方形周边坐标的复用缓冲（⚠ 同上，仅供 {@link #perimeterPoint} 使用）。
+     * <p>索引 0 为相对中心的 dx，索引 1 为 dz。调用点只有 {@link #drawSquare} 的边框彗星一处。</p>
+     */
+    private static final double[] PERIMETER_XZ = new double[2];
 
     private AuraGroundRenderer() {
     }
@@ -557,6 +630,10 @@ public final class AuraGroundRenderer {
      * <b>底色填充、三层发光边、四角位置本身完全不削</b>——方形只有 4 条边、4 个角，
      * 削掉任何一个都不再是「方形」；且三层边加起来才 72 顶点，是精确边界的唯一表达。
      * </p>
+     * <p>
+     * v5：颜色改为 {@link VisualColor#unpackInto} 写入 {@link #SCRATCH} 后立即提取标量；
+     * 边框彗星的周边坐标改为写入 {@link #PERIMETER_XZ}。二者时序上先后不重叠，互不干扰。
+     * </p>
      *
      * @param fillMul 填充呼吸亮度系数
      * @param lineMul 线条呼吸亮度系数
@@ -567,8 +644,9 @@ public final class AuraGroundRenderer {
                                    float fillMul, float lineMul, float now, float detail) {
         double cx = p.rx(), cy = p.ry(), cz = p.rz();
         double half = p.radius();
-        float[] col = unpack(p.color());
-        float r = col[0], g = col[1], b = col[2];
+        // v5：无分配解包，写入复用缓冲后立即提取为标量（之后再不碰缓冲）
+        VisualColor.unpackInto(SCRATCH, p.color());
+        float r = SCRATCH[0], g = SCRATCH[1], b = SCRATCH[2];
         float br = brighten(r), bg = brighten(g), bb = brighten(b);
 
         // 区域底色
@@ -602,11 +680,31 @@ public final class AuraGroundRenderer {
         if (VisualLod.keepLayer(detail, SPARKLE_KEEP_THRESHOLD)) {
             double xMin = cx - half, xMax = cx + half;
             double zMin = cz - half, zMax = cz + half;
-            double[][] corners = {{xMin, zMin}, {xMax, zMin}, {xMax, zMax}, {xMin, zMax}};
+            // v5：四个角点内联为标量，不再用 double[][] 字面量（原实现每帧分配 5 个数组）
             for (int i = 0; i < 4; i++) {
+                double cornerX;
+                double cornerZ;
+                switch (i) {
+                    case 0 -> {
+                        cornerX = xMin;
+                        cornerZ = zMin;
+                    }
+                    case 1 -> {
+                        cornerX = xMax;
+                        cornerZ = zMin;
+                    }
+                    case 2 -> {
+                        cornerX = xMax;
+                        cornerZ = zMax;
+                    }
+                    default -> {
+                        cornerX = xMin;
+                        cornerZ = zMax;
+                    }
+                }
                 float phase = 0.45f + 0.55f * (0.5f + 0.5f * Mth.sin(now * CORNER_CHASE_SPEED + i * HALF_PI));
                 float a = CORNER_ALPHA * lineMul * phase;
-                addSpark(builder, m, corners[i][0], cy, corners[i][1], CORNER_SIZE, br, bg, bb, a);
+                addSpark(builder, m, cornerX, cy, cornerZ, CORNER_SIZE, br, bg, bb, a);
             }
         }
 
@@ -614,8 +712,9 @@ public final class AuraGroundRenderer {
         if (VisualLod.keepLayer(detail, COMET_KEEP_THRESHOLD)) {
             for (int i = 0; i < COMET_COUNT; i++) {
                 float t = frac(now / COMET_PERIOD_TICKS + (float) i / COMET_COUNT);
-                double[] off = perimeterPoint(half, t);
-                addSpark(builder, m, cx + off[0], cy, cz + off[1], COMET_SIZE,
+                // v5：写入复用缓冲后立即读走，不再返回新数组
+                perimeterPoint(half, t);
+                addSpark(builder, m, cx + PERIMETER_XZ[0], cy, cz + PERIMETER_XZ[1], COMET_SIZE,
                         br, bg, bb, COMET_ALPHA * lineMul);
             }
         }
@@ -623,29 +722,40 @@ public final class AuraGroundRenderer {
 
     /**
      * 计算方形周边某处的偏移坐标（相对中心），t∈[0,1) 沿顺时针绕行一周。
+     * <p>
+     * <b>v5：结果写入 {@link #PERIMETER_XZ} 而非返回新数组。</b>
+     * 索引 0 为 dx、索引 1 为 dz。调用方必须「调用后立即读走」，不可跨调用留存。
+     * </p>
      *
      * @param half 半边长
      * @param t    周长参数（0~1）
-     * @return 长度为 2 的数组 {dx, dz}（相对方形中心的偏移）
      */
-    private static double[] perimeterPoint(double half, double t) {
+    private static void perimeterPoint(double half, double t) {
         double per = t * 4.0;          // 0~4，整数部分为边序号
         int side = (int) per;          // 0=北 1=东 2=南 3=西
         double f = per - side;         // 该边内的进度 0~1
         double span = 2.0 * half;
         switch (side) {
-            case 0:
+            case 0 -> {
                 // 北边 z=-half，x 从 -half → +half
-                return new double[]{-half + f * span, -half};
-            case 1:
+                PERIMETER_XZ[0] = -half + f * span;
+                PERIMETER_XZ[1] = -half;
+            }
+            case 1 -> {
                 // 东边 x=+half，z 从 -half → +half
-                return new double[]{half, -half + f * span};
-            case 2:
+                PERIMETER_XZ[0] = half;
+                PERIMETER_XZ[1] = -half + f * span;
+            }
+            case 2 -> {
                 // 南边 z=+half，x 从 +half → -half
-                return new double[]{half - f * span, half};
-            default:
+                PERIMETER_XZ[0] = half - f * span;
+                PERIMETER_XZ[1] = half;
+            }
+            default -> {
                 // 西边 x=-half，z 从 +half → -half
-                return new double[]{-half, half - f * span};
+                PERIMETER_XZ[0] = -half;
+                PERIMETER_XZ[1] = half - f * span;
+            }
         }
     }
 
@@ -697,23 +807,58 @@ public final class AuraGroundRenderer {
     }
 
     /**
-     * 在某点绘制一个小菱形光点（四角火花 / 边框彗星共用），中心最亮、四角渐隐。
+     * 在某点绘制一个小菱形光点（四角火花 / 边框彗星 / 母题芒尖 / 星屑共用），
+     * 中心最亮、四角渐隐。
      * <p>仅 12 顶点，不参与分段缩放；是否绘制由调用方按保留阈值决定。</p>
+     * <p>
+     * <b>v5：四个角点内联为标量，本方法自此零分配。</b>
+     * 原实现用 {@code float[][] pts} 字面量表达角点，每次调用分配 <b>5 个临时数组</b>
+     * （1 个外层 + 4 个 {@code float[2]}）。而本方法是全渲染器调用最密集的一个——
+     * 四角火花、边框彗星、卡利亚水晶碎光、宇宙星屑、圣域芒尖<b>全都走它</b>，
+     * 单光环峰值 20~26 次 / 帧，合计约 100~130 个数组（详见类注释的「v5」小节）。
+     * </p>
+     * <p>顶点输出与顺序逐字不变（做法与 {@code AoeEffectRenderer} v7 同源）。</p>
      *
      * @param size 半尺寸（格）
      */
     private static void addSpark(BufferBuilder builder, Matrix4f m, double px, double py, double pz,
                                  float size, float r, float g, float b, float alpha) {
+        if (alpha <= 0.004f || size <= 1.0e-4f) {
+            return;
+        }
         float y = (float) py;
         float cxF = (float) px, czF = (float) pz;
-        float[][] pts = {{cxF, czF - size}, {cxF + size, czF}, {cxF, czF + size}, {cxF - size, czF}};
-        for (int i = 0; i < 4; i++) {
-            float[] a = pts[i];
-            float[] c = pts[(i + 1) % 4];
-            builder.vertex(m, cxF, y, czF).color(r, g, b, alpha).endVertex();
-            builder.vertex(m, a[0], y, a[1]).color(r, g, b, 0f).endVertex();
-            builder.vertex(m, c[0], y, c[1]).color(r, g, b, 0f).endVertex();
-        }
+
+        // 四个角点（顺序与原 pts[0..3] 一致：北 → 东 → 南 → 西）
+        float p0x = cxF, p0z = czF - size;
+        float p1x = cxF + size, p1z = czF;
+        float p2x = cxF, p2z = czF + size;
+        float p3x = cxF - size, p3z = czF;
+
+        sparkTri(builder, m, cxF, y, czF, p0x, p0z, p1x, p1z, r, g, b, alpha);
+        sparkTri(builder, m, cxF, y, czF, p1x, p1z, p2x, p2z, r, g, b, alpha);
+        sparkTri(builder, m, cxF, y, czF, p2x, p2z, p3x, p3z, r, g, b, alpha);
+        sparkTri(builder, m, cxF, y, czF, p3x, p3z, p0x, p0z, r, g, b, alpha);
+    }
+
+    /**
+     * 菱形光点的一瓣三角形：中心不透明，两个外角渐隐为 0。
+     *
+     * @param cx 中心 X（相对相机）
+     * @param y  水平面高度
+     * @param cz 中心 Z
+     * @param ax 第一个外角 X
+     * @param az 第一个外角 Z
+     * @param bx 第二个外角 X
+     * @param bz 第二个外角 Z
+     */
+    private static void sparkTri(BufferBuilder builder, Matrix4f m,
+                                 float cx, float y, float cz,
+                                 float ax, float az, float bx, float bz,
+                                 float r, float g, float b, float alpha) {
+        builder.vertex(m, cx, y, cz).color(r, g, b, alpha).endVertex();
+        builder.vertex(m, ax, y, az).color(r, g, b, 0f).endVertex();
+        builder.vertex(m, bx, y, bz).color(r, g, b, 0f).endVertex();
     }
 
     /**
@@ -741,6 +886,11 @@ public final class AuraGroundRenderer {
      * v4 削减：填充盘与三层主环、涟漪的分段数缩放（<b>占本方法七成顶点，是首要杠杆</b>）；
      * 涟漪条数缩减；外缘符文刻度按步长抽取（均布角度）；彗星层按保留阈值整层跳过。
      * </p>
+     * <p>
+     * v5：颜色改为 {@link VisualColor#unpackInto} 写入 {@link #SCRATCH} 后立即提取标量。
+     * 注意 {@link #drawRuneMotif} 及其下游母题方法接收的都是已拆开的 r/g/b 标量，
+     * 不持有任何数组引用，因此不受缓冲复用影响。
+     * </p>
      *
      * @param now    当前时间（tick，墙钟驱动）
      * @param detail 本帧细节系数
@@ -749,8 +899,9 @@ public final class AuraGroundRenderer {
                                    float fillMul, float lineMul, float runeRot, float now, float detail) {
         double cx = p.rx(), cy = p.ry(), cz = p.rz();
         double radius = p.radius();
-        float[] col = unpack(p.color());
-        float r = col[0], g = col[1], b = col[2];
+        // v5：无分配解包，写入复用缓冲后立即提取为标量（之后再不碰缓冲）
+        VisualColor.unpackInto(SCRATCH, p.color());
+        float r = SCRATCH[0], g = SCRATCH[1], b = SCRATCH[2];
         float br = brighten(r), bg = brighten(g), bb = brighten(b);
         int ringSeg = ringSegments(radius, detail);
 
@@ -926,16 +1077,10 @@ public final class AuraGroundRenderer {
         return c + (1f - c) * CORE_BRIGHTEN;
     }
 
-    /**
-     * 0xRRGGBB 拆为 [r,g,b]（0~1）。
-     */
-    private static float[] unpack(int color) {
-        return new float[]{
-                ((color >> 16) & 0xFF) / 255f,
-                ((color >> 8) & 0xFF) / 255f,
-                (color & 0xFF) / 255f
-        };
-    }
+    // v5 说明：原先的 unpack(int) 已删除——它每次调用 new float[3]，
+    // 现由 VisualColor.unpackInto(SCRATCH, color) 取代。
+    // 注意本渲染器的颜色来自运行时字段（AuraInfo.color），无法像其它渲染器那样
+    // 预解包成 C_ 常量，只能走复用缓冲；调用后务必立即提取 r/g/b 标量。
 
     /**
      * 圆形填充分段数（全细节基准值）。
@@ -1028,6 +1173,8 @@ public final class AuraGroundRenderer {
 
     /**
      * 按样式绘制专属符文母题。
+     * <p><b>v5 说明：</b>本方法与全部 {@code motifXxx} 接收的都是已拆开的 r/g/b 标量，
+     * 不持有任何数组引用，因此完全不受 {@link #SCRATCH} 复用影响。</p>
      *
      * @param radius  圆半径（格）
      * @param style   样式

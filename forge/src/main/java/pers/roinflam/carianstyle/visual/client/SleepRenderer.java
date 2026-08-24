@@ -127,8 +127,44 @@ import java.util.List;
  * 因此输出与 v2 的每个颜色分量完全相同——不是「肉眼看不出」而是「数值相等」。
  * </p>
  *
+ * <h3>v4（堆分配，视觉逐位一致）：花瓣与柔光几何数组零分配化</h3>
+ * <p>
+ * v3 清掉了颜色数组，但<b>漏了两处几何分配</b>：
+ * </p>
+ * <pre>
+ * emitPetal（每次 1 个 float[][] 外层 + 6 个 float[2] + 3 个 float[6] = 10 个）
+ *   × 10 片花瓣                                              = 100 个
+ * spark（每次 1 个 float[][] 外层 + 4 个 float[2] = 5 个）
+ *   × 1 次（螺旋中心柔光）                                     = 5 个
+ * ──────────────────────────────────────────────────────────
+ * 合计                                        ~105 个数组 / 实体 / 帧
+ * </pre>
+ * <p>
+ * 数量与 v3 清掉的 109 次颜色分配几乎持平，而且 {@code float[6]} 比 {@code float[3]} 更大。
+ * 也就是说 v3 只解决了一半问题——本次把另一半补上，本渲染器自此每帧堆分配为 <b>0</b>。
+ * </p>
+ * <p>
+ * 现改为（做法与 {@code AoeEffectRenderer} v7 同源）：
+ * </p>
+ * <ol>
+ *     <li><b>局部轮廓点内联为标量</b>——花瓣 6 点、柔光 4 点，都是由 {@code size} 线性缩放的
+ *         固定比例，展开成局部变量即可；</li>
+ *     <li><b>世界坐标改用静态复用缓冲</b>——{@link #PETAL_WX} / {@link #PETAL_WY} /
+ *         {@link #PETAL_WZ}。{@link #emitPetal} 不可重入（同一线程内不会嵌套调用自己，
+ *         且只在渲染线程访问），复用安全。</li>
+ * </ol>
+ * <p>
+ * <b>⚠ 复用缓冲的约束：</b>这三个缓冲<b>只能在 {@link #emitPetal} 内部使用</b>，
+ * 且必须「写满 → 立刻画完 → 不再引用」。{@link #spark} 只有 4 个角点、直接内联成标量，
+ * 不需要缓冲。
+ * </p>
+ * <p>
+ * <b>视觉逐位一致：</b>轮廓点数值、旋转公式、顶点写入顺序全部照搬原实现，
+ * 输出的每个顶点坐标与 v3 完全相同。
+ * </p>
+ *
  * @author FlameForge
- * @version 3
+ * @version 4
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -140,6 +176,14 @@ public final class SleepRenderer {
     private static final float TAU = (float) (Math.PI * 2.0);
     private static final float Y_OFFSET = 0.02f;
     private static final long START_MILLIS = System.currentTimeMillis();
+
+    /**
+     * 花瓣轮廓的顶点数（固定 6 点，不参与 LOD 缩放）。
+     * <p>同时也是 {@link #PETAL_WX} / {@link #PETAL_WY} / {@link #PETAL_WZ}
+     * 三个复用缓冲的长度依据。改动此值必须同步改三个缓冲的长度与
+     * {@link #emitPetal} 内的展开代码。</p>
+     */
+    private static final int PETAL_POINTS = 6;
 
     // ===== v2 LOD 下限 =====
     /**
@@ -188,6 +232,30 @@ public final class SleepRenderer {
      * </p>
      */
     private static final float[] SCRATCH_B = new float[VisualColor.RGB];
+
+    /**
+     * v4：花瓣世界坐标的复用缓冲 X（⚠ 仅供 {@link #emitPetal} 内部使用）。
+     * <p>
+     * 旧实现每片花瓣 {@code new float[6]} 三次 + 局部轮廓点数组七个，
+     * 10 片即 <b>100 个临时数组 / 实体 / 帧</b>——与 v3 清掉的颜色分配几乎等量，
+     * 且单个数组更大（详见类注释的「v4」小节）。
+     * </p>
+     * <p>
+     * {@link #emitPetal} 不可重入（同一线程内不会嵌套调用自己），且只在渲染线程访问，
+     * 故提为静态定长缓冲复用，分配归零。
+     * </p>
+     * <p>
+     * <b>⚠ 约束：</b>只能在 {@link #emitPetal} 内部使用，且必须
+     * 「写满 → 立刻画完 → 不再引用」。
+     * </p>
+     */
+    private static final float[] PETAL_WX = new float[PETAL_POINTS];
+
+    /** v4：花瓣世界坐标的复用缓冲 Y（⚠ 同上，与 {@link #PETAL_WX} 配对）。 */
+    private static final float[] PETAL_WY = new float[PETAL_POINTS];
+
+    /** v4：花瓣世界坐标的复用缓冲 Z（⚠ 同上，与 {@link #PETAL_WX} 配对）。 */
+    private static final float[] PETAL_WZ = new float[PETAL_POINTS];
 
     // ===== 头顶催眠螺旋 =====
     /** 螺旋悬浮高度系数（× 实体高度）：略高于头顶 */
@@ -418,6 +486,9 @@ public final class SleepRenderer {
      * <b>v3：颜色写入 {@link #SCRATCH_A} 后立即被 {@link #emitPetal} 消费，零分配。</b>
      * 本方法与螺旋不嵌套（顺序调用），故可安全复用同一缓冲。
      * </p>
+     * <p>
+     * <b>v4：{@link #emitPetal} 内部亦已零分配</b>，本循环整体不再产生任何临时数组。
+     * </p>
      */
     private static void drawPetals(BufferBuilder b, Matrix4f m,
                                    float cx, float cyFoot, float cz,
@@ -512,6 +583,21 @@ public final class SleepRenderer {
      * 支持绕视线方向旋转。中心不透明、边缘渐隐为 0。
      * <p><b>轮廓点数固定为 6，不参与 LOD 缩放</b>——再少就不成花瓣形了，
      * 花瓣的削减完全通过「减少片数」实现。</p>
+     * <p>
+     * <b>v4：本方法此前每次调用要分配 10 个数组</b>
+     * （1 个 {@code float[][]} 外层 + 6 个 {@code float[2]} 轮廓点 + 3 个 {@code float[6]}
+     * 世界坐标），10 片即 <b>100 个临时数组 / 实体 / 帧</b>
+     * （详见类注释的「v4」小节）。
+     * </p>
+     * <p>
+     * 现改为：轮廓点内联为 12 个标量、世界坐标写入静态复用缓冲
+     * {@link #PETAL_WX} / {@link #PETAL_WY} / {@link #PETAL_WZ}。
+     * 本方法不可重入（同一线程内不会嵌套调用自己，且只在渲染线程访问），复用安全。
+     * </p>
+     * <p>
+     * <b>视觉逐位一致：</b>轮廓点数值、旋转公式、顶点写入顺序全部照搬原实现，
+     * 输出的每个顶点坐标与 v3 完全相同。
+     * </p>
      *
      * @param size 花瓣半尺寸
      * @param rot  在 billboard 平面内的旋转角（弧度）
@@ -521,24 +607,54 @@ public final class SleepRenderer {
                                   float r, float g, float bl, float alpha,
                                   float rightX, float rightY, float rightZ,
                                   float upX, float upY, float upZ) {
-        // 圆润的椭圆轮廓（横向略宽），比正圆更像花瓣、比尖菱形更柔和
-        float[][] local = {
-                {0f, size * 1.05f}, {size * 0.85f, size * 0.5f}, {size * 0.85f, -size * 0.5f},
-                {0f, -size * 1.05f}, {-size * 0.85f, -size * 0.5f}, {-size * 0.85f, size * 0.5f}
-        };
-        float cosR = (float) Math.cos(rot), sinR = (float) Math.sin(rot);
-        float[] wx = new float[6];
-        float[] wy = new float[6];
-        float[] wz = new float[6];
-        for (int i = 0; i < 6; i++) {
-            float lu = local[i][0] * cosR - local[i][1] * sinR;
-            float lv = local[i][0] * sinR + local[i][1] * cosR;
-            wx[i] = cx + rightX * lu + upX * lv;
-            wy[i] = cy + rightY * lu + upY * lv;
-            wz[i] = cz + rightZ * lu + upZ * lv;
-        }
-        for (int i = 0; i < 6; i++) {
-            int j = (i + 1) % 6;
+        // ⭐ v4：圆润椭圆花瓣的 6 个局部轮廓点内联为标量。
+        // 数值与原 local 字面量逐位相同：
+        //   {0, +1.05}, {+0.85, +0.50}, {+0.85, -0.50},
+        //   {0, -1.05}, {-0.85, -0.50}, {-0.85, +0.50}   （均 × size）
+        // 横向略宽的椭圆——比正圆更像花瓣、比尖菱形更柔和
+        final float l0u = 0f, l0v = size * 1.05f;
+        final float l1u = size * 0.85f, l1v = size * 0.5f;
+        final float l2u = size * 0.85f, l2v = -size * 0.5f;
+        final float l3u = 0f, l3v = -size * 1.05f;
+        final float l4u = -size * 0.85f, l4v = -size * 0.5f;
+        final float l5u = -size * 0.85f, l5v = size * 0.5f;
+
+        final float cosR = (float) Math.cos(rot);
+        final float sinR = (float) Math.sin(rot);
+
+        // ⭐ v4：世界坐标写入静态复用缓冲，不再每片 new float[6] 三次
+        final float[] wx = PETAL_WX;
+        final float[] wy = PETAL_WY;
+        final float[] wz = PETAL_WZ;
+
+        // 逐点：局部二维坐标 → 绕视线旋转 → 沿相机右 / 上向量展开为世界坐标
+        wx[0] = cx + rightX * (l0u * cosR - l0v * sinR) + upX * (l0u * sinR + l0v * cosR);
+        wy[0] = cy + rightY * (l0u * cosR - l0v * sinR) + upY * (l0u * sinR + l0v * cosR);
+        wz[0] = cz + rightZ * (l0u * cosR - l0v * sinR) + upZ * (l0u * sinR + l0v * cosR);
+
+        wx[1] = cx + rightX * (l1u * cosR - l1v * sinR) + upX * (l1u * sinR + l1v * cosR);
+        wy[1] = cy + rightY * (l1u * cosR - l1v * sinR) + upY * (l1u * sinR + l1v * cosR);
+        wz[1] = cz + rightZ * (l1u * cosR - l1v * sinR) + upZ * (l1u * sinR + l1v * cosR);
+
+        wx[2] = cx + rightX * (l2u * cosR - l2v * sinR) + upX * (l2u * sinR + l2v * cosR);
+        wy[2] = cy + rightY * (l2u * cosR - l2v * sinR) + upY * (l2u * sinR + l2v * cosR);
+        wz[2] = cz + rightZ * (l2u * cosR - l2v * sinR) + upZ * (l2u * sinR + l2v * cosR);
+
+        wx[3] = cx + rightX * (l3u * cosR - l3v * sinR) + upX * (l3u * sinR + l3v * cosR);
+        wy[3] = cy + rightY * (l3u * cosR - l3v * sinR) + upY * (l3u * sinR + l3v * cosR);
+        wz[3] = cz + rightZ * (l3u * cosR - l3v * sinR) + upZ * (l3u * sinR + l3v * cosR);
+
+        wx[4] = cx + rightX * (l4u * cosR - l4v * sinR) + upX * (l4u * sinR + l4v * cosR);
+        wy[4] = cy + rightY * (l4u * cosR - l4v * sinR) + upY * (l4u * sinR + l4v * cosR);
+        wz[4] = cz + rightZ * (l4u * cosR - l4v * sinR) + upZ * (l4u * sinR + l4v * cosR);
+
+        wx[5] = cx + rightX * (l5u * cosR - l5v * sinR) + upX * (l5u * sinR + l5v * cosR);
+        wy[5] = cy + rightY * (l5u * cosR - l5v * sinR) + upY * (l5u * sinR + l5v * cosR);
+        wz[5] = cz + rightZ * (l5u * cosR - l5v * sinR) + upZ * (l5u * sinR + l5v * cosR);
+
+        // 三角扇：中心不透明 + 相邻两轮廓点渐隐为 0（顺序与原实现完全一致）
+        for (int i = 0; i < PETAL_POINTS; i++) {
+            int j = (i + 1) % PETAL_POINTS;
             b.vertex(m, cx, cy, cz).color(r, g, bl, alpha).endVertex();
             b.vertex(m, wx[i], wy[i], wz[i]).color(r, g, bl, 0f).endVertex();
             b.vertex(m, wx[j], wy[j], wz[j]).color(r, g, bl, 0f).endVertex();
@@ -579,18 +695,47 @@ public final class SleepRenderer {
 
     /**
      * 小菱形光点（柔光），中心最亮、四角渐隐。水平面。
+     * <p>
+     * <b>v4：四个角点内联为标量。</b>原实现用 {@code float[][] pts} 字面量表达角点，
+     * 每次调用分配 <b>5 个临时数组</b>（1 个外层 + 4 个 {@code float[2]}）。
+     * 本方法虽然每实体每帧只调用一次（螺旋中心锚点），但清理方式与
+     * {@link #emitPetal} 完全同源，一并处理；顶点输出与顺序逐字不变。
+     * </p>
      */
     private static void spark(BufferBuilder b, Matrix4f m, float px, float pz, float y,
                               float size, float[] col, float alpha) {
         float r = col[0], g = col[1], bl = col[2];
-        float[][] pts = {{px, pz - size}, {px + size, pz}, {px, pz + size}, {px - size, pz}};
-        for (int i = 0; i < 4; i++) {
-            float[] a = pts[i];
-            float[] c = pts[(i + 1) % 4];
-            b.vertex(m, px, y, pz).color(r, g, bl, alpha).endVertex();
-            b.vertex(m, a[0], y, a[1]).color(r, g, bl, 0f).endVertex();
-            b.vertex(m, c[0], y, c[1]).color(r, g, bl, 0f).endVertex();
-        }
+
+        // 四个角点（顺序与原 pts[0..3] 一致：北 → 东 → 南 → 西）
+        float p0x = px, p0z = pz - size;
+        float p1x = px + size, p1z = pz;
+        float p2x = px, p2z = pz + size;
+        float p3x = px - size, p3z = pz;
+
+        sparkTri(b, m, px, y, pz, p0x, p0z, p1x, p1z, r, g, bl, alpha);
+        sparkTri(b, m, px, y, pz, p1x, p1z, p2x, p2z, r, g, bl, alpha);
+        sparkTri(b, m, px, y, pz, p2x, p2z, p3x, p3z, r, g, bl, alpha);
+        sparkTri(b, m, px, y, pz, p3x, p3z, p0x, p0z, r, g, bl, alpha);
+    }
+
+    /**
+     * 柔光光点的一瓣三角形：中心不透明，两个外角渐隐为 0。
+     *
+     * @param cx 中心 X（相对相机）
+     * @param y  水平面高度
+     * @param cz 中心 Z
+     * @param ax 第一个外角 X
+     * @param az 第一个外角 Z
+     * @param bx 第二个外角 X
+     * @param bz 第二个外角 Z
+     */
+    private static void sparkTri(BufferBuilder b, Matrix4f m,
+                                 float cx, float y, float cz,
+                                 float ax, float az, float bx, float bz,
+                                 float r, float g, float bl, float alpha) {
+        b.vertex(m, cx, y, cz).color(r, g, bl, alpha).endVertex();
+        b.vertex(m, ax, y, az).color(r, g, bl, 0f).endVertex();
+        b.vertex(m, bx, y, bz).color(r, g, bl, 0f).endVertex();
     }
 
     /**

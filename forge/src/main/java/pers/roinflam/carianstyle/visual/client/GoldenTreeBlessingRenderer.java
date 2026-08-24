@@ -127,14 +127,55 @@ import java.util.List;
  * 唯一需要留意的是 {@link #drawRootVeins}：主题色写入 {@link #SCRATCH} 后要横跨整个根须循环，
  * 期间 {@link #drawRootBranch}（含递归支根）只读不写，因此安全。
  * </p>
+ *
+ * <h3>v10（堆分配，视觉逐位一致）：金叶几何数组零分配化</h3>
  * <p>
- * <b>视觉逐位一致：</b>{@link VisualColor#lerpInto} 保留了旧 {@code lerpRgb → unpack} 链路
- * 在 0~255 整数域插值并 {@link Math#round} 取整的行为，输出的每个颜色分量与 v8 完全相同——
- * 不是「肉眼看不出」而是「数值相等」。
+ * v9 清掉了颜色数组，但<b>漏了一个更大的分配点</b>：{@link #emitLeafMote} 内部
+ * 每次调用要分配 <b>10 个数组</b>——
+ * </p>
+ * <pre>
+ * float[][] localPts = { ... };   // 1 个外层 + 6 个 float[2] = 7 个
+ * float[] wx = new float[6];      // 3 个 float[6]
+ * float[] wy = new float[6];
+ * float[] wz = new float[6];
+ * ─────────────────────────────────────────
+ * 合计                              10 个 / 次
+ * </pre>
+ * <p>
+ * 而三重祝福满配时，上升金叶最多 21 片、飘落金叶最多 14 片，
+ * 二者<b>都</b>调用本方法：
+ * </p>
+ * <pre>
+ * (21 + 14) 片 × 10 个数组 = ~350 个数组 / 实体 / 帧
+ * </pre>
+ * <p>
+ * <b>这比 v9 清掉的 46 次颜色分配高出近八倍</b>，而且单个数组更大——
+ * {@code float[6]} 是 {@code float[3]} 的两倍字节。10 人混战 × 60fps ≈
+ * <b>每秒 21 万次</b>小数组分配，全部集中在客户端最需要帧率的时候。
+ * </p>
+ * <p>
+ * 现改为两条路径（做法与 {@code AoeEffectRenderer} v7 处理 {@code spark} / {@code drawOrb} 同源）：
+ * </p>
+ * <ol>
+ *     <li><b>局部轮廓点内联为标量</b>——叶形的 6 个轮廓点是由 {@code size} 线性缩放的
+ *         固定比例，展开成 12 个局部变量即可，编译器还能把它们直接放进寄存器；</li>
+ *     <li><b>世界坐标改用静态复用缓冲</b>——{@link #LEAF_WX} / {@link #LEAF_WY} /
+ *         {@link #LEAF_WZ}。{@link #emitLeafMote} 不可重入（同一线程内不会嵌套调用自己，
+ *         且只在渲染线程访问），复用安全。</li>
+ * </ol>
+ * <p>
+ * <b>⚠ 复用缓冲的约束：</b>{@link #LEAF_WX} 等三个缓冲<b>只能在
+ * {@link #emitLeafMote} 内部使用</b>，且必须「写满 → 立刻画完 → 不再引用」。
+ * 若将来新增其它需要世界坐标缓冲的元素，请另开一组，不要复用这三个——
+ * 上升金叶与飘落金叶虽然都用它，但二者是顺序调用、互不嵌套，不会互相踩。
+ * </p>
+ * <p>
+ * <b>视觉逐位一致：</b>轮廓点的数值、旋转公式、顶点写入顺序全部照搬原实现，
+ * 只是把「先建数组再读」改成「直接算标量」，输出的每个顶点坐标与 v9 完全相同。
  * </p>
  *
  * @author FlameForge
- * @version 9
+ * @version 10
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -147,6 +188,14 @@ public final class GoldenTreeBlessingRenderer {
     private static final float Y_OFFSET = 0.02f;
     private static final int MOTE_SEGMENTS = 10;
     private static final long START_MILLIS = System.currentTimeMillis();
+
+    /**
+     * 金叶轮廓的顶点数（固定 6 点，不参与 LOD 缩放）。
+     * <p>同时也是 {@link #LEAF_WX} / {@link #LEAF_WY} / {@link #LEAF_WZ}
+     * 三个复用缓冲的长度依据。改动此值必须同步改三个缓冲的长度与
+     * {@link #emitLeafMote} 内的展开代码。</p>
+     */
+    private static final int LEAF_POINTS = 6;
 
     // ===== v8 LOD 下限与保留阈值 =====
     /** 柔光点的最少分段数：4 段仍是个饱满的菱形柔光块，再低就露馅 */
@@ -201,6 +250,31 @@ public final class GoldenTreeBlessingRenderer {
      * <p>仅渲染线程访问，无并发问题。</p>
      */
     private static final float[] SCRATCH = new float[VisualColor.RGB];
+
+    /**
+     * v10：金叶世界坐标的复用缓冲 X（⚠ 仅供 {@link #emitLeafMote} 内部使用）。
+     * <p>
+     * 旧实现每片金叶 {@code new float[6]} 三次 + 局部轮廓点数组七个，
+     * 三重祝福满配时合计约 350 个临时数组 / 实体 / 帧——
+     * <b>比 v9 清掉的颜色分配高出近八倍</b>（详见类注释的「v10」小节）。
+     * </p>
+     * <p>
+     * {@link #emitLeafMote} 不可重入（同一线程内不会嵌套调用自己），且只在渲染线程访问，
+     * 故提为静态定长缓冲复用，分配归零。
+     * </p>
+     * <p>
+     * <b>⚠ 约束：</b>只能在 {@link #emitLeafMote} 内部使用，且必须
+     * 「写满 → 立刻画完 → 不再引用」。上升金叶与飘落金叶都会用它，但二者顺序调用、
+     * 互不嵌套，不会互相踩。
+     * </p>
+     */
+    private static final float[] LEAF_WX = new float[LEAF_POINTS];
+
+    /** v10：金叶世界坐标的复用缓冲 Y（⚠ 同上，与 {@link #LEAF_WX} 配对）。 */
+    private static final float[] LEAF_WY = new float[LEAF_POINTS];
+
+    /** v10：金叶世界坐标的复用缓冲 Z（⚠ 同上，与 {@link #LEAF_WX} 配对）。 */
+    private static final float[] LEAF_WZ = new float[LEAF_POINTS];
 
     // ===== 脚下金色光晕 =====
     private static final int HALO_SEGMENTS = 28;
@@ -609,6 +683,10 @@ public final class GoldenTreeBlessingRenderer {
      * 而 {@link VisualColor#lerpInto} 的 {@code from} 参数接收的正是 int，故这里保留
      * {@link #lerpRgb} 不动。
      * </p>
+     * <p>
+     * <b>v10：本方法也是全渲染器最密集的几何数组分配点。</b>
+     * 优化后 {@link #emitLeafMote} 内部零分配，本循环整体不再产生任何临时数组。
+     * </p>
      */
     private static void drawRisingMotes(BufferBuilder b, Matrix4f m,
                                         float cx, float cyFoot, float cz, float width, float height,
@@ -677,6 +755,7 @@ public final class GoldenTreeBlessingRenderer {
      * 让整体更有层次。数量随 {@code activeCount} 小幅增加。
      * <p>v8：数量按细节系数缩放；整层由调用方按 {@link #DESCENDING_KEEP_THRESHOLD} 决定是否绘制。</p>
      * <p>v9：每片的颜色写入 {@link #SCRATCH} 后立即被 {@link #emitLeafMote} 消费，零分配。</p>
+     * <p>v10：{@link #emitLeafMote} 内部亦已零分配，本循环整体不再产生任何临时数组。</p>
      */
     private static void drawDescendingMotes(BufferBuilder b, Matrix4f m,
                                             float cx, float cyFoot, float cz, float width, float height,
@@ -954,6 +1033,21 @@ public final class GoldenTreeBlessingRenderer {
      * 自然翻转。中心不透明、边缘渐隐为 0。
      * <p><b>轮廓点数固定为 6，不参与 LOD 缩放</b>——再少就不成叶形了，
      * 金叶的削减完全通过「减少片数」实现。</p>
+     * <p>
+     * <b>v10：本方法此前是全渲染器最大的堆分配点。</b>旧实现每次调用要分配 10 个数组
+     * （1 个 {@code float[][]} 外层 + 6 个 {@code float[2]} 轮廓点 + 3 个 {@code float[6]}
+     * 世界坐标），而三重祝福满配时上升 + 飘落金叶合计最多 35 片、
+     * 即约 <b>350 个临时数组 / 实体 / 帧</b>（详见类注释的「v10」小节）。
+     * </p>
+     * <p>
+     * 现改为：轮廓点内联为 12 个标量、世界坐标写入静态复用缓冲
+     * {@link #LEAF_WX} / {@link #LEAF_WY} / {@link #LEAF_WZ}。
+     * 本方法不可重入（同一线程内不会嵌套调用自己，且只在渲染线程访问），复用安全。
+     * </p>
+     * <p>
+     * <b>视觉逐位一致：</b>轮廓点数值、旋转公式、顶点写入顺序全部照搬原实现，
+     * 输出的每个顶点坐标与 v9 完全相同。
+     * </p>
      *
      * @param rot 叶片在 billboard 平面内的旋转角（弧度）
      */
@@ -962,23 +1056,54 @@ public final class GoldenTreeBlessingRenderer {
                                      float r, float g, float bl, float alpha,
                                      float rightX, float rightY, float rightZ,
                                      float upX, float upY, float upZ) {
-        float[][] localPts = {
-                {0f, size * 1.3f}, {size * 0.55f, size * 0.35f}, {size * 0.4f, -size * 0.7f},
-                {0f, -size * 1.1f}, {-size * 0.4f, -size * 0.7f}, {-size * 0.55f, size * 0.35f}
-        };
-        float cosR = (float) Math.cos(rot), sinR = (float) Math.sin(rot);
-        float[] wx = new float[6];
-        float[] wy = new float[6];
-        float[] wz = new float[6];
-        for (int i = 0; i < 6; i++) {
-            float lu = localPts[i][0] * cosR - localPts[i][1] * sinR;
-            float lv = localPts[i][0] * sinR + localPts[i][1] * cosR;
-            wx[i] = cx + rightX * lu + upX * lv;
-            wy[i] = cy + rightY * lu + upY * lv;
-            wz[i] = cz + rightZ * lu + upZ * lv;
-        }
-        for (int i = 0; i < 6; i++) {
-            int j = (i + 1) % 6;
+        // ⭐ v10：叶形的 6 个局部轮廓点内联为标量。
+        // 数值与原 localPts 字面量逐位相同：
+        //   {0, +1.30}, {+0.55, +0.35}, {+0.40, -0.70},
+        //   {0, -1.10}, {-0.40, -0.70}, {-0.55, +0.35}   （均 × size）
+        // 顶端拉长（1.30）、底端略短（1.10）、腰部最宽，即水滴 / 杏仁形的叶片轮廓
+        final float l0u = 0f, l0v = size * 1.3f;
+        final float l1u = size * 0.55f, l1v = size * 0.35f;
+        final float l2u = size * 0.4f, l2v = -size * 0.7f;
+        final float l3u = 0f, l3v = -size * 1.1f;
+        final float l4u = -size * 0.4f, l4v = -size * 0.7f;
+        final float l5u = -size * 0.55f, l5v = size * 0.35f;
+
+        final float cosR = (float) Math.cos(rot);
+        final float sinR = (float) Math.sin(rot);
+
+        // ⭐ v10：世界坐标写入静态复用缓冲，不再每片 new float[6] 三次
+        final float[] wx = LEAF_WX;
+        final float[] wy = LEAF_WY;
+        final float[] wz = LEAF_WZ;
+
+        // 逐点：局部二维坐标 → 绕视线旋转 → 沿相机右 / 上向量展开为世界坐标
+        wx[0] = cx + rightX * (l0u * cosR - l0v * sinR) + upX * (l0u * sinR + l0v * cosR);
+        wy[0] = cy + rightY * (l0u * cosR - l0v * sinR) + upY * (l0u * sinR + l0v * cosR);
+        wz[0] = cz + rightZ * (l0u * cosR - l0v * sinR) + upZ * (l0u * sinR + l0v * cosR);
+
+        wx[1] = cx + rightX * (l1u * cosR - l1v * sinR) + upX * (l1u * sinR + l1v * cosR);
+        wy[1] = cy + rightY * (l1u * cosR - l1v * sinR) + upY * (l1u * sinR + l1v * cosR);
+        wz[1] = cz + rightZ * (l1u * cosR - l1v * sinR) + upZ * (l1u * sinR + l1v * cosR);
+
+        wx[2] = cx + rightX * (l2u * cosR - l2v * sinR) + upX * (l2u * sinR + l2v * cosR);
+        wy[2] = cy + rightY * (l2u * cosR - l2v * sinR) + upY * (l2u * sinR + l2v * cosR);
+        wz[2] = cz + rightZ * (l2u * cosR - l2v * sinR) + upZ * (l2u * sinR + l2v * cosR);
+
+        wx[3] = cx + rightX * (l3u * cosR - l3v * sinR) + upX * (l3u * sinR + l3v * cosR);
+        wy[3] = cy + rightY * (l3u * cosR - l3v * sinR) + upY * (l3u * sinR + l3v * cosR);
+        wz[3] = cz + rightZ * (l3u * cosR - l3v * sinR) + upZ * (l3u * sinR + l3v * cosR);
+
+        wx[4] = cx + rightX * (l4u * cosR - l4v * sinR) + upX * (l4u * sinR + l4v * cosR);
+        wy[4] = cy + rightY * (l4u * cosR - l4v * sinR) + upY * (l4u * sinR + l4v * cosR);
+        wz[4] = cz + rightZ * (l4u * cosR - l4v * sinR) + upZ * (l4u * sinR + l4v * cosR);
+
+        wx[5] = cx + rightX * (l5u * cosR - l5v * sinR) + upX * (l5u * sinR + l5v * cosR);
+        wy[5] = cy + rightY * (l5u * cosR - l5v * sinR) + upY * (l5u * sinR + l5v * cosR);
+        wz[5] = cz + rightZ * (l5u * cosR - l5v * sinR) + upZ * (l5u * sinR + l5v * cosR);
+
+        // 三角扇：中心不透明 + 相邻两轮廓点渐隐为 0（顺序与原实现完全一致）
+        for (int i = 0; i < LEAF_POINTS; i++) {
+            int j = (i + 1) % LEAF_POINTS;
             b.vertex(m, cx, cy, cz).color(r, g, bl, alpha).endVertex();
             b.vertex(m, wx[i], wy[i], wz[i]).color(r, g, bl, 0f).endVertex();
             b.vertex(m, wx[j], wy[j], wz[j]).color(r, g, bl, 0f).endVertex();

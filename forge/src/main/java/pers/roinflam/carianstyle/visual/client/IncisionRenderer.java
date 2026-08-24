@@ -124,13 +124,46 @@ import java.util.List;
  * 又因「本段的末端色 == 下一段的起点色」，这里采用<b>滚动交换</b>：每段只算一次新颜色，
  * 用完把两个缓冲的引用对调，20 次插值降为 10 次。
  * </p>
+ *
+ * <h3>v4（堆分配，视觉逐位一致）：血刃碎片几何数组零分配化</h3>
  * <p>
- * <b>视觉逐位一致：</b>{@link VisualColor#mixInto} 与旧的 {@code mix} 都是在归一化域直接线性插值，
- * 输出的每个颜色分量与 v2 完全相同——不是「肉眼看不出」而是「数值相等」。
+ * v3 清掉了颜色数组，但<b>漏了 {@link #emitShard} 内部的几何分配</b>——
+ * 每次调用要分配 <b>8 个数组</b>：
+ * </p>
+ * <pre>
+ * float[][] local = { ... };   // 1 个外层 + 4 个 float[2] = 5 个
+ * float[] wx = new float[4];   // 3 个 float[4]
+ * float[] wy = new float[4];
+ * float[] wz = new float[4];
+ * ────────────────────────────────────────
+ * 合计                            8 个 / 次
+ * </pre>
+ * <p>
+ * 而血刃碎片满配 20 片，即 <b>160 个数组 / 实体 / 帧</b>——比 v3 清掉的 60 次颜色分配
+ * 高出近三倍。5 人同时开切腹 × 60fps ≈ <b>每秒 4.8 万次</b>小数组分配，
+ * 而这恰好发生在团战爆发、客户端最需要帧率的时候。
+ * </p>
+ * <p>
+ * 现改为（做法与 {@code AoeEffectRenderer} v7 处理 {@code spark} / {@code drawOrb} 同源）：
+ * </p>
+ * <ol>
+ *     <li><b>局部轮廓点内联为标量</b>——菱形只有 4 个点，且是由 {@code size} /
+ *         {@code longAxis} 线性缩放的固定比例，展开成 8 个局部变量即可；</li>
+ *     <li><b>世界坐标改用静态复用缓冲</b>——{@link #SHARD_WX} / {@link #SHARD_WY} /
+ *         {@link #SHARD_WZ}。{@link #emitShard} 不可重入（同一线程内不会嵌套调用自己，
+ *         且只在渲染线程访问），复用安全。</li>
+ * </ol>
+ * <p>
+ * <b>⚠ 复用缓冲的约束：</b>这三个缓冲<b>只能在 {@link #emitShard} 内部使用</b>，
+ * 且必须「写满 → 立刻画完 → 不再引用」。若将来新增其它需要世界坐标缓冲的元素，请另开一组。
+ * </p>
+ * <p>
+ * <b>视觉逐位一致：</b>轮廓点数值、旋转公式、顶点写入顺序全部照搬原实现，
+ * 输出的每个顶点坐标与 v3 完全相同。
  * </p>
  *
  * @author FlameForge
- * @version 3
+ * @version 4
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -147,6 +180,14 @@ public final class IncisionRenderer {
      * 直接用 currentTimeMillis()/1000f 数值过大会导致 float 精度不足、动画卡死。
      */
     private static final long START_MILLIS = System.currentTimeMillis();
+
+    /**
+     * 血刃碎片的轮廓顶点数（固定 4 点菱形，不参与 LOD 缩放）。
+     * <p>同时也是 {@link #SHARD_WX} / {@link #SHARD_WY} / {@link #SHARD_WZ}
+     * 三个复用缓冲的长度依据。改动此值必须同步改三个缓冲的长度与
+     * {@link #emitShard} 内的展开代码。</p>
+     */
+    private static final int SHARD_POINTS = 4;
 
     // ===== v2 LOD 下限与保留阈值 =====
     /** 刀痕沿长度的最少细分段数：4 段轮廓略方，但两端收尖的形态仍然成立 */
@@ -196,6 +237,30 @@ public final class IncisionRenderer {
      * </p>
      */
     private static final float[] SCRATCH_B = new float[VisualColor.RGB];
+
+    /**
+     * v4：血刃碎片世界坐标的复用缓冲 X（⚠ 仅供 {@link #emitShard} 内部使用）。
+     * <p>
+     * 旧实现每片碎片 {@code new float[4]} 三次 + 局部轮廓点数组五个，
+     * 满配 20 片即 <b>160 个临时数组 / 实体 / 帧</b>——比 v3 清掉的颜色分配高出近三倍
+     * （详见类注释的「v4」小节）。
+     * </p>
+     * <p>
+     * {@link #emitShard} 不可重入（同一线程内不会嵌套调用自己），且只在渲染线程访问，
+     * 故提为静态定长缓冲复用，分配归零。
+     * </p>
+     * <p>
+     * <b>⚠ 约束：</b>只能在 {@link #emitShard} 内部使用，且必须
+     * 「写满 → 立刻画完 → 不再引用」。
+     * </p>
+     */
+    private static final float[] SHARD_WX = new float[SHARD_POINTS];
+
+    /** v4：血刃碎片世界坐标的复用缓冲 Y（⚠ 同上，与 {@link #SHARD_WX} 配对）。 */
+    private static final float[] SHARD_WY = new float[SHARD_POINTS];
+
+    /** v4：血刃碎片世界坐标的复用缓冲 Z（⚠ 同上，与 {@link #SHARD_WX} 配对）。 */
+    private static final float[] SHARD_WZ = new float[SHARD_POINTS];
 
     // ===== 腹部横向刀痕（核心标志）=====
     /** 刀痕高度系数（× 实体高度）。取腹部而非胸口，贴合「切腹」意象 */
@@ -530,6 +595,9 @@ public final class IncisionRenderer {
      * <p>
      * <b>v3：颜色写入 {@link #SCRATCH_A} 后立即被 {@link #emitShard} 消费，零分配。</b>
      * </p>
+     * <p>
+     * <b>v4：{@link #emitShard} 内部亦已零分配</b>，本循环整体不再产生任何临时数组。
+     * </p>
      */
     private static void drawRisingShards(BufferBuilder b, Matrix4f m,
                                          float cx, float cyFoot, float cz, float width, float height,
@@ -604,6 +672,21 @@ public final class IncisionRenderer {
      * 中心不透明、四个顶点渐隐为 0。
      * <p><b>轮廓固定 4 点，不参与 LOD 缩放</b>——菱形已是最简形状，
      * 碎片的削减完全通过「减少片数」实现。</p>
+     * <p>
+     * <b>v4：本方法此前是本渲染器最大的堆分配点。</b>旧实现每次调用要分配 8 个数组
+     * （1 个 {@code float[][]} 外层 + 4 个 {@code float[2]} 轮廓点 + 3 个 {@code float[4]}
+     * 世界坐标），满配 20 片即约 <b>160 个临时数组 / 实体 / 帧</b>
+     * （详见类注释的「v4」小节）。
+     * </p>
+     * <p>
+     * 现改为：轮廓点内联为 8 个标量、世界坐标写入静态复用缓冲
+     * {@link #SHARD_WX} / {@link #SHARD_WY} / {@link #SHARD_WZ}。
+     * 本方法不可重入（同一线程内不会嵌套调用自己，且只在渲染线程访问），复用安全。
+     * </p>
+     * <p>
+     * <b>视觉逐位一致：</b>轮廓点数值、旋转公式、顶点写入顺序全部照搬原实现，
+     * 输出的每个顶点坐标与 v3 完全相同。
+     * </p>
      *
      * @param size 短轴半长（长轴为其 3 倍）
      * @param rot  在 billboard 平面内的旋转角（弧度）
@@ -613,24 +696,45 @@ public final class IncisionRenderer {
                                   float r, float g, float bl, float alpha,
                                   float rightX, float rightY, float rightZ,
                                   float upX, float upY, float upZ) {
-        float longAxis = size * 3f;
-        // 局部坐标下的四个顶点：上下为长轴尖端，左右为短轴
-        float[][] local = {
-                {0f, longAxis}, {size, 0f}, {0f, -longAxis}, {-size, 0f}
-        };
-        float cosR = (float) Math.cos(rot), sinR = (float) Math.sin(rot);
-        float[] wx = new float[4];
-        float[] wy = new float[4];
-        float[] wz = new float[4];
-        for (int i = 0; i < 4; i++) {
-            float lu = local[i][0] * cosR - local[i][1] * sinR;
-            float lv = local[i][0] * sinR + local[i][1] * cosR;
-            wx[i] = cx + rightX * lu + upX * lv;
-            wy[i] = cy + rightY * lu + upY * lv;
-            wz[i] = cz + rightZ * lu + upZ * lv;
-        }
-        for (int i = 0; i < 4; i++) {
-            int j = (i + 1) % 4;
+        final float longAxis = size * 3f;
+
+        // ⭐ v4：菱形的 4 个局部顶点内联为标量。
+        // 数值与原 local 字面量逐位相同：
+        //   {0, +longAxis}, {+size, 0}, {0, -longAxis}, {-size, 0}
+        // 上下为长轴尖端、左右为短轴，即细长菱形（血刃）的轮廓
+        final float l0u = 0f, l0v = longAxis;
+        final float l1u = size, l1v = 0f;
+        final float l2u = 0f, l2v = -longAxis;
+        final float l3u = -size, l3v = 0f;
+
+        final float cosR = (float) Math.cos(rot);
+        final float sinR = (float) Math.sin(rot);
+
+        // ⭐ v4：世界坐标写入静态复用缓冲，不再每片 new float[4] 三次
+        final float[] wx = SHARD_WX;
+        final float[] wy = SHARD_WY;
+        final float[] wz = SHARD_WZ;
+
+        // 逐点：局部二维坐标 → 绕视线旋转 → 沿相机右 / 上向量展开为世界坐标
+        wx[0] = cx + rightX * (l0u * cosR - l0v * sinR) + upX * (l0u * sinR + l0v * cosR);
+        wy[0] = cy + rightY * (l0u * cosR - l0v * sinR) + upY * (l0u * sinR + l0v * cosR);
+        wz[0] = cz + rightZ * (l0u * cosR - l0v * sinR) + upZ * (l0u * sinR + l0v * cosR);
+
+        wx[1] = cx + rightX * (l1u * cosR - l1v * sinR) + upX * (l1u * sinR + l1v * cosR);
+        wy[1] = cy + rightY * (l1u * cosR - l1v * sinR) + upY * (l1u * sinR + l1v * cosR);
+        wz[1] = cz + rightZ * (l1u * cosR - l1v * sinR) + upZ * (l1u * sinR + l1v * cosR);
+
+        wx[2] = cx + rightX * (l2u * cosR - l2v * sinR) + upX * (l2u * sinR + l2v * cosR);
+        wy[2] = cy + rightY * (l2u * cosR - l2v * sinR) + upY * (l2u * sinR + l2v * cosR);
+        wz[2] = cz + rightZ * (l2u * cosR - l2v * sinR) + upZ * (l2u * sinR + l2v * cosR);
+
+        wx[3] = cx + rightX * (l3u * cosR - l3v * sinR) + upX * (l3u * sinR + l3v * cosR);
+        wy[3] = cy + rightY * (l3u * cosR - l3v * sinR) + upY * (l3u * sinR + l3v * cosR);
+        wz[3] = cz + rightZ * (l3u * cosR - l3v * sinR) + upZ * (l3u * sinR + l3v * cosR);
+
+        // 三角扇：中心不透明 + 相邻两轮廓点渐隐为 0（顺序与原实现完全一致）
+        for (int i = 0; i < SHARD_POINTS; i++) {
+            int j = (i + 1) % SHARD_POINTS;
             b.vertex(m, cx, cy, cz).color(r, g, bl, alpha).endVertex();
             b.vertex(m, wx[i], wy[i], wz[i]).color(r, g, bl, 0f).endVertex();
             b.vertex(m, wx[j], wy[j], wz[j]).color(r, g, bl, 0f).endVertex();

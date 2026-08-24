@@ -2,6 +2,7 @@ package pers.roinflam.carianstyle.visual.client;
 
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import net.minecraft.client.Minecraft;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
@@ -155,7 +156,7 @@ import java.util.List;
  * 现改为两条路径（工具见 {@link VisualColor}）：
  * </p>
  * <ol>
- *     <li><b>全部 15 个主题色类加载时预解包一次</b>（{@code C_} 前缀常量），此后永久复用。
+ *     <li><b>全部主题色类加载时预解包一次</b>（{@code C_} 前缀常量），此后永久复用。
  *         本渲染器的主题色全是编译期常量，无一例外，因此这一项直接归零；</li>
  *     <li><b>动态插值色写入复用缓冲</b>——{@link #PETAL_COL_A} / {@link #PETAL_COL_B}
  *         专供花瓣滚动，{@link #SCRATCH} 供其余一次性混色。</li>
@@ -196,13 +197,49 @@ import java.util.List;
  * 线性插值并 {@code clamp01}，{@link VisualColor#constant} 与旧的 {@code unpack} 是同一个
  * {@code /255f} 公式，因此输出的每个颜色分量与 v6 完全相同——不是「肉眼看不出」而是「数值相等」。
  * </p>
+ *
+ * <h3>v9 新增：满月月华（{@link #drawMoonBlessing}）与神圣净化（{@link #drawSacredPurge}）</h3>
  * <p>
- * <b>顺带清理：</b>转换后 {@code mix} 与 {@code unpack} 在本类内已无任何调用点，
- * 予以删除，避免后续有人误用而重新引入分配。
+ * 两套新演出<b>完全复用现有几何基元</b>（{@code band} / {@code glowRing} / {@code line} /
+ * {@code spark} / {@code tickRing} / {@code lightningSegment}），没有新增任何基元，
+ * 也没有改动任何既有演出的一行代码。
+ * </p>
+ *
+ * <h4>满月月华：为什么月轮是「满」的</h4>
+ * <p>
+ * {@code DarkMoonRenderer}（暗月的持续视觉）画的是<b>带暗面弧的亏凸月</b>，
+ * 而本演出画的是<b>完整无缺的圆盘</b>。这不是偷懒省一个基元，而是语义自洽：
+ * 一个叫暗月、一个叫满月，月相当然应该不同——玩家同时装备两者时
+ * （机制上正是「月之共鸣」的组合），头顶的亏月与复活时降下的满月形成呼应。
+ * </p>
+ * <p>
+ * <b>回春环刻意向内收拢。</b>本模组其余全部环形演出都是向外扩散（因果律、冻结地震、
+ * 排斥、龙雷、癫火、立体花的爆发环无一例外），反向收拢在视觉上直接读作
+ * 「能量在往身上汇聚」，与「每秒回 0.5% 最大生命」的语义一致；
+ * 同屏叠加时也能一眼与那些爆发类演出区分开。
+ * </p>
+ * <p>
+ * <b>细节系数按柱高换算。</b>月华柱高 {@link #MOON_COLUMN_HEIGHT} 格、月轮悬浮在
+ * {@link #MOON_DISC_HEIGHT} 格处，而半径只有 3.5——玩家站在自己脚边仰头看月轮时，
+ * 按中心距离算会显得「近」，但演出的主体其实在头顶上方几格。
+ * 故 {@link #visualRadiusFor} 取 {@code max(radius, 月轮高度 × }{@value #MOON_VISUAL_RADIUS_FACTOR}{@code )}，
+ * 与红闪电柱同源的处理。
+ * </p>
+ *
+ * <h4>神圣净化：三维十字而非平面法阵</h4>
+ * <p>
+ * 本模组的地面演出已经密集到「再加一个平面法阵就没人分得清」的程度，
+ * 因此神圣净化的主视觉做成<b>立在目标躯干高度的三维十字光刃</b>——
+ * 一道竖刃（{@code lightningSegment} 十字双面）+ 两道正交横刃（水平 {@code line}），
+ * 从任意角度看都是一个悬在半空的发光十字，而不是又一个铺在地上的圆。
+ * </p>
+ * <p>
+ * <b>时长只有 700ms</b>，是全部演出里第二短的（仅次于排斥的 520ms）。
+ * 这是命中反馈而非状态演出，拖长了会让连续攻击亡灵时前后两次的爆闪叠成一片。
  * </p>
  *
  * @author RoinFlam
- * @version 7.0
+ * @version 10.0
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -262,6 +299,39 @@ public final class AoeEffectRenderer {
      */
     private static final float PETAL_INNER_LAYER_KEEP_THRESHOLD = 0.4f;
 
+    // ===== v9 LOD 下限与保留阈值（满月月华 / 神圣净化）=====
+
+    /**
+     * 月华柱的最少竖直分段数。
+     * <p>分段只用于沿高度做透明度渐变（上亮下柔），3 段仍能表达「光从月轮流下来」；
+     * 降到 1 段整根柱子会变成均匀不透明的方棱柱，失去通透感。</p>
+     */
+    private static final int MOON_COLUMN_SEGMENTS_MIN = 3;
+
+    /**
+     * 月轮盘 / 环的最少分段数。
+     * <p>月轮是本演出的核心标志，多边形化最不能容忍，故下限比通用环高。
+     * 半径仅约 1.7 格，18 段的偏离量约 2.6cm，肉眼不可辨。</p>
+     */
+    private static final int MOON_DISC_SEGMENTS_MIN = 18;
+
+    /**
+     * 月尘层的保留阈值。
+     * <p>极细的上升短光丝（半宽 0.035 格），远处几乎不可见。</p>
+     */
+    private static final float MOON_DUST_KEEP_THRESHOLD = 0.45f;
+
+    /**
+     * 月轮外缘刻度层的保留阈值。
+     * <p>细密小段，远处糊成一圈，而月轮本体的盘 + 环已足够表达「这是月亮」。</p>
+     */
+    private static final float MOON_TICK_KEEP_THRESHOLD = 0.5f;
+
+    /**
+     * 神圣净化升天光尘层的保留阈值。
+     */
+    private static final float SACRED_MOTE_KEEP_THRESHOLD = 0.45f;
+
     // ===== v6 视觉尺度系数（用于把「特效半径」换算成「视觉边界半径」）=====
 
     /**
@@ -282,6 +352,14 @@ public final class AoeEffectRenderer {
      * 故用柱高的 0.4 倍（约 11 格）作为视觉边界——玩家在柱子附近仰头看时不会被削减。</p>
      */
     private static final double LIGHTNING_VISUAL_RADIUS_FACTOR = 0.4;
+
+    /**
+     * 满月月华的视觉半径系数（× {@link #MOON_DISC_HEIGHT}）。
+     * <p>月轮悬浮在 3.4 格高处、月华柱贯穿其下，主体视觉在<b>头顶上方</b>而非脚下平面，
+     * 故用月轮高度的 0.9 倍（约 3.1 格）与名义半径取大值作为视觉边界
+     * （详见类注释「细节系数按柱高换算」）。</p>
+     */
+    private static final double MOON_VISUAL_RADIUS_FACTOR = 0.9;
 
     // ===== 主题配色（0xRRGGBB）=====
     private static final int CAUSALITY_GOLD = 0xFFD24A;
@@ -306,6 +384,25 @@ public final class AoeEffectRenderer {
     private static final int LIGHTNING_GLOW = 0xFF2A36;
     /** 龙雷电柱外层光晕 / 落地冲击 / 分叉末端：浓深红 */
     private static final int LIGHTNING_DEEP = 0xC81022;
+
+    // ===== v9 满月月华配色（0xRRGGBB）=====
+    // 与 DarkMoonRenderer 取同一组三色，使暗月的持续视觉与满月的复活演出形成视觉家族。
+    /** 月白：月轮盘面、月华柱核心、起手闪光 */
+    private static final int MOON_CORE = 0xF0F6FF;
+    /** 月华蓝：月轮外环、月华柱主体、回春环、月尘 */
+    private static final int MOON_GLOW = 0xA8C4F0;
+    /** 夜蓝：月光池外缘、月华柱外晕 */
+    private static final int MOON_DEEP = 0x3F5C99;
+
+    // ===== v9 神圣净化配色（0xRRGGBB）=====
+    // 与黄金树祝福（0xFFC23A）色相接近但形态完全不同（瞬时三维十字爆闪 vs 持续贴身光晕），
+    // 且神圣刀刃的语义本就是「神圣」，用金色是对的、不构成辨识歧义。
+    /** 圣光核心：近白暖光 */
+    private static final int SACRED_CORE = 0xFFFBE8;
+    /** 圣光主色：暖金 */
+    private static final int SACRED_GOLD = 0xFFD470;
+    /** 圣光深色：净化环外缘与地面圣徽暗部 */
+    private static final int SACRED_DEEP = 0xC08A28;
 
     // ===== v7：预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
     // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
@@ -345,6 +442,18 @@ public final class AoeEffectRenderer {
     private static final float[] C_LIGHTNING_GLOW = VisualColor.constant(LIGHTNING_GLOW);
     /** 龙雷浓深红外晕 */
     private static final float[] C_LIGHTNING_DEEP = VisualColor.constant(LIGHTNING_DEEP);
+    /** v9 月白（月轮盘面 / 柱核 / 起手闪光） */
+    private static final float[] C_MOON_CORE = VisualColor.constant(MOON_CORE);
+    /** v9 月华蓝（月轮外环 / 柱主体 / 回春环 / 月尘） */
+    private static final float[] C_MOON_GLOW = VisualColor.constant(MOON_GLOW);
+    /** v9 夜蓝（月光池 / 柱外晕） */
+    private static final float[] C_MOON_DEEP = VisualColor.constant(MOON_DEEP);
+    /** v9 圣光核心（十字光刃 / 中心爆闪） */
+    private static final float[] C_SACRED_CORE = VisualColor.constant(SACRED_CORE);
+    /** v9 圣光暖金（净化环 / 光尘） */
+    private static final float[] C_SACRED_GOLD = VisualColor.constant(SACRED_GOLD);
+    /** v9 圣光深金（外环 / 地面圣徽） */
+    private static final float[] C_SACRED_DEEP = VisualColor.constant(SACRED_DEEP);
 
     /**
      * v7：花瓣脊线滚动双缓冲之一（⚠ 写入后必须立即消费，不可跨调用留存）。
@@ -398,6 +507,11 @@ public final class AoeEffectRenderer {
      * 二者时序上不重叠；但分开命名可以杜绝「将来有人把 SCRATCH 传进 drawPetalLayer」这类误用
      * （那会在花瓣循环跑到一半时把配色改掉）。
      * </p>
+     * <p>
+     * <b>v9 说明：</b>新增的两套演出（满月月华 / 神圣净化）<b>不使用本缓冲</b>——
+     * 它们的六个配色全是编译期常量、演出中只有 alpha 与尺寸在变、色相从不插值，
+     * 因此全部直接引用 {@code C_} 只读常量，零动态色。
+     * </p>
      */
     private static final float[] SCRATCH = new float[VisualColor.RGB];
 
@@ -422,6 +536,113 @@ public final class AoeEffectRenderer {
     private static final int LIGHTNING_BRANCH_SEGMENTS = 5;
     /** 分叉每段步长（格） */
     private static final double LIGHTNING_BRANCH_STEP = 1.7;
+
+    // ===== v9 满月月华几何参数 =====
+    /** 月轮悬浮高度（格，自脚底算起）：约在玩家头顶上方 1.5 格 */
+    private static final double MOON_DISC_HEIGHT = 3.4;
+    /** 月轮半径系数（× 特效半径） */
+    private static final double MOON_DISC_RADIUS_FACTOR = 0.48;
+    /** 月轮盘面 / 外环分段数 */
+    private static final int MOON_DISC_SEGMENTS = 32;
+    /** 月轮外缘刻度数量 */
+    private static final int MOON_TICK_COUNT = 16;
+    /** 月华柱高度（格）：自月轮下沿延伸到地面 */
+    private static final double MOON_COLUMN_HEIGHT = 3.4;
+    /** 月华柱竖直分段数（用于沿高度做透明度渐变） */
+    private static final int MOON_COLUMN_SEGMENTS = 8;
+    /** 月华柱底部半宽（格） */
+    private static final double MOON_COLUMN_HALF = 0.62;
+    /** 回春环数量（同时存在的收拢波） */
+    private static final int MOON_RING_COUNT = 3;
+    /** 月尘数量（自地面向上飘的短光丝） */
+    private static final int MOON_DUST_COUNT = 14;
+    /** 月尘上升高度（格） */
+    private static final double MOON_DUST_RISE = 3.0;
+    /** 月尘短光丝长度（格） */
+    private static final double MOON_DUST_LENGTH = 0.32;
+    /** 月尘半宽（格） */
+    private static final double MOON_DUST_HALF = 0.035;
+
+    // ===== v10 满月月华：时间轴与月轮外观（新增）=====
+
+    /**
+     * 满月月华演出总时长（秒）。
+     * <p>
+     * <b>⚠ 必须与 {@code AoeEffectManager.durationFor} 里 TYPE_MOON_BLESSING 的返回值保持一致</b>
+     * （那边是毫秒，即 {@value} × 1000）。本方法用它把归一化的 {@code progress}
+     * 换算回绝对秒数，从而让全部动画速度与总时长脱钩——
+     * 改总时长时两处一起改，动画不会变形（详见 {@link #drawMoonBlessing} 注释）。
+     * </p>
+     * <p>
+     * 取 20 秒是为了覆盖<b>持有暗月时</b>的最长回血时长（400 tick）。
+     * 不带暗月时机制只回 10 秒，演出会多播 10 秒——那时玩家已经满血，多余的月光无害。
+     * 嫌长就把这里和 manager 那边一起调小。
+     * </p>
+     */
+    private static final float MOON_BLESSING_SECONDS = 20f;
+
+    /** 月轮展开时长（秒） */
+    private static final float MOON_APPEAR_SECONDS = 0.9f;
+    /** 收尾整体淡出时长（秒） */
+    private static final float MOON_FADE_SECONDS = 1.8f;
+    /** 起手白热强闪时长（秒） */
+    private static final float MOON_FLASH_SECONDS = 0.5f;
+    /** 月华柱开始降落的时刻（秒） */
+    private static final float MOON_COLUMN_DROP_DELAY = 0.15f;
+    /** 月华柱降落耗时（秒） */
+    private static final float MOON_COLUMN_DROP_SECONDS = 0.7f;
+    /** 月华柱开始收细的时刻（秒） */
+    private static final float MOON_COLUMN_FADE_START = 1.5f;
+    /** 月华柱收细完成的时刻（秒） */
+    private static final float MOON_COLUMN_FADE_END = 3.5f;
+    /**
+     * 月华柱收细后保留的强度。
+     * <p>不做成 0 是因为「光柱完全消失」会让人以为效果结束了；
+     * 保留三成既维持「月光还笼罩着我」的信息，又不至于 20 秒一直糊住视野。</p>
+     */
+    private static final float MOON_COLUMN_MIN_STRENGTH = 0.3f;
+    /** 月轮自转速度（弧度/秒）——绝对速度，与总时长无关 */
+    private static final float MOON_DISC_ROT_SPEED = 0.5f;
+    /** 回春环收拢频率（圈/秒）：1 圈/秒，与「每秒回一次血」的节奏对齐 */
+    private static final float MOON_RING_PER_SECOND = 1.0f;
+    /** 月尘上升频率（次/秒） */
+    private static final float MOON_DUST_PER_SECOND = 0.4f;
+
+    /**
+     * 月海斑块（盘面上稍暗的圆斑），每 3 个 float 一组：
+     * {@code [平面内 right 分量, 平面内 up 分量, 半径]}，三者均为<b>相对月轮半径的比例</b>。
+     * <p>
+     * <b>这是「像月亮」最关键的一笔。</b>纯亮圆盘读起来是「法阵的光球」，
+     * 叠上几块深色斑块之后才会被认成月亮——真实月面的月海正是这种不规则的暗色区域。
+     * 坐标是手调的，刻意做成大小不一、分布不对称（对称会显得像图案而非天体）。
+     * </p>
+     * <p>
+     * <b>⚠ 只读常量数组</b>，绘制时只按下标读取、绝不写入。
+     * </p>
+     */
+    private static final float[] MOON_MARIA = {
+            -0.25f, 0.30f, 0.30f,
+            0.28f, 0.12f, 0.22f,
+            -0.05f, -0.28f, 0.26f,
+            0.35f, -0.35f, 0.16f,
+            -0.42f, -0.08f, 0.14f
+    };
+
+    // ===== v9 神圣净化几何参数 =====
+    /** 十字光刃中心高度（格，自脚底算起）：约在人形躯干处 */
+    private static final double SACRED_CROSS_HEIGHT = 1.05;
+    /** 十字光刃臂长系数（× 特效半径） */
+    private static final double SACRED_CROSS_LENGTH_FACTOR = 0.95;
+    /** 十字光刃半宽（格） */
+    private static final double SACRED_CROSS_HALF = 0.075;
+    /** 升天光尘数量 */
+    private static final int SACRED_MOTE_COUNT = 10;
+    /** 升天光尘上升高度（格） */
+    private static final double SACRED_MOTE_RISE = 2.4;
+    /** 升天光尘短光丝长度（格） */
+    private static final double SACRED_MOTE_LENGTH = 0.28;
+    /** 升天光尘半宽（格） */
+    private static final double SACRED_MOTE_HALF = 0.03;
 
     /**
      * v7：闪电主干节点坐标的复用缓冲 X（⚠ 仅供 {@link #drawRedLightning} 内部使用）。
@@ -585,6 +806,9 @@ public final class AoeEffectRenderer {
             case AoeEffectPacket.TYPE_RED_LIGHTNING:
                 // 闪电的主要视觉体量是 28 格高的竖直电柱，而非落地冲击环
                 return Math.max(radius, LIGHTNING_HEIGHT * LIGHTNING_VISUAL_RADIUS_FACTOR);
+            case AoeEffectPacket.TYPE_MOON_BLESSING:
+                // ⭐ v9：月轮悬浮在 3.4 格高处、月华柱贯穿其下，主体视觉在头顶上方而非脚下平面
+                return Math.max(radius, MOON_DISC_HEIGHT * MOON_VISUAL_RADIUS_FACTOR);
             default:
                 return radius;
         }
@@ -606,6 +830,8 @@ public final class AoeEffectRenderer {
             case AoeEffectPacket.TYPE_SCARLET_BLOOM -> drawScarletBloom(b, m, cx, cy, cz, radius, p, detail);
             case AoeEffectPacket.TYPE_FRENZIED_FLAME -> drawFrenziedFlame(b, m, cx, cy, cz, radius, p, detail);
             case AoeEffectPacket.TYPE_RED_LIGHTNING -> drawRedLightning(b, m, cx, cy, cz, radius, p, seed, detail);
+            case AoeEffectPacket.TYPE_MOON_BLESSING -> drawMoonBlessing(b, m, cx, cy, cz, radius, p, detail);
+            case AoeEffectPacket.TYPE_SACRED_PURGE -> drawSacredPurge(b, m, cx, cy, cz, radius, p, detail);
             default -> drawGeneric(b, m, cx, cy, cz, radius, p, detail);
         }
     }
@@ -721,6 +947,565 @@ public final class AoeEffectRenderer {
         double r2 = radius * 0.6 * expand;
         glowRing(b, m, cx, cz, cy, r1, segmentsFor(r1, detail), w, 0.85f * fade, 0.35f * fade, 0.06, 0.45);
         glowRing(b, m, cx, cz, cy, r2, segmentsFor(r2, detail), w, 0.50f * fade, 0.20f * fade, 0.05, 0.30);
+    }
+
+    // ============================== v10 满月月华 ==============================
+
+    /**
+     * 满月月华：头顶浮现<b>面向相机的完整月轮（含月海）</b> → 一道月华柱自上而下笼罩全身 →
+     * 脚下每秒一圈<b>向内收拢</b>的回春环 → 月尘持续上升。
+     * 总时长 {@value #MOON_BLESSING_SECONDS} 秒，跟随持有者。
+     * <p>
+     * 用于 {@code EnchantmentFullMoon} 的濒死复活：阻止死亡、残血保命、随后 10 秒
+     * （持有暗月时 20 秒）每秒回 0.5% 最大生命。
+     * </p>
+     *
+     * <h4>v10 修复一：月轮改 billboard，并加上月海</h4>
+     * <p>
+     * v9 的月轮是<b>水平放置</b>的圆盘（用 {@code band} 画在固定 y 高度上）。
+     * 这在俯视时是个圆，但玩家绝大多数时候是<b>平视</b>——看到的是一条扁线，
+     * 完全读不出「月亮」。
+     * </p>
+     * <p>
+     * 现改为 <b>billboard 面向相机</b>（{@link #bbDisc} / {@link #bbRing} / {@link #bbLine}，
+     * 平面基取 {@link VisualBatch#rightX()} 与 {@link VisualBatch#upX()} 一组），
+     * 于是从任意角度看都是一个正圆。
+     * </p>
+     * <p>
+     * 光有圆还不够——纯亮圆盘更像「法阵的光球」而不是月亮。因此在盘面上叠了几块
+     * 稍暗的圆斑当<b>月海</b>（{@link #MOON_MARIA}），这是「像月亮」最关键的一笔。
+     * <b>月海不随符文环自转</b>：真实的月球是潮汐锁定的、月面朝向恒定，
+     * 而且「静止的月面 + 缓慢转动的外圈符文」这个对比本身也更好看。
+     * </p>
+     *
+     * <h4>v10 修复二：时长 5 秒 → {@value #MOON_BLESSING_SECONDS} 秒，且动画速度与总时长脱钩</h4>
+     * <p>
+     * v9 只播 5 秒，而机制回血是 10 秒（持有暗月 20 秒），演出早早退场、
+     * 玩家还在回血却什么都看不见了。现在把总时长拉到 20 秒覆盖最长情况。
+     * </p>
+     * <p>
+     * <b>但只改数字是不够的。</b>演出时间轴此前全部用归一化的 {@code progress} 表达，
+     * 总时长翻 4 倍就等于<b>所有动画慢 4 倍</b>——月轮会转得像蜗牛、回春环几乎不动。
+     * 故本方法改用<b>绝对秒数</b> {@code age} 驱动全部时间轴：
+     * </p>
+     * <pre>
+     * float age = p * MOON_BLESSING_SECONDS;   // 已播放的秒数
+     * </pre>
+     * <p>
+     * 自转速度写成「弧度/秒」、回春环写成「每秒几圈」、起落写成「第几秒」——
+     * 于是<b>调整总时长不会让任何动画变形</b>，只是持续段变长或变短。
+     * 若将来要改时长，只需同步 {@link #MOON_BLESSING_SECONDS} 与
+     * {@code AoeEffectManager.durationFor} 两处即可。
+     * </p>
+     *
+     * <h4>v10 修复三：中段把光柱收细，避免 20 秒糊住视野</h4>
+     * <p>
+     * 起手两秒给足冲击（粗光柱 + 白热核 + 强闪），之后光柱按
+     * {@link #MOON_COLUMN_FADE_START}~{@link #MOON_COLUMN_FADE_END} 秒收细变淡到
+     * {@link #MOON_COLUMN_MIN_STRENGTH}。月轮、回春环、月尘则<b>全程保持</b>——
+     * 该消失的是遮视野的那根柱子，不是「我在回血」这个信息本身。
+     * </p>
+     *
+     * <h4>时间轴（秒）</h4>
+     * <ul>
+     *     <li>0 ~ 0.9：月轮浮现（半径 0 → 满、亮度淡入）；</li>
+     *     <li>0 ~ 0.5：中心白热强闪，对应「阻止死亡」那一瞬的顿挫感；</li>
+     *     <li>0.15 ~ 0.85：月华柱底端自月轮高度降落到地面；</li>
+     *     <li>1.5 ~ 3.5：光柱收细变淡（保留但不再挡视野）；</li>
+     *     <li>0.3 ~ 结束：回春环每秒一圈向内收拢，与「每秒回一次血」的节奏对齐；</li>
+     *     <li>0.5 ~ 结束：月尘持续上升；</li>
+     *     <li>最后 1.8 秒：整体淡出。</li>
+     * </ul>
+     * <p>
+     * <b>月轮为什么不画暗面：</b>这是<b>满</b>月——{@code DarkMoonRenderer} 画的才是
+     * 带暗面弧的亏凸月。两者月相不同是刻意的语义自洽（详见类注释「满月月华」小节）。
+     * </p>
+     * <p>
+     * <b>回春环为什么向内收拢：</b>本模组其余全部环形演出都是向外扩散，
+     * 反向收拢直接读作「能量在往身上汇聚」，与回血语义一致、且同屏叠加时一眼可辨。
+     * 环的 alpha 包络是「刚出现（外圈）淡入 → 收到中心时淡出」，
+     * 表现为月光一圈圈被身体吸收。
+     * </p>
+     * <p>
+     * <b>削减：</b>月轮盘 / 环与回春环的分段数缩放；月华柱竖直分段缩放；
+     * 回春环圈数缩减；月尘与月海<b>按步长抽取</b>（角度均布，截断会让元素只朝一侧）
+     * 且可整层跳过；外缘刻度层可跳过。
+     * <b>月轮本体（盘 + 环 + 月海）无论细节多低都完整绘制</b>——它是本演出的唯一标志。
+     * </p>
+     * <p>v10：三个配色全是编译期常量，直接引用只读常量，本方法零分配。</p>
+     *
+     * @param detail 本帧细节系数
+     */
+    private static void drawMoonBlessing(BufferBuilder b, Matrix4f m,
+                                         double cx, double cy, double cz, double radius, float p, float detail) {
+        // ⭐ v10：全部时间轴改用「绝对秒数」驱动，使动画速度与总时长脱钩（详见方法注释）
+        float age = p * MOON_BLESSING_SECONDS;
+
+        // 收尾淡出：最后 MOON_FADE_SECONDS 秒
+        float fade = 1f - smoothstep(MOON_BLESSING_SECONDS - MOON_FADE_SECONDS, MOON_BLESSING_SECONDS, age);
+        if (fade <= 0f) {
+            return;
+        }
+
+        final float[] core = C_MOON_CORE;
+        final float[] glow = C_MOON_GLOW;
+        final float[] deep = C_MOON_DEEP;
+
+        // 月轮浮现（前 0.9 秒展开，半径与亮度同步淡入）
+        float appear = (float) easeOutCubic(clamp01(age / MOON_APPEAR_SECONDS));
+        // 缓慢呼吸（周期约 3.5 秒），避免长达 20 秒的演出里月轮像贴图一样死板
+        float breath = 0.94f + 0.06f * Mth.sin(age * 1.8f);
+
+        double discY = cy + MOON_DISC_HEIGHT;
+        double discRadius = radius * MOON_DISC_RADIUS_FACTOR * appear * breath;
+        // 自转：弧度/秒，与总时长无关
+        float rot = age * MOON_DISC_ROT_SPEED;
+
+        // billboard 平面基（面向相机）
+        float rgX = VisualBatch.rightX();
+        float rgY = VisualBatch.rightY();
+        float rgZ = VisualBatch.rightZ();
+        float upX = VisualBatch.upX();
+        float upY = VisualBatch.upY();
+        float upZ = VisualBatch.upZ();
+
+        int discSegs = VisualLod.scaleSegments(MOON_DISC_SEGMENTS, MOON_DISC_SEGMENTS_MIN, detail);
+
+        // ===== 地面月光池：铺底，让整片区域读作「被月光照着」 =====
+        band(b, m, cx, cz, cy, 0.0, radius * 1.05, segmentsFor(radius, detail),
+                deep[0], deep[1], deep[2], 0.05f * fade * appear, 0.13f * fade * appear);
+
+        // ===== 月华柱：底端自上而下降落到地面；中段收细，避免 20 秒一直糊住视野 =====
+        float drop = (float) easeOutCubic(clamp01((age - MOON_COLUMN_DROP_DELAY) / MOON_COLUMN_DROP_SECONDS));
+        // 起手 1.5 秒内维持满强度，到 3.5 秒收细到 MOON_COLUMN_MIN_STRENGTH 并保持
+        float columnStrength = 1f - (1f - MOON_COLUMN_MIN_STRENGTH)
+                * smoothstep(MOON_COLUMN_FADE_START, MOON_COLUMN_FADE_END, age);
+        double columnBottom = discY - MOON_COLUMN_HEIGHT * drop;
+        if (discY > columnBottom + 1.0e-4 && columnStrength > 0.02f) {
+            int columnSegs = VisualLod.scaleSegments(
+                    MOON_COLUMN_SEGMENTS, MOON_COLUMN_SEGMENTS_MIN, detail);
+            double segLen = (discY - columnBottom) / columnSegs;
+            // 柱身半宽也随强度收细——只调 alpha 的话远看仍是一根粗柱子
+            double halfMul = 0.35 + 0.65 * columnStrength;
+            for (int i = 0; i < columnSegs; i++) {
+                double y0 = columnBottom + segLen * i;
+                double y1 = y0 + segLen;
+                float u0 = (float) i / columnSegs;
+                float u1 = (float) (i + 1) / columnSegs;
+                // 上端（贴近月轮）亮、下端（贴近地面）柔——光是从月轮流下来的
+                float a0 = (0.35f + 0.65f * u0) * fade * columnStrength;
+                float a1 = (0.35f + 0.65f * u1) * fade * columnStrength;
+                // 外层夜蓝光晕
+                lightningSegment(b, m, cx, y0, cz, cx, y1, cz,
+                        MOON_COLUMN_HALF * 1.9 * halfMul, deep, 0.16f * a0, 0.16f * a1);
+                // 中层月华主体
+                lightningSegment(b, m, cx, y0, cz, cx, y1, cz,
+                        MOON_COLUMN_HALF * halfMul, glow, 0.42f * a0, 0.42f * a1);
+                // 内层白热核
+                lightningSegment(b, m, cx, y0, cz, cx, y1, cz,
+                        MOON_COLUMN_HALF * 0.3 * halfMul, core, 0.85f * a0, 0.85f * a1);
+            }
+        }
+
+        // ===== 月轮：面向相机的完整满月（盘面 + 月海 + 外环 + 外缘刻度）=====
+        // ⭐ v10 核心修复：改 billboard，无论从哪个角度看都是正圆（详见方法注释）
+        if (discRadius > 0.05) {
+            float discAlpha = fade * appear;
+
+            // 盘面：中心月白偏实、边缘略淡
+            bbDisc(b, m, cx, discY, cz, discRadius, discSegs,
+                    rgX, rgY, rgZ, upX, upY, upZ,
+                    core, 0.62f * discAlpha, 0.30f * discAlpha);
+
+            // ⭐ 月海：盘面上几块稍暗的圆斑，「像月亮」最关键的一笔。
+            // 刻意不随符文环自转——真实月球潮汐锁定、月面朝向恒定，
+            // 且「静止月面 + 转动符文环」的对比更好看
+            int mariaSegs = Math.max(6, discSegs / 3);
+            int mariaCount = MOON_MARIA.length / 3;
+            int mariaDrawn = VisualLod.scale(mariaCount, detail);
+            int mariaStep = Math.max(1, mariaCount / mariaDrawn);
+            for (int i = 0; i < mariaCount; i += mariaStep) {
+                double mu = MOON_MARIA[i * 3] * discRadius;
+                double mv = MOON_MARIA[i * 3 + 1] * discRadius;
+                double mr = MOON_MARIA[i * 3 + 2] * discRadius;
+                float mx = (float) (cx + rgX * mu + upX * mv);
+                float my = (float) (discY + rgY * mu + upY * mv);
+                float mz = (float) (cz + rgZ * mu + upZ * mv);
+                bbDisc(b, m, mx, my, mz, mr, mariaSegs,
+                        rgX, rgY, rgZ, upX, upY, upZ,
+                        deep, 0.34f * discAlpha, 0.0f);
+            }
+
+            // 外环：月轮轮廓（核心亮带 + 向外渐隐的辉光）
+            double ringHalf = discRadius * 0.045;
+            bbRing(b, m, cx, discY, cz, discRadius - ringHalf, discRadius + ringHalf, discSegs, 0f,
+                    rgX, rgY, rgZ, upX, upY, upZ, glow, 0.9f * discAlpha, 0.9f * discAlpha);
+            bbRing(b, m, cx, discY, cz, discRadius + ringHalf, discRadius + ringHalf + discRadius * 0.16, discSegs, 0f,
+                    rgX, rgY, rgZ, upX, upY, upZ, glow, 0.38f * discAlpha, 0f);
+
+            // 外缘刻度：均布角度，按步长抽取（截断会让刻度只剩一段圆弧）
+            if (VisualLod.keepLayer(detail, MOON_TICK_KEEP_THRESHOLD)) {
+                int drawn = VisualLod.scale(MOON_TICK_COUNT, detail);
+                int step = Math.max(1, MOON_TICK_COUNT / drawn);
+                double rStart = discRadius * 1.10;
+                double rEnd = rStart + discRadius * 0.20;
+                double tickHalf = discRadius * 0.03;
+                for (int i = 0; i < MOON_TICK_COUNT; i += step) {
+                    // 角度基准用原始 MOON_TICK_COUNT，保证保留刻度的方位与全细节时一致
+                    float a = rot + TAU * i / MOON_TICK_COUNT;
+                    float ca = Mth.cos(a);
+                    float sa = Mth.sin(a);
+                    bbLine(b, m, cx, discY, cz, rgX, rgY, rgZ, upX, upY, upZ,
+                            rStart * ca, rStart * sa, rEnd * ca, rEnd * sa,
+                            tickHalf, glow, 0.5f * discAlpha, 0f);
+                }
+            }
+        }
+
+        // ===== 回春环：向内收拢，每秒一圈（与「每秒回一次血」的节奏对齐）=====
+        int ringCount = VisualLod.scale(MOON_RING_COUNT, detail);
+        for (int i = 0; i < ringCount; i++) {
+            float phase = (float) i / ringCount;
+            // 绝对时间驱动：MOON_RING_PER_SECOND 圈/秒，与总时长无关
+            float t = frac(age * MOON_RING_PER_SECOND + phase);
+            // ⭐ 收拢：半径从外向内递减（本模组其余环全是向外扩散，反向即读作「汇聚」）
+            double rr = radius * (1.0 - easeOutCubic(t));
+            if (rr <= 0.25) {
+                continue;
+            }
+            // 刚出现（外圈）淡入 → 收到中心时淡出，表现为月光一圈圈被身体吸收
+            float a = 0.55f * fade * smoothstep(0f, 0.12f, t) * (1f - smoothstep(0.82f, 1f, t));
+            if (a <= 0.01f) {
+                continue;
+            }
+            glowRing(b, m, cx, cz, cy, rr, segmentsFor(rr, detail), glow,
+                    a, a * 0.4f, 0.05, 0.30);
+        }
+
+        // ===== 月尘：自地面向上飘的短光丝（均布角度，必须按步长抽取）=====
+        if (VisualLod.keepLayer(detail, MOON_DUST_KEEP_THRESHOLD)) {
+            int drawn = VisualLod.scale(MOON_DUST_COUNT, detail);
+            int step = Math.max(1, MOON_DUST_COUNT / drawn);
+            for (int i = 0; i < MOON_DUST_COUNT; i += step) {
+                // 角度基准用原始 MOON_DUST_COUNT，保证保留光丝的方位与全细节时一致
+                double ang = TAU * i / MOON_DUST_COUNT + age * 0.12;
+                // 黄金比小数铺半径，使各条光丝的落点错开而不聚成一圈
+                double fr = (i * 0.6180339) - Math.floor(i * 0.6180339);
+                double rr = radius * (0.25 + 0.6 * fr);
+                double px = cx + rr * Math.cos(ang);
+                double pz = cz + rr * Math.sin(ang);
+
+                // 各条错相上升，绝对时间驱动
+                float t = frac(age * MOON_DUST_PER_SECOND + i * 0.137f);
+                double y0 = cy + t * MOON_DUST_RISE;
+                double y1 = y0 + MOON_DUST_LENGTH;
+                // 起步淡入、升顶淡出
+                float a = 0.75f * fade * smoothstep(0f, 0.12f, t) * (1f - smoothstep(0.65f, 1f, t));
+                if (a <= 0.01f) {
+                    continue;
+                }
+                // 越往上越接近月轮，颜色由月华蓝转月白
+                float[] col = (t < 0.5f) ? glow : core;
+                lightningSegment(b, m, px, y0, pz, px, y1, pz, MOON_DUST_HALF, col, a, 0f);
+            }
+        }
+
+        // ===== 起手白热闪光：对应「阻止死亡」那一瞬的顿挫感 =====
+        if (age < MOON_FLASH_SECONDS) {
+            float flash = 1f - age / MOON_FLASH_SECONDS;
+            spark(b, m, cx, cz, cy, (float) (radius * 0.35 + 0.3), core, 0.85f * flash);
+            glowRing(b, m, cx, cz, cy, radius * 0.6, segmentsFor(radius, detail), core,
+                    0.6f * flash, 0.3f * flash, 0.10, 0.45);
+        }
+    }
+
+    // ==================== v10 billboard 基元（面向相机的平面图形）====================
+    // 本渲染器原有的 band / line / spark 全部固定在水平面上（y 恒定），
+    // 适合地面法阵，但画月轮时会变成「平视只看到一条线」。
+    // 以下三个基元用相机的 right / up 向量张成平面，从任意角度看都是正对观察者的圆 / 线。
+
+    /**
+     * 面向相机的径向渐变圆盘。
+     *
+     * @param radius      半径（格）
+     * @param segments    分段数
+     * @param centerAlpha 中心不透明度
+     * @param edgeAlpha   边缘不透明度（取 0 即完全渐隐）
+     */
+    private static void bbDisc(BufferBuilder b, Matrix4f m,
+                               double cx, double cy, double cz, double radius, int segments,
+                               float rgX, float rgY, float rgZ, float upX, float upY, float upZ,
+                               float[] col, float centerAlpha, float edgeAlpha) {
+        if (centerAlpha <= 0.004f && edgeAlpha <= 0.004f) {
+            return;
+        }
+        if (radius <= 1.0e-4) {
+            return;
+        }
+        float r = col[0], g = col[1], bl = col[2];
+        float cxf = (float) cx, cyf = (float) cy, czf = (float) cz;
+        float pex = 0f, pey = 0f, pez = 0f;
+        for (int i = 0; i <= segments; i++) {
+            float ang = TAU * i / segments;
+            float ca = Mth.cos(ang) * (float) radius;
+            float sa = Mth.sin(ang) * (float) radius;
+            float ex = cxf + rgX * ca + upX * sa;
+            float ey = cyf + rgY * ca + upY * sa;
+            float ez = czf + rgZ * ca + upZ * sa;
+            if (i > 0) {
+                b.vertex(m, cxf, cyf, czf).color(r, g, bl, centerAlpha).endVertex();
+                b.vertex(m, pex, pey, pez).color(r, g, bl, edgeAlpha).endVertex();
+                b.vertex(m, ex, ey, ez).color(r, g, bl, edgeAlpha).endVertex();
+            }
+            pex = ex;
+            pey = ey;
+            pez = ez;
+        }
+    }
+
+    /**
+     * 面向相机的圆环带（annulus），内外边缘可分别指定 alpha。
+     *
+     * @param rInner   内半径
+     * @param rOuter   外半径
+     * @param segments 分段数
+     * @param rot      整环旋转角（弧度）
+     */
+    private static void bbRing(BufferBuilder b, Matrix4f m,
+                               double cx, double cy, double cz,
+                               double rInner, double rOuter, int segments, float rot,
+                               float rgX, float rgY, float rgZ, float upX, float upY, float upZ,
+                               float[] col, float alphaInner, float alphaOuter) {
+        if (rOuter <= rInner || segments < 3) {
+            return;
+        }
+        if (alphaInner <= 0.004f && alphaOuter <= 0.004f) {
+            return;
+        }
+        float r = col[0], g = col[1], bl = col[2];
+        float cxf = (float) cx, cyf = (float) cy, czf = (float) cz;
+        float ri = (float) rInner, ro = (float) rOuter;
+        float prevCos = Mth.cos(rot);
+        float prevSin = Mth.sin(rot);
+        for (int i = 1; i <= segments; i++) {
+            float a = rot + TAU * i / segments;
+            float ca = Mth.cos(a);
+            float sa = Mth.sin(a);
+
+            float ox0 = cxf + (rgX * prevCos + upX * prevSin) * ro;
+            float oy0 = cyf + (rgY * prevCos + upY * prevSin) * ro;
+            float oz0 = czf + (rgZ * prevCos + upZ * prevSin) * ro;
+            float ox1 = cxf + (rgX * ca + upX * sa) * ro;
+            float oy1 = cyf + (rgY * ca + upY * sa) * ro;
+            float oz1 = czf + (rgZ * ca + upZ * sa) * ro;
+            float ix0 = cxf + (rgX * prevCos + upX * prevSin) * ri;
+            float iy0 = cyf + (rgY * prevCos + upY * prevSin) * ri;
+            float iz0 = czf + (rgZ * prevCos + upZ * prevSin) * ri;
+            float ix1 = cxf + (rgX * ca + upX * sa) * ri;
+            float iy1 = cyf + (rgY * ca + upY * sa) * ri;
+            float iz1 = czf + (rgZ * ca + upZ * sa) * ri;
+
+            b.vertex(m, ox0, oy0, oz0).color(r, g, bl, alphaOuter).endVertex();
+            b.vertex(m, ox1, oy1, oz1).color(r, g, bl, alphaOuter).endVertex();
+            b.vertex(m, ix1, iy1, iz1).color(r, g, bl, alphaInner).endVertex();
+
+            b.vertex(m, ox0, oy0, oz0).color(r, g, bl, alphaOuter).endVertex();
+            b.vertex(m, ix1, iy1, iz1).color(r, g, bl, alphaInner).endVertex();
+            b.vertex(m, ix0, iy0, iz0).color(r, g, bl, alphaInner).endVertex();
+
+            // 推进到下一段：本段末端即下一段起点（漏掉这两行会让整环塌成一个扇形）
+            prevCos = ca;
+            prevSin = sa;
+        }
+    }
+
+    /**
+     * 在面向相机的平面内绘制一条带宽度的线段（用平面二维坐标表达端点）。
+     *
+     * @param px1 起点在平面内的 right 分量
+     * @param py1 起点在平面内的 up 分量
+     * @param px2 终点在平面内的 right 分量
+     * @param py2 终点在平面内的 up 分量
+     * @param hw  线半宽
+     */
+    private static void bbLine(BufferBuilder b, Matrix4f m,
+                               double cx, double cy, double cz,
+                               float rgX, float rgY, float rgZ, float upX, float upY, float upZ,
+                               double px1, double py1, double px2, double py2,
+                               double hw, float[] col, float a1, float a2) {
+        if (a1 <= 0.004f && a2 <= 0.004f) {
+            return;
+        }
+        double ddx = px2 - px1;
+        double ddy = py2 - py1;
+        double len = Math.sqrt(ddx * ddx + ddy * ddy);
+        if (len < 1.0e-6) {
+            return;
+        }
+        // 平面内的法线 × 半宽
+        double nx = -ddy / len * hw;
+        double ny = ddx / len * hw;
+
+        float r = col[0], g = col[1], bl = col[2];
+        float cxf = (float) cx, cyf = (float) cy, czf = (float) cz;
+
+        float a1u = (float) (px1 + nx), a1w = (float) (py1 + ny);
+        float a2u = (float) (px1 - nx), a2w = (float) (py1 - ny);
+        float b1u = (float) (px2 + nx), b1w = (float) (py2 + ny);
+        float b2u = (float) (px2 - nx), b2w = (float) (py2 - ny);
+
+        float ax1 = cxf + rgX * a1u + upX * a1w;
+        float ay1 = cyf + rgY * a1u + upY * a1w;
+        float az1 = czf + rgZ * a1u + upZ * a1w;
+        float ax2 = cxf + rgX * a2u + upX * a2w;
+        float ay2 = cyf + rgY * a2u + upY * a2w;
+        float az2 = czf + rgZ * a2u + upZ * a2w;
+        float bx1 = cxf + rgX * b1u + upX * b1w;
+        float by1 = cyf + rgY * b1u + upY * b1w;
+        float bz1 = czf + rgZ * b1u + upZ * b1w;
+        float bx2 = cxf + rgX * b2u + upX * b2w;
+        float by2 = cyf + rgY * b2u + upY * b2w;
+        float bz2 = czf + rgZ * b2u + upZ * b2w;
+
+        b.vertex(m, ax1, ay1, az1).color(r, g, bl, a1).endVertex();
+        b.vertex(m, bx1, by1, bz1).color(r, g, bl, a2).endVertex();
+        b.vertex(m, bx2, by2, bz2).color(r, g, bl, a2).endVertex();
+
+        b.vertex(m, ax1, ay1, az1).color(r, g, bl, a1).endVertex();
+        b.vertex(m, bx2, by2, bz2).color(r, g, bl, a2).endVertex();
+        b.vertex(m, ax2, ay2, az2).color(r, g, bl, a1).endVertex();
+    }
+
+    // ============================== v9 神圣净化 ==============================
+
+    /**
+     * 神圣净化：目标躯干处金色<b>三维十字光刃</b>爆开 → 净化环向外扩散 →
+     * 金色光尘升天 → 地面圣徽余辉。约 700ms，定点。
+     * <p>
+     * 用于 {@code EnchantmentSacredBlade} 击中亡灵：额外伤害 + 吸血 + 永久削弱目标。
+     * </p>
+     * <p>
+     * <b>时间轴（全程仅 0.7 秒，一切都很快）：</b>
+     * </p>
+     * <ul>
+     *     <li>p ∈ [0, 0.25]：十字光刃自中心快速张开（缓出，起手最快）；
+     *         同时中心白热爆闪（p &lt; 0.2）；</li>
+     *     <li>p ∈ [0.05, 0.7]：净化环向外扩散，另有一道错相的追赶环；</li>
+     *     <li>p ∈ [0.1, 1]：金色光尘升天；</li>
+     *     <li>p ∈ [0.05, 0.6]：地面圣徽随心跳脉动；</li>
+     *     <li>p ∈ [0.45, 1]：整体渐隐。</li>
+     * </ul>
+     * <p>
+     * <b>为什么是三维十字而非地面法阵：</b>本模组的地面演出已经密集到「再加一个平面法阵
+     * 就没人分得清」的程度。这里用一道竖刃（{@code lightningSegment} 十字双面）
+     * 加两道正交横刃（水平 {@code line}）构成悬在半空的发光十字，
+     * 从任意角度看都是十字，与所有既有演出的形状语言都不重合。
+     * </p>
+     * <p>
+     * <b>v9 削减：</b>净化环分段数缩放；升天光尘按步长抽取且整层可跳过。
+     * <b>三维十字光刃完全不削</b>——仅约 50 顶点却是本演出的全部辨识度，
+     * 且它只有 3 条线，削掉任何一条都不再是十字。
+     * </p>
+     * <p>v9：三个配色全是编译期常量，直接引用只读常量，本方法零分配。</p>
+     *
+     * @param detail 本帧细节系数
+     */
+    private static void drawSacredPurge(BufferBuilder b, Matrix4f m,
+                                        double cx, double cy, double cz, double radius, float p, float detail) {
+        float fade = 1f - smoothstep(0.45f, 1f, p);
+        if (fade <= 0f) {
+            return;
+        }
+
+        final float[] core = C_SACRED_CORE;
+        final float[] gold = C_SACRED_GOLD;
+        final float[] deep = C_SACRED_DEEP;
+
+        double bodyY = cy + SACRED_CROSS_HEIGHT;
+
+        // ===== 三维十字光刃：一竖两横，快速张开（不参与削减）=====
+        float open = (float) easeOutCubic(clamp01(p / 0.25f));
+        double armLen = radius * SACRED_CROSS_LENGTH_FACTOR * open;
+        if (armLen > 0.05) {
+            float crossAlpha = 0.95f * fade;
+            // 竖刃（十字双面，任意水平视角可见）：外金 + 内白热
+            lightningSegment(b, m, cx, bodyY - armLen, cz, cx, bodyY + armLen, cz,
+                    SACRED_CROSS_HALF * 2.4, gold, 0.30f * crossAlpha, 0.05f * crossAlpha);
+            lightningSegment(b, m, cx, bodyY - armLen, cz, cx, bodyY + armLen, cz,
+                    SACRED_CROSS_HALF, core, crossAlpha, 0.15f * crossAlpha);
+            // 两道正交横刃（水平），与竖刃共同构成三维十字
+            line(b, m, cx - armLen, cz, cx + armLen, cz, bodyY, SACRED_CROSS_HALF * 2.4,
+                    gold[0], gold[1], gold[2], 0.05f * crossAlpha, 0.05f * crossAlpha);
+            line(b, m, cx - armLen, cz, cx + armLen, cz, bodyY, SACRED_CROSS_HALF,
+                    core[0], core[1], core[2], crossAlpha, 0.15f * crossAlpha);
+            line(b, m, cx, cz - armLen, cx, cz + armLen, bodyY, SACRED_CROSS_HALF,
+                    core[0], core[1], core[2], crossAlpha, 0.15f * crossAlpha);
+        }
+
+        // ===== 中心白热爆闪：命中那一瞬的强反馈 =====
+        if (p < 0.2f) {
+            float flash = 1f - p / 0.2f;
+            spark(b, m, cx, cz, bodyY, (float) (radius * 0.4 + 0.25), core, 0.95f * flash);
+        }
+
+        // ===== 净化环：向外扩散 =====
+        float ringP = clamp01((p - 0.05f) / 0.6f);
+        if (ringP > 0f && ringP < 1f) {
+            double rr = radius * easeOutCubic(ringP);
+            float ringFade = 1f - ringP;
+            glowRing(b, m, cx, cz, cy, rr, segmentsFor(rr, detail), gold,
+                    0.85f * ringFade * fade, 0.36f * ringFade * fade, 0.07, 0.42);
+            // 错相追赶环
+            float ring2 = clamp01((p - 0.18f) / 0.5f);
+            if (ring2 > 0f && ring2 < 1f) {
+                double rr2 = radius * 0.72 * easeOutCubic(ring2);
+                glowRing(b, m, cx, cz, cy, rr2, segmentsFor(rr2, detail), deep,
+                        0.5f * (1f - ring2) * fade, 0.22f * (1f - ring2) * fade, 0.05, 0.32);
+            }
+        }
+
+        // ===== 地面圣徽：十字 + 底盘，随心跳脉动 =====
+        float emblem = smoothstep(0.03f, 0.15f, p) * (1f - smoothstep(0.5f, 0.75f, p));
+        if (emblem > 0f) {
+            float pulse = 0.65f + 0.35f * (float) Math.sin(p * 26.0);
+            double len = radius * 0.75;
+            double hw = Math.max(0.05, radius * 0.03);
+            float a = 0.7f * emblem * pulse * fade;
+            line(b, m, cx - len, cz, cx + len, cz, cy, hw, core[0], core[1], core[2], a, a);
+            line(b, m, cx, cz - len, cx, cz + len, cy, hw, core[0], core[1], core[2], a, a);
+            band(b, m, cx, cz, cy, 0.0, radius * 0.85, segmentsFor(radius, detail),
+                    gold[0], gold[1], gold[2], 0.12f * emblem * fade, 0f);
+        }
+
+        // ===== 升天光尘：短竖光丝向上飘（均布角度，必须按步长抽取）=====
+        if (VisualLod.keepLayer(detail, SACRED_MOTE_KEEP_THRESHOLD)) {
+            float moteP = clamp01((p - 0.1f) / 0.9f);
+            if (moteP > 0f) {
+                int drawn = VisualLod.scale(SACRED_MOTE_COUNT, detail);
+                int step = Math.max(1, SACRED_MOTE_COUNT / drawn);
+                for (int i = 0; i < SACRED_MOTE_COUNT; i += step) {
+                    // 角度基准用原始 SACRED_MOTE_COUNT，保证保留光尘方位与全细节时一致
+                    double ang = TAU * i / SACRED_MOTE_COUNT;
+                    double fr = (i * 0.6180339) - Math.floor(i * 0.6180339);
+                    double rr = radius * (0.2 + 0.5 * fr);
+                    double px = cx + rr * Math.cos(ang);
+                    double pz = cz + rr * Math.sin(ang);
+
+                    // 逐条错开起飞时刻，避免整圈光尘齐刷刷同时升起
+                    float t = clamp01((moteP - i * 0.04f) / 0.75f);
+                    if (t <= 0f) {
+                        continue;
+                    }
+                    double y0 = cy + t * SACRED_MOTE_RISE;
+                    double y1 = y0 + SACRED_MOTE_LENGTH;
+                    float a = 0.8f * (1f - t) * fade;
+                    if (a <= 0.01f) {
+                        continue;
+                    }
+                    lightningSegment(b, m, px, y0, pz, px, y1, pz, SACRED_MOTE_HALF, gold, a, 0f);
+                }
+            }
+        }
     }
 
     /**
@@ -844,7 +1629,7 @@ public final class AoeEffectRenderer {
      * 花心白热球仅 48 顶点，不削。
      * </p>
      * <p>
-     * <b>v7 ⚠：传给 {@link #drawPetalLayer} 的三个配色数组必须是只读常量。</b>
+     * <b>v7 ⚠：</b>传给 {@link #drawPetalLayer} 的三个配色数组必须是只读常量。
      * {@link #drawPetal} 会在整个脊线循环期间反复读取它们，若传入可写缓冲，
      * 循环跑到一半配色就会被改掉（详见类注释）。
      * 花心球的动态混色写入 {@link #SCRATCH}——此时全部花瓣已绘制完毕，时序上不重叠。
@@ -1401,7 +2186,8 @@ public final class AoeEffectRenderer {
 
     /**
      * 竖直 / 任意朝向的「十字双面」线段：沿世界 X、Z 轴各画一个四边形，使线段从任意水平视角皆可见。
-     * <p>用于闪电电柱 / 分叉。两端 alpha 可不同（a1 起点、a2 终点）。双面绘制已开启，缠绕方向无所谓。</p>
+     * <p>用于闪电电柱 / 分叉、月华柱、月尘、神圣净化的竖刃与升天光尘。
+     * 两端 alpha 可不同（a1 起点、a2 终点）。双面绘制已开启，缠绕方向无所谓。</p>
      *
      * @param hw 线半宽（格）
      */
@@ -1472,7 +2258,7 @@ public final class AoeEffectRenderer {
     /**
      * 发光圆环：外辉 + 内辉 + 核心亮带，三层叠出柔和光环。
      * <p><b>本渲染器的首要顶点杠杆</b>：内部叠三层 {@code band}，单次调用即
-     * {@code segs × 18} 个顶点，而每套演出都有 2~4 个环。调用方应传入
+     * {@code segs × 18} 个顶点，而本渲染器的每套演出都有 2~4 个环。调用方应传入
      * {@link #segmentsFor(double, float)} 的结果。</p>
      */
     private static void glowRing(BufferBuilder b, Matrix4f m, double cx, double cz, double y,
