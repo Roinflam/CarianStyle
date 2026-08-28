@@ -57,7 +57,65 @@ import java.util.Map;
  * <p>
  * 所有外观参数集中在顶部常量。全部基于帧间隔 dt，与帧率无关。
  *
+ * <h3>v2 性能：三类动态文本全部改为预建 {@link Component} 缓存</h3>
+ * <p>
+ * <b>问题：</b>本覆盖层每帧、每行都要产生三类文本，而它们此前<b>全是现场拼出来的</b>：
+ * </p>
+ * <pre>
+ * "×" + a.lastCount              // 每行每帧一个新 String
+ * seconds + "s"                  // 冷却项同上
+ * translatableWithFallback(...).getString()   // 联动徽标：一个 Component + 一个 String
+ * </pre>
+ * <p>
+ * 单帧的量不大（同屏叠层项通常几行），但这是<b>每帧都在跑的 UI 代码</b>，
+ * 60fps × 数行 × 三类，一天下来是相当可观的垃圾量；而这些字符串的<b>取值集合极其有限</b>——
+ * 层数就那几百种、秒数最多三百来种、徽标文案只有一种。
+ * </p>
+ * <p>
+ * <b>做法：</b>全部改为<b>类加载时预建的 {@link Component} 数组</b>
+ * （{@link #COUNT_LABELS} / {@link #SECOND_LABELS} / {@link #RESONANCE_BADGE}），
+ * 渲染时按下标取用，零分配。相应地 {@link #drawScaledString} 的形参由
+ * {@code String} 改为 {@link Component}——{@code Font.width(FormattedText)} 与
+ * {@code GuiGraphics.drawString(Font, Component, ...)} 都有现成重载，改动很小。
+ * </p>
+ *
+ * <h4>为什么徽标能安全地缓存成一个常量</h4>
+ * <p>
+ * 这是本次唯一需要想一下的地方：{@link #RESONANCE_BADGE} 是
+ * {@code Component.translatableWithFallback(...)}，而<b>翻译组件是在渲染时才解析当前语言的</b>
+ * ——它内部持有的是「翻译键 + 回退值」，不是某种语言的成品字符串。
+ * 因此把实例缓存下来，玩家中途切换语言后<b>下一帧就会自动显示新语言</b>，不需要任何失效逻辑。
+ * </p>
+ * <p>
+ * 相比之下，原实现每帧调 {@code .getString()} 反而是把它<b>立刻拍平成当前语言的 String</b>，
+ * 既产生垃圾又没有任何好处。
+ * </p>
+ *
+ * <h4>缓存容量与回退</h4>
+ * <p>
+ * 两个数组都设了上限，超出范围时<b>回退到动态创建</b>（{@link #countLabel} /
+ * {@link #secondLabel}）：
+ * </p>
+ * <ul>
+ *     <li>{@link #COUNT_LABELS} 覆盖 0~{@value #COUNT_LABEL_CACHE_SIZE}-1。
+ *         常见叠层的上限都远低于此（尸山血海 50、居合 198、龙徽大盾 20、腐败翼剑 20）；
+ *         唯一可能溢出的是<b>忍耐</b>——它显示的是「储存的伤害值」而非层数，
+ *         上限为 {@code 最大生命 × 等级 × 0.4}，高血量时可达四位数。
+ *         但忍耐的数值只在受击时变化、频率远低于每帧，走回退路径完全可接受；</li>
+ *     <li>{@link #SECOND_LABELS} 覆盖 0~{@value #SECOND_LABEL_CACHE_SIZE}-1 秒。
+ *         本模组最长冷却是回溯 / 巨剑方阵的 6000 tick = 300 秒，
+ *         留到 600 秒是给将来加更长冷却的附魔留余量。</li>
+ * </ul>
+ *
+ * <h4>刻意没做的一处</h4>
+ * <p>
+ * {@link #anims} 的 {@code entrySet().iterator()} 每帧也会分配一个迭代器对象。
+ * <b>没有改</b>——要消掉它就得放弃「遍历中删除」的写法，改成先收集待删键再二次遍历，
+ * 那反而要多分配一个集合。一个迭代器换一份可读性，这笔交易不划算。
+ * </p>
+ *
  * @author FlameForge
+ * @version 2
  */
 @OnlyIn(Dist.CLIENT)
 public final class StackHudOverlay implements IGuiOverlay {
@@ -92,6 +150,57 @@ public final class StackHudOverlay implements IGuiOverlay {
     private static final String RESONANCE_BADGE_KEY = "carianstyle.hud.triggered";
     /** 联动徽标计数文本的默认回退值。 */
     private static final String RESONANCE_BADGE_FALLBACK = "已触发";
+
+    /**
+     * 联动徽标的计数文本组件（<b>v2：全局缓存一份</b>）。
+     * <p>
+     * 翻译组件在<b>渲染时</b>才解析当前语言，因此缓存实例是安全的——
+     * 玩家中途切换语言后下一帧自动显示新语言，无需任何失效逻辑
+     * （详见类注释「为什么徽标能安全地缓存成一个常量」）。
+     * </p>
+     * <p>
+     * 原实现每帧调 {@code .getString()} 把它拍平成当前语言的 String，
+     * 既产生垃圾、又白白丢掉了翻译组件的延迟解析特性。
+     * </p>
+     */
+    private static final Component RESONANCE_BADGE =
+            Component.translatableWithFallback(RESONANCE_BADGE_KEY, RESONANCE_BADGE_FALLBACK);
+
+    /**
+     * "×层数" 文本组件的缓存容量（覆盖 0 ~ 本值-1）。
+     * <p>
+     * 取 {@value} 的依据见类注释「缓存容量与回退」：常见叠层上限都远低于此，
+     * 唯一可能溢出的忍耐（显示储存伤害值）变化频率极低，走回退路径无妨。
+     * </p>
+     */
+    private static final int COUNT_LABEL_CACHE_SIZE = 256;
+
+    /**
+     * "N秒" 文本组件的缓存容量（覆盖 0 ~ 本值-1 秒）。
+     * <p>本模组最长冷却 6000 tick = 300 秒，留到 {@value} 是给将来更长冷却的附魔留余量。</p>
+     */
+    private static final int SECOND_LABEL_CACHE_SIZE = 601;
+
+    /**
+     * 预建的 "×N" 文本组件表（v2 新增，索引即层数）。
+     * <p>类加载时一次性建好，渲染时按下标取用、零分配。超出范围由 {@link #countLabel} 回退。</p>
+     */
+    private static final Component[] COUNT_LABELS = new Component[COUNT_LABEL_CACHE_SIZE];
+
+    /**
+     * 预建的 "Ns" 文本组件表（v2 新增，索引即剩余秒数）。
+     * <p>类加载时一次性建好，渲染时按下标取用、零分配。超出范围由 {@link #secondLabel} 回退。</p>
+     */
+    private static final Component[] SECOND_LABELS = new Component[SECOND_LABEL_CACHE_SIZE];
+
+    static {
+        for (int i = 0; i < COUNT_LABEL_CACHE_SIZE; i++) {
+            COUNT_LABELS[i] = Component.literal("×" + i);
+        }
+        for (int i = 0; i < SECOND_LABEL_CACHE_SIZE; i++) {
+            SECOND_LABELS[i] = Component.literal(i + "s");
+        }
+    }
 
     /**
      * 文字最小可绘制透明度（4/255）。
@@ -339,13 +448,15 @@ public final class StackHudOverlay implements IGuiOverlay {
         // 计数文本三态：冷却项显示剩余秒数（如 "5s"）；联动徽标（血之/月之共鸣）显示「已触发」；
         // 其余叠层项显示 "×层数"。联动徽标以 Stacks(1,0,false) 注册，表达布尔激活态而非可累加层数，
         // 故不显示 "×1"（详见 isResonanceBadge）；连击数等其它非冷却项不受影响，仍为 "×层数"。
-        String countText;
+        //
+        // ⭐ v2：三类文本全部取自预建的 Component 缓存，不再每帧拼字符串（详见类注释）
+        Component countText;
         if (a.cooldown) {
-            countText = formatCooldownSeconds(a.lastCount);
+            countText = cooldownLabel(a.lastCount);
         } else if (isResonanceBadge(serialId)) {
-            countText = resonanceBadgeText();
+            countText = RESONANCE_BADGE;
         } else {
-            countText = "×" + a.lastCount;
+            countText = countLabel(a.lastCount);
         }
         int countWidth = font.width(countText);
 
@@ -688,22 +799,52 @@ public final class StackHudOverlay implements IGuiOverlay {
     }
 
     /**
-     * 联动徽标的计数文本「已触发」。
-     * <p>使用带回退值的翻译键：默认显示 {@link #RESONANCE_BADGE_FALLBACK}（「已触发」），
-     * 无需额外补语言键即可工作；如需自定义文案或多语言，可在语言文件中覆盖
-     * {@link #RESONANCE_BADGE_KEY}。每帧至多 2 个激活徽标调用，开销可忽略
-     * （与冷却项每帧构建秒数字符串同量级）。</p>
+     * 取 "×层数" 的文本组件（v2 新增）。
+     * <p>
+     * 优先命中 {@link #COUNT_LABELS} 预建表；超出缓存范围（或出现负数）时才动态创建。
+     * 回退路径基本只会被<b>忍耐</b>触发——它显示的是储存伤害值而非层数，高血量时可达四位数，
+     * 但其数值只在受击时变化、频率远低于每帧，动态创建完全可接受（详见类注释）。
+     * </p>
      *
-     * @return 本地化后的「已触发」文本
+     * @param count 层数 / 数值
+     * @return 文本组件
      */
-    private static String resonanceBadgeText() {
-        return Component.translatableWithFallback(RESONANCE_BADGE_KEY, RESONANCE_BADGE_FALLBACK).getString();
+    private static Component countLabel(int count) {
+        if (count >= 0 && count < COUNT_LABEL_CACHE_SIZE) {
+            return COUNT_LABELS[count];
+        }
+        return Component.literal("×" + count);
     }
 
     /**
-     * 用缩放绘制字符串（围绕其中心缩放，用于层数弹动/呼吸）。
+     * 取剩余秒数的文本组件（v2 新增，取代原先返回 String 的 {@code formatCooldownSeconds}）。
+     * <p>
+     * 剩余冷却 tick 向上取整为秒，且至少显示 1s——剩余不足 1 秒但仍在冷却时显示 "1s"，
+     * 直到归 0 那一刻该行从列表移除。例：90 tick → "5s"（90/20=4.5 向上取整为 5）。
+     * </p>
+     * <p>优先命中 {@link #SECOND_LABELS} 预建表；超出范围时才动态创建。</p>
+     *
+     * @param remainingTicks 剩余冷却 tick（&gt;0）
+     * @return 形如 "5s" 的文本组件
      */
-    private static void drawScaledString(GuiGraphics g, Font font, String text, int x, int y, int color, float scale) {
+    private static Component cooldownLabel(int remainingTicks) {
+        int seconds = Math.max(1, (int) Math.ceil(remainingTicks / 20.0));
+        if (seconds < SECOND_LABEL_CACHE_SIZE) {
+            return SECOND_LABELS[seconds];
+        }
+        return Component.literal(seconds + "s");
+    }
+
+    /**
+     * 用缩放绘制文本（围绕其中心缩放，用于层数弹动/呼吸）。
+     * <p>
+     * <b>v2：形参由 {@code String} 改为 {@link Component}</b>，配合三张预建缓存表消掉每帧字符串分配。
+     * {@code Font.width(FormattedText)} 与 {@code GuiGraphics.drawString(Font, Component, ...)}
+     * 都有现成重载，改动仅限签名。
+     * </p>
+     */
+    private static void drawScaledString(GuiGraphics g, Font font, Component text,
+                                         int x, int y, int color, float scale) {
         if (scale <= 1.001f) {
             g.drawString(font, text, x, y, color, true);
             return;
@@ -787,18 +928,5 @@ public final class StackHudOverlay implements IGuiOverlay {
             return 0f;
         }
         return Math.min(v, 1f);
-    }
-
-    /**
-     * 把剩余冷却 tick 格式化为「剩余秒数 s」（向上取整，至少显示 1s）。
-     * <p>例：90 tick → "5s"（90/20=4.5 向上取整为 5）。剩余不足 1 秒但仍在冷却时显示 "1s"，
-     * 直到归 0 那一刻该行从列表移除。</p>
-     *
-     * @param remainingTicks 剩余冷却 tick（&gt;0）
-     * @return 形如 "5s" 的字符串
-     */
-    private static String formatCooldownSeconds(int remainingTicks) {
-        int seconds = Math.max(1, (int) Math.ceil(remainingTicks / 20.0));
-        return seconds + "s";
     }
 }

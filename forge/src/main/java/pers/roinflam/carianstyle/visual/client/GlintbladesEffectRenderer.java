@@ -3,7 +3,6 @@ package pers.roinflam.carianstyle.visual.client;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
@@ -20,7 +19,7 @@ import java.util.List;
  * 魔法辉剑「辉石魔法」特效渲染器（纯客户端自绘）。
  * <p>
  * 为 {@link EntityGlintblades} 补上卡利亚辉石魔法的视觉：悬浮期在剑柄后浮现符文法阵、
- * 刀身裹上魔力光晕、剑尖拉出一条指向目标的锁定引导线；发射后转为高速拖尾 + 剑尖白热核。
+ * 刀身裹上魔力光晕；发射后转为高速拖尾 + 剑尖白热核。
  * 卡利亚圆阵一次生成 8 把剑，8 个法阵自然就围成一圈——<b>圆阵的「阵」是由剑各自的法阵拼出来的，
  * 不需要额外画一个大法阵</b>，也就不需要新增任何网络包。
  * </p>
@@ -45,18 +44,30 @@ import java.util.List;
  * GL 状态与顶点缓冲由 {@link VisualBatch} 统一管理（与其余渲染器合并为一次状态切换 + 一次 draw call），
  * {@code POSITION_COLOR} 纯顶点绘制，无贴图、无原版粒子，颜色走 {@link VisualColor} 零分配路径。
  * </p>
+ *
+ * <h3>v2 修正：改用 {@link SharedEntityQuery} 的辉剑缓存</h3>
  * <p>
- * <b>不能复用 {@link SharedEntityQuery}：</b>那份共享列表的元素类型是 {@code LivingEntity}，
- * 而辉剑是 {@link net.minecraft.world.entity.projectile.ThrowableProjectile}，不在其中。
- * 故本渲染器自行做一次范围查询——每帧仅<b>一次</b>，且列表为空时立即返回，
- * 开销与单个实体渲染器同量级。
+ * <b>此前本渲染器是唯一自行做范围查询的世界渲染器</b>——因为
+ * {@link SharedEntityQuery#livingEntitiesNearCamera} 那份共享列表的元素类型是
+ * {@code LivingEntity}，而辉剑继承自 {@code ThrowableProjectile}，不在其中。
+ * </p>
+ * <p>
+ * 于是它自己开了一次 {@code getEntitiesOfClass}，且半径 64 与共享列表的 48 不一致——
+ * 两个数字一个写在渲染器里、一个写在 {@link SharedEntityQuery} 里，
+ * 对不上也没人会发现。
+ * </p>
+ * <p>
+ * 现在 {@link SharedEntityQuery} 单开了一份辉剑专用的帧级缓存
+ * （{@link SharedEntityQuery#glintbladesNearCamera}，半径
+ * {@link SharedEntityQuery#PROJECTILE_QUERY_RANGE}）。<b>收益不在于省掉一次查询</b>
+ * ——本渲染器每帧本来也只查一次；真正的收益是范围常量集中管理、
+ * 且将来若给辉剑加第二个渲染器（例如命中特效）不会再冒出第三次查询。
  * </p>
  *
  * <h3>顶点量与 LOD</h3>
  * <pre>
  * 悬浮期（每把剑）：
  *   辉石符文阵（双环 336 + 六芒星 36 + 外缘刻度 72）   ~444
- *   锁定引导线（7 段虚线 × 12）                          84
  *   环绕碎片（6 颗 × 12）                                72
  *   剑尖光核                                             12
  *   ───────────────────────────────────────────────────
@@ -65,7 +76,7 @@ import java.util.List;
  * 飞行期（每把剑）：拖尾 108 + 光核 12 ≈ 120
  * </pre>
  * <p>
- * 卡利亚圆阵一次 8 把、巨剑阵 3 把，悬浮期同屏峰值约 5000 顶点——比出血单个患者的 948
+ * 卡利亚圆阵一次 8 把、巨剑阵 3 把，悬浮期同屏峰值约 4200 顶点——比出血单个患者的 948
  * 高不了太多，但<b>会连着 3~6 秒持续存在</b>，故全部元素接入 {@link VisualLod}：
  * 12 格内系数恒为 1.0（与不做 LOD 逐像素一致），远处逐步削减，40 格外单把剑降至约 140 顶点。
  * </p>
@@ -82,23 +93,22 @@ import java.util.List;
  *     <li><b>六芒星完全不削</b>——仅 36 顶点却是「这是卡利亚辉石魔法」的唯一辨识依据，
  *         且六个顶点是均布的，减到 4 个就不是六芒星了；</li>
  *     <li><b>外缘刻度与环绕碎片按步长抽取</b>——角度是 {@code i × (TAU / 总数)} 均布的，
- *         截断前 N 个会让法阵明显「缺一块」；</li>
- *     <li><b>锁定引导线整层可跳过</b>——它服务的是「被瞄准的那名玩家」，
- *         远处旁观者看不清也不需要这个预警信息。</li>
+ *         截断前 N 个会让法阵明显「缺一块」。</li>
  * </ul>
  *
  * @author FlameForge
- * @version 1.0
+ * @version 2.0
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
 public final class GlintbladesEffectRenderer {
 
-    /** 距离裁剪（格） */
+    /**
+     * 距离裁剪（格）。
+     * <p>必须 ≤ {@link SharedEntityQuery#PROJECTILE_QUERY_RANGE}，否则会漏掉辉剑。</p>
+     */
     private static final double CULL = 64.0;
     private static final double CULL_SQR = CULL * CULL;
-    /** 范围查询半径（格），须 ≥ {@link #CULL} */
-    private static final double QUERY_RANGE = 64.0;
 
     private static final float TAU = (float) (Math.PI * 2.0);
 
@@ -142,6 +152,7 @@ public final class GlintbladesEffectRenderer {
     // 保留的元素：辉石符文阵、剑尖光核、环绕碎片、飞行拖尾。
     // v4.1 说明：「剑尖锁定引导虚线」也已移除——原作没有这根线，
     //     剑尖朝向本身就足以表达锁定，多一根线反而像塔防游戏的激光指示器。
+    // v2 说明：随引导线一起遗留下来的 frac(float) 工具方法也已删除（自 v4.1 起就无人调用）。
 
     // ===== 几何比例（均为 × size 的系数）=====
     /** 剑尖相对中心的距离系数。物品模型对角线半长约 0.707，取略小值贴合可见刀尖 */
@@ -181,6 +192,10 @@ public final class GlintbladesEffectRenderer {
 
     /**
      * 世界渲染回调：绘制相机附近全部辉剑的魔法特效。
+     * <p>
+     * v2：实体列表改从 {@link SharedEntityQuery#glintbladesNearCamera} 取，
+     * 不再自行做 {@code getEntitiesOfClass}（详见类注释「v2 修正」小节）。
+     * </p>
      *
      * @param event 渲染阶段事件
      */
@@ -203,12 +218,7 @@ public final class GlintbladesEffectRenderer {
             return;
         }
 
-        AABB box = new AABB(
-                cam.x - QUERY_RANGE, cam.y - QUERY_RANGE, cam.z - QUERY_RANGE,
-                cam.x + QUERY_RANGE, cam.y + QUERY_RANGE, cam.z + QUERY_RANGE
-        );
-        List<EntityGlintblades> blades = mc.level.getEntitiesOfClass(
-                EntityGlintblades.class, box, e -> !e.isRemoved());
+        List<EntityGlintblades> blades = SharedEntityQuery.glintbladesNearCamera(mc, cam);
         if (blades.isEmpty()) {
             return;
         }
@@ -295,7 +305,7 @@ public final class GlintbladesEffectRenderer {
             int seedId = blade.getId();
 
             if (!shooted) {
-                // ===== 悬浮期：符文阵 + 环绕碎片 + 锁定引导线 =====
+                // ===== 悬浮期：符文阵 + 环绕碎片 =====
                 drawRuneCircle(builder, matrix, hiltX, hiltY, hiltZ,
                         ux, uy, uz, wx, wy, wz, size, appear, charge, time, seedId, detail);
 
@@ -675,15 +685,12 @@ public final class GlintbladesEffectRenderer {
     }
 
     // ==================== 数学辅助 ====================
+    // v2 说明：原先的 frac(float) 已删除——它是 v4.1 移除「剑尖锁定引导虚线」时
+    // 遗留下来的死代码，此后再无任何调用点。
 
     /** 缓出（cubic）。 */
     private static float easeOutCubic(float t) {
         float inv = 1f - t;
         return 1f - inv * inv * inv;
-    }
-
-    /** 取小数部分（结果恒在 [0,1)）。 */
-    private static float frac(float x) {
-        return x - (float) Math.floor(x);
     }
 }

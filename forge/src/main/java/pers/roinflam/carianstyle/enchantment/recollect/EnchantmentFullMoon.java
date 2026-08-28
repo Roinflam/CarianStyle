@@ -35,36 +35,35 @@ import java.util.UUID;
 /**
  * 满月附魔
  * <p>修复: DarkMoon检查getUsedItemHand -> InteractionHand.MAIN_HAND</p>
- * <p>v2.2新增: onLivingDeath 入口接入怪物附魔触发开关，
- * 怪物身上的"濒死复活"效果可由配置 allowMobTriggerDeathEnchantments 控制</p>
- * <p>v2.3新增: onLivingHeal 入口补齐怪物附魔触发开关，
- * 怪物在夜晚的治疗加成由 allowMobTriggerEnchantments 控制</p>
+ * <p>v2.2新增: onLivingDeath 入口接入怪物附魔触发开关</p>
+ * <p>v2.3新增: onLivingHeal 入口补齐怪物附魔触发开关</p>
+ * <p>v2.4新增: 月华复活特效</p>
  *
- * <h3>v2.4新增：月华复活特效</h3>
+ * <h3>v2.5：特效时长与实际回血时长严格对齐</h3>
  * <p>
- * 濒死复活触发的瞬间，调用
- * {@link CarianStyleEffects#moonBlessing(ServerLevel, LivingEntity)} 广播一个
- * <b>跟随持有者</b>的自绘演出：头顶浮现月轮 → 一道月华柱自上而下笼罩全身 →
- * 脚下每秒一圈<b>向内收拢</b>的回春环（对应每秒回 0.5% 最大生命的节奏）→ 月尘上升。
+ * <b>问题：</b>本附魔的回血持续时间<b>取决于持有者有没有装备暗月</b>——
+ * 不带是 200 tick(10 秒)，带是 400 tick(20 秒)。而客户端无从得知这一点，
+ * 早期版本只能让渲染器取最长的 20 秒写死，结果不带暗月时
+ * <b>特效比实际回血多播 10 秒</b>——玩家早就满血了，月光还挂在头顶。
  * </p>
  * <p>
- * <b>为什么用跟随而非定点：</b>复活后玩家往往立刻被继续攻击、被击退或主动跑位，
- * 定点特效会导致「人跑出了光柱」。跟随特效由客户端每帧取实体插值位置作为中心，
- * 实体若中途死亡 / 卸载则回退到最后已知坐标播完剩余演出。
+ * <b>修复：</b>把 {@code duration} 的计算<b>提前到特效调用之前</b>，
+ * 再通过 {@link CarianStyleEffects#moonBlessing(ServerLevel, LivingEntity, int)}
+ * 把实际 tick 数发给客户端。渲染器会用它把归一化进度换算回绝对秒数，
+ * 因此 10 秒版与 20 秒版的<b>动画速度完全一致</b>，只是持续段长短不同。
  * </p>
  * <p>
- * <b>放置位置：</b>紧跟在 {@code evt.setCanceled(true)} 与设置残血之后、
- * 启动回血任务之前。此时已确认复活确实触发（冷却检查已通过），
- * 不会出现「特效放了但没复活」的情况。
+ * <b>⚠ 顺序要求：</b>{@code hasDarkMoon} 与 {@code duration} 的计算<b>必须</b>
+ * 排在 {@code moonBlessing(...)} 调用之前——这是本次改动唯一调整的代码顺序。
+ * 若将来有人把特效调用挪到前面，特效时长会退回默认值，
+ * 又会出现「特效比回血长」的老毛病。
  * </p>
  * <p>
  * <b>特效不产生任何机制影响</b>：不生成实体、不触发事件、不造成伤害，
- * 只向 64 格内的客户端广播一个约 30 字节的轻量包，对服务端 tick 的开销可视为零。
- * 特效时长（5 秒）与机制回血时长（10 秒 / 有暗月时 20 秒）刻意<b>不强行对齐</b>——
- * 演出覆盖最戏剧化的前半段即可，全程铺满反而拖沓。
+ * 只向 64 格内的客户端广播一个约 34 字节的轻量包。
  * </p>
  *
- * @version 2.4
+ * @version 2.5
  */
 @AutoRegisterEnchantment(id = "full_moon", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantmentCategory.ARMOR_CHEST, slots = {EquipmentSlot.CHEST}, conflictsWith = {EnchantmentHealingByFire.class, EnchantmentShelterOfFire.class})
 @Mod.EventBusSubscriber
@@ -73,14 +72,20 @@ public class EnchantmentFullMoon extends EnchantmentBase {
     private static final String FULL_MOON_COOLDOWN_KEY = "full_moon_cooldown";
     private static final int RECOLLECT_ENCHANTABILITY = 35;
 
+    /** 不带暗月时的回血持续时间（游戏刻）= 10 秒 */
+    private static final int HEAL_DURATION_TICKS = 200;
+    /** 装备暗月时的回血持续时间（游戏刻）= 20 秒 */
+    private static final int HEAL_DURATION_TICKS_DARK_MOON = 400;
+
     public EnchantmentFullMoon() {
         super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
 
     /**
      * 监听生物死亡事件 - 触发濒死复活机制
-     * <p>v2.2新增：怪物附魔触发开关（濒死类）拦截</p>
-     * <p>v2.4新增：复活瞬间广播月华特效（跟随持有者）</p>
+     * <p>v2.2：怪物附魔触发开关（濒死类）拦截</p>
+     * <p>v2.4：复活瞬间广播月华特效（跟随持有者）</p>
+     * <p>v2.5：特效时长改为传入实际回血 tick 数，与机制严格对齐</p>
      *
      * @param evt 死亡事件
      */
@@ -89,7 +94,7 @@ public class EnchantmentFullMoon extends EnchantmentBase {
         if (evt.getEntity().level().isClientSide || evt.getSource().isCreativePlayer()) return;
         LivingEntity holder = evt.getEntity();
 
-        // ⭐ v2.2：怪物附魔触发开关 —— 满月属于濒死复活类，怪物身上不触发
+        // v2.2：怪物附魔触发开关 —— 满月属于濒死复活类，怪物身上不触发
         if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, true)) return;
 
         UUID uuid = holder.getUUID();
@@ -106,13 +111,8 @@ public class EnchantmentFullMoon extends EnchantmentBase {
             holder.setHealth(holder.getMaxHealth() * 0.0075f);
             EnchantmentDataManager.setCooldown(FULL_MOON_STATE_KEY, uuid, 400);
 
-            // ⭐ v2.4：月华复活特效（跟随持有者）。
-            // 放在此处是因为复活已确认触发（冷却检查已通过），不会出现「放了特效却没复活」。
-            // 纯视觉，不产生任何机制影响，详见类注释。
-            if (holder.level() instanceof ServerLevel serverLevel) {
-                CarianStyleEffects.moonBlessing(serverLevel, holder);
-            }
-
+            // ⭐ v2.5：先算出实际回血时长，才能把它随特效包发给客户端。
+            // 这两行原本在特效调用之后，现已提前——顺序不可再颠倒（详见类注释）。
             // 修复：使用主手检查DarkMoon
             boolean hasDarkMoon = false;
             Enchantment darkMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDarkMoon.class);
@@ -120,7 +120,15 @@ public class EnchantmentFullMoon extends EnchantmentBase {
             if (darkMoon != null && !heldItem.isEmpty() && EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem) > 0) {
                 hasDarkMoon = true;
             }
-            int duration = hasDarkMoon ? 400 : 200;
+            int duration = hasDarkMoon ? HEAL_DURATION_TICKS_DARK_MOON : HEAL_DURATION_TICKS;
+
+            // ⭐ v2.4/2.5：月华复活特效（跟随持有者，时长 = 实际回血时长）。
+            // 放在此处是因为复活已确认触发（冷却检查已通过），不会出现「放了特效却没复活」。
+            // 纯视觉，不产生任何机制影响。
+            if (holder.level() instanceof ServerLevel serverLevel) {
+                CarianStyleEffects.moonBlessing(serverLevel, holder, duration);
+            }
+
             new SynchronizationTask(1, 1) {
                 private int tick = 1;
 
@@ -162,8 +170,7 @@ public class EnchantmentFullMoon extends EnchantmentBase {
 
     /**
      * 监听生物治疗事件 - 夜晚恢复效果+25%
-     * <p>v2.3：补齐怪物附魔触发开关（受治疗者视角，非濒死触发）。
-     * 此前缺失开关检查，导致怪物在夜晚被治疗时仍获得 25% 加成。</p>
+     * <p>v2.3：补齐怪物附魔触发开关（受治疗者视角，非濒死触发）。</p>
      *
      * @param evt 治疗事件
      */
@@ -172,7 +179,7 @@ public class EnchantmentFullMoon extends EnchantmentBase {
         if (evt.getEntity().level().isClientSide || evt.getEntity().level().isDay()) return;
         LivingEntity holder = evt.getEntity();
 
-        // ⭐ v2.3：怪物附魔触发开关（受治疗者视角，治疗加成非濒死触发）
+        // v2.3：怪物附魔触发开关（受治疗者视角，治疗加成非濒死触发）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
 
         Enchantment fullMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentFullMoon.class);

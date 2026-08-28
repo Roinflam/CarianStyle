@@ -19,11 +19,9 @@ import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * 重力「压制」客户端渲染器（纯客户端自绘）。
@@ -159,8 +157,43 @@ import java.util.Set;
  * 是同一个 {@code /255f} 公式，输出的每个颜色分量与 v3 数值相等。
  * </p>
  *
+ * <h3>v5（堆分配，行为逐帧一致）：用帧号比对取代每帧的 HashSet</h3>
+ * <p>
+ * v4 把逐元素的颜色数组清干净了，但每帧开头还剩一个<b>结构性</b>的分配：
+ * </p>
+ * <pre>
+ * Set&lt;Integer&gt; activeCasterIds = new HashSet&lt;&gt;();   // 每帧一个 HashSet
+ * activeCasterIds.add(entity.getId());                    // 每次 add 装箱一个 Integer
+ * </pre>
+ * <p>
+ * 它的用途只有一个：记住「本帧哪些施法者还在同步列表里」，好在下一段循环里判断
+ * 谁该开始淡出。为此每帧要付出一个 HashSet（含桶数组）加若干 {@code Integer} 装箱——
+ * 实体网络 id 通常远超 127，{@code Integer.valueOf} 的小值缓存<b>命中不了</b>，每个都是真分配。
+ * </p>
+ * <p>
+ * <b>换个想法就完全不需要这个集合：</b>与其在外面维护一份「本帧出现过谁」的名单，
+ * 不如让每个 {@link FieldAnimState} <b>自己记住上次被看到是哪一帧</b>
+ * （{@link FieldAnimState#lastSeenFrame}）。刷新时写入当前帧号，
+ * 随后判断「本帧没出现」就退化成一次 {@code int} 比较：
+ * </p>
+ * <pre>
+ * // 旧：查集合（HashSet 分配 + Integer 装箱 + 哈希查找）
+ * if (st.fadeStart &lt; 0f &amp;&amp; !activeCasterIds.contains(e.getKey())) { ... }
+ *
+ * // 新：比帧号（零分配，一次 int 比较）
+ * if (st.fadeStart &lt; 0f &amp;&amp; st.lastSeenFrame != frameId) { ... }
+ * </pre>
+ * <p>
+ * 帧号取自 {@link VisualBatch#frameId()}——它在同一阶段的 HIGHEST 优先级里自增，
+ * 而本渲染器是默认的 NORMAL 优先级，因此读到的<b>必然是本帧的值</b>。
+ * </p>
+ * <p>
+ * <b>行为完全一致：</b>「本帧出现过」与「lastSeenFrame == 当前帧号」是等价命题，
+ * 淡出的触发时机、持续时间、状态机的其余部分一字未动。
+ * </p>
+ *
  * @author FlameForge
- * @version 4
+ * @version 5
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -273,6 +306,21 @@ public final class GravitasDistortionRenderer {
         float appearTime;
         /** 开始消失的时刻（秒）；<0 表示仍激活（未开始淡出） */
         float fadeStart = -1f;
+        /**
+         * 上次「本帧仍在同步列表中」的帧号（v5 新增）。
+         * <p>
+         * 取代了原先每帧新建的 {@code Set<Integer> activeCasterIds}：
+         * 刷新时写入 {@link VisualBatch#frameId()}，随后判断「本帧没出现」
+         * 就退化成一次 {@code int} 比较，零分配、也不再有 {@code Integer} 装箱
+         * （详见类注释「v5」小节）。
+         * </p>
+         * <p>
+         * 初值 -1 是刻意的：{@link VisualBatch#frameId()} 从 0 起自增，
+         * 用 -1 保证「刚 new 出来但还没被刷新过」的状态不会与任何真实帧号相等。
+         * 实际上创建后会立刻被赋值，这只是防御。
+         * </p>
+         */
+        int lastSeenFrame = -1;
         /** 最近一次的世界坐标（用于实体卸载后原地播完淡出） */
         double lastX;
         double lastY;
@@ -292,6 +340,7 @@ public final class GravitasDistortionRenderer {
      * {@link SharedEntityQuery} 的每帧共享查询（原先的两次范围查询改为对同一列表遍历两遍）。
      * v3：两类视觉各自按 {@link VisualLod} 的细节系数削减顶点；力场圈的系数按到边界的距离取
      * （详见类注释）。
+     * v5：施法者的「本帧是否出现」改用帧号比对，不再每帧新建 {@code HashSet}。
      * </p>
      *
      * @param event 渲染阶段事件
@@ -323,18 +372,20 @@ public final class GravitasDistortionRenderer {
 
         float partial = VisualBatch.partialTick();
         float time = (System.currentTimeMillis() - START_MILLIS) / 1000f;
+        // ⭐ v5：本帧帧号。VisualBatch 在同一阶段的 HIGHEST 优先级里自增，
+        // 而本渲染器是默认的 NORMAL 优先级，故这里读到的必然是本帧的值
+        int frameId = VisualBatch.frameId();
 
         // ===== 刷新力场范围圈的出现/消失状态（即使本帧没有受压制者也要做，
         // 否则「刚失去同步的力场」永远等不到淡出的机会）=====
         // v2：不再单独查询施法者列表，改为遍历共享列表筛选（共享列表已保证 isAlive）
-        Set<Integer> activeCasterIds = new HashSet<>();
+        // v5：不再用 HashSet 记录「本帧出现过谁」，改为往状态里写帧号
         for (LivingEntity entity : candidates) {
             if (!ClientSyncEffectManager.shouldRenderEffect(
                     EnchantmentGravitas.GRAVITY_FIELD_SERIAL, entity.getId())) {
                 continue;
             }
             int id = entity.getId();
-            activeCasterIds.add(id);
             FieldAnimState st = FIELD_STATE.get(id);
             if (st == null) {
                 st = new FieldAnimState();
@@ -342,13 +393,17 @@ public final class GravitasDistortionRenderer {
                 FIELD_STATE.put(id, st);
             }
             st.fadeStart = -1f; // 仍激活：清除淡出标记（若此前在淡出会被“救回”）
+            st.lastSeenFrame = frameId;
             st.lastX = entity.getX();
             st.lastY = entity.getY();
             st.lastZ = entity.getZ();
         }
         for (Map.Entry<Integer, FieldAnimState> e : FIELD_STATE.entrySet()) {
-            if (e.getValue().fadeStart < 0f && !activeCasterIds.contains(e.getKey())) {
-                e.getValue().fadeStart = time;
+            FieldAnimState st = e.getValue();
+            // ⭐ v5：「本帧没出现」等价于「lastSeenFrame 不是当前帧号」，
+            // 一次 int 比较取代了原先的 HashSet 查找 + Integer 装箱
+            if (st.fadeStart < 0f && st.lastSeenFrame != frameId) {
+                st.fadeStart = time;
             }
         }
 

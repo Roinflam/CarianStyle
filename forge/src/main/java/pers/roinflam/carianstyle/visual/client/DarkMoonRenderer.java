@@ -72,32 +72,35 @@ import java.util.List;
  * 而且「静止的月面 + 缓慢转动的外圈符文」这个对比本身也更好看。
  * </p>
  *
- * <h3>v2 修复三：月相改用真实的明暗界线，不再是「吃豆人」</h3>
+ * <h3>v3 修复：月轮从「圆」变成「球」，月相由光源方向自然产生</h3>
  * <p>
- * v1 的暗面是<b>从圆心切出的一块扇形</b>，读起来像被咬掉一口的吃豆人，而不是月相。
+ * v2 已经把月轮改成 billboard（解决了「平视看是一条线」），并用一条沿真实明暗界线
+ * 构造的月牙带表现月相。但盘面本身仍是<b>平的</b>——中心到边缘只有单调的 alpha 渐变，
+ * 读起来像「一枚发光的硬币贴了块阴影」，而不是一颗悬着的天体。
  * </p>
  * <p>
- * 现改为按天文学上真实的方式构造（{@link #bbMoonShadow}）：月相的暗面是
- * <b>圆周（明暗分界的外缘）与一段椭圆（明暗界线 terminator）之间的月牙形区域</b>。
- * 参数化很简单——沿 θ ∈ [0, π] 取两条曲线：
+ * 现在改用 {@link #bbSphere} 画：把圆盘拆成同心环带，<b>逐顶点计算球面法线并做兰伯特着色</b>。
+ * 平面内归一化坐标 {@code (u, v)} 对应的球面法线是
  * </p>
  * <pre>
- * 圆周（限）：  x = r·sinθ,       y = r·cosθ
- * 明暗界线：    x = r·k·sinθ,     y = r·cosθ
+ * n = (u, v, sqrt(1 - u² - v²))
  * </pre>
  * <p>
- * 两条曲线之间的带状区域即暗面。系数 {@code k}（{@link #MOON_PHASE_GIBBOUS} /
- * {@link #MOON_PHASE_RESONANCE}）一个值就能从满月连续调到新月：
+ * 第三个分量朝向相机。与光源方向点乘即得该点亮度，于是在<b>没有任何光照管线</b>的
+ * {@code POSITION_COLOR} 纯顶点绘制下，也能得到真正的球体明暗过渡与边缘暗化。
+ * </p>
+ * <p>
+ * <b>最大的附带收益：月相不必再画了。</b>球面着色的明暗界线本来就是月相的成因——
+ * 光源朝向相机即满月，越偏向侧面越接近新月。于是 v2 那个单独绘制的月牙带
+ * （{@code bbMoonShadow}）连同它的月相系数一起删除，改由两个光源常量表达：
  * </p>
  * <ul>
- *     <li>{@code k = +1}：明暗界线与圆周重合 → <b>满月</b>（无暗面）；</li>
- *     <li>{@code k = +0.55}：一条细月牙暗面 → <b>亏凸月</b>（当前默认）；</li>
- *     <li>{@code k = 0}：界线是直线 → <b>半月</b>；</li>
- *     <li>{@code k = -1}：界线跑到对侧圆周 → <b>新月</b>（全暗）。</li>
+ *     <li>普通状态：{@link #LIGHT_U_GIBBOUS} / {@link #LIGHT_W_GIBBOUS} 明显侧照 → <b>亏凸月</b>；</li>
+ *     <li>月之共鸣：{@link #LIGHT_U_RESONANCE} / {@link #LIGHT_W_RESONANCE} 近正照 → <b>接近满月</b>。</li>
  * </ul>
  * <p>
- * 共鸣时把 {@code k} 调到 {@link #MOON_PHASE_RESONANCE}(0.88)，暗面收成一道细边、
- * 接近满月——与「满月 + 暗月 = 月之共鸣」的名字直接呼应。
+ * 同时<b>去掉了球体外圈的硬轮廓线</b>，只保留一层向外渐隐的月晕——
+ * 硬边框会把球压回成一枚有描边的硬币，破坏刚建立起来的立体感。
  * </p>
  *
  * <h3>形状语言</h3>
@@ -127,7 +130,7 @@ import java.util.List;
  * <ul>
  *     <li>月轮直径放大 {@link #RESONANCE_SCALE} 倍、亮度提升；</li>
  *     <li>月轮外<b>再加一圈光晕环</b>（普通状态没有），是最直接的辨识差异；</li>
- *     <li>月相从亏凸月收成接近满月（{@link #MOON_PHASE_RESONANCE}）；</li>
+ *     <li>月相从亏凸月收成接近满月（近正照光源）；</li>
  *     <li>月尘数量与亮度提升。</li>
  * </ul>
  *
@@ -160,7 +163,7 @@ import java.util.List;
  * </p>
  *
  * @author FlameForge
- * @version 2.0
+ * @version 3.0
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -192,8 +195,6 @@ public final class DarkMoonRenderer {
     private static final int POOL_SEGMENTS_MIN = 8;
     /** 月尘柔光点的最少分段数 */
     private static final int DUST_SEGMENTS_MIN = 4;
-    /** 月相暗面的最少分段数：低于此值月牙的弧线会显出折角 */
-    private static final int SHADOW_SEGMENTS_MIN = 8;
     /** 外缘刻度层的保留阈值：细密小段，远处糊成一圈 */
     private static final float TICK_KEEP_THRESHOLD = 0.5f;
     /** 周身月尘层的保留阈值：纯氛围层 */
@@ -234,37 +235,44 @@ public final class DarkMoonRenderer {
     private static final float DISC_BREATH_SPEED = 0.85f;
     /** 月轮盘面中心不透明度 */
     private static final float DISC_FILL_ALPHA = 0.62f;
-    /** 月轮盘面边缘不透明度（略低于中心，让盘面有一点球面感） */
-    private static final float DISC_EDGE_ALPHA = 0.30f;
-    /** 月轮外环不透明度 */
-    private static final float DISC_RING_ALPHA = 0.85f;
-    /** 月轮外环半宽相对半径的比例 */
-    private static final double DISC_RING_HALF_RATIO = 0.045;
+
+    /** 月轮球体的径向环数（明暗过渡的平滑度，是球体的主要顶点杠杆） */
+    private static final int SPHERE_RINGS = 6;
+    /** 月轮球体的最少径向环数：3 环仍能读出明暗渐变，再低会出现明显色带 */
+    private static final int SPHERE_RINGS_MIN = 3;
 
     /**
-     * 普通状态的月相系数（明暗界线椭圆的横向压缩比）。
-     * <p>0.55 = 一条明显但不夸张的月牙暗面，读作<b>亏凸月</b>
-     * （详见类注释「v2 修复三」小节的取值表）。</p>
+     * 普通状态（亏凸月）的光源 right 分量。
+     * <p>
+     * <b>v2 起月相不再单独绘制暗面，而是由光源方向自然产生</b>
+     * （详见 {@link #bbSphere} 的「月相 = 光源方向」小节）。
+     * 明显偏侧即得亏凸月：明暗界线出现在球面偏右处，左侧沉入阴影。
+     * </p>
      */
-    private static final float MOON_PHASE_GIBBOUS = 0.55f;
-
+    private static final float LIGHT_U_GIBBOUS = 0.62f;
+    /** 普通状态的光源「朝向相机」分量（配合 {@link #LIGHT_U_GIBBOUS} 构成侧照） */
+    private static final float LIGHT_W_GIBBOUS = 0.72f;
     /**
-     * 月之共鸣时的月相系数：暗面收成一道细边、接近满月，
-     * 与「满月 + 暗月」的名字直接呼应。
+     * 月之共鸣时的光源 right 分量：转向近正照、接近满月，
+     * 与「满月 + 暗月 = 月之共鸣」的名字直接呼应。
      */
-    private static final float MOON_PHASE_RESONANCE = 0.88f;
+    private static final float LIGHT_U_RESONANCE = 0.20f;
+    /** 共鸣时的光源「朝向相机」分量（接近 1 = 接近满月） */
+    private static final float LIGHT_W_RESONANCE = 0.95f;
+    /** 光源的 up 分量（略偏上，符合「月光自上而来」的直觉） */
+    private static final float LIGHT_V = 0.24f;
+    /** 环境光下限：0 会让暗侧纯黑、像挖了个洞，留一点更像被地球反照的月面 */
+    private static final float MOON_AMBIENT = 0.34f;
 
-    /** 月相暗面的分段数 */
-    private static final int SHADOW_SEGMENTS = 16;
-    /** 月相暗面不透明度（盖在盘面上，把那一侧压暗） */
-    private static final float SHADOW_ALPHA = 0.6f;
+    /** 月晕不透明度（球体外圈的向外渐隐柔光） */
+    private static final float HALO_ALPHA = 0.34f;
 
     /** 外缘刻度数量 */
     private static final int TICK_COUNT = 16;
     /** 外缘刻度长度相对半径的比例 */
     private static final double TICK_LENGTH_RATIO = 0.18;
     /** 外缘刻度起点相对半径的比例 */
-    private static final double TICK_START_RATIO = 1.10;
+    private static final double TICK_START_RATIO = 1.26;
     private static final float TICK_ALPHA = 0.45f;
 
     /**
@@ -481,7 +489,6 @@ public final class DarkMoonRenderer {
                 return true;
             }
         }
-
         return false;
     }
 
@@ -539,7 +546,7 @@ public final class DarkMoonRenderer {
      * </p>
      * <p>
      * <b>共鸣加强：</b>直径 × {@link #RESONANCE_SCALE}、亮度 × {@link #RESONANCE_ALPHA_MUL}、
-     * 月相收到 {@link #MOON_PHASE_RESONANCE}（接近满月）、
+     * 光源转向近正照使月相接近满月、
      * 外加一圈普通状态没有的光晕环——四项叠加，玩家不看 HUD 也能一眼分辨。
      * </p>
      * <p>
@@ -573,10 +580,15 @@ public final class DarkMoonRenderer {
 
         int segments = VisualLod.scaleSegments(DISC_SEGMENTS, DISC_SEGMENTS_MIN, detail);
 
-        // ===== 盘面：中心月白偏实、边缘略淡（一点球面感）=====
-        bbDisc(b, m, cx, discY, cz, radius, segments, rgX, rgY, rgZ, upX, upY, upZ,
-                C_MOON_CORE, clamp01(DISC_FILL_ALPHA * alphaMul * breath),
-                clamp01(DISC_EDGE_ALPHA * alphaMul * breath));
+        // ===== 球体：逐顶点兰伯特着色，月相由光源方向决定（详见 bbSphere 注释）=====
+        // 暗月画的是【亏凸月】，故光源明显偏侧；共鸣时转向近正照、接近满月
+        int rings = VisualLod.scaleSegments(SPHERE_RINGS, SPHERE_RINGS_MIN, detail);
+        float lu = resonance ? LIGHT_U_RESONANCE : LIGHT_U_GIBBOUS;
+        float lw = resonance ? LIGHT_W_RESONANCE : LIGHT_W_GIBBOUS;
+        bbSphere(b, m, cx, discY, cz, radius, rings, segments,
+                rgX, rgY, rgZ, upX, upY, upZ, C_MOON_CORE,
+                lu, LIGHT_V, lw, MOON_AMBIENT,
+                clamp01(DISC_FILL_ALPHA * alphaMul * breath));
 
         // ===== 月海：盘面上几块稍暗的圆斑，「像月亮」最关键的一笔 =====
         // 刻意不随符文环自转——真实月球潮汐锁定、月面朝向恒定
@@ -588,28 +600,25 @@ public final class DarkMoonRenderer {
             double mu = MOON_MARIA[i * 3] * radius;
             double mv = MOON_MARIA[i * 3 + 1] * radius;
             double mr = MOON_MARIA[i * 3 + 2] * radius;
+            // 该斑块所在球面点的亮度——与球体本身用同一光源，暗侧的月海自然融进阴影
+            float nu = MOON_MARIA[i * 3];
+            float nv = MOON_MARIA[i * 3 + 1];
+            float shade = sphereShade(nu, nv, lu, LIGHT_V, lw, MOON_AMBIENT);
+            // 球面透视：越靠边缘的斑块视觉上越窄
+            float edgeSquash = Mth.sqrt(Math.max(0f, 1f - nu * nu - nv * nv));
             float mx = cx + rgX * (float) mu + upX * (float) mv;
             float my = discY + rgY * (float) mu + upY * (float) mv;
             float mz = cz + rgZ * (float) mu + upZ * (float) mv;
-            bbDisc(b, m, mx, my, mz, mr, mariaSegs, rgX, rgY, rgZ, upX, upY, upZ,
-                    C_MOON_DEEP, MARIA_ALPHA * breath, 0f);
+            bbDisc(b, m, mx, my, mz, mr * (0.55 + 0.45 * edgeSquash), mariaSegs,
+                    rgX, rgY, rgZ, upX, upY, upZ,
+                    C_MOON_DEEP, MARIA_ALPHA * shade * breath, 0f);
         }
 
-        // ===== 月相暗面：沿真实的明暗界线构造的月牙带（不是从圆心切的扇形）=====
-        float phaseK = resonance ? MOON_PHASE_RESONANCE : MOON_PHASE_GIBBOUS;
-        int shadowSegs = VisualLod.scaleSegments(SHADOW_SEGMENTS, SHADOW_SEGMENTS_MIN, detail);
-        bbMoonShadow(b, m, cx, discY, cz, radius, phaseK, shadowSegs,
-                rgX, rgY, rgZ, upX, upY, upZ, C_MOON_DEEP, SHADOW_ALPHA * breath);
-
-        // ===== 外环：月轮的轮廓线 + 向外渐隐的辉光 =====
-        double ringHalf = radius * DISC_RING_HALF_RATIO;
-        bbRing(b, m, cx, discY, cz, radius - ringHalf, radius + ringHalf, segments, 0f,
+        // ===== 月晕：球体外圈一层向外渐隐的柔光 =====
+        // 不画硬轮廓线——那会把球压回成一枚有边框的硬币，破坏刚建立起来的立体感
+        bbRing(b, m, cx, discY, cz, radius, radius * 1.22, segments, 0f,
                 rgX, rgY, rgZ, upX, upY, upZ, C_MOON_GLOW,
-                clamp01(DISC_RING_ALPHA * alphaMul * breath),
-                clamp01(DISC_RING_ALPHA * alphaMul * breath));
-        bbRing(b, m, cx, discY, cz, radius + ringHalf, radius + ringHalf + radius * 0.16, segments, 0f,
-                rgX, rgY, rgZ, upX, upY, upZ, C_MOON_GLOW,
-                clamp01(DISC_RING_ALPHA * 0.35f * alphaMul * breath), 0f);
+                clamp01(HALO_ALPHA * alphaMul * breath), 0f);
 
         // ===== 共鸣光晕环：普通状态没有，是最直接的辨识差异 =====
         if (resonance) {
@@ -749,6 +758,132 @@ public final class DarkMoonRenderer {
     }
 
     // ==================== billboard 几何基元（面向相机）====================
+
+    /**
+     * 面向相机的<b>着色球体</b>：用同心环带 + 逐顶点兰伯特光照，
+     * 在没有任何光照管线的 {@code POSITION_COLOR} 纯顶点绘制下做出真正的球感。
+     *
+     * <h4>原理</h4>
+     * <p>
+     * 球体正对相机时轮廓是一个圆；圆内任意一点 {@code (u, v)}（归一化到单位圆）
+     * 对应的球面法线为 {@code n = (u, v, sqrt(1 - u² - v²))}，第三个分量朝向相机。
+     * 把它与光源方向点乘即得该点的兰伯特亮度，逐顶点写入不同颜色，
+     * 就能得到球体的明暗过渡与边缘暗化——这两样正是「圆盘」与「球」的分野。
+     * </p>
+     *
+     * <h4>为什么这比「中心亮边缘暗的径向渐变」好</h4>
+     * <p>
+     * 径向渐变是<b>各向同性</b>的：亮斑永远在正中心，看起来像一枚发光的硬币。
+     * 兰伯特着色的亮斑<b>偏向光源一侧</b>，明暗界线是一条椭圆弧而非同心圆，
+     * 大脑会立刻把它读成三维物体。
+     * </p>
+     *
+     * <h4>月相 = 光源方向</h4>
+     * <p>
+     * 这是本方法最大的附带收益：<b>不再需要单独绘制月相暗面</b>。
+     * {@code L = (0,0,1)}（正照）即满月；L 越偏向侧面，明暗界线越往中间推，
+     * 依次经过亏凸月、半月、蛾眉月——与现实中月相的成因完全一致。
+     * 暗月取 {@link #LIGHT_U_GIBBOUS} 的明显侧照得到亏凸月，
+     * 共鸣时转向 {@link #LIGHT_U_RESONANCE} 的近正照、接近满月。
+     * </p>
+     *
+     * @param radius   球体半径（格）
+     * @param rings    径向环数（决定明暗过渡的平滑度，是主要顶点杠杆）
+     * @param segments 每环的角度分段数
+     * @param col      基色（只读；实际顶点色为基色 × 该点亮度）
+     * @param lu       光源方向的 right 分量
+     * @param lv       光源方向的 up 分量
+     * @param lw       光源方向的「朝向相机」分量（1 = 正照 = 满月）
+     * @param ambient  环境光下限（0 会让暗面纯黑、像挖了个洞；留一点更像被地球反照的月面）
+     * @param alpha    整体不透明度
+     */
+    private static void bbSphere(BufferBuilder b, Matrix4f m,
+                                 float cx, float cy, float cz, double radius,
+                                 int rings, int segments,
+                                 float rgX, float rgY, float rgZ, float upX, float upY, float upZ,
+                                 float[] col, float lu, float lv, float lw,
+                                 float ambient, float alpha) {
+        if (alpha <= 0.004f || radius <= 1.0e-4 || rings < 1 || segments < 3) {
+            return;
+        }
+        float r = col[0], g = col[1], bl = col[2];
+        float rad = (float) radius;
+
+        for (int i = 0; i < rings; i++) {
+            float t0 = (float) i / rings;
+            float t1 = (float) (i + 1) / rings;
+            for (int j = 0; j < segments; j++) {
+                float a0 = TAU * j / segments;
+                float a1 = TAU * (j + 1) / segments;
+                float c0 = Mth.cos(a0), s0 = Mth.sin(a0);
+                float c1 = Mth.cos(a1), s1 = Mth.sin(a1);
+
+                // 四个角点的平面归一化坐标
+                float u00 = t0 * c0, v00 = t0 * s0;
+                float u01 = t0 * c1, v01 = t0 * s1;
+                float u11 = t1 * c1, v11 = t1 * s1;
+                float u10 = t1 * c0, v10 = t1 * s0;
+
+                // 逐顶点兰伯特亮度
+                float sh00 = sphereShade(u00, v00, lu, lv, lw, ambient);
+                float sh01 = sphereShade(u01, v01, lu, lv, lw, ambient);
+                float sh11 = sphereShade(u11, v11, lu, lv, lw, ambient);
+                float sh10 = sphereShade(u10, v10, lu, lv, lw, ambient);
+
+                // 平面坐标 → 世界坐标
+                float x00 = cx + rgX * (u00 * rad) + upX * (v00 * rad);
+                float y00 = cy + rgY * (u00 * rad) + upY * (v00 * rad);
+                float z00 = cz + rgZ * (u00 * rad) + upZ * (v00 * rad);
+                float x01 = cx + rgX * (u01 * rad) + upX * (v01 * rad);
+                float y01 = cy + rgY * (u01 * rad) + upY * (v01 * rad);
+                float z01 = cz + rgZ * (u01 * rad) + upZ * (v01 * rad);
+                float x11 = cx + rgX * (u11 * rad) + upX * (v11 * rad);
+                float y11 = cy + rgY * (u11 * rad) + upY * (v11 * rad);
+                float z11 = cz + rgZ * (u11 * rad) + upZ * (v11 * rad);
+                float x10 = cx + rgX * (u10 * rad) + upX * (v10 * rad);
+                float y10 = cy + rgY * (u10 * rad) + upY * (v10 * rad);
+                float z10 = cz + rgZ * (u10 * rad) + upZ * (v10 * rad);
+
+                // 最外环稍降 alpha，柔化轮廓、避免硬锯齿边
+                float aIn = alpha;
+                float aOut = (i == rings - 1) ? alpha * 0.82f : alpha;
+
+                b.vertex(m, x00, y00, z00).color(r * sh00, g * sh00, bl * sh00, aIn).endVertex();
+                b.vertex(m, x01, y01, z01).color(r * sh01, g * sh01, bl * sh01, aIn).endVertex();
+                b.vertex(m, x11, y11, z11).color(r * sh11, g * sh11, bl * sh11, aOut).endVertex();
+
+                b.vertex(m, x00, y00, z00).color(r * sh00, g * sh00, bl * sh00, aIn).endVertex();
+                b.vertex(m, x11, y11, z11).color(r * sh11, g * sh11, bl * sh11, aOut).endVertex();
+                b.vertex(m, x10, y10, z10).color(r * sh10, g * sh10, bl * sh10, aOut).endVertex();
+            }
+        }
+    }
+
+    /**
+     * 球面某点的兰伯特亮度系数。
+     * <p>
+     * 给定球体正对相机时平面内的归一化坐标 {@code (u, v)}（单位圆内），
+     * 其球面法线为 {@code (u, v, sqrt(1 - u² - v²))}；与光源方向点乘、
+     * 夹取到非负后，混入环境光下限即得最终亮度。
+     * </p>
+     *
+     * @param u       平面内 right 分量（归一化，|(u,v)| ≤ 1）
+     * @param v       平面内 up 分量
+     * @param lu      光源方向 right 分量
+     * @param lv      光源方向 up 分量
+     * @param lw      光源方向「朝向相机」分量
+     * @param ambient 环境光下限
+     * @return 亮度系数（{@code ambient} ~ 1.0）
+     */
+    private static float sphereShade(float u, float v, float lu, float lv, float lw, float ambient) {
+        float nzSq = 1f - u * u - v * v;
+        float nz = (nzSq <= 0f) ? 0f : Mth.sqrt(nzSq);
+        float lam = u * lu + v * lv + nz * lw;
+        if (lam < 0f) {
+            lam = 0f;
+        }
+        return ambient + (1f - ambient) * lam;
+    }
 
     /**
      * 面向相机的径向渐变圆盘。
@@ -900,95 +1035,6 @@ public final class DarkMoonRenderer {
         b.vertex(m, ax2, ay2, az2).color(r, g, bl, a1).endVertex();
     }
 
-    /**
-     * 绘制月相的暗面——沿<b>真实的明暗界线</b>构造的月牙带。
-     * <p>
-     * v1 用的是「从圆心切出一块扇形」，读起来像被咬掉一口的吃豆人。
-     * 真实的月相暗面是<b>圆周与一段椭圆之间的区域</b>：沿 θ ∈ [0, π] 取两条曲线，
-     * </p>
-     * <pre>
-     * 圆周（限）：  x = r·sinθ,     y = r·cosθ
-     * 明暗界线：    x = r·k·sinθ,   y = r·cosθ
-     * </pre>
-     * <p>
-     * 两者之间的带即暗面。系数 {@code k} 一个值就能从满月连续调到新月：
-     * {@code +1} 满月（无暗面）、{@code +0.55} 亏凸月、{@code 0} 半月、{@code -1} 新月。
-     * </p>
-     * <p>
-     * <b>两端 alpha 不同：</b>贴着圆周的一侧最实（那里完全没有光），
-     * 贴着明暗界线的一侧渐隐（现实中明暗过渡是柔和的），这样月相不会有生硬的切边。
-     * </p>
-     * <p>
-     * 暗面<b>不随符文环自转</b>——真实月球潮汐锁定、月面朝向恒定。
-     * </p>
-     *
-     * @param radius   月轮半径
-     * @param phaseK   月相系数（见上表；≥1 时不绘制，即满月）
-     * @param segments 分段数
-     * @param alpha    暗面不透明度（贴圆周一侧的峰值）
-     */
-    private static void bbMoonShadow(BufferBuilder b, Matrix4f m,
-                                     float cx, float cy, float cz, double radius,
-                                     float phaseK, int segments,
-                                     float rgX, float rgY, float rgZ, float upX, float upY, float upZ,
-                                     float[] col, float alpha) {
-        if (alpha <= 0.004f || radius <= 1.0e-4 || segments < 3) {
-            return;
-        }
-        // k ≥ 1 表示满月：明暗界线与圆周重合，没有暗面可画
-        if (phaseK >= 0.999f) {
-            return;
-        }
-        float r = col[0], g = col[1], bl = col[2];
-        float rad = (float) radius;
-
-        // 明暗界线一侧渐隐——现实中明暗过渡是柔和的，硬切边会很假
-        float alphaTerminator = alpha * 0.25f;
-
-        float prevLimbU = 0f, prevLimbV = 0f;
-        float prevTermU = 0f, prevTermV = 0f;
-        for (int i = 0; i <= segments; i++) {
-            // θ 从 0 扫到 π，覆盖半个圆周
-            float th = PI * i / segments;
-            float sinT = Mth.sin(th);
-            float cosT = Mth.cos(th);
-
-            // 圆周（暗面的外缘）
-            float limbU = rad * sinT;
-            float limbV = rad * cosT;
-            // 明暗界线（横向压缩的椭圆弧）
-            float termU = rad * phaseK * sinT;
-            float termV = rad * cosT;
-
-            if (i > 0) {
-                // 上一段与本段之间拉一个四边形（拆成两个三角形）
-                float p0x = cx + rgX * prevLimbU + upX * prevLimbV;
-                float p0y = cy + rgY * prevLimbU + upY * prevLimbV;
-                float p0z = cz + rgZ * prevLimbU + upZ * prevLimbV;
-                float p1x = cx + rgX * limbU + upX * limbV;
-                float p1y = cy + rgY * limbU + upY * limbV;
-                float p1z = cz + rgZ * limbU + upZ * limbV;
-                float q0x = cx + rgX * prevTermU + upX * prevTermV;
-                float q0y = cy + rgY * prevTermU + upY * prevTermV;
-                float q0z = cz + rgZ * prevTermU + upZ * prevTermV;
-                float q1x = cx + rgX * termU + upX * termV;
-                float q1y = cy + rgY * termU + upY * termV;
-                float q1z = cz + rgZ * termU + upZ * termV;
-
-                b.vertex(m, p0x, p0y, p0z).color(r, g, bl, alpha).endVertex();
-                b.vertex(m, p1x, p1y, p1z).color(r, g, bl, alpha).endVertex();
-                b.vertex(m, q1x, q1y, q1z).color(r, g, bl, alphaTerminator).endVertex();
-
-                b.vertex(m, p0x, p0y, p0z).color(r, g, bl, alpha).endVertex();
-                b.vertex(m, q1x, q1y, q1z).color(r, g, bl, alphaTerminator).endVertex();
-                b.vertex(m, q0x, q0y, q0z).color(r, g, bl, alphaTerminator).endVertex();
-            }
-            prevLimbU = limbU;
-            prevLimbV = limbV;
-            prevTermU = termU;
-            prevTermV = termV;
-        }
-    }
 
     // ==================== 水平几何基元 ====================
 

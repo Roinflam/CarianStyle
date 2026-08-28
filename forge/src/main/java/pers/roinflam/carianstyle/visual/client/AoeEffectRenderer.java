@@ -239,7 +239,7 @@ import java.util.List;
  * </p>
  *
  * @author RoinFlam
- * @version 10.0
+ * @version 11.0
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -565,21 +565,6 @@ public final class AoeEffectRenderer {
 
     // ===== v10 满月月华：时间轴与月轮外观（新增）=====
 
-    /**
-     * 满月月华演出总时长（秒）。
-     * <p>
-     * <b>⚠ 必须与 {@code AoeEffectManager.durationFor} 里 TYPE_MOON_BLESSING 的返回值保持一致</b>
-     * （那边是毫秒，即 {@value} × 1000）。本方法用它把归一化的 {@code progress}
-     * 换算回绝对秒数，从而让全部动画速度与总时长脱钩——
-     * 改总时长时两处一起改，动画不会变形（详见 {@link #drawMoonBlessing} 注释）。
-     * </p>
-     * <p>
-     * 取 20 秒是为了覆盖<b>持有暗月时</b>的最长回血时长（400 tick）。
-     * 不带暗月时机制只回 10 秒，演出会多播 10 秒——那时玩家已经满血，多余的月光无害。
-     * 嫌长就把这里和 manager 那边一起调小。
-     * </p>
-     */
-    private static final float MOON_BLESSING_SECONDS = 20f;
 
     /** 月轮展开时长（秒） */
     private static final float MOON_APPEAR_SECONDS = 0.9f;
@@ -607,6 +592,27 @@ public final class AoeEffectRenderer {
     private static final float MOON_RING_PER_SECOND = 1.0f;
     /** 月尘上升频率（次/秒） */
     private static final float MOON_DUST_PER_SECOND = 0.4f;
+
+    /** 月轮球体的径向环数（明暗过渡的平滑度，是球体的主要顶点杠杆） */
+    private static final int MOON_SPHERE_RINGS = 6;
+    /** 月轮球体的最少径向环数：3 环仍能读出明暗渐变，再低会出现明显色带 */
+    private static final int MOON_SPHERE_RINGS_MIN = 3;
+    /**
+     * 月轮光源方向的 right 分量。
+     * <p>本演出画的是<b>满</b>月，故光源接近正照（{@link #MOON_LIGHT_W} 接近 1），
+     * 只留一点点侧偏——太正会让球退化成平盘，稍偏反而更能读出立体感。</p>
+     */
+    private static final float MOON_LIGHT_U = -0.22f;
+    /** 月轮光源方向的 up 分量（略偏上，符合「月光自上而来」的直觉） */
+    private static final float MOON_LIGHT_V = 0.26f;
+    /** 月轮光源方向的「朝向相机」分量：接近 1 即满月（详见 {@link #bbSphere} 注释） */
+    private static final float MOON_LIGHT_W = 0.94f;
+    /** 月轮环境光下限：0 会让暗侧纯黑、像挖了个洞，留一点更像被地球反照的月面 */
+    private static final float MOON_AMBIENT = 0.42f;
+
+    /** 月海不透明度 */
+    private static final float MARIA_ALPHA = 0.30f;
+
 
     /**
      * 月海斑块（盘面上稍暗的圆斑），每 3 个 float 一组：
@@ -765,7 +771,10 @@ public final class AoeEffectRenderer {
 
             // fx.seed 为该特效创建时确定的固定外形种子（仅红色闪电用到），整段生命周期恒定，
             // 即便红闪被「同位置合并」反复续命也不跳变外形。
-            dispatch(builder, matrix, fx.type, rx, ry, rz, fx.radius, progress, fx.seed, detail);
+            // v11：把本次演出的实际总时长（秒）一并传下去。满月月华用它把 progress
+            // 换算回绝对秒数，使 10 秒版与 20 秒版的动画速度完全一致
+            float totalSeconds = fx.durationMs / 1000f;
+            dispatch(builder, matrix, fx.type, rx, ry, rz, fx.radius, progress, fx.seed, totalSeconds, detail);
         }
     }
 
@@ -822,7 +831,7 @@ public final class AoeEffectRenderer {
      */
     private static void dispatch(BufferBuilder b, Matrix4f m, int type,
                                  double cx, double cy, double cz, double radius, float p,
-                                 long seed, float detail) {
+                                 long seed, float totalSeconds, float detail) {
         switch (type) {
             case AoeEffectPacket.TYPE_CAUSALITY -> drawCausality(b, m, cx, cy, cz, radius, p, detail);
             case AoeEffectPacket.TYPE_FROST_QUAKE -> drawFrostQuake(b, m, cx, cy, cz, radius, p, detail);
@@ -830,7 +839,7 @@ public final class AoeEffectRenderer {
             case AoeEffectPacket.TYPE_SCARLET_BLOOM -> drawScarletBloom(b, m, cx, cy, cz, radius, p, detail);
             case AoeEffectPacket.TYPE_FRENZIED_FLAME -> drawFrenziedFlame(b, m, cx, cy, cz, radius, p, detail);
             case AoeEffectPacket.TYPE_RED_LIGHTNING -> drawRedLightning(b, m, cx, cy, cz, radius, p, seed, detail);
-            case AoeEffectPacket.TYPE_MOON_BLESSING -> drawMoonBlessing(b, m, cx, cy, cz, radius, p, detail);
+            case AoeEffectPacket.TYPE_MOON_BLESSING -> drawMoonBlessing(b, m, cx, cy, cz, radius, p, totalSeconds, detail);
             case AoeEffectPacket.TYPE_SACRED_PURGE -> drawSacredPurge(b, m, cx, cy, cz, radius, p, detail);
             default -> drawGeneric(b, m, cx, cy, cz, radius, p, detail);
         }
@@ -949,61 +958,67 @@ public final class AoeEffectRenderer {
         glowRing(b, m, cx, cz, cy, r2, segmentsFor(r2, detail), w, 0.50f * fade, 0.20f * fade, 0.05, 0.30);
     }
 
-    // ============================== v10 满月月华 ==============================
+    // ============================== v11 满月月华 ==============================
 
     /**
-     * 满月月华：头顶浮现<b>面向相机的完整月轮（含月海）</b> → 一道月华柱自上而下笼罩全身 →
+     * 满月月华：头顶浮现<b>球形月轮</b> → 一道月华柱自上而下笼罩全身 →
      * 脚下每秒一圈<b>向内收拢</b>的回春环 → 月尘持续上升。
-     * 总时长 {@value #MOON_BLESSING_SECONDS} 秒，跟随持有者。
      * <p>
-     * 用于 {@code EnchantmentFullMoon} 的濒死复活：阻止死亡、残血保命、随后 10 秒
-     * （持有暗月时 20 秒）每秒回 0.5% 最大生命。
+     * 用于 {@code EnchantmentFullMoon} 的濒死复活：阻止死亡、残血保命、随后持续回血。
+     * <b>演出时长由服务端按实际回血时间指定</b>（不带暗月 10 秒 / 带暗月 20 秒），
+     * 与机制严格对齐。
      * </p>
      *
-     * <h4>v10 修复一：月轮改 billboard，并加上月海</h4>
+     * <h4>v11 修复一：月轮从「圆」变成「球」</h4>
      * <p>
-     * v9 的月轮是<b>水平放置</b>的圆盘（用 {@code band} 画在固定 y 高度上）。
-     * 这在俯视时是个圆，但玩家绝大多数时候是<b>平视</b>——看到的是一条扁线，
-     * 完全读不出「月亮」。
+     * v10 已经把月轮改成 billboard 面向相机（解决了「平视看是一条线」），
+     * 但它仍然是个<b>平面圆盘</b>——中心到边缘只有单调的 alpha 渐变，
+     * 读起来是「一枚发光的硬币」而不是一颗悬着的天体。
      * </p>
      * <p>
-     * 现改为 <b>billboard 面向相机</b>（{@link #bbDisc} / {@link #bbRing} / {@link #bbLine}，
-     * 平面基取 {@link VisualBatch#rightX()} 与 {@link VisualBatch#upX()} 一组），
-     * 于是从任意角度看都是一个正圆。
-     * </p>
-     * <p>
-     * 光有圆还不够——纯亮圆盘更像「法阵的光球」而不是月亮。因此在盘面上叠了几块
-     * 稍暗的圆斑当<b>月海</b>（{@link #MOON_MARIA}），这是「像月亮」最关键的一笔。
-     * <b>月海不随符文环自转</b>：真实的月球是潮汐锁定的、月面朝向恒定，
-     * 而且「静止的月面 + 缓慢转动的外圈符文」这个对比本身也更好看。
-     * </p>
-     *
-     * <h4>v10 修复二：时长 5 秒 → {@value #MOON_BLESSING_SECONDS} 秒，且动画速度与总时长脱钩</h4>
-     * <p>
-     * v9 只播 5 秒，而机制回血是 10 秒（持有暗月 20 秒），演出早早退场、
-     * 玩家还在回血却什么都看不见了。现在把总时长拉到 20 秒覆盖最长情况。
-     * </p>
-     * <p>
-     * <b>但只改数字是不够的。</b>演出时间轴此前全部用归一化的 {@code progress} 表达，
-     * 总时长翻 4 倍就等于<b>所有动画慢 4 倍</b>——月轮会转得像蜗牛、回春环几乎不动。
-     * 故本方法改用<b>绝对秒数</b> {@code age} 驱动全部时间轴：
+     * 现在改用 {@link #bbSphere} 画：把圆盘拆成同心环带，<b>逐顶点计算球面法线并做兰伯特着色</b>。
+     * 平面内归一化坐标 {@code (u, v)} 对应的球面法线是
      * </p>
      * <pre>
-     * float age = p * MOON_BLESSING_SECONDS;   // 已播放的秒数
+     * n = (u, v, sqrt(1 - u² - v²))
      * </pre>
      * <p>
-     * 自转速度写成「弧度/秒」、回春环写成「每秒几圈」、起落写成「第几秒」——
-     * 于是<b>调整总时长不会让任何动画变形</b>，只是持续段变长或变短。
-     * 若将来要改时长，只需同步 {@link #MOON_BLESSING_SECONDS} 与
-     * {@code AoeEffectManager.durationFor} 两处即可。
+     * 其中第三个分量朝向相机。与光源方向点乘即得该点亮度，于是在<b>没有任何光照管线</b>的
+     * {@code POSITION_COLOR} 纯顶点绘制下，也能得到真正的球体明暗过渡与边缘暗化。
      * </p>
      *
-     * <h4>v10 修复三：中段把光柱收细，避免 20 秒糊住视野</h4>
+     * <h4>v11 修复二：月相不再是画上去的，而是光照的自然结果</h4>
      * <p>
-     * 起手两秒给足冲击（粗光柱 + 白热核 + 强闪），之后光柱按
-     * {@link #MOON_COLUMN_FADE_START}~{@link #MOON_COLUMN_FADE_END} 秒收细变淡到
-     * {@link #MOON_COLUMN_MIN_STRENGTH}。月轮、回春环、月尘则<b>全程保持</b>——
-     * 该消失的是遮视野的那根柱子，不是「我在回血」这个信息本身。
+     * 有了球面着色之后，<b>月相就是光源方向</b>——这正是现实中月相的成因，
+     * 因此暗月那边（{@code DarkMoonRenderer}）单独绘制明暗界线月牙带的做法也一并废弃了，
+     * 两处统一由光源方向表达月相。
+     * </p>
+     * <ul>
+     *     <li>光源朝向相机 {@code (0, 0, 1)} → <b>满月</b>（整个盘面亮）；</li>
+     *     <li>光源偏侧 → 明暗界线自然出现在球面上，越偏越接近新月。</li>
+     * </ul>
+     * <p>
+     * 本演出画的是<b>满</b>月，故光源取 {@link #MOON_LIGHT_W} 接近 1 的近正照方向，
+     * 只留一点点偏移让球体不至于像个纯平的亮盘——太正会失去立体感，
+     * 稍偏一点点反而更能读出「这是个球」。
+     * </p>
+     *
+     * <h4>v11 修复三：时长跟随机制，不再写死</h4>
+     * <p>
+     * v10 写死 20 秒（覆盖带暗月的最长情况），于是不带暗月时特效比回血多播 10 秒。
+     * 现在服务端把实际时长随包发下来，本方法用
+     * </p>
+     * <pre>
+     * float age   = p * totalSeconds;      // 已播放秒数
+     * </pre>
+     * <p>
+     * 换算出绝对时间来驱动全部动画。由于 {@code totalSeconds} 取自
+     * {@code AoeEffect.durationMs}（服务端指定），<b>渲染器不再需要维护任何时长常量</b>，
+     * v10 那个「两处常量必须手工同步」的隐患也随之消失。
+     * </p>
+     * <p>
+     * 全部动画速度以「弧度/秒」「圈/秒」表达，因此 10 秒版和 20 秒版的
+     * 月轮转速、回春环频率完全一致，只是持续段长短不同。
      * </p>
      *
      * <h4>时间轴（秒）</h4>
@@ -1017,32 +1032,29 @@ public final class AoeEffectRenderer {
      *     <li>最后 1.8 秒：整体淡出。</li>
      * </ul>
      * <p>
-     * <b>月轮为什么不画暗面：</b>这是<b>满</b>月——{@code DarkMoonRenderer} 画的才是
-     * 带暗面弧的亏凸月。两者月相不同是刻意的语义自洽（详见类注释「满月月华」小节）。
-     * </p>
-     * <p>
      * <b>回春环为什么向内收拢：</b>本模组其余全部环形演出都是向外扩散，
      * 反向收拢直接读作「能量在往身上汇聚」，与回血语义一致、且同屏叠加时一眼可辨。
-     * 环的 alpha 包络是「刚出现（外圈）淡入 → 收到中心时淡出」，
-     * 表现为月光一圈圈被身体吸收。
      * </p>
      * <p>
-     * <b>削减：</b>月轮盘 / 环与回春环的分段数缩放；月华柱竖直分段缩放；
+     * <b>削减：</b>球体的环数与分段数、回春环分段数、月华柱竖直分段数均按细节系数缩放；
      * 回春环圈数缩减；月尘与月海<b>按步长抽取</b>（角度均布，截断会让元素只朝一侧）
-     * 且可整层跳过；外缘刻度层可跳过。
-     * <b>月轮本体（盘 + 环 + 月海）无论细节多低都完整绘制</b>——它是本演出的唯一标志。
+     * 且可整层跳过。<b>球体本身无论细节多低都完整绘制</b>——它是本演出的唯一标志。
      * </p>
-     * <p>v10：三个配色全是编译期常量，直接引用只读常量，本方法零分配。</p>
+     * <p>v11：三个配色全是编译期常量，直接引用只读常量，本方法零分配。</p>
      *
-     * @param detail 本帧细节系数
+     * @param p            归一化播放进度
+     * @param totalSeconds 本次演出的总时长（秒，服务端指定）
+     * @param detail       本帧细节系数
      */
     private static void drawMoonBlessing(BufferBuilder b, Matrix4f m,
-                                         double cx, double cy, double cz, double radius, float p, float detail) {
-        // ⭐ v10：全部时间轴改用「绝对秒数」驱动，使动画速度与总时长脱钩（详见方法注释）
-        float age = p * MOON_BLESSING_SECONDS;
+                                         double cx, double cy, double cz, double radius,
+                                         float p, float totalSeconds, float detail) {
+        // ⭐ v11：绝对播放秒数。totalSeconds 来自服务端指定的实际回血时长，
+        // 因此 10 秒版与 20 秒版的动画速度完全一致（详见方法注释）
+        float age = p * totalSeconds;
 
         // 收尾淡出：最后 MOON_FADE_SECONDS 秒
-        float fade = 1f - smoothstep(MOON_BLESSING_SECONDS - MOON_FADE_SECONDS, MOON_BLESSING_SECONDS, age);
+        float fade = 1f - smoothstep(totalSeconds - MOON_FADE_SECONDS, totalSeconds, age);
         if (fade <= 0f) {
             return;
         }
@@ -1053,12 +1065,12 @@ public final class AoeEffectRenderer {
 
         // 月轮浮现（前 0.9 秒展开，半径与亮度同步淡入）
         float appear = (float) easeOutCubic(clamp01(age / MOON_APPEAR_SECONDS));
-        // 缓慢呼吸（周期约 3.5 秒），避免长达 20 秒的演出里月轮像贴图一样死板
+        // 缓慢呼吸，避免长演出里月轮像贴图一样死板
         float breath = 0.94f + 0.06f * Mth.sin(age * 1.8f);
 
         double discY = cy + MOON_DISC_HEIGHT;
         double discRadius = radius * MOON_DISC_RADIUS_FACTOR * appear * breath;
-        // 自转：弧度/秒，与总时长无关
+        // 自转：弧度/秒，与总时长无关（只作用于外缘刻度）
         float rot = age * MOON_DISC_ROT_SPEED;
 
         // billboard 平面基（面向相机）
@@ -1070,14 +1082,14 @@ public final class AoeEffectRenderer {
         float upZ = VisualBatch.upZ();
 
         int discSegs = VisualLod.scaleSegments(MOON_DISC_SEGMENTS, MOON_DISC_SEGMENTS_MIN, detail);
+        int discRings = VisualLod.scaleSegments(MOON_SPHERE_RINGS, MOON_SPHERE_RINGS_MIN, detail);
 
         // ===== 地面月光池：铺底，让整片区域读作「被月光照着」 =====
         band(b, m, cx, cz, cy, 0.0, radius * 1.05, segmentsFor(radius, detail),
                 deep[0], deep[1], deep[2], 0.05f * fade * appear, 0.13f * fade * appear);
 
-        // ===== 月华柱：底端自上而下降落到地面；中段收细，避免 20 秒一直糊住视野 =====
+        // ===== 月华柱：底端自上而下降落到地面；中段收细，避免长时间糊住视野 =====
         float drop = (float) easeOutCubic(clamp01((age - MOON_COLUMN_DROP_DELAY) / MOON_COLUMN_DROP_SECONDS));
-        // 起手 1.5 秒内维持满强度，到 3.5 秒收细到 MOON_COLUMN_MIN_STRENGTH 并保持
         float columnStrength = 1f - (1f - MOON_COLUMN_MIN_STRENGTH)
                 * smoothstep(MOON_COLUMN_FADE_START, MOON_COLUMN_FADE_END, age);
         double columnBottom = discY - MOON_COLUMN_HEIGHT * drop;
@@ -1095,59 +1107,57 @@ public final class AoeEffectRenderer {
                 // 上端（贴近月轮）亮、下端（贴近地面）柔——光是从月轮流下来的
                 float a0 = (0.35f + 0.65f * u0) * fade * columnStrength;
                 float a1 = (0.35f + 0.65f * u1) * fade * columnStrength;
-                // 外层夜蓝光晕
                 lightningSegment(b, m, cx, y0, cz, cx, y1, cz,
                         MOON_COLUMN_HALF * 1.9 * halfMul, deep, 0.16f * a0, 0.16f * a1);
-                // 中层月华主体
                 lightningSegment(b, m, cx, y0, cz, cx, y1, cz,
                         MOON_COLUMN_HALF * halfMul, glow, 0.42f * a0, 0.42f * a1);
-                // 内层白热核
                 lightningSegment(b, m, cx, y0, cz, cx, y1, cz,
                         MOON_COLUMN_HALF * 0.3 * halfMul, core, 0.85f * a0, 0.85f * a1);
             }
         }
 
-        // ===== 月轮：面向相机的完整满月（盘面 + 月海 + 外环 + 外缘刻度）=====
-        // ⭐ v10 核心修复：改 billboard，无论从哪个角度看都是正圆（详见方法注释）
+        // ===== 月轮：球体（逐顶点兰伯特着色）+ 月海 + 月晕 + 外缘刻度 =====
         if (discRadius > 0.05) {
             float discAlpha = fade * appear;
 
-            // 盘面：中心月白偏实、边缘略淡
-            bbDisc(b, m, cx, discY, cz, discRadius, discSegs,
-                    rgX, rgY, rgZ, upX, upY, upZ,
-                    core, 0.62f * discAlpha, 0.30f * discAlpha);
+            // ⭐ v11 核心：球面着色。月相由光源方向决定，此处取近正照 = 满月
+            bbSphere(b, m, cx, discY, cz, discRadius, discRings, discSegs,
+                    rgX, rgY, rgZ, upX, upY, upZ, core,
+                    MOON_LIGHT_U, MOON_LIGHT_V, MOON_LIGHT_W,
+                    MOON_AMBIENT, 0.92f * discAlpha);
 
-            // ⭐ 月海：盘面上几块稍暗的圆斑，「像月亮」最关键的一笔。
-            // 刻意不随符文环自转——真实月球潮汐锁定、月面朝向恒定，
-            // 且「静止月面 + 转动符文环」的对比更好看
-            int mariaSegs = Math.max(6, discSegs / 3);
+            // ⭐ 月海：球面上几块稍暗的斑块。「像月亮」最关键的一笔——
+            // 纯亮球读起来是「光球」，有了不规则暗斑才认得出是天体。
+            // 月海用同一套光照着色，因此暗面那侧的月海会自然融进阴影里
             int mariaCount = MOON_MARIA.length / 3;
             int mariaDrawn = VisualLod.scale(mariaCount, detail);
             int mariaStep = Math.max(1, mariaCount / mariaDrawn);
+            int mariaSegs = Math.max(6, discSegs / 3);
             for (int i = 0; i < mariaCount; i += mariaStep) {
-                double mu = MOON_MARIA[i * 3] * discRadius;
-                double mv = MOON_MARIA[i * 3 + 1] * discRadius;
-                double mr = MOON_MARIA[i * 3 + 2] * discRadius;
-                float mx = (float) (cx + rgX * mu + upX * mv);
-                float my = (float) (discY + rgY * mu + upY * mv);
-                float mz = (float) (cz + rgZ * mu + upZ * mv);
-                bbDisc(b, m, mx, my, mz, mr, mariaSegs,
+                float mu = MOON_MARIA[i * 3];
+                float mv = MOON_MARIA[i * 3 + 1];
+                float mr = MOON_MARIA[i * 3 + 2];
+                // 该斑块所在球面点的亮度——与球体本身用同一光源，融合自然
+                float shade = sphereShade(mu, mv, MOON_LIGHT_U, MOON_LIGHT_V, MOON_LIGHT_W, MOON_AMBIENT);
+                // 球面透视：越靠边缘的斑块在视觉上越窄（沿径向压缩）
+                float edge = Mth.sqrt(Math.max(0f, 1f - mu * mu - mv * mv));
+                float mx = (float) (cx + rgX * (mu * discRadius) + upX * (mv * discRadius));
+                float my = (float) (discY + rgY * (mu * discRadius) + upY * (mv * discRadius));
+                float mz = (float) (cz + rgZ * (mu * discRadius) + upZ * (mv * discRadius));
+                bbDisc(b, m, mx, my, mz, mr * discRadius * (0.55 + 0.45 * edge), mariaSegs,
                         rgX, rgY, rgZ, upX, upY, upZ,
-                        deep, 0.34f * discAlpha, 0.0f);
+                        deep, MARIA_ALPHA * shade * discAlpha, 0f);
             }
 
-            // 外环：月轮轮廓（核心亮带 + 向外渐隐的辉光）
-            double ringHalf = discRadius * 0.045;
-            bbRing(b, m, cx, discY, cz, discRadius - ringHalf, discRadius + ringHalf, discSegs, 0f,
-                    rgX, rgY, rgZ, upX, upY, upZ, glow, 0.9f * discAlpha, 0.9f * discAlpha);
-            bbRing(b, m, cx, discY, cz, discRadius + ringHalf, discRadius + ringHalf + discRadius * 0.16, discSegs, 0f,
-                    rgX, rgY, rgZ, upX, upY, upZ, glow, 0.38f * discAlpha, 0f);
+            // 月晕：球体外圈一层向外渐隐的柔光（不是硬轮廓线——那会破坏球感）
+            bbRing(b, m, cx, discY, cz, discRadius, discRadius * 1.22, discSegs, 0f,
+                    rgX, rgY, rgZ, upX, upY, upZ, glow, 0.34f * discAlpha, 0f);
 
             // 外缘刻度：均布角度，按步长抽取（截断会让刻度只剩一段圆弧）
             if (VisualLod.keepLayer(detail, MOON_TICK_KEEP_THRESHOLD)) {
                 int drawn = VisualLod.scale(MOON_TICK_COUNT, detail);
                 int step = Math.max(1, MOON_TICK_COUNT / drawn);
-                double rStart = discRadius * 1.10;
+                double rStart = discRadius * 1.26;
                 double rEnd = rStart + discRadius * 0.20;
                 double tickHalf = discRadius * 0.03;
                 for (int i = 0; i < MOON_TICK_COUNT; i += step) {
@@ -1173,7 +1183,6 @@ public final class AoeEffectRenderer {
             if (rr <= 0.25) {
                 continue;
             }
-            // 刚出现（外圈）淡入 → 收到中心时淡出，表现为月光一圈圈被身体吸收
             float a = 0.55f * fade * smoothstep(0f, 0.12f, t) * (1f - smoothstep(0.82f, 1f, t));
             if (a <= 0.01f) {
                 continue;
@@ -1195,16 +1204,13 @@ public final class AoeEffectRenderer {
                 double px = cx + rr * Math.cos(ang);
                 double pz = cz + rr * Math.sin(ang);
 
-                // 各条错相上升，绝对时间驱动
                 float t = frac(age * MOON_DUST_PER_SECOND + i * 0.137f);
                 double y0 = cy + t * MOON_DUST_RISE;
                 double y1 = y0 + MOON_DUST_LENGTH;
-                // 起步淡入、升顶淡出
                 float a = 0.75f * fade * smoothstep(0f, 0.12f, t) * (1f - smoothstep(0.65f, 1f, t));
                 if (a <= 0.01f) {
                     continue;
                 }
-                // 越往上越接近月轮，颜色由月华蓝转月白
                 float[] col = (t < 0.5f) ? glow : core;
                 lightningSegment(b, m, px, y0, pz, px, y1, pz, MOON_DUST_HALF, col, a, 0f);
             }
@@ -1217,6 +1223,139 @@ public final class AoeEffectRenderer {
             glowRing(b, m, cx, cz, cy, radius * 0.6, segmentsFor(radius, detail), core,
                     0.6f * flash, 0.3f * flash, 0.10, 0.45);
         }
+    }
+
+    // ==================== v11 球体基元 ====================
+
+    /**
+     * 面向相机的<b>着色球体</b>：用同心环带 + 逐顶点兰伯特光照，
+     * 在没有任何光照管线的 {@code POSITION_COLOR} 纯顶点绘制下做出真正的球感。
+     *
+     * <h4>原理</h4>
+     * <p>
+     * 球体正对相机时，其轮廓是一个圆；圆内任意一点 {@code (u, v)}（归一化到单位圆）
+     * 对应的球面法线为
+     * </p>
+     * <pre>
+     * n = (u, v, sqrt(1 - u² - v²))
+     * </pre>
+     * <p>
+     * 第三个分量朝向相机。把它与光源方向 {@code L} 点乘即得该点的兰伯特亮度。
+     * 于是逐顶点写入不同的颜色，就能得到球体的明暗过渡与边缘暗化——
+     * 这两样正是「圆盘」与「球」的分野。
+     * </p>
+     *
+     * <h4>为什么这比「中心亮边缘暗的径向渐变」好</h4>
+     * <p>
+     * 径向渐变是<b>各向同性</b>的：亮斑永远在正中心，看起来像一枚发光的硬币。
+     * 兰伯特着色的亮斑<b>偏向光源一侧</b>，明暗界线是一条椭圆弧而非同心圆，
+     * 大脑会立刻把它读成三维物体。
+     * </p>
+     *
+     * <h4>顺带解决月相</h4>
+     * <p>
+     * <b>月相就是光源方向</b>，不需要额外绘制暗面：
+     * {@code L = (0,0,1)}（正照）即满月；L 越偏向侧面，明暗界线越往中间推，
+     * 依次经过亏凸月、半月、蛾眉月。这与现实中月相的成因完全一致。
+     * </p>
+     *
+     * @param radius   球体半径（格）
+     * @param rings    径向环数（决定明暗过渡的平滑度，是主要顶点杠杆）
+     * @param segments 每环的角度分段数
+     * @param col      基色（只读；实际顶点色为基色 × 该点亮度）
+     * @param lu       光源方向的 right 分量
+     * @param lv       光源方向的 up 分量
+     * @param lw       光源方向的「朝向相机」分量（1 = 正照 = 满月）
+     * @param ambient  环境光下限（0 会让暗面纯黑、显得像挖了个洞；留一点更自然）
+     * @param alpha    整体不透明度
+     */
+    private static void bbSphere(BufferBuilder b, Matrix4f m,
+                                 double cx, double cy, double cz, double radius,
+                                 int rings, int segments,
+                                 float rgX, float rgY, float rgZ, float upX, float upY, float upZ,
+                                 float[] col, float lu, float lv, float lw,
+                                 float ambient, float alpha) {
+        if (alpha <= 0.004f || radius <= 1.0e-4 || rings < 1 || segments < 3) {
+            return;
+        }
+        float r = col[0], g = col[1], bl = col[2];
+        float cxf = (float) cx, cyf = (float) cy, czf = (float) cz;
+        float rad = (float) radius;
+
+        for (int i = 0; i < rings; i++) {
+            float t0 = (float) i / rings;
+            float t1 = (float) (i + 1) / rings;
+            for (int j = 0; j < segments; j++) {
+                float a0 = TAU * j / segments;
+                float a1 = TAU * (j + 1) / segments;
+                float c0 = Mth.cos(a0), s0 = Mth.sin(a0);
+                float c1 = Mth.cos(a1), s1 = Mth.sin(a1);
+
+                // 四个角点的平面归一化坐标
+                float u00 = t0 * c0, v00 = t0 * s0;
+                float u01 = t0 * c1, v01 = t0 * s1;
+                float u11 = t1 * c1, v11 = t1 * s1;
+                float u10 = t1 * c0, v10 = t1 * s0;
+
+                // 逐顶点兰伯特亮度
+                float sh00 = sphereShade(u00, v00, lu, lv, lw, ambient);
+                float sh01 = sphereShade(u01, v01, lu, lv, lw, ambient);
+                float sh11 = sphereShade(u11, v11, lu, lv, lw, ambient);
+                float sh10 = sphereShade(u10, v10, lu, lv, lw, ambient);
+
+                // 平面坐标 → 世界坐标
+                float x00 = cxf + rgX * (u00 * rad) + upX * (v00 * rad);
+                float y00 = cyf + rgY * (u00 * rad) + upY * (v00 * rad);
+                float z00 = czf + rgZ * (u00 * rad) + upZ * (v00 * rad);
+                float x01 = cxf + rgX * (u01 * rad) + upX * (v01 * rad);
+                float y01 = cyf + rgY * (u01 * rad) + upY * (v01 * rad);
+                float z01 = czf + rgZ * (u01 * rad) + upZ * (v01 * rad);
+                float x11 = cxf + rgX * (u11 * rad) + upX * (v11 * rad);
+                float y11 = cyf + rgY * (u11 * rad) + upY * (v11 * rad);
+                float z11 = czf + rgZ * (u11 * rad) + upZ * (v11 * rad);
+                float x10 = cxf + rgX * (u10 * rad) + upX * (v10 * rad);
+                float y10 = cyf + rgY * (u10 * rad) + upY * (v10 * rad);
+                float z10 = czf + rgZ * (u10 * rad) + upZ * (v10 * rad);
+
+                // 最外环稍降 alpha，柔化轮廓、避免硬锯齿边
+                float aIn = alpha;
+                float aOut = (i == rings - 1) ? alpha * 0.82f : alpha;
+
+                b.vertex(m, x00, y00, z00).color(r * sh00, g * sh00, bl * sh00, aIn).endVertex();
+                b.vertex(m, x01, y01, z01).color(r * sh01, g * sh01, bl * sh01, aIn).endVertex();
+                b.vertex(m, x11, y11, z11).color(r * sh11, g * sh11, bl * sh11, aOut).endVertex();
+
+                b.vertex(m, x00, y00, z00).color(r * sh00, g * sh00, bl * sh00, aIn).endVertex();
+                b.vertex(m, x11, y11, z11).color(r * sh11, g * sh11, bl * sh11, aOut).endVertex();
+                b.vertex(m, x10, y10, z10).color(r * sh10, g * sh10, bl * sh10, aOut).endVertex();
+            }
+        }
+    }
+
+    /**
+     * 球面某点的兰伯特亮度系数。
+     * <p>
+     * 给定球体正对相机时平面内的归一化坐标 {@code (u, v)}（单位圆内），
+     * 其球面法线为 {@code (u, v, sqrt(1 - u² - v²))}；与光源方向点乘、
+     * 夹取到非负后，混入环境光下限即得最终亮度。
+     * </p>
+     *
+     * @param u       平面内 right 分量（归一化，|(u,v)| ≤ 1）
+     * @param v       平面内 up 分量
+     * @param lu      光源方向 right 分量
+     * @param lv      光源方向 up 分量
+     * @param lw      光源方向「朝向相机」分量
+     * @param ambient 环境光下限
+     * @return 亮度系数（{@code ambient} ~ 1.0）
+     */
+    private static float sphereShade(float u, float v, float lu, float lv, float lw, float ambient) {
+        float nzSq = 1f - u * u - v * v;
+        float nz = (nzSq <= 0f) ? 0f : Mth.sqrt(nzSq);
+        float lam = u * lu + v * lv + nz * lw;
+        if (lam < 0f) {
+            lam = 0f;
+        }
+        return ambient + (1f - ambient) * lam;
     }
 
     // ==================== v10 billboard 基元（面向相机的平面图形）====================

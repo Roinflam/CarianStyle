@@ -15,11 +15,9 @@ import pers.roinflam.carianstyle.utils.Reference;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * 光环地面渲染器（客户端）——按形状绘制水平发光法阵。
@@ -78,7 +76,7 @@ import java.util.Set;
  * radiusFactor = alpha = 0        // 完全不可见
  * </pre>
  * <p>
- * 而该光环<b>仍在 {@code activeKeys} 之中</b>（附魔还穿在身上），
+ * 而该光环<b>仍在激活集合之中</b>（附魔还穿在身上），
  * 每帧都会被刷新回 {@code fadeStart = -1}（视为"仍激活"），
  * 因此永远不会进入淡出分支、也就永远不会被移除重建——
  * <b>光环会永久消失，直到玩家把装备脱下再穿上</b>（或重进世界）。
@@ -100,11 +98,6 @@ import java.util.Set;
  * <b>行为差异（是改进）：</b>时间源由「世界游戏刻」变为「墙钟」，动画不再受服务端 TPS 影响——
  * 服务器卡顿时光环旋转 / 呼吸不会跟着变慢，与本模组其余特效表现统一。
  * 由于是纯客户端的视觉动画、不参与任何机制判定，该差异无副作用。
- * </p>
- * <p>
- * <b>关于 partial：</b>墙钟本身即连续量，无需再叠加帧间插值，故 {@code now} 不再使用
- * {@code partial}；但实体位置插值（{@code Mth.lerp(partial, entity.xo, entity.getX())}）
- * <b>仍然保留</b>——那是位置平滑，与动画时间无关。
  * </p>
  * <p>
  * <b>新的精度边界：</b>float 尾数 24 位，tick 单位下约 1677 万 tick（连续运行 <b>233 小时</b>）
@@ -219,8 +212,63 @@ import java.util.Set;
  * {@link #perimeterPoint} 的分支逻辑一字未改。输出的每个顶点与 v4 完全相同。
  * </p>
  *
+ * <h3>v6（堆分配，行为逐帧一致）：干掉每帧的 HashSet 与 Prepared 列表</h3>
+ * <p>
+ * v5 之后逐元素的分配已经清干净，但<b>每帧开头还剩两个结构性分配</b>：
+ * </p>
+ * <pre>
+ * Set&lt;Long&gt; activeKeys = new HashSet&lt;&gt;();      // 每帧一个 HashSet
+ * activeKeys.add(key(entityId, serialId));          // 每次 add 装箱一个 Long
+ *
+ * List&lt;Prepared&gt; prepared = new ArrayList&lt;&gt;();  // 每帧一个 ArrayList
+ * prepared.add(new Prepared(...));                  // 每个光环一个 record 实例
+ * </pre>
+ * <p>
+ * 装箱这一项尤其亏：键是 {@code (entityId << 16) | serialId}，数值远超
+ * {@code Long.valueOf} 的小值缓存范围（-128~127），<b>每一个都是真分配</b>。
+ * 附近 20 个实体各带 2~4 个光环时，单帧就是几十个 {@code Long} 加一个 HashSet 的桶数组。
+ * </p>
+ *
+ * <h4>第一处：用帧号比对取代 HashSet</h4>
+ * <p>
+ * {@code activeKeys} 的用途只有一个——记住「本帧哪些光环还在扫描结果里」，
+ * 好在下一段循环里判断谁该开始淡出。与其在外面维护这份名单，
+ * 不如让每个 {@link AuraState} <b>自己记住上次被看到是哪一帧</b>
+ * （{@link AuraState#lastSeenFrame}）：
+ * </p>
+ * <pre>
+ * // 旧：查集合（HashSet 分配 + Long 装箱 + 哈希查找）
+ * if (st.fadeStart &lt; 0f &amp;&amp; !activeKeys.contains(e.getKey())) { ... }
+ *
+ * // 新：比帧号（零分配，一次 int 比较）
+ * if (st.fadeStart &lt; 0f &amp;&amp; st.lastSeenFrame != frameId) { ... }
+ * </pre>
+ * <p>
+ * 帧号取自 {@link VisualBatch#frameId()}——它在同一阶段的 HIGHEST 优先级里自增，
+ * 而本渲染器是默认的 NORMAL 优先级，因此读到的<b>必然是本帧的值</b>。
+ * 「本帧出现过」与「lastSeenFrame == 当前帧号」是等价命题，行为完全一致。
+ * </p>
+ *
+ * <h4>第二处：Prepared 由 record 改为对象池</h4>
+ * <p>
+ * {@link PreparedSlot} 的前身是 {@code record}——不可变、每帧每光环新建一个，
+ * 加上装它的 {@code ArrayList} 本身。改为可变的 {@link PreparedSlot} 加一个
+ * <b>只增不减的复用池</b>（{@link #PREPARED_POOL}）：每帧把 {@link #preparedCount}
+ * 归零，需要时从池里取下一个槽位复写字段，池不够长才 new 一个补进去。
+ * </p>
+ * <p>
+ * 于是稳态下（同屏光环数不再创新高）<b>一个对象都不分配</b>。
+ * 池只增不减是刻意的：同屏光环数的峰值就那么大（几十个封顶），
+ * 留着比反复伸缩划算；而且「收缩池」这种逻辑本身就容易写出 bug。
+ * </p>
+ * <p>
+ * <b>代价是失去了 record 的不可变性</b>——槽位会被下一帧复写。
+ * 但 {@link #PREPARED_POOL} 的内容<b>只在同一次 {@link #onRenderLevel} 调用内使用</b>
+ * （填充完立刻遍历绘制，绝不跨帧留存引用），这个约束由本类自己保证，不外泄。
+ * </p>
+ *
  * @author FlameForge
- * @version 5
+ * @version 6
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -248,7 +296,7 @@ public final class AuraGroundRenderer {
 
     /**
      * 每游戏刻的毫秒数。
-     * <p>用于把墙钟毫秒差换算为 <b>tick 单位</b>的动画时间，从而让下方全部
+     * <p>用于把墙钟毫秒差换算为 <b>tick 单位</b>的动画时间，从而让下方所有
      * {@code *_TICKS} / {@code *_SPEED} 常量原样沿用、动画速度与修复前逐帧一致。</p>
      */
     private static final float MILLIS_PER_TICK = 50.0f;
@@ -271,7 +319,7 @@ public final class AuraGroundRenderer {
      * 环 / 涟漪类基元的最少分段数。
      * <p>
      * 比实体渲染器的下限（8~10）高不少：多边形与真圆的偏离量正比于半径，
-     * 而光环半径可达 16 格（圣域）。24 段在 16 格半径下偏离约 14cm，
+     * 而本渲染器的环半径可达 16 格（圣域）。24 段在 16 格半径下偏离约 14cm，
      * 在削减生效的距离上不可察；再低就能看出明显棱角了。
      * </p>
      */
@@ -394,6 +442,21 @@ public final class AuraGroundRenderer {
         float appearTime;
         /** 开始消失的时刻（tick，墙钟换算）；<0 表示仍激活（未开始淡出） */
         float fadeStart = -1f;
+        /**
+         * 上次「本帧仍在扫描结果中」的帧号（v6 新增）。
+         * <p>
+         * 取代了原先每帧新建的 {@code Set<Long> activeKeys}：
+         * 刷新时写入 {@link VisualBatch#frameId()}，随后判断「本帧没出现」
+         * 就退化成一次 {@code int} 比较，零分配、也不再有 {@code Long} 装箱
+         * （详见类注释「v6」小节）。
+         * </p>
+         * <p>
+         * 初值 -1 是刻意的：{@link VisualBatch#frameId()} 从 0 起自增，
+         * 用 -1 保证「刚 new 出来但还没被刷新过」的状态不会与任何真实帧号相等。
+         * 实际上创建后会立刻被赋值，这只是防御。
+         * </p>
+         */
+        int lastSeenFrame = -1;
         /** 实体网络 id（淡出时优先按实体当前位置渲染） */
         int entityId;
         /** 序列号（决定专属符文母题） */
@@ -404,7 +467,13 @@ public final class AuraGroundRenderer {
         double nominalRadius;
         /** 形状 */
         AuraDisplayRegistry.AuraShape shape;
-        /** 最近一次的世界坐标（实体消失后用于淡出定位） */
+        /**
+         * 最近一次的世界坐标（实体消失后用于淡出定位）。
+         * <p>
+         * <b>由每帧的位置循环从存活实体写回，而非来自 {@link AuraScanner.ActiveAura}</b>——
+         * 后者只携带 {@code entityId}，坐标一律由渲染端反查实体实时获取。
+         * </p>
+         */
         double lastX;
         double lastY;
         double lastZ;
@@ -412,11 +481,57 @@ public final class AuraGroundRenderer {
 
     /**
      * 准备好渲染的一个光环（坐标已转为相对相机；尺寸已含动画与边缘余量；alpha 为整体淡入淡出系数）。
-     *
-     * @param detail 本帧细节系数（v4 新增，按到圆环边界的距离取，详见类注释）
+     * <p>
+     * <b>v6：由 {@code record} 改为可变类 + 对象池。</b>原先每帧每光环都要 new 一个 record，
+     * 外加装它们的那个 {@code ArrayList}；现在从 {@link #PREPARED_POOL} 取槽位复写字段，
+     * 稳态下一个对象都不分配（详见类注释「第二处：Prepared 由 record 改为对象池」）。
+     * </p>
+     * <p>
+     * <b>⚠ 槽位会被下一帧复写</b>，因此其内容<b>只能在同一次 {@link #onRenderLevel}
+     * 调用内使用</b>——填充完立刻遍历绘制，绝不跨帧留存引用。这个约束由本类自己保证、不外泄。
+     * </p>
      */
-    private record Prepared(int serialId, double rx, double ry, double rz, int color, double radius,
-                            AuraDisplayRegistry.AuraShape shape, double alpha, float detail) {
+    private static final class PreparedSlot {
+        int serialId;
+        double rx;
+        double ry;
+        double rz;
+        int color;
+        double radius;
+        AuraDisplayRegistry.AuraShape shape;
+        double alpha;
+        float detail;
+    }
+
+    /**
+     * {@link PreparedSlot} 的复用池（v6 新增，<b>只增不减</b>）。
+     * <p>
+     * 每帧把 {@link #preparedCount} 归零，需要时从池里取下一个槽位复写字段，
+     * 池不够长才 new 一个补进去。于是稳态下（同屏光环数不再创新高）零分配。
+     * </p>
+     * <p>
+     * <b>只增不减是刻意的：</b>同屏光环数的峰值就那么大（几十个封顶），
+     * 留着比反复伸缩划算；而且「收缩池」这种逻辑本身就容易写出 bug。
+     * </p>
+     */
+    private static final List<PreparedSlot> PREPARED_POOL = new ArrayList<>();
+
+    /** 本帧已使用的 {@link #PREPARED_POOL} 槽位数（每帧开头归零） */
+    private static int preparedCount = 0;
+
+    /**
+     * 取下一个可用的 {@link PreparedSlot}（池不够长则扩容一格）。
+     *
+     * @return 可复写的槽位
+     */
+    private static PreparedSlot obtainPrepared() {
+        if (preparedCount < PREPARED_POOL.size()) {
+            return PREPARED_POOL.get(preparedCount++);
+        }
+        PreparedSlot slot = new PreparedSlot();
+        PREPARED_POOL.add(slot);
+        preparedCount++;
+        return slot;
     }
 
     /**
@@ -441,11 +556,13 @@ public final class AuraGroundRenderer {
     }
 
     /**
-     * 渲染回调。
+     * 世界渲染回调：在半透明方块之后绘制所有光环法阵。
      * <p>
-     * v2：GL 状态与顶点缓冲由 {@link VisualBatch} 统一管理；本方法只负责状态机推进与写顶点。
-     * v3：动画时间源改为墙钟（{@link #currentTime()}），修复 13.9 小时回绕导致光环永久消失。
-     * v4：新增细节系数计算（按到圆环边界的距离）与同屏实例登记。
+     * v2：GL 状态与顶点缓冲改由 {@link VisualBatch} 统一管理。
+     * v3：动画时间源改为墙钟差值（tick 单位），修复 13.9 小时后光环永久消失的问题。
+     * v4：全部元素按 {@link VisualLod} 细节系数缩放，并补上此前缺失的实例登记；
+     * 细节系数按<b>到圆环边界的距离</b>取（详见类注释）。
+     * v6：「本帧是否出现」改用帧号比对、{@link PreparedSlot} 改用对象池，每帧零结构性分配。
      * </p>
      *
      * @param event 渲染阶段事件
@@ -455,16 +572,15 @@ public final class AuraGroundRenderer {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
             return;
         }
-        List<AuraScanner.ActiveAura> auras = AuraScanner.getActiveAuras();
         Minecraft mc = Minecraft.getInstance();
-        // 迁移要点：清空状态必须先于「取共享缓冲」的判空，否则离开世界时状态会残留（见类注释）
+        // ⚠ 必须在取共享缓冲之前处理「离开世界」：离开世界那一帧共享批次本就不会开启，
+        // 若把清空逻辑排在下面的判空之后，淡出状态会残留到下次进入世界，
+        // 与新的实体网络 id 撞号后会闪出一两帧错误光环。
         if (mc.level == null) {
             STATE.clear();
             return;
         }
-        // 注意：即使本帧没有任何激活光环（auras 为空），仍需继续——
-        // 因为可能有刚消失、正在播放淡出动画的光环要渲染。
-
+        // 共享批次未开启：直接跳过
         BufferBuilder builder = VisualBatch.builder();
         if (builder == null) {
             return;
@@ -474,686 +590,670 @@ public final class AuraGroundRenderer {
             return;
         }
 
-        float partial = VisualBatch.partialTick();
-        // ⭐ v3：墙钟驱动的动画时间（tick 单位）。
-        // 不再叠加 partial —— 墙钟本身即连续量；partial 仅保留用于下方的实体位置插值。
+        List<AuraScanner.ActiveAura> auras = AuraScanner.getActiveAuras();
+        // v3：墙钟驱动的 tick 时间轴（不再受服务端 TPS 影响，也不会回绕）
         float now = currentTime();
+        // ⭐ v6：本帧帧号。VisualBatch 在同一阶段的 HIGHEST 优先级里自增，
+        // 而本渲染器是默认的 NORMAL 优先级，故这里读到的必然是本帧的值
+        int frameId = VisualBatch.frameId();
 
-        // ===== 1) 刷新本帧激活光环的状态（取消淡出、记录最新参数与世界坐标）=====
-        Set<Long> activeKeys = new HashSet<>();
+        // ===== 1) 刷新状态：本帧仍在扫描结果中的光环，写入当前帧号 =====
+        // v6：不再用 HashSet 记录「本帧出现过谁」，改为往状态里写帧号
         for (AuraScanner.ActiveAura aura : auras) {
-            Entity entity = mc.level.getEntity(aura.entityId());
-            if (entity == null) {
-                continue;
-            }
             long k = key(aura.entityId(), aura.serialId());
-            activeKeys.add(k);
             AuraState st = STATE.get(k);
             if (st == null) {
                 st = new AuraState();
                 st.appearTime = now;
                 STATE.put(k, st);
             }
-            st.fadeStart = -1f; // 仍激活：清除淡出标记（若此前在淡出会被“救回”）
+            st.fadeStart = -1f; // 仍激活：清除淡出标记（若此前在淡出会被"救回"）
+            st.lastSeenFrame = frameId;
             st.entityId = aura.entityId();
             st.serialId = aura.serialId();
             st.color = aura.color();
             st.nominalRadius = aura.radius();
             st.shape = aura.shape();
-            st.lastX = entity.getX();
-            st.lastY = entity.getY();
-            st.lastZ = entity.getZ();
+            // 注意：ActiveAura 不带坐标分量（扫描器只给 entityId，坐标由渲染端反查实体实时获取），
+            // 故 lastX/lastY/lastZ 不在这里写，而是在下方位置循环里从存活实体写回
         }
 
-        // ===== 2) 不在激活集里的状态：开始淡出（若尚未开始）=====
+        // ===== 2) 标记本帧未出现的光环开始淡出 =====
         for (Map.Entry<Long, AuraState> e : STATE.entrySet()) {
             AuraState st = e.getValue();
-            if (st.fadeStart < 0f && !activeKeys.contains(e.getKey())) {
+            // ⭐ v6：「本帧没出现」等价于「lastSeenFrame 不是当前帧号」，
+            // 一次 int 比较取代了原先的 HashSet 查找 + Long 装箱
+            if (st.fadeStart < 0f && st.lastSeenFrame != frameId) {
                 st.fadeStart = now;
             }
         }
 
-        // ===== 3) 由全部状态构建渲染数据（出现=展开+淡入；消失=收缩+淡出；淡出完成移除）=====
-        List<Prepared> prepared = new ArrayList<>();
-        double cullSqr = RENDER_CULL * RENDER_CULL;
+        // ===== 3) 计算本帧要画的光环（含正在淡出的），淡出结束则移除状态 =====
+        // v6：不再新建 ArrayList + record，改为从对象池取槽位复写
+        preparedCount = 0;
         Iterator<Map.Entry<Long, AuraState>> it = STATE.entrySet().iterator();
         while (it.hasNext()) {
-            AuraState st = it.next().getValue();
+            Map.Entry<Long, AuraState> entry = it.next();
+            AuraState st = entry.getValue();
 
             float radiusFactor;
-            float alpha;
+            float animAlpha;
             if (st.fadeStart < 0f) {
-                // 出现/稳定：展开 + 淡入（用同一缓动曲线）
-                float eased = easeOutCubic(Mth.clamp((now - st.appearTime) / APPEAR_TICKS, 0f, 1f));
+                // 出现/稳定：从中心展开（缓出）+ 淡入
+                float p = clamp01((now - st.appearTime) / APPEAR_TICKS);
+                float eased = easeOutCubic(p);
                 radiusFactor = eased;
-                alpha = eased;
+                animAlpha = eased;
             } else {
                 // 消失：收缩 + 淡出
-                float p2 = Mth.clamp((now - st.fadeStart) / FADE_TICKS, 0f, 1f);
-                if (p2 >= 1f) {
+                float p = clamp01((now - st.fadeStart) / FADE_TICKS);
+                if (p >= 1f) {
                     it.remove(); // 淡出结束，移除状态
                     continue;
                 }
-                float v = 1f - p2;                 // 1→0
-                radiusFactor = 0.55f + 0.45f * v;  // 收缩到 ~55%
-                alpha = v;
+                float v = 1f - p; // 1 -> 0
+                radiusFactor = 0.75f + 0.25f * v; // 轻微收缩，不至于塌成一点
+                animAlpha = v;
             }
 
-            // 位置：实体仍在场用插值；否则用最近世界坐标（实体已卸载也能在原地淡完）
-            Entity entity = mc.level.getEntity(st.entityId);
-            double lerpX;
-            double lerpY;
-            double lerpZ;
-            if (entity != null) {
-                lerpX = Mth.lerp((double) partial, entity.xo, entity.getX());
-                lerpY = Mth.lerp((double) partial, entity.yo, entity.getY()) + Y_OFFSET;
-                lerpZ = Mth.lerp((double) partial, entity.zo, entity.getZ());
+            if (animAlpha <= 0.01f || radiusFactor <= 0.02f) {
+                continue;
+            }
+
+            // 位置：实体仍在世界中用实时坐标，否则用最近已知坐标原地播完淡出
+            double wx, wy, wz;
+            Entity ent = mc.level.getEntity(st.entityId);
+            if (ent != null && ent.isAlive()) {
+                wx = ent.getX();
+                wy = ent.getY();
+                wz = ent.getZ();
+                // 顺手记下最后已知坐标：实体一旦卸载 / 死亡，下面的 else 分支就靠它
+                // 把剩余的淡出动画留在原地播完
+                st.lastX = wx;
+                st.lastY = wy;
+                st.lastZ = wz;
             } else {
-                lerpX = st.lastX;
-                lerpY = st.lastY + Y_OFFSET;
-                lerpZ = st.lastZ;
+                wx = st.lastX;
+                wy = st.lastY;
+                wz = st.lastZ;
             }
 
-            double dx = lerpX - cam.x;
-            double dy = lerpY - cam.y;
-            double dz = lerpZ - cam.z;
+            double dx = wx - cam.x;
+            double dy = wy - cam.y;
+            double dz = wz - cam.z;
             double distSqr = dx * dx + dy * dy + dz * dz;
-            if (distSqr > cullSqr) {
+            if (distSqr > RENDER_CULL * RENDER_CULL) {
                 continue; // 太远：本帧不渲染，但保留状态，淡出计时继续
             }
 
-            // 方形：中心吸附到方块坐标（floor），半边长含碰撞箱余量；
-            // 圆形：平滑居中、精确半径（对应 distanceTo 球形判定）。
-            double centerWorldX;
-            double centerWorldZ;
-            double drawReach;
+            // 方形吸附到方块坐标；圆形保持精确小数坐标（与判定一致）
+            double px, pz;
             if (st.shape == AuraDisplayRegistry.AuraShape.SQUARE) {
-                centerWorldX = Math.floor(lerpX);
-                centerWorldZ = Math.floor(lerpZ);
-                drawReach = st.nominalRadius + EDGE_MARGIN;
+                px = Math.floor(wx) + 0.5;
+                pz = Math.floor(wz) + 0.5;
             } else {
-                centerWorldX = lerpX;
-                centerWorldZ = lerpZ;
-                drawReach = st.nominalRadius;
-            }
-            double animatedReach = drawReach * radiusFactor;
-            if (animatedReach < 0.05) {
-                continue;
+                px = wx;
+                pz = wz;
             }
 
-            // ⭐ v4：细节系数必须按「到圆环边界的距离」取，不能按到圈心的距离。
-            // 圣域半径 16 格 > VisualLod.FULL_DETAIL_RANGE(12)，按圈心算会导致
-            // 玩家站在自己圈的边缘时被判定为"远"并削减，而那圈线其实就在脚边（详见类注释）。
-            double edgeDist = Math.max(0.0, Math.sqrt(distSqr) - animatedReach);
+            double radius = st.nominalRadius * radiusFactor;
+
+            // ⭐ v4：细节系数必须按「到圆环边界的距离」取，不能按到中心的距离。
+            // 圣域半径 16 格 > VisualLod.FULL_DETAIL_RANGE(12)，若按中心距离算，
+            // 玩家站在圈内侧边缘时（到圈心 ≈ 16）会被判定为"远"并大幅削减，
+            // 但那圈发光边界其实就在脚边、削减清晰可见。
+            // 改用到边界的近似距离后，人在圈内或贴着圈边时该值为 0、detail 恒为 1.0。
+            // 开方成本可忽略（同屏光环数量通常是个位数）。
+            double edgeDist = Math.max(0.0, Math.sqrt(distSqr) - radius);
             float detail = VisualLod.detail(edgeDist * edgeDist);
-            // ⭐ v4：登记同屏实例。本渲染器此前不登记，导致全局 crowdFactor 被系统性低估，
-            // 已接入 LOD 的实体类渲染器在团战时削减不足
+            // ⭐ v4：补上此前缺失的实例登记。不登记会让全局 crowdFactor 被系统性低估，
+            // 导致已接入 LOD 的实体类渲染器在团战时削减不足
             VisualLod.countInstance();
 
-            prepared.add(new Prepared(
-                    st.serialId,
-                    centerWorldX - cam.x, lerpY - cam.y, centerWorldZ - cam.z,
-                    st.color, animatedReach, st.shape, alpha, detail));
+            PreparedSlot slot = obtainPrepared();
+            slot.serialId = st.serialId;
+            slot.rx = px - cam.x;
+            slot.ry = wy - cam.y + Y_OFFSET;
+            slot.rz = pz - cam.z;
+            slot.color = st.color;
+            slot.radius = radius;
+            slot.shape = st.shape;
+            slot.alpha = animAlpha;
+            slot.detail = detail;
         }
 
-        if (prepared.isEmpty()) {
+        if (preparedCount == 0) {
             return;
         }
 
-        float pulse = 0.5f + 0.5f * Mth.sin(now * PULSE_SPEED);
-        float fillMul = 0.85f + 0.15f * pulse;
-        float lineMul = 0.80f + 0.20f * pulse;
-        float runeRot = now * RUNE_SPEED;
-
+        // ===== 4) 绘制 =====
         Matrix4f matrix = VisualBatch.matrix();
+        // 整体亮度呼吸（半径严格不缩放，边界始终对应效果范围）
+        float pulse = 0.90f + 0.10f * Mth.sin(now * PULSE_SPEED);
 
-        // 每个光环按 填充→辉光→核心→强调 的顺序追加（顺序即混合顺序）。
-        // 把整体 alpha 折入 fillMul/lineMul——因绘制函数内所有顶点 alpha 均为
-        // “基值 × fillMul/lineMul”，故乘一次即可让整张光环统一淡入/淡出（颜色不受影响）。
-        for (Prepared p : prepared) {
-            float af = fillMul * (float) p.alpha();
-            float al = lineMul * (float) p.alpha();
-            if (p.shape() == AuraDisplayRegistry.AuraShape.SQUARE) {
-                drawSquare(builder, matrix, p, af, al, now, p.detail());
+        for (int i = 0; i < preparedCount; i++) {
+            PreparedSlot p = PREPARED_POOL.get(i);
+            if (p.shape == AuraDisplayRegistry.AuraShape.SQUARE) {
+                drawSquare(builder, matrix, p, now, pulse);
             } else {
-                drawCircle(builder, matrix, p, af, al, runeRot, now, p.detail());
+                drawCircle(builder, matrix, p, now, pulse);
             }
         }
     }
 
-    // ==================== 方形绘制 ====================
+    // ==================== 方形（对应 AABB.inflate 判定） ====================
 
     /**
-     * 绘制一个方形光环（填充 + 发光边 + 四角追逐 + 方形涟漪 + 边框彗星）。
+     * 绘制方形法阵：底色 → 四条发光边（精确边界）→ 四角追逐火花
+     * → 从中心向外扩散的方形涟漪 → 沿边框巡游的彗星光点。
      * <p>
-     * v4 削减：涟漪条数缩减；四角火花与边框彗星按保留阈值整层跳过。
-     * <b>底色填充、三层发光边、四角位置本身完全不削</b>——方形只有 4 条边、4 个角，
-     * 削掉任何一个都不再是「方形」；且三层边加起来才 72 顶点，是精确边界的唯一表达。
+     * <b>v4：涟漪数量、火花与彗星层按细节系数削减。</b>
+     * 方形的边是四条直线段（顶点量与半边长无关），本身很便宜，故主体不削；
+     * 真正的杠杆在循环动效上。
      * </p>
-     * <p>
-     * v5：颜色改为 {@link VisualColor#unpackInto} 写入 {@link #SCRATCH} 后立即提取标量；
-     * 边框彗星的周边坐标改为写入 {@link #PERIMETER_XZ}。二者时序上先后不重叠，互不干扰。
-     * </p>
-     *
-     * @param fillMul 填充呼吸亮度系数
-     * @param lineMul 线条呼吸亮度系数
-     * @param now     当前时间（tick，墙钟驱动），驱动追逐/涟漪/彗星相位
-     * @param detail  本帧细节系数
+     * <p>v5：颜色解包改用 {@link #SCRATCH} 复用缓冲，{@link #addSpark} 已内联为标量。</p>
      */
-    private static void drawSquare(BufferBuilder builder, Matrix4f m, Prepared p,
-                                   float fillMul, float lineMul, float now, float detail) {
-        double cx = p.rx(), cy = p.ry(), cz = p.rz();
-        double half = p.radius();
-        // v5：无分配解包，写入复用缓冲后立即提取为标量（之后再不碰缓冲）
-        VisualColor.unpackInto(SCRATCH, p.color());
-        float r = SCRATCH[0], g = SCRATCH[1], b = SCRATCH[2];
-        float br = brighten(r), bg = brighten(g), bb = brighten(b);
+    private static void drawSquare(BufferBuilder b, Matrix4f m, PreparedSlot p, float now, float pulse) {
+        // v5：写入复用缓冲后立即提取标量，之后不再碰缓冲（与旧 unpack 逐位一致）
+        VisualColor.unpackInto(SCRATCH, p.color);
+        float cr = SCRATCH[0];
+        float cg = SCRATCH[1];
+        float cb = SCRATCH[2];
 
-        // 区域底色
-        addSquareFill(builder, m, cx, cy, cz, half, r, g, b, SQUARE_FILL_ALPHA * fillMul);
+        VisualColor.unpackInto(SCRATCH, brighten(p.color, CORE_BRIGHTEN));
+        float lr = SCRATCH[0];
+        float lg = SCRATCH[1];
+        float lb = SCRATCH[2];
 
-        // 从中心向外扩散的方形涟漪。相位为 i/count 均布的循环波，没有固定方位，
-        // 减条数只表现为「波与波之间隔得更开」，观感自然，无需按步长抽取
-        int rippleCount = VisualLod.scale(RIPPLE_COUNT, detail);
+        float a = (float) p.alpha;
+        // 半边长 = 名义半径 + 每边外扩余量（近似碰撞箱相交带来的额外生效宽度）
+        double half = p.radius + EDGE_MARGIN;
+
+        // 1) 区域底色
+        addSquareFill(b, m, p.rx, p.ry, p.rz, half, cr, cg, cb, SQUARE_FILL_ALPHA * a * pulse);
+
+        // 2) 四条发光边（外辉光 → 内辉光 → 核心亮带）
+        addSquareEdges(b, m, p.rx, p.ry, p.rz, half, half + GLOW_SPREAD,
+                cr, cg, cb, GLOW_ALPHA * a * pulse, 0f);
+        addSquareEdges(b, m, p.rx, p.ry, p.rz, half - GLOW_SPREAD * 0.6, half,
+                cr, cg, cb, 0f, GLOW_ALPHA * 0.75f * a * pulse);
+        addSquareEdges(b, m, p.rx, p.ry, p.rz, half - CORE_HALF, half + CORE_HALF,
+                lr, lg, lb, CORE_ALPHA * a * pulse, CORE_ALPHA * a * pulse);
+
+        // 3) 四角追逐火花（每角相位错开，依次明灭）
+        if (VisualLod.keepLayer(p.detail, SPARKLE_KEEP_THRESHOLD)) {
+            for (int i = 0; i < 4; i++) {
+                float phase = now * CORNER_CHASE_SPEED - i * HALF_PI;
+                float k = 0.55f + 0.45f * Mth.sin(phase);
+                double sx = ((i == 0 || i == 3) ? -half : half);
+                double sz = ((i < 2) ? -half : half);
+                addSpark(b, m, p.rx + sx, p.ry, p.rz + sz, CORNER_SIZE * (0.75f + 0.5f * k),
+                        lr, lg, lb, CORNER_ALPHA * a * k);
+            }
+        }
+
+        // 4) 方形涟漪：从中心向外扩散的方框，抵达边界时淡出
+        int rippleCount = VisualLod.scale(RIPPLE_COUNT, p.detail);
         for (int i = 0; i < rippleCount; i++) {
-            float phase = frac(now / RIPPLE_PERIOD_TICKS + (float) i / rippleCount);
-            double rippleHalf = half * phase;
-            if (rippleHalf < 0.3) {
+            float t = frac((now / RIPPLE_PERIOD_TICKS) + (float) i / rippleCount);
+            double r = half * t;
+            if (r <= 0.05) {
                 continue;
             }
-            float a = (1f - phase) * RIPPLE_ALPHA * lineMul;
-            addSquareEdges(builder, m, cx, cy, cz, rippleHalf,
-                    -RIPPLE_HALF_WIDTH, RIPPLE_HALF_WIDTH, br, bg, bb, a, a);
+            // 起步渐入、末段渐出，避免在中心/边界处突兀出现或消失
+            float fade = Mth.sin((float) (t * Math.PI));
+            addSquareEdges(b, m, p.rx, p.ry, p.rz, r - RIPPLE_HALF_WIDTH, r + RIPPLE_HALF_WIDTH,
+                    cr, cg, cb, RIPPLE_ALPHA * a * fade, RIPPLE_ALPHA * a * fade);
         }
 
-        // 外辉光（边界外侧渐隐）
-        addSquareEdges(builder, m, cx, cy, cz, half,
-                CORE_HALF, CORE_HALF + GLOW_SPREAD, r, g, b, GLOW_ALPHA * lineMul, 0f);
-        // 内辉光（边界内侧渐隐）
-        addSquareEdges(builder, m, cx, cy, cz, half,
-                -CORE_HALF - GLOW_SPREAD, -CORE_HALF, r, g, b, 0f, GLOW_ALPHA * lineMul);
-        // 核心亮带（提亮色，精确边界）
-        addSquareEdges(builder, m, cx, cy, cz, half,
-                -CORE_HALF, CORE_HALF, br, bg, bb, CORE_ALPHA * lineMul, CORE_ALPHA * lineMul);
-
-        // 四角追逐火花：四个角依次明灭。纯装饰光点，远处看不出，低细节时整层跳过
-        if (VisualLod.keepLayer(detail, SPARKLE_KEEP_THRESHOLD)) {
-            double xMin = cx - half, xMax = cx + half;
-            double zMin = cz - half, zMax = cz + half;
-            // v5：四个角点内联为标量，不再用 double[][] 字面量（原实现每帧分配 5 个数组）
-            for (int i = 0; i < 4; i++) {
-                double cornerX;
-                double cornerZ;
-                switch (i) {
-                    case 0 -> {
-                        cornerX = xMin;
-                        cornerZ = zMin;
-                    }
-                    case 1 -> {
-                        cornerX = xMax;
-                        cornerZ = zMin;
-                    }
-                    case 2 -> {
-                        cornerX = xMax;
-                        cornerZ = zMax;
-                    }
-                    default -> {
-                        cornerX = xMin;
-                        cornerZ = zMax;
-                    }
-                }
-                float phase = 0.45f + 0.55f * (0.5f + 0.5f * Mth.sin(now * CORNER_CHASE_SPEED + i * HALF_PI));
-                float a = CORNER_ALPHA * lineMul * phase;
-                addSpark(builder, m, cornerX, cy, cornerZ, CORNER_SIZE, br, bg, bb, a);
-            }
-        }
-
-        // 沿边框巡游的彗星光点
-        if (VisualLod.keepLayer(detail, COMET_KEEP_THRESHOLD)) {
+        // 5) 边框彗星：沿方形周长巡游的光点 + 拖尾
+        if (VisualLod.keepLayer(p.detail, COMET_KEEP_THRESHOLD)) {
+            double perimeter = 8.0 * half;
             for (int i = 0; i < COMET_COUNT; i++) {
-                float t = frac(now / COMET_PERIOD_TICKS + (float) i / COMET_COUNT);
-                // v5：写入复用缓冲后立即读走，不再返回新数组
-                perimeterPoint(half, t);
-                addSpark(builder, m, cx + PERIMETER_XZ[0], cy, cz + PERIMETER_XZ[1], COMET_SIZE,
-                        br, bg, bb, COMET_ALPHA * lineMul);
+                float base = frac((now / COMET_PERIOD_TICKS) + (float) i / COMET_COUNT);
+                for (int t = 0; t < COMET_TRAIL; t++) {
+                    float tp = frac(base - t * COMET_TRAIL_STEP);
+                    // v5：写入 PERIMETER_XZ 后立即读走（与旧 double[2] 返回值逐位一致）
+                    perimeterPoint(half, tp * perimeter);
+                    float fade = 1f - (float) t / COMET_TRAIL;
+                    addSpark(b, m, p.rx + PERIMETER_XZ[0], p.ry, p.rz + PERIMETER_XZ[1],
+                            COMET_SIZE * fade, lr, lg, lb, COMET_ALPHA * a * fade * fade);
+                }
             }
         }
     }
 
     /**
-     * 计算方形周边某处的偏移坐标（相对中心），t∈[0,1) 沿顺时针绕行一周。
+     * 把「沿方形周长的行进距离」换算为相对中心的 (dx, dz)，写入 {@link #PERIMETER_XZ}。
      * <p>
-     * <b>v5：结果写入 {@link #PERIMETER_XZ} 而非返回新数组。</b>
-     * 索引 0 为 dx、索引 1 为 dz。调用方必须「调用后立即读走」，不可跨调用留存。
+     * 从左上角起顺时针：上边 → 右边 → 下边 → 左边。
+     * </p>
+     * <p>
+     * <b>v5：改为写入复用缓冲，不再返回新数组。</b>
+     * 调用点只有边框彗星一处（每帧最多 {@code COMET_COUNT × COMET_TRAIL} = 6 次），
+     * 且是「写入 → 立刻读走」，故一个缓冲足够。分支逻辑与旧实现一字未改。
      * </p>
      *
      * @param half 半边长
-     * @param t    周长参数（0~1）
+     * @param dist 沿周长的行进距离（0 ~ 8×half）
      */
-    private static void perimeterPoint(double half, double t) {
-        double per = t * 4.0;          // 0~4，整数部分为边序号
-        int side = (int) per;          // 0=北 1=东 2=南 3=西
-        double f = per - side;         // 该边内的进度 0~1
-        double span = 2.0 * half;
-        switch (side) {
-            case 0 -> {
-                // 北边 z=-half，x 从 -half → +half
-                PERIMETER_XZ[0] = -half + f * span;
-                PERIMETER_XZ[1] = -half;
-            }
-            case 1 -> {
-                // 东边 x=+half，z 从 -half → +half
-                PERIMETER_XZ[0] = half;
-                PERIMETER_XZ[1] = -half + f * span;
-            }
-            case 2 -> {
-                // 南边 z=+half，x 从 +half → -half
-                PERIMETER_XZ[0] = half - f * span;
-                PERIMETER_XZ[1] = half;
-            }
-            default -> {
-                // 西边 x=-half，z 从 +half → -half
-                PERIMETER_XZ[0] = -half;
-                PERIMETER_XZ[1] = half - f * span;
-            }
+    private static void perimeterPoint(double half, double dist) {
+        double side = 2.0 * half;
+        if (dist < side) {
+            PERIMETER_XZ[0] = -half + dist;
+            PERIMETER_XZ[1] = -half;
+        } else if (dist < side * 2) {
+            PERIMETER_XZ[0] = half;
+            PERIMETER_XZ[1] = -half + (dist - side);
+        } else if (dist < side * 3) {
+            PERIMETER_XZ[0] = half - (dist - side * 2);
+            PERIMETER_XZ[1] = half;
+        } else {
+            PERIMETER_XZ[0] = -half;
+            PERIMETER_XZ[1] = half - (dist - side * 3);
         }
     }
 
     /**
-     * 绘制方形四条边的一层（指定内外偏移与内外 alpha）。
-     * 各边端到端绘制，四角处相邻边自然衔接。
+     * 绘制方形边框带（内外两个同心方形之间的四条带）。
      *
-     * @param half       半边长
-     * @param offInner   带内沿相对边界线的偏移（向内为负、向外为正）
-     * @param offOuter   带外沿偏移
-     * @param alphaInner 内沿 alpha
-     * @param alphaOuter 外沿 alpha
+     * @param rInner     内侧半边长
+     * @param rOuter     外侧半边长
+     * @param alphaOuter 外侧顶点 alpha
+     * @param alphaInner 内侧顶点 alpha
      */
-    private static void addSquareEdges(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
-                                       double half, double offInner, double offOuter,
-                                       float r, float g, float b, float alphaInner, float alphaOuter) {
-        double xMin = cx - half, xMax = cx + half;
-        double zMin = cz - half, zMax = cz + half;
-        // 北边 z=zMin，外法线 (0,-1)
-        addEdgeStrip(builder, m, xMin, zMin, xMax, zMin, cy, 0, -1, offInner, offOuter, r, g, b, alphaInner, alphaOuter);
-        // 南边 z=zMax，外法线 (0,+1)
-        addEdgeStrip(builder, m, xMax, zMax, xMin, zMax, cy, 0, 1, offInner, offOuter, r, g, b, alphaInner, alphaOuter);
-        // 西边 x=xMin，外法线 (-1,0)
-        addEdgeStrip(builder, m, xMin, zMax, xMin, zMin, cy, -1, 0, offInner, offOuter, r, g, b, alphaInner, alphaOuter);
-        // 东边 x=xMax，外法线 (+1,0)
-        addEdgeStrip(builder, m, xMax, zMin, xMax, zMax, cy, 1, 0, offInner, offOuter, r, g, b, alphaInner, alphaOuter);
+    private static void addSquareEdges(BufferBuilder b, Matrix4f m, double cx, double cy, double cz,
+                                       double rInner, double rOuter,
+                                       float r, float g, float bl,
+                                       float alphaOuter, float alphaInner) {
+        if (rOuter <= rInner) {
+            return;
+        }
+        // 上（-Z）
+        addEdgeStrip(b, m, cx - rOuter, cy, cz - rOuter, cx + rOuter, cy, cz - rOuter,
+                cx + rInner, cy, cz - rInner, cx - rInner, cy, cz - rInner, r, g, bl, alphaOuter, alphaInner);
+        // 右（+X）
+        addEdgeStrip(b, m, cx + rOuter, cy, cz - rOuter, cx + rOuter, cy, cz + rOuter,
+                cx + rInner, cy, cz + rInner, cx + rInner, cy, cz - rInner, r, g, bl, alphaOuter, alphaInner);
+        // 下（+Z）
+        addEdgeStrip(b, m, cx + rOuter, cy, cz + rOuter, cx - rOuter, cy, cz + rOuter,
+                cx - rInner, cy, cz + rInner, cx + rInner, cy, cz + rInner, r, g, bl, alphaOuter, alphaInner);
+        // 左（-X）
+        addEdgeStrip(b, m, cx - rOuter, cy, cz + rOuter, cx - rOuter, cy, cz - rOuter,
+                cx - rInner, cy, cz - rInner, cx - rInner, cy, cz + rInner, r, g, bl, alphaOuter, alphaInner);
     }
 
     /**
-     * 沿一条边（a→b）按外法线 (nx,nz) 生成一个带状四边形（两三角形），内外沿可分别指定 alpha。
+     * 绘制一条四边形边带（两个三角形），外侧两点与内侧两点可用不同 alpha。
      */
-    private static void addEdgeStrip(BufferBuilder builder, Matrix4f m,
-                                     double ax, double az, double bx, double bz, double cy,
-                                     double nx, double nz, double offInner, double offOuter,
-                                     float r, float g, float b, float alphaInner, float alphaOuter) {
-        float y = (float) cy;
-        float aiX = (float) (ax + nx * offInner), aiZ = (float) (az + nz * offInner);
-        float biX = (float) (bx + nx * offInner), biZ = (float) (bz + nz * offInner);
-        float aoX = (float) (ax + nx * offOuter), aoZ = (float) (az + nz * offOuter);
-        float boX = (float) (bx + nx * offOuter), boZ = (float) (bz + nz * offOuter);
+    private static void addEdgeStrip(BufferBuilder b, Matrix4f m,
+                                     double o1x, double o1y, double o1z,
+                                     double o2x, double o2y, double o2z,
+                                     double i2x, double i2y, double i2z,
+                                     double i1x, double i1y, double i1z,
+                                     float r, float g, float bl,
+                                     float alphaOuter, float alphaInner) {
+        b.vertex(m, (float) o1x, (float) o1y, (float) o1z).color(r, g, bl, alphaOuter).endVertex();
+        b.vertex(m, (float) o2x, (float) o2y, (float) o2z).color(r, g, bl, alphaOuter).endVertex();
+        b.vertex(m, (float) i2x, (float) i2y, (float) i2z).color(r, g, bl, alphaInner).endVertex();
 
-        builder.vertex(m, aiX, y, aiZ).color(r, g, b, alphaInner).endVertex();
-        builder.vertex(m, biX, y, biZ).color(r, g, b, alphaInner).endVertex();
-        builder.vertex(m, boX, y, boZ).color(r, g, b, alphaOuter).endVertex();
-
-        builder.vertex(m, aiX, y, aiZ).color(r, g, b, alphaInner).endVertex();
-        builder.vertex(m, boX, y, boZ).color(r, g, b, alphaOuter).endVertex();
-        builder.vertex(m, aoX, y, aoZ).color(r, g, b, alphaOuter).endVertex();
+        b.vertex(m, (float) o1x, (float) o1y, (float) o1z).color(r, g, bl, alphaOuter).endVertex();
+        b.vertex(m, (float) i2x, (float) i2y, (float) i2z).color(r, g, bl, alphaInner).endVertex();
+        b.vertex(m, (float) i1x, (float) i1y, (float) i1z).color(r, g, bl, alphaInner).endVertex();
     }
 
     /**
-     * 在某点绘制一个小菱形光点（四角火花 / 边框彗星 / 母题芒尖 / 星屑共用），
-     * 中心最亮、四角渐隐。
-     * <p>仅 12 顶点，不参与分段缩放；是否绘制由调用方按保留阈值决定。</p>
+     * 绘制一个水平菱形光点（中心亮、四角渐隐），用于角部火花、彗星与母题装饰。
      * <p>
-     * <b>v5：四个角点内联为标量，本方法自此零分配。</b>
-     * 原实现用 {@code float[][] pts} 字面量表达角点，每次调用分配 <b>5 个临时数组</b>
-     * （1 个外层 + 4 个 {@code float[2]}）。而本方法是全渲染器调用最密集的一个——
-     * 四角火花、边框彗星、卡利亚水晶碎光、宇宙星屑、圣域芒尖<b>全都走它</b>，
-     * 单光环峰值 20~26 次 / 帧，合计约 100~130 个数组（详见类注释的「v5」小节）。
+     * <b>v5：四个角点由 {@code float[][]} 内联为标量。</b>
+     * 旧实现每次调用要分配 1 个外层数组 + 4 个 {@code float[2]}，
+     * 而本方法是全渲染器调用最频繁的基元（单光环峰值 20~26 次 / 帧，
+     * 其中 {@code motifCosmic} 的星屑一项就占 14 次）。
+     * 圣域是群体增益光环，团战十人举盾时这里就是每秒数万次分配。
      * </p>
-     * <p>顶点输出与顺序逐字不变（做法与 {@code AoeEffectRenderer} v7 同源）。</p>
+     * <p>
+     * 做法与 {@code AoeEffectRenderer} v7 处理同名方法完全一致：
+     * 角点数值与四个三角形的顶点写入顺序<b>逐字照搬</b>，输出与优化前逐位相同。
+     * </p>
      *
      * @param size 半尺寸（格）
      */
-    private static void addSpark(BufferBuilder builder, Matrix4f m, double px, double py, double pz,
-                                 float size, float r, float g, float b, float alpha) {
+    private static void addSpark(BufferBuilder b, Matrix4f m, double cx, double cy, double cz,
+                                 float size, float r, float g, float bl, float alpha) {
         if (alpha <= 0.004f || size <= 1.0e-4f) {
             return;
         }
-        float y = (float) py;
-        float cxF = (float) px, czF = (float) pz;
+        // 四个角点（上、右、下、左），内联为标量避免每次调用分配 5 个数组
+        double p0x = cx, p0z = cz - size;
+        double p1x = cx + size, p1z = cz;
+        double p2x = cx, p2z = cz + size;
+        double p3x = cx - size, p3z = cz;
 
-        // 四个角点（顺序与原 pts[0..3] 一致：北 → 东 → 南 → 西）
-        float p0x = cxF, p0z = czF - size;
-        float p1x = cxF + size, p1z = czF;
-        float p2x = cxF, p2z = czF + size;
-        float p3x = cxF - size, p3z = czF;
-
-        sparkTri(builder, m, cxF, y, czF, p0x, p0z, p1x, p1z, r, g, b, alpha);
-        sparkTri(builder, m, cxF, y, czF, p1x, p1z, p2x, p2z, r, g, b, alpha);
-        sparkTri(builder, m, cxF, y, czF, p2x, p2z, p3x, p3z, r, g, b, alpha);
-        sparkTri(builder, m, cxF, y, czF, p3x, p3z, p0x, p0z, r, g, b, alpha);
+        sparkTri(b, m, cx, cy, cz, p0x, p0z, p1x, p1z, r, g, bl, alpha);
+        sparkTri(b, m, cx, cy, cz, p1x, p1z, p2x, p2z, r, g, bl, alpha);
+        sparkTri(b, m, cx, cy, cz, p2x, p2z, p3x, p3z, r, g, bl, alpha);
+        sparkTri(b, m, cx, cy, cz, p3x, p3z, p0x, p0z, r, g, bl, alpha);
     }
 
     /**
      * 菱形光点的一瓣三角形：中心不透明，两个外角渐隐为 0。
-     *
-     * @param cx 中心 X（相对相机）
-     * @param y  水平面高度
-     * @param cz 中心 Z
-     * @param ax 第一个外角 X
-     * @param az 第一个外角 Z
-     * @param bx 第二个外角 X
-     * @param bz 第二个外角 Z
+     * <p>v5：参数由角点数组改为拆开的标量，与 {@link #addSpark} 的内联化配套。</p>
      */
-    private static void sparkTri(BufferBuilder builder, Matrix4f m,
-                                 float cx, float y, float cz,
-                                 float ax, float az, float bx, float bz,
-                                 float r, float g, float b, float alpha) {
-        builder.vertex(m, cx, y, cz).color(r, g, b, alpha).endVertex();
-        builder.vertex(m, ax, y, az).color(r, g, b, 0f).endVertex();
-        builder.vertex(m, bx, y, bz).color(r, g, b, 0f).endVertex();
+    private static void sparkTri(BufferBuilder b, Matrix4f m,
+                                 double cx, double cy, double cz,
+                                 double ax, double az, double bx, double bz,
+                                 float r, float g, float bl, float alpha) {
+        b.vertex(m, (float) cx, (float) cy, (float) cz).color(r, g, bl, alpha).endVertex();
+        b.vertex(m, (float) ax, (float) cy, (float) az).color(r, g, bl, 0f).endVertex();
+        b.vertex(m, (float) bx, (float) cy, (float) bz).color(r, g, bl, 0f).endVertex();
     }
 
     /**
-     * 绘制方形区域底色填充（平铺单色）。
+     * 绘制方形区域底色（两个三角形铺满）。
      */
-    private static void addSquareFill(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
-                                      double half, float r, float g, float b, float alpha) {
-        float y = (float) cy;
-        float xMin = (float) (cx - half), xMax = (float) (cx + half);
-        float zMin = (float) (cz - half), zMax = (float) (cz + half);
-        builder.vertex(m, xMin, y, zMin).color(r, g, b, alpha).endVertex();
-        builder.vertex(m, xMax, y, zMin).color(r, g, b, alpha).endVertex();
-        builder.vertex(m, xMax, y, zMax).color(r, g, b, alpha).endVertex();
+    private static void addSquareFill(BufferBuilder b, Matrix4f m, double cx, double cy, double cz,
+                                      double half, float r, float g, float bl, float alpha) {
+        if (alpha <= 0.004f) {
+            return;
+        }
+        double x0 = cx - half, x1 = cx + half;
+        double z0 = cz - half, z1 = cz + half;
 
-        builder.vertex(m, xMin, y, zMin).color(r, g, b, alpha).endVertex();
-        builder.vertex(m, xMax, y, zMax).color(r, g, b, alpha).endVertex();
-        builder.vertex(m, xMin, y, zMax).color(r, g, b, alpha).endVertex();
+        b.vertex(m, (float) x0, (float) cy, (float) z0).color(r, g, bl, alpha).endVertex();
+        b.vertex(m, (float) x1, (float) cy, (float) z0).color(r, g, bl, alpha).endVertex();
+        b.vertex(m, (float) x1, (float) cy, (float) z1).color(r, g, bl, alpha).endVertex();
+
+        b.vertex(m, (float) x0, (float) cy, (float) z0).color(r, g, bl, alpha).endVertex();
+        b.vertex(m, (float) x1, (float) cy, (float) z1).color(r, g, bl, alpha).endVertex();
+        b.vertex(m, (float) x0, (float) cy, (float) z1).color(r, g, bl, alpha).endVertex();
     }
 
-    // ==================== 圆形绘制 ====================
+    // ==================== 圆形（对应 distanceTo 球形判定） ====================
 
     /**
-     * 绘制一个圆形光环（径向渐变填充 + 发光主环 + 旋转符文）。
+     * 绘制圆形法阵：径向渐变填充 → 主环（外辉光/内辉光/核心）→ 外缘符文刻度
+     * → 专属母题 → 圆形涟漪 → 边框彗星。
      * <p>
-     * v4 削减：填充盘与三层主环、涟漪的分段数缩放（<b>占本方法七成顶点，是首要杠杆</b>）；
-     * 涟漪条数缩减；外缘符文刻度按步长抽取（均布角度）；彗星层按保留阈值整层跳过。
+     * <b>v4：全部元素按细节系数缩放。</b>三层主环 + 涟漪合计占七成顶点，是首要杠杆；
+     * 符文刻度的角度是 {@code i × (TAU / 40)} 均布的，必须按步长抽取而非截断，
+     * 否则整圈只剩一段圆弧上有刻度、法阵会明显"缺一块"。
      * </p>
-     * <p>
-     * v5：颜色改为 {@link VisualColor#unpackInto} 写入 {@link #SCRATCH} 后立即提取标量。
-     * 注意 {@link #drawRuneMotif} 及其下游母题方法接收的都是已拆开的 r/g/b 标量，
-     * 不持有任何数组引用，因此不受缓冲复用影响。
-     * </p>
-     *
-     * @param now    当前时间（tick，墙钟驱动）
-     * @param detail 本帧细节系数
+     * <p>v5：颜色解包改用 {@link #SCRATCH} 复用缓冲。</p>
      */
-    private static void drawCircle(BufferBuilder builder, Matrix4f m, Prepared p,
-                                   float fillMul, float lineMul, float runeRot, float now, float detail) {
-        double cx = p.rx(), cy = p.ry(), cz = p.rz();
-        double radius = p.radius();
-        // v5：无分配解包，写入复用缓冲后立即提取为标量（之后再不碰缓冲）
-        VisualColor.unpackInto(SCRATCH, p.color());
-        float r = SCRATCH[0], g = SCRATCH[1], b = SCRATCH[2];
-        float br = brighten(r), bg = brighten(g), bb = brighten(b);
-        int ringSeg = ringSegments(radius, detail);
+    private static void drawCircle(BufferBuilder b, Matrix4f m, PreparedSlot p, float now, float pulse) {
+        // v5：写入复用缓冲后立即提取标量，之后不再碰缓冲（与旧 unpack 逐位一致）
+        VisualColor.unpackInto(SCRATCH, p.color);
+        float cr = SCRATCH[0];
+        float cg = SCRATCH[1];
+        float cb = SCRATCH[2];
 
-        // 径向渐变填充
-        addGradientDisc(builder, m, cx, cy, cz, radius, fillSegments(radius, detail),
-                r, g, b, CIRCLE_FILL_ALPHA_CENTER * fillMul, CIRCLE_FILL_ALPHA_RIM * fillMul);
+        VisualColor.unpackInto(SCRATCH, brighten(p.color, CORE_BRIGHTEN));
+        float lr = SCRATCH[0];
+        float lg = SCRATCH[1];
+        float lb = SCRATCH[2];
 
-        // 从中心向外扩散的圆形涟漪（相位均布的循环波，减条数只是波间隔变大）
-        int rippleCount = VisualLod.scale(RIPPLE_COUNT, detail);
+        float a = (float) p.alpha;
+        double radius = p.radius;
+
+        int fillSeg = fillSegments(radius, p.detail);
+        int ringSeg = ringSegments(radius, p.detail);
+
+        // 1) 径向渐变填充（中心淡、边缘浓，突出边界）
+        addGradientDisc(b, m, p.rx, p.ry, p.rz, radius, fillSeg, cr, cg, cb,
+                CIRCLE_FILL_ALPHA_CENTER * a * pulse, CIRCLE_FILL_ALPHA_RIM * a * pulse);
+
+        // 2) 主环：外辉光 → 内辉光 → 核心亮带（核心即精确半径）
+        addBand(b, m, p.rx, p.ry, p.rz, radius, radius + GLOW_SPREAD, ringSeg,
+                cr, cg, cb, GLOW_ALPHA * a * pulse, 0f);
+        addBand(b, m, p.rx, p.ry, p.rz, radius - GLOW_SPREAD * 0.6, radius, ringSeg,
+                cr, cg, cb, 0f, GLOW_ALPHA * 0.75f * a * pulse);
+        addBand(b, m, p.rx, p.ry, p.rz, radius - CORE_HALF, radius + CORE_HALF, ringSeg,
+                lr, lg, lb, CORE_ALPHA * a * pulse, CORE_ALPHA * a * pulse);
+
+        // 3) 外缘符文刻度（旋转）
+        addRunes(b, m, p.rx, p.ry, p.rz, radius, now, cr, cg, cb, RUNE_ALPHA * a * pulse, p.detail);
+
+        // 4) 专属母题（按 serialId 决定风格）
+        drawRuneMotif(b, m, p, now, pulse, cr, cg, cb, lr, lg, lb, a);
+
+        // 5) 圆形涟漪：从中心向外扩散
+        int rippleCount = VisualLod.scale(RIPPLE_COUNT, p.detail);
         for (int i = 0; i < rippleCount; i++) {
-            float phase = frac(now / RIPPLE_PERIOD_TICKS + (float) i / rippleCount);
-            double rr = radius * phase;
-            if (rr < 0.3) {
+            float t = frac((now / RIPPLE_PERIOD_TICKS) + (float) i / rippleCount);
+            double r = radius * t;
+            if (r <= 0.05) {
                 continue;
             }
-            float a = (1f - phase) * RIPPLE_ALPHA * lineMul;
-            addBand(builder, m, cx, cy, cz, rr - RIPPLE_HALF_WIDTH, rr + RIPPLE_HALF_WIDTH,
-                    ringSegments(rr, detail), br, bg, bb, a, a);
+            float fade = Mth.sin((float) (t * Math.PI));
+            addBand(b, m, p.rx, p.ry, p.rz, r - RIPPLE_HALF_WIDTH, r + RIPPLE_HALF_WIDTH, ringSeg,
+                    cr, cg, cb, RIPPLE_ALPHA * a * fade, RIPPLE_ALPHA * a * fade);
         }
 
-        // 外辉光
-        addBand(builder, m, cx, cy, cz, radius + CORE_HALF, radius + CORE_HALF + GLOW_SPREAD, ringSeg,
-                r, g, b, GLOW_ALPHA * lineMul, 0f);
-        // 内辉光
-        addBand(builder, m, cx, cy, cz, radius - CORE_HALF - GLOW_SPREAD, radius - CORE_HALF, ringSeg,
-                r, g, b, 0f, GLOW_ALPHA * lineMul);
-        // 主环核心
-        addBand(builder, m, cx, cy, cz, radius - CORE_HALF, radius + CORE_HALF, ringSeg,
-                br, bg, bb, CORE_ALPHA * lineMul, CORE_ALPHA * lineMul);
-
-        // 外缘旋转符文刻度（所有母题共用的细密刻度环，强化“法阵”质感）
-        int runeCount = Mth.clamp((int) (radius * 2), 12, 40);
-        if ((runeCount & 1) == 1) {
-            runeCount++;
-        }
-        addRunes(builder, m, cx, cy, cz, radius + CORE_HALF + 0.05, 0.26, runeCount, runeRot,
-                br, bg, bb, RUNE_ALPHA * lineMul, detail);
-
-        // 各光环专属符文母题（取自艾尔登法环原作意象；元素数量固定，不随半径膨胀以控性能）
-        drawRuneMotif(builder, m, cx, cy, cz, radius, styleFor(p.serialId()),
-                br, bg, bb, lineMul, now, detail);
-
-        // 沿主环绕行的彗星光点（带渐隐拖尾）。纯动效装饰，远处看不出，低细节时整层跳过
-        if (VisualLod.keepLayer(detail, COMET_KEEP_THRESHOLD)) {
-            // 尾点是相位递减序列，截断保留头部（最亮那个），衰减曲线不变
-            int trail = VisualLod.scale(COMET_TRAIL, detail);
+        // 6) 边框彗星：沿圆周巡游的光点 + 拖尾
+        if (VisualLod.keepLayer(p.detail, COMET_KEEP_THRESHOLD)) {
             for (int i = 0; i < COMET_COUNT; i++) {
-                float base = frac(now / COMET_PERIOD_TICKS + (float) i / COMET_COUNT);
-                for (int t = 0; t < trail; t++) {
-                    float ph = base - t * COMET_TRAIL_STEP;
-                    double ang = Math.PI * 2.0 * ph;
-                    double px = cx + radius * Math.cos(ang);
-                    double pz = cz + radius * Math.sin(ang);
-                    // 分母仍用原始 COMET_TRAIL，保证保留尾点的亮度与全细节时逐点一致
-                    float a = COMET_ALPHA * lineMul * (1f - (float) t / COMET_TRAIL);
-                    float sz = COMET_SIZE * (1f - 0.18f * t);
-                    addSpark(builder, m, px, cy, pz, sz, br, bg, bb, a);
+                float base = frac((now / COMET_PERIOD_TICKS) + (float) i / COMET_COUNT);
+                for (int t = 0; t < COMET_TRAIL; t++) {
+                    float tp = frac(base - t * COMET_TRAIL_STEP);
+                    double ang = tp * Math.PI * 2.0;
+                    double sx = Math.cos(ang) * radius;
+                    double sz = Math.sin(ang) * radius;
+                    float fade = 1f - (float) t / COMET_TRAIL;
+                    addSpark(b, m, p.rx + sx, p.ry, p.rz + sz, COMET_SIZE * fade,
+                            lr, lg, lb, COMET_ALPHA * a * fade * fade);
                 }
             }
         }
     }
 
     /**
-     * 追加一个径向渐变圆盘（中心到边缘 alpha 渐变）。
+     * 绘制径向渐变圆盘（中心 alpha → 边缘 alpha）。
      */
-    private static void addGradientDisc(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
+    private static void addGradientDisc(BufferBuilder b, Matrix4f m, double cx, double cy, double cz,
                                         double radius, int segments,
-                                        float r, float g, float b, float alphaCenter, float alphaRim) {
-        float y = (float) cy;
+                                        float r, float g, float bl,
+                                        float alphaCenter, float alphaRim) {
+        if (radius <= 0 || (alphaCenter <= 0.004f && alphaRim <= 0.004f)) {
+            return;
+        }
         for (int i = 0; i < segments; i++) {
-            double a0 = (Math.PI * 2 * i) / segments;
-            double a1 = (Math.PI * 2 * (i + 1)) / segments;
-            float x0 = (float) (cx + radius * Math.cos(a0));
-            float z0 = (float) (cz + radius * Math.sin(a0));
-            float x1 = (float) (cx + radius * Math.cos(a1));
-            float z1 = (float) (cz + radius * Math.sin(a1));
-            builder.vertex(m, (float) cx, y, (float) cz).color(r, g, b, alphaCenter).endVertex();
-            builder.vertex(m, x0, y, z0).color(r, g, b, alphaRim).endVertex();
-            builder.vertex(m, x1, y, z1).color(r, g, b, alphaRim).endVertex();
+            double a0 = (Math.PI * 2.0 * i) / segments;
+            double a1 = (Math.PI * 2.0 * (i + 1)) / segments;
+            double x0 = cx + Math.cos(a0) * radius;
+            double z0 = cz + Math.sin(a0) * radius;
+            double x1 = cx + Math.cos(a1) * radius;
+            double z1 = cz + Math.sin(a1) * radius;
+
+            b.vertex(m, (float) cx, (float) cy, (float) cz).color(r, g, bl, alphaCenter).endVertex();
+            b.vertex(m, (float) x0, (float) cy, (float) z0).color(r, g, bl, alphaRim).endVertex();
+            b.vertex(m, (float) x1, (float) cy, (float) z1).color(r, g, bl, alphaRim).endVertex();
         }
     }
 
     /**
-     * 追加一个圆环带（annulus），内/外边缘可分别指定 alpha。
-     * <p><b>本渲染器的首要顶点杠杆</b>：单次调用即 {@code segments × 6} 顶点，
-     * 而每个圆形光环有三层主环 + 若干涟漪。调用方应传入
-     * {@link #ringSegments(double, float)} 的结果。</p>
+     * 绘制圆环带（内外两个同心圆之间的环形带）。
      */
-    private static void addBand(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
+    private static void addBand(BufferBuilder b, Matrix4f m, double cx, double cy, double cz,
                                 double rInner, double rOuter, int segments,
-                                float r, float g, float b, float alphaInner, float alphaOuter) {
-        float y = (float) cy;
+                                float r, float g, float bl,
+                                float alphaOuter, float alphaInner) {
+        if (rOuter <= rInner || rOuter <= 0) {
+            return;
+        }
+        double ri = Math.max(0.0, rInner);
         for (int i = 0; i < segments; i++) {
-            double a0 = (Math.PI * 2 * i) / segments;
-            double a1 = (Math.PI * 2 * (i + 1)) / segments;
-            float cos0 = (float) Math.cos(a0), sin0 = (float) Math.sin(a0);
-            float cos1 = (float) Math.cos(a1), sin1 = (float) Math.sin(a1);
+            double a0 = (Math.PI * 2.0 * i) / segments;
+            double a1 = (Math.PI * 2.0 * (i + 1)) / segments;
+            double c0 = Math.cos(a0), s0 = Math.sin(a0);
+            double c1 = Math.cos(a1), s1 = Math.sin(a1);
 
-            float ox0 = (float) (cx + rOuter * cos0), oz0 = (float) (cz + rOuter * sin0);
-            float ox1 = (float) (cx + rOuter * cos1), oz1 = (float) (cz + rOuter * sin1);
-            float ix0 = (float) (cx + rInner * cos0), iz0 = (float) (cz + rInner * sin0);
-            float ix1 = (float) (cx + rInner * cos1), iz1 = (float) (cz + rInner * sin1);
+            double ox0 = cx + c0 * rOuter, oz0 = cz + s0 * rOuter;
+            double ox1 = cx + c1 * rOuter, oz1 = cz + s1 * rOuter;
+            double ix0 = cx + c0 * ri, iz0 = cz + s0 * ri;
+            double ix1 = cx + c1 * ri, iz1 = cz + s1 * ri;
 
-            builder.vertex(m, ox0, y, oz0).color(r, g, b, alphaOuter).endVertex();
-            builder.vertex(m, ox1, y, oz1).color(r, g, b, alphaOuter).endVertex();
-            builder.vertex(m, ix1, y, iz1).color(r, g, b, alphaInner).endVertex();
+            b.vertex(m, (float) ox0, (float) cy, (float) oz0).color(r, g, bl, alphaOuter).endVertex();
+            b.vertex(m, (float) ox1, (float) cy, (float) oz1).color(r, g, bl, alphaOuter).endVertex();
+            b.vertex(m, (float) ix1, (float) cy, (float) iz1).color(r, g, bl, alphaInner).endVertex();
 
-            builder.vertex(m, ox0, y, oz0).color(r, g, b, alphaOuter).endVertex();
-            builder.vertex(m, ix1, y, iz1).color(r, g, b, alphaInner).endVertex();
-            builder.vertex(m, ix0, y, iz0).color(r, g, b, alphaInner).endVertex();
+            b.vertex(m, (float) ox0, (float) cy, (float) oz0).color(r, g, bl, alphaOuter).endVertex();
+            b.vertex(m, (float) ix1, (float) cy, (float) iz1).color(r, g, bl, alphaInner).endVertex();
+            b.vertex(m, (float) ix0, (float) cy, (float) iz0).color(r, g, bl, alphaInner).endVertex();
         }
     }
 
     /**
-     * 追加一圈旋转符文刻度（沿圆周均布的短径向小段）。
-     * <p><b>v4：按细节系数步长抽取</b>——角度是 {@code (TAU × k / count) + rotation} 均布的，
-     * 若截断前 N 条，整圈刻度会只剩一段圆弧、法阵明显「缺一块」。
-     * 步长抽取时角度基准仍用<b>原始 count</b>，保证保留刻度的方位与全细节时完全一致。</p>
-     *
-     * @param detail 本帧细节系数
+     * 绘制外缘符文刻度（旋转的短径向线段）。
+     * <p>
+     * <b>v4：角度均布，必须按步长抽取而非截断。</b>
+     * 刻度角度是 {@code rot + i × (TAU / 40)}，若只画前 N 个，
+     * 整圈会只剩一段圆弧上有刻度、其余大半圈空着，法阵明显"缺一块"。
+     * </p>
      */
-    private static void addRunes(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
-                                 double rStart, double length, int count, float rotation,
-                                 float r, float g, float b, float alpha, float detail) {
-        float y = (float) cy;
-        double rEnd = rStart + length;
-        float halfW = 0.03f;
-        int drawn = VisualLod.scale(count, detail);
-        int step = Math.max(1, count / drawn);
-        for (int k = 0; k < count; k += step) {
-            double base = (Math.PI * 2 * k) / count + rotation;
-            double aL = base - halfW;
-            double aR = base + halfW;
-            float cosL = (float) Math.cos(aL), sinL = (float) Math.sin(aL);
-            float cosR = (float) Math.cos(aR), sinR = (float) Math.sin(aR);
+    private static void addRunes(BufferBuilder b, Matrix4f m, double cx, double cy, double cz,
+                                 double radius, float now,
+                                 float r, float g, float bl, float alpha, float detail) {
+        if (alpha <= 0.004f) {
+            return;
+        }
+        final int total = 40;
+        double rot = now * RUNE_SPEED;
+        double rIn = radius + 0.10;
+        double rOut = radius + 0.34;
+        double halfW = 0.030;
 
-            float ix0 = (float) (cx + rStart * cosL), iz0 = (float) (cz + rStart * sinL);
-            float ix1 = (float) (cx + rStart * cosR), iz1 = (float) (cz + rStart * sinR);
-            float ox0 = (float) (cx + rEnd * cosL), oz0 = (float) (cz + rEnd * sinL);
-            float ox1 = (float) (cx + rEnd * cosR), oz1 = (float) (cz + rEnd * sinR);
+        int drawn = VisualLod.scale(total, detail);
+        int step = Math.max(1, total / drawn);
 
-            builder.vertex(m, ix0, y, iz0).color(r, g, b, alpha * 0.5f).endVertex();
-            builder.vertex(m, ix1, y, iz1).color(r, g, b, alpha * 0.5f).endVertex();
-            builder.vertex(m, ox1, y, oz1).color(r, g, b, alpha).endVertex();
+        for (int i = 0; i < total; i += step) {
+            double ang = rot + (Math.PI * 2.0 * i) / total;
+            double ca = Math.cos(ang), sa = Math.sin(ang);
+            // 垂直于半径方向的偏移
+            double px = -sa * halfW, pz = ca * halfW;
 
-            builder.vertex(m, ix0, y, iz0).color(r, g, b, alpha * 0.5f).endVertex();
-            builder.vertex(m, ox1, y, oz1).color(r, g, b, alpha).endVertex();
-            builder.vertex(m, ox0, y, oz0).color(r, g, b, alpha).endVertex();
+            double ax = cx + ca * rIn, az = cz + sa * rIn;
+            double bx = cx + ca * rOut, bz = cz + sa * rOut;
+
+            b.vertex(m, (float) (ax + px), (float) cy, (float) (az + pz)).color(r, g, bl, alpha).endVertex();
+            b.vertex(m, (float) (bx + px), (float) cy, (float) (bz + pz)).color(r, g, bl, 0f).endVertex();
+            b.vertex(m, (float) (bx - px), (float) cy, (float) (bz - pz)).color(r, g, bl, 0f).endVertex();
+
+            b.vertex(m, (float) (ax + px), (float) cy, (float) (az + pz)).color(r, g, bl, alpha).endVertex();
+            b.vertex(m, (float) (bx - px), (float) cy, (float) (bz - pz)).color(r, g, bl, 0f).endVertex();
+            b.vertex(m, (float) (ax - px), (float) cy, (float) (az - pz)).color(r, g, bl, alpha).endVertex();
         }
     }
 
-    // ==================== 数学/几何辅助 ====================
+    // ==================== 数学 / 颜色辅助 ====================
+    // v5 说明：原先的 unpack(int) 已删除——它每次调用都 new float[3]，
+    // 现由 VisualColor.unpackInto(dst, rgb) 写入 SCRATCH 复用缓冲取代。
+    // 注意本渲染器的颜色来自运行时字段（AuraInfo.color()），无法像其它渲染器那样
+    // 预解包成 C_ 常量，只能走复用缓冲——新增元素时请沿用该写法，
+    // 不要重新引入返回新数组的形式。
 
-    /**
-     * 缓出（cubic）。
-     */
+    /** 缓出（cubic）。 */
     private static float easeOutCubic(float t) {
         float inv = 1f - t;
         return 1f - inv * inv * inv;
     }
 
-    /**
-     * 取小数部分（结果恒在 [0,1)）。
-     */
+    /** 取小数部分（结果恒在 0 到 1 之间，不含 1）。 */
     private static float frac(float x) {
         return x - (float) Math.floor(x);
     }
 
-    /**
-     * 颜色提亮：向白色靠拢一点点（保留色相，只略增亮）。
-     */
-    private static float brighten(float c) {
-        return c + (1f - c) * CORE_BRIGHTEN;
+    /** 夹取到 0~1。 */
+    private static float clamp01(float v) {
+        if (v < 0f) {
+            return 0f;
+        }
+        return Math.min(v, 1f);
     }
 
-    // v5 说明：原先的 unpack(int) 已删除——它每次调用 new float[3]，
-    // 现由 VisualColor.unpackInto(SCRATCH, color) 取代。
-    // 注意本渲染器的颜色来自运行时字段（AuraInfo.color），无法像其它渲染器那样
-    // 预解包成 C_ 常量，只能走复用缓冲；调用后务必立即提取 r/g/b 标量。
+    /**
+     * 把 0xRRGGBB 向白提亮（保留色相，不洗白）。
+     *
+     * @param rgb 原色
+     * @param f   提亮比例 0~1
+     * @return 提亮后的 0xRRGGBB
+     */
+    private static int brighten(int rgb, float f) {
+        int r = (rgb >> 16) & 0xFF;
+        int g = (rgb >> 8) & 0xFF;
+        int b = rgb & 0xFF;
+        r = Math.round(r + (255 - r) * f);
+        g = Math.round(g + (255 - g) * f);
+        b = Math.round(b + (255 - b) * f);
+        return (r << 16) | (g << 8) | b;
+    }
 
     /**
-     * 圆形填充分段数（全细节基准值）。
-     * <p><b>保守优化（视觉无损）：</b>系数 3→2、上限 96→48。半径 ≤10 的光环仍取下限 32
-     * （与优化前完全一致）；仅 16 格的圣域由 48 段降为 32 段。填充盘是中心→边缘的低 alpha
-     * 渐变、无描边线，分段下降几乎不可察。
+     * 圆盘填充分段数（按半径自适应，全细节）。
+     * <p>保留原签名供不参与 LOD 的调用点使用。</p>
      */
     private static int fillSegments(double radius) {
-        return Mth.clamp((int) (radius * 2), 32, 48);
+        return (int) Mth.clamp(Math.round(radius * 3.0) + 12, 16, 48);
     }
 
     /**
-     * 带细节层级的圆形填充分段数（v4 新增）。
+     * 圆盘填充分段数（按半径自适应，再按细节系数缩放）。
      *
-     * @param radius 半径（格）
-     * @param detail 本帧细节系数
-     * @return 缩放后的分段数，下限 {@link #FILL_SEGMENTS_MIN}
+     * @param detail 细节系数
      */
     private static int fillSegments(double radius, float detail) {
         return VisualLod.scaleSegments(fillSegments(radius), FILL_SEGMENTS_MIN, detail);
     }
 
     /**
-     * 圆形环线分段数（全细节基准值）。
-     * <p><b>保守优化（视觉无损）：</b>系数 5→3、上限 110→64。半径 ≤8 的光环仍取下限 48
-     * （像素级一致）；仅半径最大的圣域（16 格）由 80 段降为 48 段——其多边形与真圆的最大偏离
-     * 约 3.4cm（{@code R(1-cos(180°/48))}），在 32 格直径的发光法阵上肉眼不可见，
-     * 却省下约四成环带/辉光顶点（多人举盾圣域时收益最大）。
+     * 圆环分段数（按半径自适应，全细节）。
+     * <p>保留原签名供不参与 LOD 的调用点使用。</p>
      */
     private static int ringSegments(double radius) {
-        return Mth.clamp((int) (radius * 3), 48, 64);
+        return (int) Mth.clamp(Math.round(radius * 4.0) + 16, 24, 72);
     }
 
     /**
-     * 带细节层级的圆形环线分段数（v4 新增）。
-     * <p>
-     * 下限取 {@link #RING_SEGMENTS_MIN}(24)，比实体渲染器的 8~10 高不少——
-     * 多边形与真圆的偏离量正比于半径，而光环半径可达 16 格。
-     * </p>
+     * 圆环分段数（按半径自适应，再按细节系数缩放）。
+     * <p>下限 {@link #RING_SEGMENTS_MIN}(24) 比实体渲染器高，因为环半径可达 16 格
+     * （多边形与真圆的偏离量正比于半径，详见该常量注释）。</p>
      *
-     * @param radius 半径（格）
-     * @param detail 本帧细节系数
-     * @return 缩放后的分段数
+     * @param detail 细节系数
      */
     private static int ringSegments(double radius, float detail) {
         return VisualLod.scaleSegments(ringSegments(radius), RING_SEGMENTS_MIN, detail);
     }
 
-    // ==================== 专属符文母题（取自艾尔登法环原作意象） ====================
+    // ==================== 专属符文母题（按 serialId 区分光环身份） ====================
 
     /**
-     * 符文母题样式。每个光环对应一套独特纹理：
-     * <ul>
-     *     <li>{@link #CARIAN}：魔法之境——卡利亚辉石魔法，六芒星徽 + 六边形 + 水晶碎光；</li>
-     *     <li>{@link #WARD}：托普斯的立场——魔法免疫，双层反向断环 + 径向栅条构成结界网；</li>
-     *     <li>{@link #COSMIC}：回归性原理——塞乐恩宇宙法则，放射光线 + 闪烁星空；</li>
-     *     <li>{@link #HOLY}：圣域——黄金树信仰，长短交替金色光芒 + 中央十字圣徽；</li>
-     *     <li>{@link #PLAIN}：通用回退（仅外缘刻度环，无额外母题）。</li>
-     * </ul>
+     * 符文母题风格。
+     * <p>
+     * 每个光环有各自的图案语言，让玩家<b>不靠颜色也能一眼分辨脚下是哪个光环</b>——
+     * 色觉障碍玩家、以及多个光环重叠时尤其重要。
+     * </p>
      */
     private enum RuneStyle {
+        /** 卡利亚：内六边形 + 六芒星 + 顶点水晶碎光（辉石魔法的几何语言） */
         CARIAN,
+        /** 守护：双层反向断环 + 径向栅条（"屏障"的语言） */
         WARD,
+        /** 星辰：放射光线 + 星屑（"星空 / 宇宙"的语言） */
         COSMIC,
+        /** 神圣：长短交替光芒 + 十字圣徽 + 芒尖金光（黄金树秩序的语言） */
         HOLY,
+        /** 无母题（仅主环与刻度） */
         PLAIN
     }
 
     /**
-     * 由光环序列号映射到符文样式。新光环未登记时回退为 {@link RuneStyle#PLAIN}。
+     * 按序列号决定母题风格。
+     * <p>
+     * serialId 直接引用 {@link CarianStyleAuraDisplays} 的公开常量而非魔数——
+     * 这样新增 / 调整光环时，编译器会帮忙检查引用是否还成立。
+     * </p>
      *
      * @param serialId 光环序列号
-     * @return 符文样式
+     * @return 对应的母题风格；未登记的序列号返回 {@link RuneStyle#PLAIN}
      */
     private static RuneStyle styleFor(int serialId) {
         if (serialId == CarianStyleAuraDisplays.TERRA_MAGICA) {
@@ -1172,300 +1272,366 @@ public final class AuraGroundRenderer {
     }
 
     /**
-     * 按样式绘制专属符文母题。
-     * <p><b>v5 说明：</b>本方法与全部 {@code motifXxx} 接收的都是已拆开的 r/g/b 标量，
-     * 不持有任何数组引用，因此完全不受 {@link #SCRATCH} 复用影响。</p>
+     * 按风格分发绘制专属母题。
+     * <p>
+     * <b>v4 削减原则（各母题内部遵循）：</b>
+     * </p>
+     * <ul>
+     *     <li><b>星形 / 多边形完全不削</b>——六芒星、十字圣徽各只有 30~40 顶点，
+     *         却是「这是哪个光环」的唯一辨识依据，减顶点数就不成其形了；</li>
+     *     <li><b>均布角度元素按步长抽取</b>——射线、栅条、断环、芒尖的角度都是
+     *         {@code i × (TAU / 总数)}，截断会让整圈缺一块；</li>
+     *     <li><b>装饰光点层整层跳过</b>——水晶碎光、星屑、芒尖金光按保留阈值决定画不画。</li>
+     * </ul>
      *
-     * @param radius  圆半径（格）
-     * @param style   样式
-     * @param lineMul 呼吸亮度系数
-     * @param now     时间（tick，墙钟驱动）
-     * @param detail  本帧细节系数
+     * @param p     本帧准备好的光环
+     * @param now   当前动画时间（tick）
+     * @param pulse 整体亮度呼吸系数
+     * @param cr    主题色 R
+     * @param cg    主题色 G
+     * @param cb    主题色 B
+     * @param lr    提亮色 R
+     * @param lg    提亮色 G
+     * @param lb    提亮色 B
+     * @param a     整体淡入淡出系数
      */
-    private static void drawRuneMotif(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
-                                      double radius, RuneStyle style,
-                                      float r, float g, float b, float lineMul, float now, float detail) {
-        switch (style) {
-            case CARIAN -> motifCarian(builder, m, cx, cy, cz, radius, r, g, b, lineMul, now, detail);
-            case WARD -> motifWard(builder, m, cx, cy, cz, radius, r, g, b, lineMul, now, detail);
-            case COSMIC -> motifCosmic(builder, m, cx, cy, cz, radius, r, g, b, lineMul, now, detail);
-            case HOLY -> motifHoly(builder, m, cx, cy, cz, radius, r, g, b, lineMul, now, detail);
-            default -> {
-                // PLAIN：外缘刻度环已表现，无额外母题
-            }
+    private static void drawRuneMotif(BufferBuilder b, Matrix4f m, PreparedSlot p, float now, float pulse,
+                                      float cr, float cg, float cb,
+                                      float lr, float lg, float lb, float a) {
+        switch (styleFor(p.serialId)) {
+            case CARIAN:
+                motifCarian(b, m, p, now, pulse, cr, cg, cb, lr, lg, lb, a);
+                break;
+            case WARD:
+                motifWard(b, m, p, now, pulse, cr, cg, cb, lr, lg, lb, a);
+                break;
+            case COSMIC:
+                motifCosmic(b, m, p, now, pulse, cr, cg, cb, lr, lg, lb, a);
+                break;
+            case HOLY:
+                motifHoly(b, m, p, now, pulse, cr, cg, cb, lr, lg, lb, a);
+                break;
+            case PLAIN:
+            default:
+                break;
         }
     }
 
     /**
-     * 卡利亚辉石母题：内六边形 + 六芒星（两叠三角）+ 顶点水晶碎光，缓慢顺时针旋转。
-     * <p>v4：六边形与六芒星共 72 顶点却是本光环的唯一辨识依据，<b>完全不削</b>；
-     * 仅 6 颗水晶碎光按保留阈值整层跳过。</p>
+     * 卡利亚母题：内六边形 + 反向旋转的六芒星 + 顶点水晶碎光。
+     * <p>与 {@code GlintbladesEffectRenderer} 的辉石符文阵同源，都是卡利亚辉石魔法的几何语言。</p>
+     * <p><b>六边形与六芒星均不削减</b>——顶点数极少却是核心辨识符号。</p>
      */
-    private static void motifCarian(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
-                                    double radius, float r, float g, float b, float lineMul,
-                                    float now, float detail) {
-        double rot = now * 0.012;
-        float a = 0.70f * lineMul;
-        double hw = Math.max(0.05, radius * 0.012);
-        // 内六边形
-        addPolygonRing(builder, m, cx, cy, cz, radius * 0.40, 6, rot, hw, r, g, b, a * 0.8f);
-        // 六芒星（6 顶点，连接步距 2 → 两叠三角）
-        addStarPolygon(builder, m, cx, cy, cz, radius * 0.62, 6, 2, rot, hw, r, g, b, a);
-        // 顶点水晶碎光
-        if (VisualLod.keepLayer(detail, SPARKLE_KEEP_THRESHOLD)) {
+    private static void motifCarian(BufferBuilder b, Matrix4f m, PreparedSlot p, float now, float pulse,
+                                    float cr, float cg, float cb,
+                                    float lr, float lg, float lb, float a) {
+        double rot = now * RUNE_SPEED * 0.8;
+        double hexR = p.radius * 0.55;
+        double starR = p.radius * 0.72;
+        double halfW = Math.max(0.030, p.radius * 0.010);
+        float alpha = 0.55f * a * pulse;
+
+        // 内六边形（正向旋转）
+        addPolygonRing(b, m, p.rx, p.ry, p.rz, hexR, 6, rot, halfW, cr, cg, cb, alpha);
+        // 六芒星（反向旋转，两叠三角构成）
+        addStarPolygon(b, m, p.rx, p.ry, p.rz, starR, 6, 2, -rot * 1.15, halfW,
+                lr, lg, lb, alpha * 1.25f);
+
+        // 六芒星顶点的水晶碎光（装饰层，可整层跳过）
+        if (VisualLod.keepLayer(p.detail, SPARKLE_KEEP_THRESHOLD)) {
             for (int i = 0; i < 6; i++) {
-                double ang = rot + Math.PI * 2 * i / 6.0;
-                double px = cx + radius * 0.62 * Math.cos(ang);
-                double pz = cz + radius * 0.62 * Math.sin(ang);
-                addSpark(builder, m, px, cy, pz, (float) (radius * 0.035 + 0.06), r, g, b, a);
+                double ang = -rot * 1.15 + (Math.PI * 2.0 * i) / 6.0;
+                double sx = Math.cos(ang) * starR;
+                double sz = Math.sin(ang) * starR;
+                float tw = 0.5f + 0.5f * Mth.sin(now * 0.18f + i * 1.7f);
+                addSpark(b, m, p.rx + sx, p.ry, p.rz + sz,
+                        (float) (p.radius * 0.045) * (0.7f + 0.6f * tw),
+                        lr, lg, lb, 0.75f * a * tw);
             }
         }
     }
 
     /**
-     * 托普斯结界母题：双层反向旋转断环 + 径向栅条，构成屏障网格。
-     * <p>v4：两层断环的段数与径向栅条数量均按步长抽取（都是均布角度，截断会让结界网只剩一段圆弧）。</p>
+     * 守护母题：双层反向旋转的断环 + 径向栅条。
+     * <p>断续的环与栅条读作「屏障 / 护盾」，与卡利亚的连续几何形成对比。</p>
+     * <p><b>断环与栅条的角度均布，按步长抽取。</b></p>
      */
-    private static void motifWard(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
-                                  double radius, float r, float g, float b, float lineMul,
-                                  float now, float detail) {
-        double rot = now * 0.020;
-        float a = 0.60f * lineMul;
-        // 双层反向断环
-        addDashedRing(builder, m, cx, cy, cz, radius * 0.42, radius * 0.50, 10, 0.55, rot, r, g, b, a, detail);
-        addDashedRing(builder, m, cx, cy, cz, radius * 0.62, radius * 0.70, 14, 0.45, -rot * 1.2,
-                r, g, b, a * 0.85f, detail);
-        // 径向栅条：均布角度，按步长抽取
-        double hw = Math.max(0.05, radius * 0.014);
+    private static void motifWard(BufferBuilder b, Matrix4f m, PreparedSlot p, float now, float pulse,
+                                  float cr, float cg, float cb,
+                                  float lr, float lg, float lb, float a) {
+        double rot = now * RUNE_SPEED * 0.9;
+        double rOuter = p.radius * 0.78;
+        double rInner = p.radius * 0.52;
+        double halfW = Math.max(0.035, p.radius * 0.012);
+        float alpha = 0.5f * a * pulse;
+        int ringSeg = ringSegments(p.radius, p.detail);
+
+        // 外层断环（正转）与内层断环（反转），弧段数不同以免转速看起来一致
+        addDashedRing(b, m, p.rx, p.ry, p.rz, rOuter, 8, 0.62, rot, halfW,
+                cr, cg, cb, alpha, ringSeg, p.detail);
+        addDashedRing(b, m, p.rx, p.ry, p.rz, rInner, 6, 0.55, -rot * 1.3, halfW,
+                lr, lg, lb, alpha * 1.15f, ringSeg, p.detail);
+
+        // 径向栅条：连接内外两环，强化「格栅屏障」的读法
         final int bars = 12;
-        int drawnBars = VisualLod.scale(bars, detail);
+        int drawnBars = VisualLod.scale(bars, p.detail);
         int barStep = Math.max(1, bars / drawnBars);
         for (int i = 0; i < bars; i += barStep) {
-            double ang = rot * 0.5 + Math.PI * 2 * i / bars;
-            double ix = cx + radius * 0.50 * Math.cos(ang), iz = cz + radius * 0.50 * Math.sin(ang);
-            double ox = cx + radius * 0.62 * Math.cos(ang), oz = cz + radius * 0.62 * Math.sin(ang);
-            addLine(builder, m, ix, iz, ox, oz, cy, hw, r, g, b, a, a);
+            double ang = rot * 0.5 + (Math.PI * 2.0 * i) / bars;
+            double ca = Math.cos(ang), sa = Math.sin(ang);
+            float k = 0.45f + 0.55f * Mth.sin(now * 0.13f + i * 0.9f);
+            addLine(b, m,
+                    p.rx + ca * rInner, p.ry, p.rz + sa * rInner,
+                    p.rx + ca * rOuter, p.ry, p.rz + sa * rOuter,
+                    halfW * 0.8, cr, cg, cb, alpha * k, alpha * k * 0.35f);
         }
     }
 
     /**
-     * 塞乐恩宇宙母题：放射光线（长短交替、尖端渐隐，缓慢逆旋）+ 闪烁星空。
-     * <p>v4：放射光线按步长抽取（均布角度）；星屑数量缩减
-     * （黄金角螺旋的前 N 个本身即均匀铺满，截断安全）。</p>
+     * 星辰母题：自中心放射的长短光线 + 环绕星屑。
+     * <p>放射线读作「星芒」，配合星屑表达「宇宙 / 回归」的语义。</p>
+     * <p><b>射线角度均布，步长必须取奇数</b>——否则长短交替的规律会被抽没（详见 {@link #addRays}）。</p>
      */
-    private static void motifCosmic(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
-                                    double radius, float r, float g, float b, float lineMul,
-                                    float now, float detail) {
-        double rot = -now * 0.010;
-        float a = 0.60f * lineMul;
-        double hw = Math.max(0.04, radius * 0.010);
-        addRays(builder, m, cx, cy, cz, radius * 0.12, radius * 0.70, radius * 0.45, 12, rot, hw,
-                r, g, b, a, detail);
-        addStarField(builder, m, cx, cy, cz, radius * 0.80, 14, now, (float) (radius * 0.025 + 0.05),
-                r, g, b, 0.85f * lineMul, detail);
+    private static void motifCosmic(BufferBuilder b, Matrix4f m, PreparedSlot p, float now, float pulse,
+                                    float cr, float cg, float cb,
+                                    float lr, float lg, float lb, float a) {
+        double rot = now * RUNE_SPEED * 0.6;
+        double halfW = Math.max(0.028, p.radius * 0.009);
+        float alpha = 0.45f * a * pulse;
+
+        // 12 道放射光线，长短交替
+        addRays(b, m, p.rx, p.ry, p.rz, p.radius * 0.20, p.radius * 0.80, p.radius * 0.55,
+                12, rot, halfW, cr, cg, cb, alpha, p.detail);
+
+        // 环绕星屑（装饰层，可整层跳过）
+        if (VisualLod.keepLayer(p.detail, SPARKLE_KEEP_THRESHOLD)) {
+            addStarField(b, m, p.rx, p.ry, p.rz, p.radius, now, lr, lg, lb, 0.7f * a, p.detail);
+        }
     }
 
     /**
-     * 黄金树圣域母题：长短交替金色光芒（缓慢顺旋）+ 中央十字圣徽 + 芒尖金光，整体随圣光脉动。
-     * <p>v4：16 条光芒按步长抽取（均布，且长短交替——步长为偶数时会全取到长芒，
-     * 故步长强制取奇数以保留长短交替的节奏）；<b>中央十字圣徽只有 12 顶点却是圣域的核心标志，
-     * 完全不削</b>；8 个芒尖金光按保留阈值整层跳过。</p>
+     * 神圣母题：长短交替的圣光芒 + 中心十字圣徽 + 芒尖金光。
+     * <p>与 {@code AoeEffectRenderer} 的神圣净化 / 祈祷一击同一套语言（黄金树秩序）。</p>
+     * <p><b>十字圣徽不削减</b>——只有 4 条线，却是圣域最直接的辨识符号。</p>
      */
-    private static void motifHoly(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
-                                  double radius, float r, float g, float b, float lineMul,
-                                  float now, float detail) {
-        double rot = now * 0.008;
-        float pulse = 0.55f + 0.45f * (0.5f + 0.5f * Mth.sin(now * 0.06f));
-        float a = 0.75f * lineMul * pulse;
-        double hw = Math.max(0.05, radius * 0.013);
-        // 长短交替金色光芒
-        addRays(builder, m, cx, cy, cz, radius * 0.18, radius * 0.72, radius * 0.50, 16, rot, hw,
-                r, g, b, a, detail);
-        // 中央十字圣徽：仅 12 顶点，是圣域的核心标志，不参与削减
-        double cl = radius * 0.30;
-        addLine(builder, m, cx - cl, cz, cx + cl, cz, cy, hw * 1.4, r, g, b, a, a);
-        addLine(builder, m, cx, cz - cl, cx, cz + cl, cy, hw * 1.4, r, g, b, a, a);
-        // 芒尖金光（取偶数光芒尖端）
-        if (VisualLod.keepLayer(detail, SPARKLE_KEEP_THRESHOLD)) {
-            for (int i = 0; i < 16; i += 2) {
-                double ang = rot + Math.PI * 2 * i / 16.0;
-                double px = cx + radius * 0.72 * Math.cos(ang), pz = cz + radius * 0.72 * Math.sin(ang);
-                addSpark(builder, m, px, cy, pz, (float) (radius * 0.025 + 0.05), r, g, b, a);
+    private static void motifHoly(BufferBuilder b, Matrix4f m, PreparedSlot p, float now, float pulse,
+                                  float cr, float cg, float cb,
+                                  float lr, float lg, float lb, float a) {
+        double rot = now * RUNE_SPEED * 0.5;
+        double halfW = Math.max(0.032, p.radius * 0.010);
+        float alpha = 0.5f * a * pulse;
+
+        // 16 道圣光芒，长短交替（像哥特式光轮）
+        addRays(b, m, p.rx, p.ry, p.rz, p.radius * 0.26, p.radius * 0.86, p.radius * 0.58,
+                16, rot, halfW, cr, cg, cb, alpha, p.detail);
+
+        // 中心十字圣徽：竖长横短，读作「圣十字」而非「加号」
+        double armLong = p.radius * 0.42;
+        double armShort = p.radius * 0.26;
+        float crossAlpha = alpha * 1.4f;
+        addLine(b, m, p.rx, p.ry, p.rz - armLong, p.rx, p.ry, p.rz + armLong * 0.62,
+                halfW * 1.2, lr, lg, lb, crossAlpha, crossAlpha);
+        addLine(b, m, p.rx - armShort, p.ry, p.rz - armLong * 0.30,
+                p.rx + armShort, p.ry, p.rz - armLong * 0.30,
+                halfW * 1.2, lr, lg, lb, crossAlpha, crossAlpha);
+
+        // 长芒尖端的金光点（装饰层，可整层跳过）
+        if (VisualLod.keepLayer(p.detail, SPARKLE_KEEP_THRESHOLD)) {
+            final int tips = 8;
+            int drawnTips = VisualLod.scale(tips, p.detail);
+            int tipStep = Math.max(1, tips / drawnTips);
+            for (int i = 0; i < tips; i += tipStep) {
+                // 长芒位于偶数序号（i×2），与 addRays 的长短交替对齐
+                double ang = rot + (Math.PI * 2.0 * (i * 2)) / 16.0;
+                double sx = Math.cos(ang) * p.radius * 0.86;
+                double sz = Math.sin(ang) * p.radius * 0.86;
+                float tw = 0.5f + 0.5f * Mth.sin(now * 0.15f + i * 1.3f);
+                addSpark(b, m, p.rx + sx, p.ry, p.rz + sz,
+                        (float) (p.radius * 0.040) * (0.7f + 0.6f * tw),
+                        lr, lg, lb, 0.7f * a * tw);
             }
         }
     }
 
-    // ==================== 母题用通用几何辅助 ====================
+    // ==================== 母题通用几何基元 ====================
 
     /**
-     * 绘制一条带宽度的线段（两点之间的细长四边形，两端 alpha 可不同）。
+     * 绘制一条水平线段（带宽度，两端可用不同 alpha）。
      *
-     * @param hw 线半宽（格）
+     * @param halfW 线半宽（格）
      */
-    private static void addLine(BufferBuilder builder, Matrix4f m,
-                                double x1, double z1, double x2, double z2, double y,
-                                double hw, float r, float g, float b, float a1, float a2) {
-        double dx = x2 - x1, dz = z2 - z1;
+    private static void addLine(BufferBuilder b, Matrix4f m,
+                                double x1, double y, double z1,
+                                double x2, double y2, double z2,
+                                double halfW, float r, float g, float bl,
+                                float a1, float a2) {
+        if (a1 <= 0.004f && a2 <= 0.004f) {
+            return;
+        }
+        double dx = x2 - x1;
+        double dz = z2 - z1;
         double len = Math.sqrt(dx * dx + dz * dz);
         if (len < 1.0e-6) {
             return;
         }
-        // 垂直于线方向的法线 × 半宽
-        double nx = -dz / len * hw;
-        double nz = dx / len * hw;
-        float yf = (float) y;
-        float ax1 = (float) (x1 + nx), az1 = (float) (z1 + nz);
-        float ax2 = (float) (x1 - nx), az2 = (float) (z1 - nz);
-        float bx1 = (float) (x2 + nx), bz1 = (float) (z2 + nz);
-        float bx2 = (float) (x2 - nx), bz2 = (float) (z2 - nz);
+        // 水平面内的法线 × 半宽
+        double nx = -dz / len * halfW;
+        double nz = dx / len * halfW;
 
-        builder.vertex(m, ax1, yf, az1).color(r, g, b, a1).endVertex();
-        builder.vertex(m, bx1, yf, bz1).color(r, g, b, a2).endVertex();
-        builder.vertex(m, bx2, yf, bz2).color(r, g, b, a2).endVertex();
+        b.vertex(m, (float) (x1 + nx), (float) y, (float) (z1 + nz)).color(r, g, bl, a1).endVertex();
+        b.vertex(m, (float) (x2 + nx), (float) y2, (float) (z2 + nz)).color(r, g, bl, a2).endVertex();
+        b.vertex(m, (float) (x2 - nx), (float) y2, (float) (z2 - nz)).color(r, g, bl, a2).endVertex();
 
-        builder.vertex(m, ax1, yf, az1).color(r, g, b, a1).endVertex();
-        builder.vertex(m, bx2, yf, bz2).color(r, g, b, a2).endVertex();
-        builder.vertex(m, ax2, yf, az2).color(r, g, b, a1).endVertex();
+        b.vertex(m, (float) (x1 + nx), (float) y, (float) (z1 + nz)).color(r, g, bl, a1).endVertex();
+        b.vertex(m, (float) (x2 - nx), (float) y2, (float) (z2 - nz)).color(r, g, bl, a2).endVertex();
+        b.vertex(m, (float) (x1 - nx), (float) y, (float) (z1 - nz)).color(r, g, bl, a1).endVertex();
     }
 
     /**
-     * 绘制一个正多边形外框（N 条边首尾相连）。
-     * <p>边数很少（6），共 36 顶点，是母题的辨识核心，<b>不参与 LOD 削减</b>。</p>
+     * 绘制正多边形环（各顶点依次连线）。
+     * <p><b>不参与削减</b>：顶点数由多边形的边数决定（六边形就是 6 条线），减了就不成其形。</p>
      *
-     * @param sides    边数
-     * @param rotation 旋转角（弧度）
-     * @param hw       线半宽
+     * @param sides 边数
+     * @param rot   起始旋转角（弧度）
      */
-    private static void addPolygonRing(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
-                                       double radius, int sides, double rotation, double hw,
-                                       float r, float g, float b, float alpha) {
-        double prevX = 0, prevZ = 0;
-        for (int i = 0; i <= sides; i++) {
-            double ang = rotation + (Math.PI * 2 * i) / sides;
-            double x = cx + radius * Math.cos(ang);
-            double z = cz + radius * Math.sin(ang);
-            if (i > 0) {
-                addLine(builder, m, prevX, prevZ, x, z, cy, hw, r, g, b, alpha, alpha);
-            }
-            prevX = x;
-            prevZ = z;
+    private static void addPolygonRing(BufferBuilder b, Matrix4f m, double cx, double cy, double cz,
+                                       double radius, int sides, double rot, double halfW,
+                                       float r, float g, float bl, float alpha) {
+        if (alpha <= 0.004f || sides < 3) {
+            return;
+        }
+        for (int i = 0; i < sides; i++) {
+            double a0 = rot + (Math.PI * 2.0 * i) / sides;
+            double a1 = rot + (Math.PI * 2.0 * (i + 1)) / sides;
+            addLine(b, m,
+                    cx + Math.cos(a0) * radius, cy, cz + Math.sin(a0) * radius,
+                    cx + Math.cos(a1) * radius, cy, cz + Math.sin(a1) * radius,
+                    halfW, r, g, bl, alpha, alpha);
         }
     }
 
     /**
-     * 绘制星形多边形：把 points 个顶点按步距 step 互连（如 points=6,step=2 即六芒星两叠三角）。
-     * <p>共 36 顶点，是母题的辨识核心，<b>不参与 LOD 削减</b>。</p>
+     * 绘制星形多边形（{@code {n/skip}} 星形，如 {@code {6/2}} 即六芒星）。
+     * <p><b>不参与削减</b>：星形的顶点数就是它的定义，减了不成其形。</p>
      *
-     * @param hw 线半宽
+     * @param points 顶点数
+     * @param skip   连接跨度（每次跳过几个顶点）
      */
-    private static void addStarPolygon(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
-                                       double radius, int points, int step, double rotation, double hw,
-                                       float r, float g, float b, float alpha) {
+    private static void addStarPolygon(BufferBuilder b, Matrix4f m, double cx, double cy, double cz,
+                                       double radius, int points, int skip, double rot, double halfW,
+                                       float r, float g, float bl, float alpha) {
+        if (alpha <= 0.004f || points < 3 || skip < 1) {
+            return;
+        }
         for (int i = 0; i < points; i++) {
-            double a1 = rotation + (Math.PI * 2 * i) / points;
-            double a2 = rotation + (Math.PI * 2 * ((i + step) % points)) / points;
-            double x1 = cx + radius * Math.cos(a1), z1 = cz + radius * Math.sin(a1);
-            double x2 = cx + radius * Math.cos(a2), z2 = cz + radius * Math.sin(a2);
-            addLine(builder, m, x1, z1, x2, z2, cy, hw, r, g, b, alpha, alpha);
+            double a0 = rot + (Math.PI * 2.0 * i) / points;
+            double a1 = rot + (Math.PI * 2.0 * ((i + skip) % points)) / points;
+            addLine(b, m,
+                    cx + Math.cos(a0) * radius, cy, cz + Math.sin(a0) * radius,
+                    cx + Math.cos(a1) * radius, cy, cz + Math.sin(a1) * radius,
+                    halfW, r, g, bl, alpha, alpha);
         }
     }
 
     /**
-     * 绘制放射光线：count 条由内向外的径向线，偶/奇数交替使用 rOuter / rOuterAlt，尖端 alpha 渐隐。
+     * 绘制自中心向外的放射光线（长短交替）。
      * <p>
-     * <b>v4：按细节系数步长抽取，且步长强制取奇数。</b>角度是 {@code rotation + TAU × i / count}
-     * 均布的，截断会让光芒只朝一侧喷；而步长若取偶数，{@code i % 2} 会恒为同一值，
-     * <b>长短交替的节奏会退化成全长或全短</b>——圣域母题正是靠这个交替来表现「圣光芒」的，
-     * 故这里额外把步长调整为奇数。
+     * <b>v4：按步长抽取，且步长必须取奇数。</b>光线的长短由 {@code i % 2} 决定；
+     * 若步长为偶数，抽取出来的下标奇偶性完全相同——<b>要么全是长芒、要么全是短芒</b>，
+     * 长短交替的节奏会被抽没。取奇数步长可保证奇偶交替得以保留。
      * </p>
      *
-     * @param hw     线半宽
-     * @param detail 本帧细节系数
+     * @param rInner    起点半径
+     * @param rLong     长线终点半径
+     * @param rShort    短线终点半径
+     * @param count     光线总数
      */
-    private static void addRays(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
-                                double rInner, double rOuter, double rOuterAlt, int count, double rotation,
-                                double hw, float r, float g, float b, float alpha, float detail) {
+    private static void addRays(BufferBuilder b, Matrix4f m, double cx, double cy, double cz,
+                                double rInner, double rLong, double rShort,
+                                int count, double rot, double halfW,
+                                float r, float g, float bl, float alpha, float detail) {
+        if (alpha <= 0.004f) {
+            return;
+        }
         int drawn = VisualLod.scale(count, detail);
         int step = Math.max(1, count / drawn);
-        // 步长取偶数会让 i % 2 恒定、长短交替消失，故强制调整为奇数
-        if (step > 1 && (step & 1) == 0) {
-            step--;
+        // ⭐ 步长必须为奇数，否则长短交替会被抽成"全长"或"全短"
+        if ((step & 1) == 0) {
+            step++;
         }
         for (int i = 0; i < count; i += step) {
-            double ang = rotation + (Math.PI * 2 * i) / count;
-            double ro = (i % 2 == 0) ? rOuter : rOuterAlt;
-            double ix = cx + rInner * Math.cos(ang), iz = cz + rInner * Math.sin(ang);
-            double ox = cx + ro * Math.cos(ang), oz = cz + ro * Math.sin(ang);
-            addLine(builder, m, ix, iz, ox, oz, cy, hw, r, g, b, alpha, alpha * 0.15f);
+            double ang = rot + (Math.PI * 2.0 * i) / count;
+            double ca = Math.cos(ang), sa = Math.sin(ang);
+            double rOut = ((i & 1) == 0) ? rLong : rShort;
+            addLine(b, m,
+                    cx + ca * rInner, cy, cz + sa * rInner,
+                    cx + ca * rOut, cy, cz + sa * rOut,
+                    halfW, r, g, bl, alpha, 0f);
         }
     }
 
     /**
-     * 绘制断环（虚线圆环）：dashes 段弧，每段占该格 fillRatio 比例，其余留空。
-     * <p><b>v4：段数按细节系数步长抽取</b>（均布角度）。每段内部的细分 {@code sub} 本就只有 2，
-     * 不再缩减——降到 1 会让弧退化成直线弦、断环变成折线碎片。</p>
+     * 绘制断续圆环（若干等分弧段，段间留空）。
+     * <p>
+     * <b>v4：弧段数按步长抽取。</b>弧段起始角是 {@code rot + i × (TAU / dashes)} 均布的，
+     * 截断会让整环只剩一侧有弧段。每段内部的细分数也随之缩放。
+     * </p>
      *
-     * @param fillRatio 每段实心占比（0~1）
-     * @param rotation  旋转角（弧度）
-     * @param detail    本帧细节系数
+     * @param dashes   弧段数量
+     * @param fill     每段占其扇区的比例（0~1；1 即连续环）
+     * @param ringSeg  整环的参考分段数（用于决定每段的细分）
      */
-    private static void addDashedRing(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
-                                      double rInner, double rOuter, int dashes, double fillRatio, double rotation,
-                                      float r, float g, float b, float alpha, float detail) {
-        final int sub = 2; // 每段弧细分（控性能；本就是 2，不再缩减）
-        float yf = (float) cy;
-        int drawn = VisualLod.scale(dashes, detail);
-        int step = Math.max(1, dashes / drawn);
-        for (int i = 0; i < dashes; i += step) {
-            double a0 = rotation + (Math.PI * 2 * i) / dashes;
-            double a1 = a0 + (Math.PI * 2 / dashes) * fillRatio;
-            double prevOx = 0, prevOz = 0, prevIx = 0, prevIz = 0;
-            for (int s = 0; s <= sub; s++) {
-                double a = a0 + (a1 - a0) * s / sub;
-                double ox = cx + rOuter * Math.cos(a), oz = cz + rOuter * Math.sin(a);
-                double ix = cx + rInner * Math.cos(a), iz = cz + rInner * Math.sin(a);
-                if (s > 0) {
-                    builder.vertex(m, (float) prevOx, yf, (float) prevOz).color(r, g, b, alpha).endVertex();
-                    builder.vertex(m, (float) ox, yf, (float) oz).color(r, g, b, alpha).endVertex();
-                    builder.vertex(m, (float) ix, yf, (float) iz).color(r, g, b, alpha).endVertex();
+    private static void addDashedRing(BufferBuilder b, Matrix4f m, double cx, double cy, double cz,
+                                      double radius, int dashes, double fill, double rot, double halfW,
+                                      float r, float g, float bl, float alpha, int ringSeg, float detail) {
+        if (alpha <= 0.004f || dashes < 1 || radius <= 0) {
+            return;
+        }
+        int drawnDashes = VisualLod.scale(dashes, detail);
+        int dashStep = Math.max(1, dashes / drawnDashes);
+        // 每段内部的细分数：整环分段数 / 段数，至少 2 段以免弧看起来是直线
+        int perDash = Math.max(2, ringSeg / dashes);
+        double sector = (Math.PI * 2.0) / dashes;
+        double arc = sector * fill;
 
-                    builder.vertex(m, (float) prevOx, yf, (float) prevOz).color(r, g, b, alpha).endVertex();
-                    builder.vertex(m, (float) ix, yf, (float) iz).color(r, g, b, alpha).endVertex();
-                    builder.vertex(m, (float) prevIx, yf, (float) prevIz).color(r, g, b, alpha).endVertex();
-                }
-                prevOx = ox;
-                prevOz = oz;
-                prevIx = ix;
-                prevIz = iz;
+        for (int d = 0; d < dashes; d += dashStep) {
+            double start = rot + sector * d;
+            for (int s = 0; s < perDash; s++) {
+                double a0 = start + arc * s / perDash;
+                double a1 = start + arc * (s + 1) / perDash;
+                addLine(b, m,
+                        cx + Math.cos(a0) * radius, cy, cz + Math.sin(a0) * radius,
+                        cx + Math.cos(a1) * radius, cy, cz + Math.sin(a1) * radius,
+                        halfW, r, g, bl, alpha, alpha);
             }
         }
     }
 
     /**
-     * 绘制闪烁星空：count 个确定性分布的小星点（黄金角排布，半径错落），各自正弦闪烁。
+     * 绘制环绕的星屑光点（伪随机分布，各自错相闪烁）。
      * <p>
-     * <b>v4：按细节系数直接减数量（截断尾部）。</b>分布用黄金角螺旋
-     * （{@code ang = i × 2.399963}）+ 黄金比小数半径，<b>前 N 个本身即均匀铺满整个圆面</b>，
-     * 这是黄金角螺旋的固有性质，故截断安全、不会出现「只剩中心一撮」的塌陷。
+     * <b>v4：数量按细节系数缩放，可直接截断。</b>星屑的角度与半径由下标做伪随机散列得到、
+     * 与均布无关，因此截断尾部不会造成"缺一块"——只是星星变少。
      * </p>
-     *
-     * @param size      星点半尺寸（格）
-     * @param baseAlpha 基础亮度（再乘以闪烁系数）
-     * @param detail    本帧细节系数
      */
-    private static void addStarField(BufferBuilder builder, Matrix4f m, double cx, double cy, double cz,
-                                     double radius, int count, float now, float size,
-                                     float r, float g, float b, float baseAlpha, float detail) {
-        int drawn = VisualLod.scale(count, detail);
+    private static void addStarField(BufferBuilder b, Matrix4f m, double cx, double cy, double cz,
+                                     double radius, float now,
+                                     float r, float g, float bl, float alpha, float detail) {
+        if (alpha <= 0.004f) {
+            return;
+        }
+        final int total = 14;
+        int drawn = VisualLod.scale(total, detail);
         for (int i = 0; i < drawn; i++) {
-            // 确定性伪随机：黄金角铺角度，黄金比小数铺半径，分布均匀且稳定
-            double ang = i * 2.399963;
-            double frac = (i * 0.6180339) - Math.floor(i * 0.6180339);
-            double rr = radius * (0.18 + 0.78 * frac);
-            double px = cx + rr * Math.cos(ang);
-            double pz = cz + rr * Math.sin(ang);
-            float tw = 0.35f + 0.65f * (0.5f + 0.5f * Mth.sin(now * 0.18f + i * 1.7f));
-            addSpark(builder, m, px, cy, pz, size, r, g, b, baseAlpha * tw);
+            // 用黄金角散列出角度与半径，避免星星排成规则圈
+            double ang = i * 2.39996 + now * 0.004;
+            double rr = radius * (0.30 + 0.62 * frac(i * 0.6180339887f));
+            double sx = Math.cos(ang) * rr;
+            double sz = Math.sin(ang) * rr;
+            float tw = 0.5f + 0.5f * Mth.sin(now * 0.20f + i * 2.1f);
+            addSpark(b, m, cx + sx, cy, cz + sz,
+                    (float) (radius * 0.030) * (0.6f + 0.7f * tw),
+                    r, g, bl, alpha * tw);
         }
     }
 }

@@ -1,8 +1,6 @@
 package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
@@ -32,15 +30,38 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
  * <b>攻击端</b>按天气概率召唤红色龙雷追加伤害。
  * </p>
  *
- * <h3>红色龙雷：去掉原版闪电后必须自己补雷声</h3>
+ * <h3>红色龙雷：视觉与雷声都交给 {@link CarianStyleEffects#redLightningStrike}</h3>
  * <p>
- * 攻击端召唤的原版蓝白 {@code LightningBolt} 已替换为
- * {@link CarianStyleEffects#redLightning}，与古龙雷击保持一致的红色雷击意象。
+ * 攻击端召唤的原版蓝白 {@code LightningBolt} 已替换为自绘红闪，
+ * 与古龙雷击保持一致的红色雷击意象。
  * </p>
  * <p>
  * 原版闪电用的是 {@code setVisualOnly(true)}，本就只有「视觉 + 音效」无副作用，
- * 但<b>音效随它一起没了</b>。因此下方两条 {@code playSound}
- * （雷鸣 + 落地）<b>必须保留</b>，否则只有画面没有声音。
+ * 但<b>音效随它一起没了</b>，所以雷声必须自己补。
+ * </p>
+ * <p>
+ * <b>v3.1：雷声不再由本类手写 {@code playSound}</b>，改为与视觉一并交给门面方法。
+ * 原先本类与 {@code EnchantmentAncientDragonLightning} 各自维护一份音量 / 音高
+ * 完全相同的 {@code playSound}，属于复制粘贴，改一处忘一处就会导致两个龙雷附魔听感不一致；
+ * 现在共用 {@code CarianStyleEffects} 顶部的一组常量。
+ * </p>
+ *
+ * <h3>本附魔是「按实体节流」真正生效的那一处</h3>
+ * <p>
+ * {@link CarianStyleEffects#redLightningStrike} 内部有两级节流，二者针对的场景完全不同：
+ * </p>
+ * <ul>
+ *     <li><b>视觉按实体节流</b>（3 tick）——正是为本附魔设计的。本附魔在<b>每次造成伤害</b>时
+ *         按概率触发，而雷暴天概率是 100%；玩家攻速一高（或用了多重攻击类附魔），
+ *         同一个目标一两 tick 内就能连发好几次，画面上是同一处疯狂闪。
+ *         节流后表现为一道持续劈着的雷，机制伤害<b>完全不受影响</b>
+ *         （下方 {@code victim.hurt} 在节流之外，每次触发都照常结算）；</li>
+ *     <li><b>雷声按网格节流</b>（3 tick / 64 格）——对本附魔收益有限（本来就只有一个目标），
+ *         它主要是为古龙雷击的百目标场景准备的。</li>
+ * </ul>
+ * <p>
+ * <b>务必注意：节流只作用于视听，不作用于伤害。</b>被节流掉的那次仍然会走完
+ * {@code victim.hurt(...)}，玩家该吃的伤害一点不少——省掉的只是重复的画面与声音。
  * </p>
  *
  * <h3>天气倍率互斥判断</h3>
@@ -50,7 +71,7 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
  * </p>
  *
  * @author RoinFlam
- * @version 3.0
+ * @version 3.1
  */
 @AutoRegisterEnchantment(
         id = "vic_dragon_thunder",
@@ -147,20 +168,13 @@ public class EnchantmentVicDragonThunder extends EnchantmentBase {
 
         Level world = victim.level();
         if (world instanceof ServerLevel serverLevel) {
-            double lx = victim.getX();
-            double ly = victim.getY();
-            double lz = victim.getZ();
-
-            // ⭐ 原版蓝白闪电替换为红色自绘闪电（龙雷红色雷击意象，与古龙雷击一致）
-            CarianStyleEffects.redLightning(serverLevel, lx, ly, lz);
-
-            // 原版闪电去掉后需手动补雷声：雷鸣 + 落地，音高带轻微随机，避免机械重复
-            serverLevel.playSound(null, lx, ly, lz,
-                    SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.WEATHER,
-                    0.8f, 0.9f + serverLevel.random.nextFloat() * 0.2f);
-            serverLevel.playSound(null, lx, ly, lz,
-                    SoundEvents.LIGHTNING_BOLT_IMPACT, SoundSource.WEATHER,
-                    0.5f, 1.0f + serverLevel.random.nextFloat() * 0.2f);
+            // ⭐ v3.1：视觉 + 雷声一次调用，两级节流在门面类内部各自生效。
+            // 本附魔是「按实体节流」真正生效的那一处——雷暴天 100% 概率 + 高攻速时，
+            // 同一目标一两 tick 内会连发好几次，节流后表现为一道持续劈着的雷。
+            //
+            // ⚠ 节流只作用于视听：下方 victim.hurt 在节流之外，
+            // 被拦掉的那次仍然会照常结算伤害（详见类注释）。
+            CarianStyleEffects.redLightningStrike(serverLevel, victim);
         }
 
         victim.invulnerableTime = 10;

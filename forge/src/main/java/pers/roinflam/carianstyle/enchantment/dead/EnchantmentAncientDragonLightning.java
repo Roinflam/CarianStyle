@@ -1,8 +1,6 @@
 package pers.roinflam.carianstyle.enchantment.dead;
 
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
@@ -39,28 +37,43 @@ import java.util.List;
  * 现改为互斥：雷暴 4x、下雨 2x、晴天 1x（与 PreciseLightning 一致）。
  * </p>
  *
- * <h3>红色龙雷：去掉原版闪电后必须自己补雷声</h3>
+ * <h3>红色龙雷：视觉与雷声都交给 {@link CarianStyleEffects#redLightningStrike}</h3>
  * <p>
  * 为还原艾尔登法环「龙雷」的红色雷击意象，原版蓝白 {@code LightningBolt}
- * 已替换为 {@link CarianStyleEffects#redLightning}（自绘红色之字电柱 + 分叉 + 落地红色冲击）。
+ * 已替换为自绘红色之字电柱 + 分叉 + 落地红色冲击。
  * </p>
  * <p>
  * 原版闪电用的是 {@code setVisualOnly(true)}，本就只有「视觉 + 音效」无副作用，
- * 但<b>音效随它一起没了</b>。因此下方两条 {@code playSound}
- * （{@code LIGHTNING_BOLT_THUNDER} 雷鸣 + {@code LIGHTNING_BOLT_IMPACT} 落地）
- * <b>必须保留</b>，否则只有画面没有声音。
+ * 但<b>音效随它一起没了</b>，所以雷声必须自己补。
  * </p>
+ * <p>
+ * <b>v3.2：雷声不再由本类手写 {@code playSound}</b>，而是与视觉一并交给
+ * {@link CarianStyleEffects#redLightningStrike}。两个理由：
+ * </p>
+ * <ol>
+ *     <li><b>去重</b>——本类与 {@code EnchantmentVicDragonThunder} 原先各自维护一份
+ *         音量 / 音高完全相同的 {@code playSound}，属于复制粘贴，改一处忘一处就会
+ *         导致两个龙雷附魔听感不一致；现在共用门面类顶部的一组常量；</li>
+ *     <li><b>节流</b>——见下。</li>
+ * </ol>
  *
- * <h3>为什么高频落雷不会「鬼畜」</h3>
+ * <h3>为什么高频落雷不会「鬼畜」，以及雷声为什么必须节流</h3>
  * <p>
- * 本附魔对同一目标每 5 tick 重复降雷。若每次都新建特效实例，
- * 同一处会同时叠着多道形态各异的闪电并不断新生，视觉上呈高频跳变。
+ * 本附魔对同一目标每 5 tick 重复降雷，且同时最多有 {@link #MAX_TARGETS} 个目标。
  * </p>
  * <p>
- * 客户端 {@code AoeEffectManager} 对 {@code TYPE_RED_LIGHTNING} 做了 2.5 格内的
- * <b>同位置合并</b>——重复落雷只续命已存在那道、不新建，且其外形种子保持不变，
- * 因此表现为一道<b>持续劈着、缓慢明灭</b>的雷。这是红闪独有的处理，
- * 其余演出类型不参与合并（详见 {@code refreshNearbyRedLightning}）。
+ * <b>视觉侧</b>：客户端 {@code AoeEffectManager} 对 {@code TYPE_RED_LIGHTNING} 做了
+ * 4.5 格内的<b>同位置合并</b>——重复落雷只续命已存在那道、不新建，且其外形种子保持不变，
+ * 因此表现为一道<b>持续劈着、缓慢明灭</b>的雷；此外还有红闪专用的数量上限与新建限速兜底。
+ * 服务端侧的按实体节流（3 tick）对本附魔<b>近乎无效</b>——本附魔本来就是 5 tick 一次，
+ * 这是<b>刻意</b>的：每个目标身上那道雷是打击反馈，砍掉会让雷变稀疏、机制表现失真。
+ * </p>
+ * <p>
+ * <b>雷声侧</b>：这才是本附魔真正省下开销的地方。原实现每次落雷播两个音效，
+ * 100 目标 × 每 5 tick × 2 ≈ <b>每秒 400 个音效包</b>，而 20 道雷声同时播
+ * 只是把音量叠满——玩家听感与播 2 组毫无区别。现在
+ * {@link CarianStyleEffects#redLightningStrike} 内部按 64 格网格做全局节流，
+ * 包量降到约 40/秒，降幅一个数量级，听感不变。
  * </p>
  *
  * <h3>v3.1 新增：命中目标数硬上限（{@link #MAX_TARGETS}）</h3>
@@ -79,10 +92,9 @@ import java.util.List;
  *       单目标封顶 {@code level*15}，目标越多总次数越接近 {@code level*100}；
  *       但每次落雷的<b>三个包都要发给附近每个玩家</b>，目标数越多、落雷点越分散，
  *       同一时刻的包量峰值越高；</li>
- *   <li><b>客户端特效被挤掉</b>——红闪的同位置合并只覆盖 2.5 格，不同目标各自成一道。
- *       客户端 {@code AoeEffectManager.MAX_ACTIVE} 为 64，超出后
- *       {@code ACTIVE.remove(0)} 会挤掉最早的实例，表现为<b>闪电随机消失、闪烁</b>——
- *       目标越多这个现象越严重，反而不如封顶后好看。</li>
+ *   <li><b>客户端特效被挤掉</b>——红闪的同位置合并只覆盖有限半径，不同目标各自成一道。
+ *       客户端有红闪专用的存活上限，超出后会回收最老的实例，
+ *       目标越多这个现象越明显，反而不如封顶后好看。</li>
  * </ol>
  * <p>
  * 现封顶 {@value #MAX_TARGETS}：既远高于常规战斗场景（正常不会有 100 个敌人同时在 60 格内），
@@ -106,7 +118,7 @@ import java.util.List;
  * </p>
  *
  * @author RoinFlam
- * @version 3.1
+ * @version 3.2
  */
 @AutoRegisterEnchantment(
         id = "ancient_dragon_lightning",
@@ -123,7 +135,7 @@ public class EnchantmentAncientDragonLightning extends EnchantmentBase {
      * 每个目标会创建一个独立的周期任务并持续广播特效 / 音效包，
      * 故必须封顶。取 {@value} 的理由见类注释「v3.1 新增：命中目标数硬上限」小节：
      * 常规战斗远达不到该值（不影响正常体验），密集场景下则守住并发任务数、
-     * 网络包峰值与客户端 {@code AoeEffectManager.MAX_ACTIVE}(64) 的特效名额。
+     * 网络包峰值与客户端红闪特效的存活名额。
      * </p>
      * <p>
      * <b>请勿放宽。</b>若确需更大范围的压制感，应调整 {@code level * 15} 的
@@ -213,23 +225,15 @@ public class EnchantmentAncientDragonLightning extends EnchantmentBase {
 
                     Level world = entityLivingBase.level();
                     if (world instanceof ServerLevel serverLevel) {
-                        double lx = entityLivingBase.getX();
-                        double ly = entityLivingBase.getY();
-                        double lz = entityLivingBase.getZ();
-
-                        // ⭐ 原版蓝白闪电替换为红色自绘闪电（古龙龙雷意象）。
-                        // 客户端会对 2.5 格内的重复落雷做同位置合并，
+                        // ⭐ v3.2：视觉 + 雷声一次调用，两级节流在门面类内部各自生效。
+                        // 视觉按目标实体节流（对本附魔近乎 no-op，刻意为之——
+                        // 每个目标身上那道雷是打击反馈，不该被砍）；
+                        // 雷声按 64 格网格全局节流，把 100 目标场景下的音效包量
+                        // 从约 400/秒压到约 40/秒，而听感几乎不变（详见类注释）。
+                        //
+                        // 客户端还会对 4.5 格内的重复落雷做同位置合并，
                         // 因此高频重复调用不会叠成一团「鬼畜」，而是一道持续劈着的雷。
-                        CarianStyleEffects.redLightning(serverLevel, lx, ly, lz);
-
-                        // 原版闪电去掉后需手动补雷声：雷鸣 + 落地，
-                        // 音高带轻微随机，避免高频重复时听感机械
-                        serverLevel.playSound(null, lx, ly, lz,
-                                SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.WEATHER,
-                                0.8f, 0.9f + serverLevel.random.nextFloat() * 0.2f);
-                        serverLevel.playSound(null, lx, ly, lz,
-                                SoundEvents.LIGHTNING_BOLT_IMPACT, SoundSource.WEATHER,
-                                0.5f, 1.0f + serverLevel.random.nextFloat() * 0.2f);
+                        CarianStyleEffects.redLightningStrike(serverLevel, entityLivingBase);
                     }
 
                     entityLivingBase.invulnerableTime = 10;
