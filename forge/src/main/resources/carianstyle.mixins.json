@@ -8,7 +8,9 @@
     "helper.DamageSourceMixin"
   ],
   "client": [
-    "client.MixinPlayerHurtTo"
+    "client.MixinPlayerHurtTo",
+    "client.MixinItemInHandLayer",
+    "client.MixinItemInHandRenderer"
   ],
   "server": [
   ],

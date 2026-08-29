@@ -18,6 +18,32 @@ import net.minecraft.world.item.*;
  * <p>
  * 统一管理所有自定义附魔的实例化和分类
  * </p>
+ *
+ * <h3>v1.1 修复：补上缺失的 PICKAXE 自定义类型</h3>
+ * <p>
+ * {@link #getCustomEnchantmentCategory(String)} 的文档注释、以及
+ * {@code AutoRegisterEnchantment#customType()} 的文档注释里都写明了支持
+ * {@code "PICKAXE"}，但 switch 分支里<b>从来没有实现</b>，
+ * 传入 "PICKAXE" 会静默返回 null。
+ * </p>
+ * <p>
+ * 后果分两种，都很隐蔽：
+ * </p>
+ * <ul>
+ *   <li>若从注解走（{@code customType = "PICKAXE"}）——
+ *       {@code EnchantmentRegistry.resolveEnchantmentCategory} 会抛
+ *       {@code IllegalArgumentException}，被 {@code registerSingle} 的 try/catch 吞掉，
+ *       只在日志里留一行 error，<b>该附魔直接不注册</b>，游戏里查无此附魔；</li>
+ *   <li>若从构造函数走（{@code super(getCustomEnchantmentCategory("PICKAXE"), ...)}）——
+ *       会把 null 传给 {@code Enchantment} 的 category 字段，
+ *       之后任何一次 {@code canEnchant} / {@code canApplyAtEnchantingTable} 调用都会 NPE。</li>
+ * </ul>
+ * <p>
+ * 本次按文档补上 {@link #PICKAXE}，判定为 {@code item instanceof PickaxeItem}，
+ * 供 {@code EnchantmentRockBlaster} 使用（该附魔的实际逻辑本来就只认镐子）。
+ * </p>
+ *
+ * @version 1.1
  */
 public class CarianStyleEnchantments {
 
@@ -51,6 +77,24 @@ public class CarianStyleEnchantments {
     public static final EnchantmentCategory ARMS = EnchantmentCategory.create(
             "cs_arms",
             item -> item instanceof SwordItem || item instanceof BowItem || item instanceof CrossbowItem
+    );
+
+    /**
+     * 镐子附魔类型（v1.1 新增）
+     * <p>
+     * 与原版 {@code EnchantmentCategory.DIGGER} 的区别：
+     * DIGGER 的判定是 {@code item instanceof DiggerItem}，
+     * 会同时命中<b>镐、斧、锹、锄</b>四类工具；
+     * 而本类型只命中镐子。
+     * </p>
+     * <p>
+     * 用于那些逻辑上只对镐子生效的附魔（如岩石爆破），
+     * 避免附魔台把它们刷到斧 / 锹 / 锄上却毫无效果。
+     * </p>
+     */
+    public static final EnchantmentCategory PICKAXE = EnchantmentCategory.create(
+            "cs_pickaxe",
+            item -> item instanceof PickaxeItem
     );
 
     // ==================== 附魔能力常量 ====================
@@ -158,8 +202,8 @@ public class CarianStyleEnchantments {
      * @param customType 自定义类型标识符（大小写不敏感）
      *                   <ul>
      *                     <li>"SHIELD" - 盾牌类型</li>
-     *                     <li>"ARMS" - 武器类型（剑+弓）</li>
-     *                     <li>"PICKAXE" - 镐子类型</li>
+     *                     <li>"ARMS" - 武器类型（剑+弓+弩）</li>
+     *                     <li>"PICKAXE" - 镐子类型（v1.1 新增实现）</li>
      *                   </ul>
      * @return 对应的 EnchantmentCategory 对象，如果标识符无效或为空则返回 null
      */
@@ -175,6 +219,9 @@ public class CarianStyleEnchantments {
                 return SHIELD;
             case "ARMS":
                 return ARMS;
+            case "PICKAXE":
+                // v1.1：补上此前只写在文档里、从未实现的分支
+                return PICKAXE;
             default:
                 // 未知的自定义类型，返回 null
                 // 调用者应该处理这种情况（抛出异常或使用默认值）

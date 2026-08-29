@@ -14,6 +14,8 @@ import java.util.List;
  * Carian Style Cloth Config Screen
  *
  * <p>v2.3新增：怪物附魔触发分类（两个开关：通用 / 死亡类）。</p>
+ * <p>v2.4新增：游戏平衡分类下的两个开关
+ * （useVanillaRarityWeight 附魔台权重映射 / allowVillagerBookTrade 村民附魔书交易）。</p>
  *
  * @author RoinFlam
  */
@@ -163,6 +165,24 @@ public class ClothConfigScreen {
                 .setMax(10.0)
                 .setTooltip(Component.translatable("config.carianstyle.enchantingDifficulty.tooltip"))
                 .setSaveConsumer(ConfigLoader.COMMON.enchantingDifficulty::set)
+                .build());
+
+        // v2.4新增：附魔台候选权重映射
+        balanceCategory.addEntry(entryBuilder.startBooleanToggle(
+                        Component.translatable("config.carianstyle.useVanillaRarityWeight"),
+                        ConfigLoader.COMMON.useVanillaRarityWeight.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.translatable("config.carianstyle.useVanillaRarityWeight.tooltip"))
+                .setSaveConsumer(ConfigLoader.COMMON.useVanillaRarityWeight::set)
+                .build());
+
+        // v2.4新增：村民附魔书交易池
+        balanceCategory.addEntry(entryBuilder.startBooleanToggle(
+                        Component.translatable("config.carianstyle.allowVillagerBookTrade"),
+                        ConfigLoader.COMMON.allowVillagerBookTrade.get())
+                .setDefaultValue(false)
+                .setTooltip(Component.translatable("config.carianstyle.allowVillagerBookTrade.tooltip"))
+                .setSaveConsumer(ConfigLoader.COMMON.allowVillagerBookTrade::set)
                 .build());
 
         // ═══════════════════════════════════════════════════════════════

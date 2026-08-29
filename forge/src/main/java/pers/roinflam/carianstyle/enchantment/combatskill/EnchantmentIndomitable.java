@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
@@ -19,13 +20,27 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
+import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 /**
  * 不屈附魔
  * <p>v2.1：受击者视角接入怪物附魔触发开关</p>
+ * <p>v2.2：免疫成功时触发「不屈壁障」自绘特效</p>
+ *
+ * <h3>v2.2 为什么要加这个特效</h3>
+ * <p>
+ * 本附魔的免疫概率是 {@code 缺失血量百分比 × 75%}——残血时接近必定免疫，
+ * 但在此之前<b>玩家完全看不出它有没有生效</b>：血条没动，可能是免疫了，
+ * 也可能是对方压根没打中，还可能是别的减伤挡下来了。
+ * 一个只在真正免疫时出现的视觉反馈，补的正是这个缺口。
+ * </p>
+ * <p>
+ * <b>严格放在 {@code setCanceled(true)} 的同一分支里</b>：概率没中的时候不能播，
+ * 否则视觉就在骗人，比没有反馈更糟。
+ * </p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "indomitable",
@@ -78,6 +93,12 @@ public class EnchantmentIndomitable extends EnchantmentBase {
 
         if (RandomUtil.percentageChance(immuneChance)) {
             evt.setCanceled(true);
+
+            // ⭐ v2.2：免疫真正生效，播放「不屈壁障」自绘特效。
+            // 位置与朝向都取持有者——这是「我把这一下弹回去了」的自身反馈
+            if (holder.level() instanceof ServerLevel serverLevel) {
+                CarianStyleCombatArtEffects.indomitable(serverLevel, holder);
+            }
         }
     }
 

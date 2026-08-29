@@ -7,7 +7,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.PickaxeItem;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.Level;
@@ -24,6 +23,7 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 
 import java.util.*;
 
@@ -36,14 +36,37 @@ import java.util.*;
  * - 范围半径 = 1 + 等级/2（受配置上限限制）
  * </p>
  *
+ * <h3>v3.2 修复：附魔类型由 DIGGER 收窄为 PICKAXE</h3>
+ * <p>
+ * <b>问题：</b>原来注解与构造函数都用的是原版 {@code EnchantmentCategory.DIGGER}，
+ * 而 DIGGER 的判定是 {@code item instanceof DiggerItem}——
+ * 它同时包含<b>镐、斧、锹、锄</b>四类工具。
+ * </p>
+ * <p>
+ * 但本附魔的实际逻辑在 {@link #onBreak} 里明确要求
+ * {@code tool.getItem() instanceof PickaxeItem}，也就是<b>只有镐子才会生效</b>。
+ * 于是玩家用附魔台附斧头 / 锹 / 锄时，岩石爆破照样会出现在候选池里并被刷出来，
+ * 附上去之后却毫无效果——这正是玩家反馈的「工具附魔串了、刷出来一堆没用的」。
+ * </p>
+ * <p>
+ * <b>修复：</b>改用 {@code CarianStyleEnchantments} 中定义的自定义类型
+ * {@code "PICKAXE"}，让候选池与实际生效条件一致。
+ * 注解的 {@code type} 参数随之替换为 {@code customType}，两边保持同步。
+ * </p>
+ * <p>
+ * <b>兼容性：</b>已经附在斧 / 锹 / 锄上的旧存档物品不会被自动清除，
+ * 但它们本来就没有任何效果；铁砧与附魔台之后不会再把本附魔加到这些工具上。
+ * </p>
+ *
  * @author RoinFlam
- * @version 3.1
+ * @version 3.2
  */
 @AutoRegisterEnchantment(
         id = "rock_blaster",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.RARE,
-        type = EnchantmentCategory.DIGGER,
+        // v3.2：DIGGER（镐斧锹锄）→ PICKAXE（仅镐），与下方 onBreak 的 PickaxeItem 判定一致
+        customType = "PICKAXE",
         slots = {EquipmentSlot.MAINHAND},
         forceTreasure = true,
         conflictsWith = {}
@@ -95,7 +118,9 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
     );
 
     public EnchantmentRockBlaster() {
-        super(EnchantmentCategory.DIGGER, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+        // v3.2：DIGGER → PICKAXE 自定义类型（详见类注释）
+        super(CarianStyleEnchantments.getCustomEnchantmentCategory("PICKAXE"),
+                new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
     /**
@@ -182,7 +207,7 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
     }
 
     /**
-     * 判断指定方块是否属于常见废石，需要在配置开启时抑制掉落物
+     * 判断指定方块是否属于常见废石，需要在配置开启时抑制掉落
      *
      * @param block 要检查的方块
      * @return 如果配置开启且方块在废石列表中则返回 true

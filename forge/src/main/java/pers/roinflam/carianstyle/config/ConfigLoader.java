@@ -37,6 +37,15 @@ import java.util.List;
  * </ul>
  * </p>
  *
+ * <p>
+ * v2.4新增：附魔获取途径平衡开关
+ * <ul>
+ *   <li>{@link #useVanillaRarityWeight}：是否把模组稀有度映射回原版权重体系，默认开启（即修复生效）。</li>
+ *   <li>{@link #allowVillagerBookTrade}：是否允许模组附魔进入村民附魔书交易池，默认关闭（即修复生效）。</li>
+ * </ul>
+ * 两项的背景与影响详见 {@code EnchantmentBase} 的类注释。
+ * </p>
+ *
  * @author RoinFlam
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
@@ -85,6 +94,11 @@ public final class ConfigLoader {
 
         public final ForgeConfigSpec.BooleanValue levelLimit;
         public final ForgeConfigSpec.DoubleValue enchantingDifficulty;
+
+        // ==================== 附魔获取途径平衡配置（v2.4新增） ====================
+
+        public final ForgeConfigSpec.BooleanValue useVanillaRarityWeight;
+        public final ForgeConfigSpec.BooleanValue allowVillagerBookTrade;
 
         // ==================== 怪物附魔触发配置（v2.3新增） ====================
 
@@ -224,6 +238,44 @@ public final class ConfigLoader {
                     .comment("1.0 是默认难度。")
                     .defineInRange("enchantingDifficulty", 1.0, 0.1, 10.0);
 
+            // ---------- v2.4新增：附魔台候选权重 ----------
+            useVanillaRarityWeight = builder
+                    .comment("Map CarianStyle enchantment rarities onto the vanilla weight system.")
+                    .comment("将卡利亚式附魔的稀有度映射到原版的权重体系。")
+                    .comment("Vanilla picks enchanting-table candidates by weight:")
+                    .comment("原版附魔台按权重加权抽取候选附魔：")
+                    .comment("COMMON=10, UNCOMMON=5, RARE=2, VERY_RARE=1")
+                    .comment("Without this, every CarianStyle enchantment registers as COMMON (weight 10),")
+                    .comment("关闭时所有卡利亚式附魔都以 COMMON（权重 10）注册，")
+                    .comment("i.e. as common as Efficiency / Protection / Sharpness, which floods the table")
+                    .comment("即与「效率 / 保护 / 锋利」同档，会把原版附魔挤出附魔台候选池。")
+                    .comment("and crowds vanilla enchantments out of the candidate pool.")
+                    .comment("SIDE EFFECT: anvil combine cost also reads rarity (1x/2x/4x/8x),")
+                    .comment("副作用：铁砧合成花费同样读取稀有度（1/2/4/8 倍率），")
+                    .comment("so Rare and Very Rare enchantments become more expensive on the anvil.")
+                    .comment("因此 Rare 与 Very Rare 档的附魔在铁砧上会变贵。")
+                    .comment("Set to false to restore the old behaviour (everything weight 10).")
+                    .comment("设为 false 可恢复旧行为（全部权重 10）。")
+                    .comment("Default: true")
+                    .comment("默认值：true")
+                    .define("useVanillaRarityWeight", true);
+
+            // ---------- v2.4新增：村民附魔书交易池 ----------
+            allowVillagerBookTrade = builder
+                    .comment("Allow CarianStyle enchantments to appear in librarian enchanted book trades.")
+                    .comment("是否允许卡利亚式附魔出现在图书管理员的附魔书交易中。")
+                    .comment("WARNING: vanilla picks trade books UNIFORMLY at random from every tradeable")
+                    .comment("警告：原版是从所有可交易附魔里【等概率】随机抽一本，完全不看稀有度权重。")
+                    .comment("enchantment, ignoring rarity weights entirely. Enabling this adds 100+ entries")
+                    .comment("启用后会往原版约 40 个可交易附魔的池子里塞进一百多个条目，")
+                    .comment("to a pool of roughly 40, cutting the odds of rolling Mending to about a quarter.")
+                    .comment("「经验修补」的出现概率会掉到原来的四分之一左右。")
+                    .comment("This does NOT affect enchanting tables or loot chests.")
+                    .comment("此选项不影响附魔台与战利品箱的获取途径。")
+                    .comment("Default: false (block)")
+                    .comment("默认值：false（拦截）")
+                    .define("allowVillagerBookTrade", false);
+
             builder.pop();
 
             // ========== 怪物附魔触发配置（v2.3新增） ==========
@@ -303,6 +355,35 @@ public final class ConfigLoader {
     public static double enchantingDifficulty = 1.0;
 
     /**
+     * 是否把模组稀有度映射到原版权重体系（v2.4新增）
+     * <p>
+     * 默认 true。原版附魔台按 {@code getRarity().getWeight()} 加权抽取候选
+     * （COMMON=10、UNCOMMON=5、RARE=2、VERY_RARE=1），
+     * 而 {@code EnchantmentBase} 的主构造函数只能在 super() 阶段传占位值 COMMON，
+     * 若不做映射，全部模组附魔都是权重 10，会把原版附魔挤出候选池。
+     * </p>
+     * <p>
+     * 副作用：铁砧合成花费同样读取稀有度，Rare / Very Rare 档会变贵。
+     * 设为 false 可恢复旧行为。
+     * </p>
+     */
+    public static boolean useVanillaRarityWeight = true;
+
+    /**
+     * 是否允许模组附魔进入村民附魔书交易池（v2.4新增）
+     * <p>
+     * 默认 false。1.20.1 的 {@code VillagerTrades.EnchantBookForEmeralds}
+     * 是从所有 {@code isTradeable()} 为 true 的附魔里<b>等概率</b>抽取，不看权重。
+     * 一百多个模组附魔全部可交易会把原版约 40 个的池子撑到 150+，
+     * 导致「经验修补」等原版关键附魔的出现概率掉到原来的四分之一左右。
+     * </p>
+     * <p>
+     * 不影响附魔台与战利品箱的获取途径。
+     * </p>
+     */
+    public static boolean allowVillagerBookTrade = false;
+
+    /**
      * 是否允许非玩家生物触发卡利亚式附魔
      * <p>
      * 默认 true（允许）。关闭后可大幅降低存在大量附魔怪物时的服务器开销，
@@ -340,6 +421,7 @@ public final class ConfigLoader {
      * 在配置加载或修改后调用。
      * v2.2修复：末尾清除所有附魔的禁用状态缓存，确保黑名单变更立即生效。
      * v2.3新增：同步两个怪物附魔触发开关。
+     * v2.4新增：同步权重映射与村民交易两个开关。
      * </p>
      */
     public static void bake() {
@@ -360,6 +442,10 @@ public final class ConfigLoader {
 
         levelLimit = COMMON.levelLimit.get();
         enchantingDifficulty = COMMON.enchantingDifficulty.get();
+
+        // v2.4新增：同步附魔获取途径平衡开关
+        useVanillaRarityWeight = COMMON.useVanillaRarityWeight.get();
+        allowVillagerBookTrade = COMMON.allowVillagerBookTrade.get();
 
         // v2.3新增：同步怪物附魔触发开关
         allowMobTriggerEnchantments = COMMON.allowMobTriggerEnchantments.get();

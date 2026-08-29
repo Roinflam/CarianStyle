@@ -17,6 +17,7 @@ import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttribute;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
+import pers.roinflam.carianstyle.network.HowlShabririSyncHelper;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import java.util.List;
@@ -26,7 +27,7 @@ import java.util.UUID;
  * 卡利亚风格模组 - 动态属性注册
  * 完全独立的效果系统，不依赖任何药水
  *
- * <h3>性能优化 v2.1（本次新增，效果行为基本不变，差异见下）</h3>
+ * <h3>性能优化 v2.1（效果行为基本不变，差异见下）</h3>
  * <p>
  * <b>问题：per-entity 事件处理器挂在全局事件总线上，却监听高频事件。</b>
  * {@code DynamicAttributeInstance.setEventHandler} 会把每个实体的处理器
@@ -75,8 +76,35 @@ import java.util.UUID;
  * 的那批生物，清一次即可，0.5 秒的周期复查纯属冗余保险。
  * </p>
  *
+ * <h3>v2.2 新增：嘶吼层数的客户端同步（本次改动，机制零影响）</h3>
+ * <p>
+ * {@link #HOWL_SHABRIRI} 此前只有属性修正器与治疗削减，<b>客户端完全不知道它的存在</b>——
+ * 因为 {@code DynamicAttributeManager} 的数据只在服务端产生，客户端那份 Map 恒为空。
+ * 于是「目标身上叠了几层发狂」这个信息对玩家完全不可见，
+ * 而该附魔的核心机制恰恰是「对满层目标额外 +15%×等级 伤害」，
+ * 玩家必须能看出层数才知道下一击是否吃到加成。
+ * </p>
+ * <p>
+ * 本次在静态块里给它挂上 {@code onApplied} / {@code onRemoved} 两个生命周期回调，
+ * 转交 {@link HowlShabririSyncHelper} 把层数同步到客户端（每层一个序列号，
+ * 序列号 13~18，详见该类注释）。
+ * </p>
+ * <p>
+ * <b>为什么改在这里而不是改附魔类：</b>叠层、覆盖、自然过期、实体死亡（{@code clearAll}）
+ * 全部路径都会经过这两个回调，挂在属性定义上是唯一不会漏网的位置；
+ * 而 {@code EnchantmentHowlShabriri} 里只有「施加」这一处，
+ * 在那里同步就无法覆盖过期与死亡，会造成层数视觉残留。
+ * <b>该附魔因此一行都不用改。</b>
+ * </p>
+ * <p>
+ * <b>机制影响为零：</b>生命周期回调只做网络广播，不碰任何属性修正器、不改 amplifier、
+ * 不影响 {@code DynamicAttributeManager} 的覆盖判定；
+ * 而 v2.2 的「同等级重复 apply 只刷新时长、直接返回」这一早退分支
+ * 意味着攻击同一目标但层数已封顶时<b>连回调都不会触发</b>，不会产生任何多余的包。
+ * </p>
+ *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 public class DynamicAttributes {
 
@@ -159,6 +187,10 @@ public class DynamicAttributes {
      * - 护甲-15%×等级
      * - 韧性-15%×等级
      * - 治疗量-10%×(等级+1)
+     * <p>
+     * v2.2：新增层数的客户端同步（见静态块），使观察者能看出目标叠了几层发狂。
+     * 同步只做网络广播，不影响本效果的任何数值与判定。
+     * </p>
      */
     public static final DynamicAttribute HOWL_SHABRIRI = new DynamicAttribute("carianstyle_howl_shabriri")
             .addModifier(Attributes.ARMOR, -0.15, AttributeModifier.Operation.MULTIPLY_TOTAL)
@@ -234,6 +266,15 @@ public class DynamicAttributes {
         STEALTH
                 .onApplied(ClientSyncEffectHelper::onAttributeApplied)
                 .onRemoved(ClientSyncEffectHelper::onAttributeRemoved);
+
+        // ⭐ v2.2：嘶吼的层数同步。
+        // 刻意不走 ClientSyncAttribute + ClientSyncEffectHelper 那套——
+        // 那套是「一个属性对应一个固定序列号」，只能表达「有 / 没有」，
+        // 而嘶吼需要表达「第几层」，故用 HowlShabririSyncHelper 的
+        // 「一层一个序列号」方案（序列号 13~18，详见该类注释）。
+        HOWL_SHABRIRI
+                .onApplied(HowlShabririSyncHelper::onApplied)
+                .onRemoved(HowlShabririSyncHelper::onRemoved);
     }
 
     // ========== 共享工具方法 ==========

@@ -44,8 +44,67 @@ import java.util.Map;
  * - 新增静态工具方法 isEnchantmentDisabled(Enchantment)，供独立 @SubscribeEvent 方法使用
  * </p>
  *
+ * <h3>修复记录 v2.3：附魔台权重与村民交易池污染</h3>
+ * <p>
+ * <b>问题一：所有附魔在原版权重体系里都是「最常见」。</b>
+ * 本类的主构造函数把 {@code Enchantment.Rarity.COMMON} 硬编码传给了 super，
+ * 而模组自己的 {@link EnchantmentRarity}（UNCOMMON / RARE / VERY_RARE）
+ * 只被用来决定 {@link #getMaxLevel()} 与 {@link #getMinCost(int)}，
+ * <b>从未参与原版的权重计算</b>。
+ * </p>
+ * <p>
+ * 原版附魔台的候选池是加权抽取的：
+ * {@code EnchantmentHelper.getAvailableEnchantmentResults} 收集候选后，
+ * 交给 {@code WeightedRandom} 按 {@code EnchantmentInstance} 的权重抽取，
+ * 而该权重来自 {@code enchantment.getRarity().getWeight()}
+ * （COMMON=10、UNCOMMON=5、RARE=2、VERY_RARE=1）。
+ * </p>
+ * <p>
+ * 于是本模组一百多个附魔<b>每一个都是权重 10</b>，
+ * 和「效率 / 保护 / 锋利」这类最常见的原版附魔同档，
+ * 而原版真正稀有的附魔只有 2 或 1。玩家在附魔台看到的自然全是模组附魔。
+ * </p>
+ * <p>
+ * <b>修复：</b>覆写 {@link #getRarity()}，把模组稀有度映射回原版权重
+ * （UNCOMMON→5、RARE→2、VERY_RARE→1）。
+ * 之所以覆写 getter 而不是改构造函数，是因为 {@code Enchantment.rarity}
+ * 是 private final、且 super() 调用时还拿不到子类注解，无法在构造期得到正确值；
+ * 而 {@code getRarity()} 是 public 非 final 方法，原版所有读取点都走它。
+ * </p>
+ * <p>
+ * <b>⚠ 已知副作用：</b>铁砧的附魔书合成花费也读 {@code getRarity()}
+ * （COMMON=1、UNCOMMON=2、RARE=4、VERY_RARE=8 倍率），
+ * 因此 RARE / VERY_RARE 档的模组附魔在铁砧上会变贵。
+ * 这与「稀有附魔更贵」的原版设计一致，但确实是本次改动带来的数值变化。
+ * </p>
+ *
+ * <p>
+ * <b>问题二：村民附魔书交易池被稀释。</b>
+ * 1.20.1 的 {@code VillagerTrades.EnchantBookForEmeralds} 不看权重——
+ * 它把所有 {@code isTradeable()} 为 true 的附魔收集成一个 List，然后<b>等概率</b>随机抽一个。
+ * 本模组一百多个附魔默认全部可交易，直接把原版约 40 个可交易附魔的池子撑到 150+，
+ * 「经验修补」的出现概率因此掉到原来的四分之一左右。
+ * </p>
+ * <p>
+ * <b>修复：</b>覆写 {@link #isTradeable()} 返回 false，
+ * 模组附魔不再进入图书管理员的附魔书交易池。
+ * 附魔台、战利品箱的获取途径不受影响（由 {@link #isDiscoverable()} 控制，未改动）。
+ * </p>
+ *
+ * <h3>v2.4：两项修复改为配置开关控制</h3>
+ * <ul>
+ *   <li>{@code ConfigLoader.useVanillaRarityWeight}（默认 true）——
+ *       控制 {@link #getRarity()} 是否做权重映射。设为 false 恢复旧行为（全部权重 10），
+ *       同时也会撤销铁砧变贵的副作用。</li>
+ *   <li>{@code ConfigLoader.allowVillagerBookTrade}（默认 false）——
+ *       控制 {@link #isTradeable()}。设为 true 恢复原版行为，模组附魔重新进入交易池。</li>
+ * </ul>
+ * <p>
+ * 两项均在 {@code ConfigLoader.bake()} 中同步，支持热重载。
+ * </p>
+ *
  * @author RoinFlam
- * @version 2.2
+ * @version 2.4
  */
 public abstract class EnchantmentBase extends Enchantment {
 
@@ -70,7 +129,9 @@ public abstract class EnchantmentBase extends Enchantment {
      * @param slots    适用装备槽位
      */
     protected EnchantmentBase(@Nonnull EnchantmentCategory category, @Nonnull EquipmentSlot[] slots) {
-        super(Enchantment.Rarity.COMMON, category, slots);
+        // 这里传入的 COMMON 只是占位：super() 调用时还拿不到子类注解，无法得到真实稀有度。
+        // 真正生效的权重由下方覆写的 getRarity() 提供（详见类注释 v2.3）。
+        super(Rarity.COMMON, category, slots);
 
         this.annotation = this.getClass().getAnnotation(AutoRegisterEnchantment.class);
 
@@ -93,7 +154,7 @@ public abstract class EnchantmentBase extends Enchantment {
      * @param slots    适用装备槽位
      * @param name     附魔名称
      */
-    protected EnchantmentBase(@Nonnull Enchantment.Rarity rarityIn, @Nonnull EnchantmentCategory category,
+    protected EnchantmentBase(@Nonnull Rarity rarityIn, @Nonnull EnchantmentCategory category,
                               @Nonnull EquipmentSlot[] slots, String name) {
         super(rarityIn, category, slots);
         this.annotation = null;
@@ -112,6 +173,44 @@ public abstract class EnchantmentBase extends Enchantment {
 
         CarianStyleEnchantments.ENCHANTMENTS.add(this);
         LogUtil.debug("卡利亚式附魔 - 通过传统方式注册附魔: %s", name);
+    }
+
+    // ==================== 稀有度与权重（v2.3新增） ====================
+
+    /**
+     * 返回本附魔在原版权重体系中的稀有度。
+     * <p>
+     * 原版附魔台按此权重加权抽取候选附魔
+     * （COMMON=10、UNCOMMON=5、RARE=2、VERY_RARE=1）。
+     * 主构造函数无法在 super() 阶段拿到子类注解，只能传占位值 COMMON，
+     * 因此必须在这里把模组自己的 {@link EnchantmentRarity} 映射回原版稀有度，
+     * 否则全部模组附魔都会以最高权重 10 参与抽取，把原版附魔挤出候选池。
+     * </p>
+     * <p>
+     * 传统构造函数路径下 {@code enchantmentRarity} 由传入的原版稀有度反推得到，
+     * 因此本方法的返回值与 super 存储的值一致，行为不变。
+     * </p>
+     *
+     * @return 映射后的原版稀有度
+     */
+    @Override
+    @Nonnull
+    public Rarity getRarity() {
+        // v2.4：配置关闭时退回 super 存储的原始值（注解路径下即占位的 COMMON），
+        // 等同于本修复上线前的旧行为
+        if (!ConfigLoader.useVanillaRarityWeight) {
+            return super.getRarity();
+        }
+
+        switch (enchantmentRarity) {
+            case VERY_RARE:
+                return Rarity.VERY_RARE;
+            case RARE:
+                return Rarity.RARE;
+            case UNCOMMON:
+            default:
+                return Rarity.UNCOMMON;
+        }
     }
 
     // ==================== 禁用检查（v2.2新增） ====================
@@ -221,11 +320,32 @@ public abstract class EnchantmentBase extends Enchantment {
     }
 
     /**
-     * 被禁用的附魔无法从村民交易获得
+     * 模组附魔一律不进入村民（图书管理员）的附魔书交易池。
+     * <p>
+     * 1.20.1 的 {@code VillagerTrades.EnchantBookForEmeralds} 把所有
+     * {@code isTradeable()} 为 true 的附魔收集成一个 List 后<b>等概率</b>抽取，
+     * 完全不看稀有度权重。本模组一百多个附魔若全部可交易，
+     * 会把原版约 40 个可交易附魔的池子撑到 150+，
+     * 导致「经验修补」等原版关键附魔的出现概率降到原来的四分之一左右。
+     * </p>
+     * <p>
+     * 因此默认返回 false。附魔台与战利品箱的获取途径不受影响
+     * （由 {@link #isDiscoverable()} 控制）。
+     * </p>
+     * <p>
+     * v2.4：改由 {@code ConfigLoader.allowVillagerBookTrade} 控制，默认 false（拦截）。
+     * 开启后恢复原版行为，模组附魔重新进入交易池。
+     * </p>
+     *
+     * @return 是否可被村民交易
      */
     @Override
     public boolean isTradeable() {
         if (isDisabled()) {
+            return false;
+        }
+        // v2.4：默认拦截，避免稀释原版附魔书交易池（详见上方注释）
+        if (!ConfigLoader.allowVillagerBookTrade) {
             return false;
         }
         return super.isTradeable();
