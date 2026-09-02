@@ -293,5 +293,7 @@
   "carianstyle.hud.moon_resonance": "群星",
   "carianstyle.hud.time_reversal_stored": "回溯储存",
   "carianstyle.hud.fire_style": "火焰流派",
-  "carianstyle.hud.triggered": "已触发"
+  "carianstyle.hud.triggered": "已触发",
+  "carianstyle.hud.broken_star_offense": "碎星·攻势",
+  "carianstyle.hud.broken_star_defense": "碎星·守势"
 }

@@ -41,8 +41,27 @@ import java.util.function.BiFunction;
  * - GC分配速率降低约15-25GB/min（消除匿名类+HashMap节点分配）
  * </p>
  *
+ * <h3>v1.1：新增来源标签（tag）与剩余伤害查询</h3>
+ * <p>
+ * <b>为什么需要：</b>本管理器是<b>七个附魔共用的池子</b>（注定死亡、死亡之刃、黑焰刃、
+ * 癫火、战士、沙布里里嚎叫、空癫火）。此前的公开 API 只有
+ * {@link #getActiveCount()} 与 {@link #getStats()}，都是全局计数，
+ * 无法回答「<b>某个实体身上、由某个特定附魔造成的</b>持续伤害还剩多少」。
+ * </p>
+ * <p>
+ * 战士的 HUD 需要显示「流血剩余」。如果直接把该实体身上所有 DoT 加起来，
+ * 一个同时中了癫火和战士的玩家，HUD 会把癫火的伤害算进战士那一行——
+ * 数字看着有，但意义是错的。因此给条目加一个可选的来源标签。
+ * </p>
+ * <p>
+ * <b>完全向后兼容：</b>原有的 {@link #applyLinear(LivingEntity, float, int, int, DamageSource, boolean)}
+ * 与 {@link #applyScaling(LivingEntity, float, int, int, DamageSource, boolean, BiFunction)}
+ * 两个重载<b>签名与行为一律不变</b>，内部以 {@code tag = null} 转调新重载。
+ * 六个尚未打标签的附魔一行都不用改，只是查不到而已。
+ * </p>
+ *
  * @author RoinFlam
- * @version 1.0
+ * @version 1.1
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class DamageOverTimeManager {
@@ -86,7 +105,30 @@ public class DamageOverTimeManager {
     public static void applyLinear(@Nonnull LivingEntity target, float damagePerTick,
                                    int durationTicks, int initialDelay,
                                    @Nonnull DamageSource source, boolean canKill) {
-        DoTEntry entry = new DoTEntry(target, damagePerTick, durationTicks, initialDelay, source, canKill, null);
+        applyLinear(target, damagePerTick, durationTicks, initialDelay, source, canKill, null);
+    }
+
+    /**
+     * 注册一个固定伤害的持续效果，并打上来源标签（v1.1 新增）
+     * <p>
+     * 打了标签的条目才能被 {@link #getRemainingDamage} 按来源查到。
+     * 标签建议用附魔自身的常量（如 {@code EnchantmentWarrior.DOT_TAG}），
+     * 不要在多处硬编码字符串。
+     * </p>
+     *
+     * @param target        目标实体
+     * @param damagePerTick 每tick伤害值（在注册时计算好，不再每tick重算）
+     * @param durationTicks 持续时间（tick）
+     * @param initialDelay  初始延迟（tick），0=下一tick开始
+     * @param source        伤害来源（用于击杀时的死亡消息）
+     * @param canKill       是否可以致死
+     * @param tag           来源标签，可为 null（表示不参与按来源查询）
+     */
+    public static void applyLinear(@Nonnull LivingEntity target, float damagePerTick,
+                                   int durationTicks, int initialDelay,
+                                   @Nonnull DamageSource source, boolean canKill,
+                                   @Nullable String tag) {
+        DoTEntry entry = new DoTEntry(target, damagePerTick, durationTicks, initialDelay, source, canKill, null, tag);
         addEntry(entry);
     }
 
@@ -108,8 +150,78 @@ public class DamageOverTimeManager {
                                     int durationTicks, int initialDelay,
                                     @Nonnull DamageSource source, boolean canKill,
                                     @Nonnull BiFunction<Float, Integer, Float> scalingFunction) {
-        DoTEntry entry = new DoTEntry(target, baseDamagePerTick, durationTicks, initialDelay, source, canKill, scalingFunction);
+        applyScaling(target, baseDamagePerTick, durationTicks, initialDelay, source, canKill, scalingFunction, null);
+    }
+
+    /**
+     * 注册一个递增/自定义伤害的持续效果，并打上来源标签（v1.1 新增）
+     * <p>
+     * <b>⚠ 注意：</b>{@link #getRemainingDamage} 对缩放型条目只能按<b>基础速率</b>估算
+     * （{@code baseDamagePerTick × 剩余 tick}），无法预测缩放函数未来的返回值。
+     * 若需要精确的剩余量，请改用 {@link #applyLinear} 的标签重载。
+     * </p>
+     *
+     * @param target            目标实体
+     * @param baseDamagePerTick 基础每tick伤害值（传给scaling函数的第一个参数）
+     * @param durationTicks     持续时间（tick）
+     * @param initialDelay      初始延迟（tick）
+     * @param source            伤害来源
+     * @param canKill           是否可以致死
+     * @param scalingFunction   伤害缩放函数：(baseDamage, elapsedTicks) -> actualDamage
+     * @param tag               来源标签，可为 null（表示不参与按来源查询）
+     */
+    public static void applyScaling(@Nonnull LivingEntity target, float baseDamagePerTick,
+                                    int durationTicks, int initialDelay,
+                                    @Nonnull DamageSource source, boolean canKill,
+                                    @Nonnull BiFunction<Float, Integer, Float> scalingFunction,
+                                    @Nullable String tag) {
+        DoTEntry entry = new DoTEntry(target, baseDamagePerTick, durationTicks, initialDelay, source, canKill, scalingFunction, tag);
         addEntry(entry);
+    }
+
+    /**
+     * 查询某实体身上、由指定来源造成的持续伤害<b>剩余总量</b>（v1.1 新增）
+     * <p>
+     * 同一来源可能有多个条目同时存在（例如战士在 60 tick 内被连续命中多次，
+     * 每次都会注册一条），本方法会把它们全部累加。
+     * </p>
+     * <p>
+     * <b>计算方式：</b>{@code Σ(每tick伤害 × 剩余tick)}。对
+     * {@link #applyLinear} 注册的条目是精确值；对 {@link #applyScaling} 注册的条目
+     * 只是按基础速率的估算（详见该方法注释）。
+     * </p>
+     * <p>
+     * <b>初始延迟期内的条目也计入</b>——伤害尚未开始扣，但它确实是「欠着的」，
+     * HUD 应该在延迟期就把它显示出来，否则玩家会看到数字凭空跳出来。
+     * </p>
+     * <p>
+     * <b>线程：</b>仅供服务端主线程调用（与 tick 处理同线程），故直接遍历 ArrayList。
+     * 用下标遍历而非迭代器，避免在 {@link #onServerTick} 遍历期间被调用时抛
+     * ConcurrentModificationException——虽然当前不存在这种调用路径，但成本为零，值得防。
+     * </p>
+     *
+     * @param target 目标实体
+     * @param tag    来源标签（与注册时传入的一致）
+     * @return 剩余伤害总量；无匹配条目时为 0
+     */
+    public static float getRemainingDamage(@Nonnull LivingEntity target, @Nonnull String tag) {
+        int targetId = target.getId();
+        float total = 0f;
+        for (int i = 0; i < ACTIVE_DOTS.size(); i++) {
+            DoTEntry dot = ACTIVE_DOTS.get(i);
+            if (dot.targetId == targetId && tag.equals(dot.tag)) {
+                total += dot.remainingDamage();
+            }
+        }
+        // 待添加队列里的条目同样算数：它们是本 tick 刚注册的，
+        // 漏掉会让 HUD 在受击后的第一次轮询少显示一截
+        for (int i = 0; i < PENDING.size(); i++) {
+            DoTEntry dot = PENDING.get(i);
+            if (dot.targetId == targetId && tag.equals(dot.tag)) {
+                total += dot.remainingDamage();
+            }
+        }
+        return total;
     }
 
     /**
@@ -220,6 +332,13 @@ public class DamageOverTimeManager {
         final boolean canKill;
         @Nullable
         final BiFunction<Float, Integer, Float> scalingFunction;
+        /**
+         * 来源标签（v1.1 新增）
+         * <p>用于把共用同一个池子的七个附魔区分开，供
+         * {@link #getRemainingDamage} 按来源查询。null 表示不参与查询。</p>
+         */
+        @Nullable
+        final String tag;
 
         int remainingDelay;
         int remainingTicks;
@@ -227,7 +346,8 @@ public class DamageOverTimeManager {
 
         DoTEntry(@Nonnull LivingEntity target, float baseDamagePerTick, int durationTicks,
                  int initialDelay, @Nonnull DamageSource source, boolean canKill,
-                 @Nullable BiFunction<Float, Integer, Float> scalingFunction) {
+                 @Nullable BiFunction<Float, Integer, Float> scalingFunction,
+                 @Nullable String tag) {
             this.targetId = target.getId();
             this.target = target;
             this.baseDamagePerTick = baseDamagePerTick;
@@ -236,7 +356,21 @@ public class DamageOverTimeManager {
             this.source = source;
             this.canKill = canKill;
             this.scalingFunction = scalingFunction;
+            this.tag = tag;
             this.elapsedDamageTicks = 0;
+        }
+
+        /**
+         * 本条目尚未结算的伤害总量（v1.1 新增）
+         * <p>对线性条目为精确值；对缩放条目为按基础速率的估算。</p>
+         *
+         * @return 剩余伤害；已结束时为 0
+         */
+        float remainingDamage() {
+            if (remainingTicks <= 0 || baseDamagePerTick <= 0f) {
+                return 0f;
+            }
+            return baseDamagePerTick * remainingTicks;
         }
 
         /**

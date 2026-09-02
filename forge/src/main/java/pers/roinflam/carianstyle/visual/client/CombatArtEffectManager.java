@@ -8,6 +8,7 @@ import net.minecraftforge.fml.common.Mod;
 import pers.roinflam.carianstyle.network.CombatArtEffectPacket;
 import pers.roinflam.carianstyle.utils.Reference;
 
+import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,10 +19,10 @@ import java.util.List;
  * {@link CombatArtEffect} 并加入存活列表；客户端每 tick 检查、到期销毁；
  * 各战技渲染器每帧读取列表自绘。所有访问都在客户端主线程
  * （网络 handle 经 enqueueWork、tick / 渲染均主线程），故用普通 {@link ArrayList} 即可，
- * 无并发问题。整体结构与 {@link AoeEffectManager} 同款。
+ * 无并发问题。整体结构与 {@code AoeEffectManager} 同款。
  * </p>
  * <p>
- * <b>与 {@link AoeEffectManager} 的差异：</b>
+ * <b>与 {@code AoeEffectManager} 的差异：</b>
  * <ul>
  *     <li>多一个 {@code yaw} 字段（持有者朝向），刀光据此确定扫过的方位；</li>
  *     <li><b>不支持跟随实体</b>——刀光是「挥出去的那一瞬间留在空间里的痕迹」，
@@ -37,56 +38,102 @@ import java.util.List;
  * {@code EnchantmentWaterfowlFlurry} 每一段攻击各发一包（共 level+1 段、每 2 tick 一段），
  * 多道刀光靠各自独立的 {@code birthMs} 自然错相叠成连斩。
  * </p>
+ *
+ * <h3>v1.2 / v1.3：新增六个 + 五个战技演出</h3>
  * <p>
- * 因此它的时长必须<b>足够短</b>（{@value #WATERFOWL_DURATION_MS} ms）：
- * 段间隔只有 2 tick(100ms)，若单段拖到 600ms，四段就会同时挂着四道弧光糊成一片，
- * 反而看不出「连斩」的节奏。
+ * 时长全部收敛在 550~950ms 区间，靠 {@link #durationFor} 一处分发。
  * </p>
  *
- * <h3>v1.2：新增六个战技演出（4~9）</h3>
+ * <h3>v1.4（本次）：高频类型的同位置合并，与上限上调</h3>
+ *
+ * <h4>为什么必须加合并</h4>
  * <p>
- * 全部只需在 {@link #durationFor} 追加一档时长，其余逻辑（进度映射、tick 清理、
- * 上限保护）一律复用，本类没有任何结构性改动。
+ * v1.3 之前的九个类型，触发条件全是「概率」或「特定动作」——
+ * 居合 1% 起、回旋要冲刺攻击、格挡要架住、狮子斩 20%……
+ * 单个玩家同屏挂着的数量是个位数，{@code MAX_ACTIVE}(32) 绰绰有余。
+ * </p>
+ * <p>
+ * <b>v1.3 新增的这批不一样。</b>血刃、挥石魔法、黄金律法
+ * 都是<b>只要满足条件、每一次攻击都触发</b>的：
+ * </p>
+ * <pre>
+ * 一个高攻速、装了这几件的玩家
+ *   → 每次挥砍同时产生 血刃 + 挥石 + 律法 三个特效
+ *   → 攻速 2.0 即每秒 6 个
+ *   → 每个活 0.6~0.7 秒
+ *   → 单人稳态挂着约 4 个
+ * 十人团战 → 约 40 个，接近 32 的上限
+ * </pre>
+ * <p>
+ * 上限被打穿的表现是<b>最早的特效提前消失</b>——玩家会看到刀光闪一半就没了，
+ * 比不画还难看。
  * </p>
  *
- * <h3>v1.3：五个新演出的时长上调（实测反馈）</h3>
+ * <h4>做法：同位置合并（照抄红闪那套）</h4>
  * <p>
- * 实测中「狮子斩没看到」「盾牌冲击好像没效果」。除了尺度之外，
- * <b>时长也是原因</b>：v1.2 把它们定在 420~600ms，理由是「触发频率高，做长了会叠成一片」。
- * 这个顾虑本身没错，但方向反了——先得让人<b>看得见一次</b>，
- * 才谈得上担心看见太多次。
+ * {@code AoeEffectManager} 对红色闪电用的是「合并半径 + 专用上限 + 新建限速」三重节流。
+ * 本类只需要其中最有效的第一重：<b>同一类型、{@value #MERGE_DIST} 格内已有实例时，
+ * 不新建、只把那个实例的 {@code birthMs} 重置</b>（表现为「同一道特效持续在闪」）。
  * </p>
  * <p>
- * 本次统一上调约 30%（550~750ms）。这个区间仍明显短于居合的 650ms 之外的两个
- * （回旋 750 / 祈祷 950），连续攻击时也还来得及在下一次触发前收干净。
+ * 这对本场景特别贴切：这几个高频特效都锚在<b>同一个实体</b>身上（自己或同一个目标），
+ * 位移在 0.7 秒内不足半格，合并半径 1.2 格足以覆盖，而两个不同的人 / 不同的目标
+ * 必定分得开。
  * </p>
  * <p>
- * <b>唯一没动的是格挡窗口</b>——它的 500ms 与附魔的 10 tick 反击窗口严格绑定，
- * 不是审美取值，改了视觉就会开始骗人。详见 {@link #PARRY_WINDOW_DURATION_MS}。
+ * <b>只对 {@link #shouldMerge} 列出的类型生效。</b>居合、回旋、水鸟这些刻意要
+ * 「多道错相叠加」的类型<b>绝不能合并</b>——水鸟乱舞的连斩感完全依赖多个实例同时存在，
+ * 合并了就只剩一道刀光。这是本次改动唯一需要小心的地方。
  * </p>
  *
- * <h3>关于 {@link #MAX_ACTIVE}</h3>
+ * <h4>上限同步提到 {@value #MAX_ACTIVE}</h4>
  * <p>
- * 上限仍保持 {@value #MAX_ACTIVE} 不动。时长上调后单个高攻速玩家同屏挂着的数量
- * 会从十来个升到二十上下，仍在上限内。若将来发现团战中被顶到上限
- * （表现为最早的刀光提前消失），优先考虑的是<b>给高频类型加同位置合并</b>
- * （照抄 {@code AoeEffectManager} 对红闪的三重节流），而不是调大这个上限——
- * 合并能同时省下渲染开销与视觉噪声，调大上限只会两者都增加。
+ * 合并之后单人稳态降回 3 个（每个附魔一道，不再随攻速堆叠），
+ * 十人团战约 30 个。48 是留了余量的估算值。
+ * v1.4 移除四个演出后压力进一步下降，但上限保持不变——留着余量没有成本。
+ * </p>
+ * <p>
+ * <b>刻意不再往上调：</b>再高就该考虑给某个类型加专用上限了（照抄红闪的第二重），
+ * 而不是无限放宽总量——总量放宽只会让远处一堆看不清的刀光继续吃掉填充率。
  * </p>
  *
  * @author FlameForge
- * @version 1.3
+ *
+ * <h3>v1.4（同批）：移除四个演出的时长与合并登记</h3>
+ * <p>
+ * 复仇誓言、战士、碎星、献斗剑四个类型已删除，本类中对应的
+ * {@link #durationFor} 分支与 {@link #shouldMerge} 登记一并移除。
+ * </p>
+ *
+ * @version 1.4
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
 public final class CombatArtEffectManager {
 
     /**
      * 存活特效上限。
-     * <p>战技特效都很短（&lt;1 秒），正常战斗下同屏不会超过个位数；
-     * 此上限仅为极端情况（大量玩家同时触发）下防止无限堆积的兜底。
-     * 调整前请先看类注释「关于 MAX_ACTIVE」小节。</p>
+     * <p>
+     * v1.4：由 32 提到 {@value}，配合同位置合并一起应对 v1.3 新增的高频类型
+     * （详见类注释「上限同步提到」小节）。
+     * </p>
      */
-    private static final int MAX_ACTIVE = 32;
+    private static final int MAX_ACTIVE = 48;
+
+    /**
+     * 同位置合并的判定半径（格）。
+     * <p>
+     * 取 {@value} 的依据：需要合并的那几个特效都锚在同一个实体身上，
+     * 而实体在单个特效的生命周期（0.6~0.8 秒）内的位移通常不足半格；
+     * 而两个不同实体的间距至少是各自碰撞箱之和（&gt;0.6 格），
+     * 再加上战斗中的走位，1.2 格能可靠地把「同一个人反复触发」与
+     * 「两个人各自触发」分开。
+     * </p>
+     * <p>调大会让贴身站位的两名玩家共用一道特效，调小会让合并失效。</p>
+     */
+    private static final double MERGE_DIST = 1.2;
+
+    /** {@link #MERGE_DIST} 的平方（避免开方） */
+    private static final double MERGE_DIST_SQR = MERGE_DIST * MERGE_DIST;
 
     /**
      * 水鸟乱舞单道刀光的时长（毫秒）。
@@ -104,12 +151,8 @@ public final class CombatArtEffectManager {
      * 即反击加成的有效期为 <b>10 tick = 500ms</b>。
      * </p>
      * <p>
-     * 准星收缩到零的那一刻必须恰好是窗口关闭的那一刻——早了玩家会错过还能用的加成，
-     * 晚了玩家会以为还有加成而挨一下。<b>如果以后改了附魔里那个 10，
-     * 这里必须同步改</b>，否则视觉就在骗人。
-     * </p>
-     * <p>
-     * <b>v1.3 的整体时长上调刻意跳过了这一项</b>，原因即在此。
+     * 准星收缩到零的那一刻必须恰好是窗口关闭的那一刻。
+     * <b>如果以后改了附魔里那个 10，这里必须同步改</b>，否则视觉就在骗人。
      * </p>
      */
     private static final long PARRY_WINDOW_DURATION_MS = 500L;
@@ -138,8 +181,12 @@ public final class CombatArtEffectManager {
         public final float radius;
         /** 持有者水平朝向（弧度，已由度数转换并折算为本项目极坐标口径，详见 {@link #spawn}） */
         public final float baseAngle;
-        /** 诞生墙钟时刻（毫秒） */
-        public final long birthMs;
+        /**
+         * 诞生墙钟时刻（毫秒）。
+         * <p>v1.4：高频类型存在「同位置合并续命」，合并时会把本字段重置为当前时刻，
+         * 故去掉 final（与 {@code AoeEffectManager.AoeEffect#birthMs} 同理）。</p>
+         */
+        public long birthMs;
         /** 总时长（毫秒） */
         public final long durationMs;
 
@@ -158,6 +205,10 @@ public final class CombatArtEffectManager {
 
     /**
      * 创建一个战技特效（由网络包在客户端主线程调用）。
+     * <p>
+     * v1.4：高频类型（见 {@link #shouldMerge}）在新建前先尝试
+     * {@link #tryMerge 同位置合并}，命中则只续命、不新建。
+     * </p>
      *
      * @param type   特效类型
      * @param x      世界坐标 X
@@ -168,11 +219,73 @@ public final class CombatArtEffectManager {
      */
     public static void spawn(int type, double x, double y, double z, float radius, float yaw) {
         long now = System.currentTimeMillis();
+        // ⭐ v1.4：高频类型的同位置合并。命中即返回，不再新建
+        if (shouldMerge(type) && tryMerge(type, x, y, z, now)) {
+            return;
+        }
         ACTIVE.add(new CombatArtEffect(type, x, y, z, radius, toBaseAngle(yaw), now, durationFor(type)));
         // 上限保护：超出则丢弃最早的
         while (ACTIVE.size() > MAX_ACTIVE) {
             ACTIVE.remove(0);
         }
+    }
+
+    /**
+     * 该类型是否参与同位置合并。
+     * <p>
+     * <b>⚠ 只列出「每次攻击都可能触发」的类型。</b>刻意要多道错相叠加的类型
+     * （尤其是水鸟乱舞——它的连斩感完全依赖多个实例同时存在）绝不能出现在这里，
+     * 否则会被合并成一道，整个演出就废了。
+     * </p>
+     * <p>
+     * 判断标准很简单：<b>这个附魔在一次普通攻击里会不会稳定触发？</b>
+     * 会 → 加入；靠概率 / 靠特定动作（冲刺、举盾、击杀）→ 不加入。
+     * </p>
+     *
+     * @param type 特效类型
+     * @return 参与合并返回 true
+     */
+    private static boolean shouldMerge(int type) {
+        switch (type) {
+            case CombatArtEffectPacket.TYPE_BLOOD_BLADE:
+            case CombatArtEffectPacket.TYPE_GOLDEN_LAW:
+            case CombatArtEffectPacket.TYPE_WAVE_STONE:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * 尝试把本次触发合并到附近同类型的已有实例上。
+     * <p>
+     * 命中时把那个实例的 {@code birthMs} 重置为当前时刻——表现为「同一道特效重新播了一遍」，
+     * 而不是叠出第二道。<b>刻意不改坐标与朝向</b>：同一个实体反复触发时二者本就几乎不变，
+     * 改了反而会让特效在两次触发之间轻微跳动。
+     * </p>
+     *
+     * @param type 特效类型
+     * @param x    新触发点 X
+     * @param y    新触发点 Y
+     * @param z    新触发点 Z
+     * @param now  当前墙钟（毫秒）
+     * @return 已合并返回 true（调用方不应再新建）
+     */
+    private static boolean tryMerge(int type, double x, double y, double z, long now) {
+        for (int i = 0; i < ACTIVE.size(); i++) {
+            CombatArtEffect fx = ACTIVE.get(i);
+            if (fx.type != type) {
+                continue;
+            }
+            double dx = fx.x - x;
+            double dy = fx.y - y;
+            double dz = fx.z - z;
+            if (dx * dx + dy * dy + dz * dz <= MERGE_DIST_SQR) {
+                fx.birthMs = now;
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -206,7 +319,7 @@ public final class CombatArtEffectManager {
                 // 居合：拔刀一瞬（弧光在前 25% 扫完）+ 残影消散
                 return 650L;
             case CombatArtEffectPacket.TYPE_SPIN_SLASH:
-                // 回旋：360° 扫过约 450ms，与附魔里 12tick(600ms) 的玩家旋转动画大致同步，其后扬尘收尾
+                // 回旋：360° 扫过约 450ms，与附魔里 12tick(600ms) 的玩家旋转动画大致同步
                 return 750L;
             case CombatArtEffectPacket.TYPE_PRAYER_STRIKE:
                 // 祈祷一击：光柱降下 + 金环扩散 + 圣徽余辉，稍长以体现「庄重」
@@ -216,27 +329,39 @@ public final class CombatArtEffectManager {
                 // 否则多段会糊成一片、读不出连斩节奏（详见类注释的 v1.1 小节）
                 return WATERFOWL_DURATION_MS;
             case CombatArtEffectPacket.TYPE_INDOMITABLE:
-                // 不屈壁障：v1.3 450 → 600。免疫是最高 75% 概率的关键正反馈，
-                // 残血混战时视野最乱，必须给足被看见的时间
+                // 不屈壁障：免疫是最高 75% 概率的关键正反馈，残血混战时视野最乱，必须给足时间
                 return 600L;
             case CombatArtEffectPacket.TYPE_LION_CLAW:
-                // 狮子斩：v1.3 500 → 650。实测「没看到」，20% 概率配半秒实在太容易漏
                 return 650L;
             case CombatArtEffectPacket.TYPE_DOUBLE_SLASH:
-                // 二连斩：v1.3 520 → 680。两道交叉刀光，第二道还要错相追上，
-                // 时间不够的话第二道刚出来第一道就没了，读不出「二连」
+                // 二连斩：第二道要错相追上，时间不够会读不出「二连」
                 return 680L;
             case CombatArtEffectPacket.TYPE_LUNGE_UP:
-                // 箭步上砍：v1.3 600 → 750。附魔里目标是 5 tick(250ms) 后才被击飞，
-                // 拉长后弧顶的火花能压在击飞发生的时刻上
+                // 箭步上砍：附魔里目标是 5 tick(250ms) 后才被击飞，弧顶火花需压在那一刻
                 return 750L;
             case CombatArtEffectPacket.TYPE_PARRY_WINDOW:
-                // 格挡窗口：与附魔的 10 tick 反击窗口严格对齐，v1.3 刻意未随其它项上调
+                // 格挡窗口：与附魔的 10 tick 反击窗口严格对齐，不可随意改
                 return PARRY_WINDOW_DURATION_MS;
             case CombatArtEffectPacket.TYPE_SHIELD_BASH:
-                // 盾牌冲击：v1.3 420 → 550。实测「好像没效果」，
-                // 举盾挨打时视角常在晃（被击退 / 被打断），420ms 太容易整个错过
                 return 550L;
+
+            // ===== 数值型附魔的打击反馈（10 / 12 / 14 / 17 / 18）=====
+            case CombatArtEffectPacket.TYPE_BLOOD_BLADE:
+                // 血刃：地面血环扩散 + 放射溅射 + 低矮血泉 + 血滴。
+                // 这是自伤反馈，必须让玩家来得及意识到「我刚扣了 15% 血」
+                return 700L;
+            case CombatArtEffectPacket.TYPE_WAVE_STONE:
+                // 挥石魔法：钝重横扫 + 碎石飞散。做长了会失去「抡一下」的干脆
+                return 580L;
+            case CombatArtEffectPacket.TYPE_GOLDEN_LAW:
+                // 黄金律法：地面碑文铺开 + 刻纹亮起 + 金环外扩。庄重感需要一点时长
+                return 650L;
+            case CombatArtEffectPacket.TYPE_SKY_SHOT:
+                // 对空射击：贯下的箭光 + 爆环 + 垂下的光柱，都需要走完全程的时间
+                return 800L;
+            case CombatArtEffectPacket.TYPE_HARD_ARROW:
+                // 硬箭：十字冲击 + 后退环。弓箭连射频率高，做长了会叠成一片
+                return 600L;
             default:
                 return 700L;
         }
@@ -250,7 +375,7 @@ public final class CombatArtEffectManager {
      * @param now 当前墙钟（毫秒）
      * @return 归一化进度，夹取到 [0,1]
      */
-    public static float progressFor(CombatArtEffect fx, long now) {
+    public static float progressFor(@Nonnull CombatArtEffect fx, long now) {
         long elapsed = now - fx.birthMs;
         if (elapsed <= 0L) {
             return 0f;

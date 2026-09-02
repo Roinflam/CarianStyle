@@ -1,7 +1,6 @@
-// EnchantmentBloodBlade.java
-// 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentBloodBlade.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
@@ -16,6 +15,7 @@ import pers.roinflam.carianstyle.enchantment.EnchantmentFireGivesPower;
 import pers.roinflam.carianstyle.enchantment.EnchantmentScarletCorruption;
 import pers.roinflam.carianstyle.enchantment.EnchantmentVicDragonThunder;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 /**
  * 血刃附魔
@@ -25,9 +25,19 @@ import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
  * 上限为目标最大生命值
  * 玩家需刚挥剑，非玩家可直接触发
  * </p>
+ * <p>
+ * v2.1：接入血刃打击反馈（自伤血溅 + 朝正前方射出的细长血色新月）。
+ * 这是「自伤换伤」的附魔，扣了 15% 血却毫无提示最容易导致误判血线，
+ * 特效因此画在<b>自己</b>身上而非目标身上。
+ * </p>
+ * <p>
+ * 视觉原型取自《艾尔登法环》的战技<b>《血刃》</b>（割破自身、射出一道新月），
+ * 而非《鲜血斩击》——后者是身周爆发，在本模组里对应另一个附魔
+ * {@code EnchantmentBloodSlash}，那套语汇留给它。
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "blood_blade",
@@ -81,6 +91,13 @@ public class EnchantmentBloodBlade extends EnchantmentBase {
 
         // 消耗自身15%最大生命值
         attacker.setHealth(attacker.getHealth() - attacker.getMaxHealth() * 0.15f);
+
+        // ⭐ v2.1：血刃打击反馈。
+        // 位置刻意放在 setHealth 之后 —— 只有代价真正付出去了才播，
+        // 上面任何一个 return 都不该看到特效
+        if (attacker.level() instanceof ServerLevel serverLevel) {
+            CarianStyleCombatArtEffects.bloodBlade(serverLevel, attacker);
+        }
 
         // 增加伤害
         ctx.addDamage(bonusDamage);

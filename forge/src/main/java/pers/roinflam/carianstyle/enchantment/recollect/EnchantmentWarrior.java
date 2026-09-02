@@ -34,8 +34,27 @@ import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
  * v3.1新增：三个独立监听器入口接入怪物附魔触发开关
  * </p>
  *
+ * <h3>视觉反馈由 HUD 承担，不做世界特效</h3>
+ * <p>
+ * 本附魔三段效果没有一段适合做瞬时演出：攻击者视角的 ×1.25 是每次攻击都生效的常驻数值，
+ * 加视觉会变成每挥一次就闪一下的噪音；受击者视角的「50% 伤害转 60 tick 持续流失」
+ * 本身就是个持续状态；击杀回血虽是离散事件，但击杀那一刻屏幕上本来就够热闹了。
+ * </p>
+ * <p>
+ * 真正缺失的信息是<b>「我还要掉多少血才停」</b>——玩家会看到自己在没人打的时候还在掉血。
+ * 这个由 {@code CarianStyleCombatStateDisplay} 在 HUD 上显示剩余流血量，
+ * 数据取自下面 {@link #DOT_TAG} 标记的 DoT 条目。
+ * </p>
+ *
+ * <h3>v3.1 补充：给持续伤害打上来源标签</h3>
+ * <p>
+ * 注册 DoT 时改用 {@code applyLinear} 的标签重载并传入 {@link #DOT_TAG}，
+ * 让 {@code CarianStyleCombatStateDisplay} 的「流血剩余」HUD 能把本附魔的条目
+ * 从七个附魔共用的 DoT 池子里挑出来。<b>行为完全不变。</b>
+ * </p>
+ *
  * @author RoinFlam
- * @version 3.1
+ * @version 3.2
  */
 @AutoRegisterEnchantment(
         id = "warrior",
@@ -52,6 +71,21 @@ public class EnchantmentWarrior extends EnchantmentBase {
     private static final int DOT_DURATION = 60;
     /** 持续伤害初始延迟（tick） */
     private static final int DOT_DELAY = 5;
+
+    /**
+     * 本附魔在 {@link DamageOverTimeManager} 中的来源标签（v3.3 新增）。
+     * <p>
+     * {@code DamageOverTimeManager} 是<b>七个附魔共用的池子</b>（注定死亡、死亡之刃、
+     * 黑焰刃、癫火、战士、沙布里里嚎叫、空癫火）。HUD 要显示「战士流血剩余」，
+     * 就必须能把本附魔的条目从池子里挑出来——否则一个同时中了癫火的玩家，
+     * 那一行会把癫火的伤害也算进来，数字看着有但意义是错的。
+     * </p>
+     * <p>
+     * <b>public 是刻意的：</b>{@code CarianStyleCombatStateDisplay} 直接引用这个常量，
+     * 而不是自己硬编码一份同样的字符串——两处字符串迟早会因为一次改名而不同步。
+     * </p>
+     */
+    public static final String DOT_TAG = "warrior";
 
     public EnchantmentWarrior() {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
@@ -115,13 +149,16 @@ public class EnchantmentWarrior extends EnchantmentBase {
         // 剩余50%分60tick持续扣血
         float damagePerTick = evt.getAmount() / DOT_DURATION;
 
+        // ⭐ v3.2：改用带来源标签的重载，使 HUD 能查到「本附魔造成的」剩余流血。
+        // 行为与不带标签的重载完全一致，只是多记一个字符串引用
         DamageOverTimeManager.applyLinear(
                 victim,
                 damagePerTick,
                 DOT_DURATION,
                 DOT_DELAY,
                 evt.getSource(),
-                true
+                true,
+                DOT_TAG
         );
     }
 

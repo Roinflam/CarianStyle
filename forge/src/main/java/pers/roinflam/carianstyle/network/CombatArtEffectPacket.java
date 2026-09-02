@@ -26,7 +26,8 @@ import java.util.function.Supplier;
  * <p>
  * <b>⚠ 新增类型时只能在末尾追加常量，数值不可插队</b>——{@link #encode} 用
  * {@code writeByte} 写类型，新旧端对同一数值的解读必须一致，插队会导致所有后续类型错位。
- * 当前已用到 9，{@code byte} 的容量（最多 127）远未触及。
+ * 当前已用到 18（其中 11 / 13 / 15 / 16 为已移除类型留下的空号），
+ * {@code byte} 的容量（最多 127）远未触及。
  * </p>
  *
  * <h3>v1.2：新增六个战技类型（4~9）</h3>
@@ -35,18 +36,39 @@ import java.util.function.Supplier;
  * {@code CombatArtEffectRenderer} <b>一行都不用改</b>——后者的分发 switch 末尾是
  * {@code default -> { }}，会静默跳过自己不认识的类型。
  * </p>
+ *
+ * <h3>v1.3：新增「数值型附魔」的打击反馈</h3>
  * <p>
- * <b>为什么这六个走本包而不是 {@link AoeEffectPacket}：</b>两条理由。
- * 其一，它们在 {@code @AutoRegisterEnchantment} 里全部标注为
- * {@code EnchantmentCategory.COMBAT_SKILL}，语义上本就属于战技。
- * 其二也是更关键的——{@code AoeEffectRenderer} 的分发 switch 末尾是
- * {@code default -> drawGeneric(...)}，往那边加类型而不改渲染器的话，
+ * 这九个附魔此前<b>一点视觉都没有</b>——它们全是「攻击时按条件加伤 / 减伤」的纯数值效果，
+ * 玩家除了盯伤害数字之外无法感知它有没有生效。本批补上的正是那个缺口。
+ * </p>
+ * <p>
+ * <b>为什么仍然走本包而不是 {@link AoeEffectPacket}：</b>
+ * 除了「它们都需要朝向」之外，更实际的理由是 {@code AoeEffectRenderer} 的分发 switch
+ * 末尾是 {@code default -> drawGeneric(...)}——往那边加类型而不改渲染器，
  * 新类型会<b>额外多画一圈通用蓝白环</b>；而改那个文件意味着动一个四千余行的类。
- * 本包这边则完全没有这个问题。
+ * 本包这边的 {@code default -> { }} 则天然安全（详见 v1.2 小节）。
+ * </p>
+ * <p>
+ * 这九个由<b>第三个独立渲染器</b> {@code CombatArtBurstRenderer} 绘制，
+ * {@code CombatArtEffectRenderer} 与 {@code CombatArtExtraRenderer} 同样一行都不用改。
+ * </p>
+ * <p>
+ * <b>⚠ 高频触发警告：</b>本批里的血刃、复仇誓言、黄金律法、献斗剑、碎星
+ * 都是<b>每次攻击</b>就可能触发的，与前两批「概率触发 / 条件触发」的性质不同。
+ * {@code CombatArtEffectManager} 已为此加了同位置合并与更高的存活上限，
+ * 但服务端侧仍建议不要在每一次伤害事件里无条件发包（详见该类注释）。
  * </p>
  *
  * @author FlameForge
- * @version 1.2
+ *
+ * <h3>v1.4：移除四个演出</h3>
+ * <p>
+ * 复仇誓言（11）、战士（13）、碎星（15）、献斗剑（16）四个类型已删除，
+ * 编号保留为空号。剩余五个为 10 血刃、12 挥石魔法、14 黄金律法、17 对空射击、18 硬箭。
+ * </p>
+ *
+ * @version 1.4
  */
 public class CombatArtEffectPacket {
 
@@ -85,11 +107,11 @@ public class CombatArtEffectPacket {
     public static final int TYPE_WATERFOWL_FLURRY = 3;
 
     /**
-     * 不屈壁障：胸口白热爆闪 + 六片向外推开的壁障碎片 + 双层冲击环（v1.2 新增）。
+     * 不屈壁障：胸口白热爆闪 + 六片向外推开的壁障碎片 + 双层冲击环。
      * <p>
      * 对应 {@code EnchantmentIndomitable} <b>免疫成功的那一瞬</b>。
      * 该附魔最高 75% 概率完全免疫伤害，但在此之前玩家只能靠「怎么没掉血」去猜——
-     * 这个反馈补的正是那个缺口。定点、约 450ms。
+     * 这个反馈补的正是那个缺口。定点、约 600ms。
      * </p>
      * <p>由 {@code CombatArtExtraRenderer} 绘制。</p>
      */
@@ -100,7 +122,7 @@ public class CombatArtEffectPacket {
      * <p>
      * 对应 {@code EnchantmentLionClaw} 的 20% 概率触发（无视护甲 + 增伤）。
      * <b>特效画在目标身上、朝向取攻击者</b>——爪痕是留在被抓的那一方身上的。
-     * 定点、约 500ms。
+     * 定点、约 650ms。
      * </p>
      * <p>由 {@code CombatArtExtraRenderer} 绘制。</p>
      */
@@ -111,7 +133,7 @@ public class CombatArtEffectPacket {
      * <p>
      * 对应 {@code EnchantmentDoubleSlash} 的追加攻击。
      * <b>「两道、交叉成 X」是它与居合（单道宽弧）、水鸟（多道窄弧）的区分依据</b>。
-     * 特效画在目标身上、朝向取攻击者。定点、约 520ms。
+     * 特效画在目标身上、朝向取攻击者。定点、约 680ms。
      * </p>
      * <p>由 {@code CombatArtExtraRenderer} 绘制。</p>
      */
@@ -122,7 +144,7 @@ public class CombatArtEffectPacket {
      * <p>
      * 对应 {@code EnchantmentLungeUp} 冲刺攻击时的中断蓄力上挑。
      * <b>运动方向向上</b>，与其余全部战技（水平横扫）相反，一眼可辨。
-     * 特效画在目标身上、朝向取攻击者。定点、约 600ms。
+     * 特效画在目标身上、朝向取攻击者。定点、约 750ms。
      * </p>
      * <p>由 {@code CombatArtExtraRenderer} 绘制。</p>
      */
@@ -135,11 +157,6 @@ public class CombatArtEffectPacket {
      * 时长刻意与附魔里 {@code setData(..., 10)} 的 10 tick 严格对齐，
      * 准星收缩到零的瞬间就是窗口关闭的瞬间。定点、500ms。
      * </p>
-     * <p>
-     * <b>为什么定点而不跟随：</b>本包不支持绑定实体，而举盾时原版会大幅削减移速，
-     * 500ms 内位移不足半格，定点完全够用；为此改包格式、动到全部既有构造点，
-     * 收益不成比例。
-     * </p>
      * <p>由 {@code CombatArtExtraRenderer} 绘制。</p>
      */
     public static final int TYPE_PARRY_WINDOW = 8;
@@ -149,11 +166,110 @@ public class CombatArtEffectPacket {
      * <p>
      * 对应 {@code EnchantmentShieldBash} 举盾受击后的额外击退。
      * <b>扇形而非整圆</b>——击退只作用于正面的攻击者，形状如实反映这一点。
-     * 定点、约 420ms。
+     * 定点、约 550ms。
      * </p>
      * <p>由 {@code CombatArtExtraRenderer} 绘制。</p>
      */
     public static final int TYPE_SHIELD_BASH = 9;
+
+    // ===== 数值型附魔的打击反馈（10 / 12 / 14 / 17 / 18），由 CombatArtBurstRenderer 绘制 =====
+    // ⚠ 11 / 13 / 15 / 16 是空号：复仇誓言、战士、碎星、献斗剑四个演出已在 v1.4 移除。
+    // 刻意不把后面的编号往前挪 —— 重编号会让新旧版本在服务端与客户端不一致时
+    // 把一种特效当成另一种播，而留几个永不发送的空号成本为零。
+
+    /**
+     * 血刃：自伤血溅 + 一道朝正前方射出的细长血色新月 + 随之前散的血滴。
+     * <p>
+     * 对应 {@code EnchantmentBloodBlade}：攻击消耗 15% 最大生命，换取基于当前生命的额外伤害。
+     * </p>
+     * <p>
+     * 原型是《艾尔登法环》的战技<b>《血刃》</b>——割破自身、朝正前方射出一道细长的新月。
+     * <b>注意不要与《鲜血斩击》混淆</b>：后者是身周的大范围爆发，
+     * 在本模组里是另一个附魔（{@code blood_slash}），那套扩散波的语汇该留给它。
+     * 两者的几何区别在于：血刃的新月<b>曲率恒定、整体平移</b>，
+     * 而鲜血斩击是以自身为圆心向外扩张。
+     * </p>
+     * <p>
+     * <b>特效画在自己身上而非目标身上</b>——这是「自伤换伤」的附魔，
+     * 玩家需要看到的是「我付出了什么」。扣了 15% 血却毫无提示，
+     * 最容易导致误判血线送命。
+     * </p>
+     * <p>
+     * <b>⚠ 全部图元压在 0.65 格以下。</b>第一人称相机就在胸口高度、朝正前方，
+     * 任何锚在自己身上又立到胸口的东西都会糊住准星。定点、约 700ms。
+     * </p>
+     */
+    public static final int TYPE_BLOOD_BLADE = 10;
+
+    /**
+     * 挥石魔法：辉石法阵正儿八经地亮起 → 一块朴素的大石头抡过去 → 法阵碎成紫渣。
+     * <p>
+     * 对应 {@code EnchantmentWaveStoneMagic}：造成的魔法伤害转为物理伤害并 +50%。
+     * </p>
+     * <p>
+     * <b>这个演出画的是一个梗，不是一个法术。</b>笑点在于法师魔力聚了半天、
+     * 掏出来的是块石头，而且比法术好使——「挥石」是抡石头，「魔法」是硬贴上去的。
+     * 因此视觉的全部重心是<b>反差</b>：法阵做得一板一眼，石头做得灰扑扑毫无光效。
+     * </p>
+     * <p>
+     * <b>⚠ 石头绝对不能加光晕。</b>只要给它一点光效就变成「石属性法术弹」，
+     * 梗当场消失。这是本演出唯一不能妥协的一条。
+     * </p>
+     * <p>位置取受击者、朝向取攻击者。定点、约 580ms。</p>
+     */
+    public static final int TYPE_WAVE_STONE = 12;
+
+    /**
+     * 黄金律法：胸前立起一面矩形黄金律法碑 + 碑面刻纹 + 外扩金环。
+     * <p>
+     * 对应 {@code EnchantmentGoldenLaw} 的<b>免疫触发</b>那一段
+     * （免疫不超过 15% 最大生命的伤害；每 5 秒免疫一次伤害）。
+     * </p>
+     * <p>
+     * <b>「矩形碑面」在全模组独一份</b>——其余演出全是圆、环、星、弧、锥，
+     * 没有任何一个用过规整的矩形。矩形天然读作「碑」「律条」「不可逾越的界」，
+     * 与黄金律法的语义完全吻合，也与同为金色的祈祷一击（竖直光柱 + 十字）、
+     * 神圣净化（三维十字）、黄金树祝福（根须 + 落叶）在形状上彻底分开。
+     * </p>
+     * <p>
+     * <b>只在免疫真正生效的那一刻调用</b>——常驻的增伤 / 减伤没有触发点，
+     * 也不该有视觉，否则会变成一个每帧都在闪的噪音源。定点、约 650ms。
+     * </p>
+     */
+    public static final int TYPE_GOLDEN_LAW = 14;
+
+    /**
+     * 对空射击：一道自更高处竖直贯下的箭光 + <b>目标高度处</b>的空爆环 + 脚下下压尘环。
+     * <p>
+     * 对应 {@code EnchantmentSkyShot}：射击高于自身至少 5 格的目标时额外加伤。
+     * </p>
+     * <p>
+     * <b>爆环画在目标所在高度而非地面</b>，这是它与其余全部演出的关键区别——
+     * 本模组此前所有的环都贴地（或贴在脚下 / 胸口），只有本演出的主环悬在半空。
+     * 因为对空射击的语义正是「在空中把它打下来」，环若落到地面就完全不成立了。
+     * </p>
+     * <p>特效画在目标身上、朝向取射手。定点、约 800ms。</p>
+     */
+    public static final int TYPE_SKY_SHOT = 17;
+
+    /**
+     * 硬箭：沿箭矢飞行方向张开的锥形贯穿激波 + 命中点四道龟裂。
+     * <p>
+     * 对应 {@code EnchantmentHardArrow}：弓箭伤害 +[等级]×80%。
+     * </p>
+     * <p>
+     * <b>「锥形」在全模组独一份</b>——盾牌冲击是扇形（竖直墙面）、
+     * 排斥是同心环，都不是沿飞行方向逐渐张开的锥。用锥形表达
+     * 「一支箭把空气捅穿了」，比再画一圈环要贴切得多。
+     * </p>
+     * <p>
+     * <b>它的代价（12 格内有生物时受伤 +80%×等级）不在这里表达</b>——
+     * 那是持续状态，由客户端的 {@code HardArrowRangeRenderer} 画一个
+     * 只有自己看得见的 12 格范围光环来提示，与本包无关。
+     * </p>
+     * <p>特效画在目标身上、朝向取射手。定点、约 600ms。</p>
+     */
+    public static final int TYPE_HARD_ARROW = 18;
 
     /** 效果类型（见上方常量） */
     private final int type;
@@ -168,7 +284,7 @@ public class CombatArtEffectPacket {
     /**
      * 持有者的水平朝向（度，Minecraft 的 {@code getYRot()} 口径）。
      * <p>决定居合斩弧光扫过的方位、回旋斩的起始角、水鸟乱舞每一段的交叉角，
-     * 以及 v1.2 新增六个演出所在平面的朝向。
+     * 以及 v1.2 / v1.3 新增演出所在平面的朝向。
      * 对朝向无关的演出（如祈祷一击的光柱）该值仅用于让不同次触发的细节
      * （火花分布等）略有差异，不影响主体形态。</p>
      */

@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -21,13 +22,18 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 /**
  * 对空射击附魔
  * <p>v2.2：射手视角接入怪物附魔触发开关</p>
+ * <p>
+ * v2.3：接入对空射击特效（自更高处竖直贯下的箭光 + <b>目标高度处</b>的空爆环）。
+ * 特效<b>只在高度差判定通过之后</b>才播——普通命中不该有这个演出。
+ * </p>
  *
  * @author RoinFlam
- * @version 2.2
+ * @version 2.3
  */
 @AutoRegisterEnchantment(
         id = "sky_shot",
@@ -112,6 +118,13 @@ public class EnchantmentSkyShot extends EnchantmentBase {
         double bonusDamage2 = target.getHealth() * 0.1;
 
         arrow.setBaseDamage(baseDamage + bonusDamage1 + bonusDamage2);
+
+        // ⭐ v2.3：对空射击特效。
+        // 必须放在高度差判定之后 —— 这个演出的全部语义就是「在空中把它打下来」。
+        // 传入的是 target 本身（它此刻在空中），空爆环会画在它所处的高度而非地面
+        if (shooter.level() instanceof ServerLevel serverLevel) {
+            CarianStyleCombatArtEffects.skyShot(serverLevel, shooter, target);
+        }
 
         shooter.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 100, 1));
     }
