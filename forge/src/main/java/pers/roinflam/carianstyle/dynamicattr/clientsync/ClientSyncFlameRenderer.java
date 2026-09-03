@@ -53,6 +53,39 @@ import javax.annotation.Nullable;
  * 因此顶点写入不调用 overlayCoords。
  * </p>
  *
+ * <h3>v4：白焰改为第三人称专属（第一人称不再绘制）</h3>
+ * <p>
+ * <b>起因：</b>黑焰仪式在条件满足时会用 {@code onPlayerTick} <b>每 20 tick 刷新一次</b>
+ * 21 tick 时长的白焰，也就是条件持续成立期间火焰是<b>无缝常亮</b>的。
+ * 而第一人称的手部火焰永远贴在镜头前——一团持续不断的火挡在视野正中，
+ * 时间一长是纯粹的干扰，与「短暂着火提示你中了效果」完全是两回事。
+ * </p>
+ * <p>
+ * 改法是给 {@link FlameConfig} 加一个 {@code renderInFirstPerson} 开关，白焰设为
+ * {@code false}。第三人称、别人看你、以及 {@code onRenderLevelStage} 的补渲染<b>全都不受影响</b>，
+ * 只有 {@link #onRenderHand} 这一条路径会跳过它。
+ * </p>
+ *
+ * <h4>已知的连带影响：黑焰刀刃</h4>
+ * <p>
+ * 序列号 2（白焰）是<b>黑焰仪式和黑焰刀刃共用</b>的，而黑焰刀刃是把火挂在<b>被打的人</b>身上。
+ * 因此本次改动的连带结果是：<b>你被别人的黑焰刀刃打中时，第一人称也看不到自己在烧</b>，
+ * 只能靠第三人称或别人的视角看到。
+ * </p>
+ * <p>
+ * 这是<b>明知并接受</b>的取舍。要精确到「仪式的火不画、刀刃的火照画」，就得给两者拆出
+ * 两个序列号，代价是 {@code ClientSyncEffectManager} 的已知序列号表再长一格、
+ * 且要多维护一套完全同色同贴图的配置。为了一个「自己视野里短暂看不到火」的差别付这个代价，
+ * 不划算——何况原版着火的火焰是另一套渲染，不受此处影响，真着火时第一人称照样看得见。
+ * </p>
+ *
+ * <h4>为什么用 break 而不是 continue</h4>
+ * <p>
+ * 跳过时直接 {@code break}，<b>不往下找别的火焰</b>。第三人称那边的选择逻辑同样是
+ * 「命中第一个就 break」，两处必须用同一套优先级；若第一人称改用 {@code continue} 找替补，
+ * 就会出现<b>第三人称烧白焰、第一人称烧黄焰</b>这种两个视角对不上的情况。
+ * </p>
+ *
  * <h3>v2 性能：接入 {@link VisualLod}（含一处必须处理的时序坑）</h3>
  * <p>
  * 本渲染器此前是<b>唯一完全没接入统一视觉体系</b>的世界渲染器——它既不做距离裁剪，
@@ -334,10 +367,36 @@ public class ClientSyncFlameRenderer {
         final ResourceLocation layer0;
         final ResourceLocation layer1;
 
+        /**
+         * 是否在第一人称（手部渲染）中绘制本种火焰（v4 新增）。
+         * <p>
+         * {@code false} 表示该火焰<b>只有别人和第三人称视角能看到</b>，
+         * 玩家自己在第一人称下视野干净。详见类注释「v4」一节。
+         * </p>
+         */
+        final boolean renderInFirstPerson;
+
+        /**
+         * 三参构造：默认<b>第一人称也绘制</b>，与 v4 之前的行为完全一致。
+         * <p>保留它是为了让不需要改变行为的火焰配置保持原样，避免无谓的 diff。</p>
+         */
         FlameConfig(int serialNumber, String layer0, String layer1) {
+            this(serialNumber, layer0, layer1, true);
+        }
+
+        /**
+         * 四参构造：显式指定是否在第一人称绘制（v4 新增）。
+         *
+         * @param serialNumber        客户端同步序列号
+         * @param layer0              火焰外层纹理
+         * @param layer1              火焰内层纹理
+         * @param renderInFirstPerson 是否在第一人称手部渲染中绘制
+         */
+        FlameConfig(int serialNumber, String layer0, String layer1, boolean renderInFirstPerson) {
             this.serialNumber = serialNumber;
             this.layer0 = new ResourceLocation(layer0);
             this.layer1 = new ResourceLocation(layer1);
+            this.renderInFirstPerson = renderInFirstPerson;
         }
     }
 
@@ -352,9 +411,12 @@ public class ClientSyncFlameRenderer {
                     Reference.MOD_ID + ":block/crimson_flame_layer_1"),
 
             // 毁灭火焰（白色）- 序列号2
+            // ⭐ v4：第三人称专属。黑焰仪式在满足条件时会持续刷新这团火，
+            //    贴在镜头前会长时间挡住视野（详见类注释「v4」一节）。
             new FlameConfig(2,
                     Reference.MOD_ID + ":block/white_flame_layer_0",
-                    Reference.MOD_ID + ":block/white_flame_layer_1"),
+                    Reference.MOD_ID + ":block/white_flame_layer_1",
+                    false),
 
             // 癫痫火焰（黄色）- 序列号3
             new FlameConfig(3,
@@ -629,6 +691,13 @@ public class ClientSyncFlameRenderer {
         // 检查每种火焰效果
         for (FlameConfig config : FLAME_CONFIGS) {
             if (ClientSyncEffectManager.shouldRenderEffect(config.serialNumber, playerId)) {
+                // ⭐ v4：第三人称专属的火焰在这里止步。
+                // 用 break 而不是 continue —— 第三人称那边同样是「命中第一个就 break」，
+                // 若这里改用 continue 往下找，会出现「第三人称烧白焰、第一人称烧黄焰」
+                // 这种两个视角不一致的情况。跳过就是彻底不画，不找替补。
+                if (!config.renderInFirstPerson) {
+                    break;
+                }
                 try {
                     renderFireInFirstPerson(
                             config.layer1,

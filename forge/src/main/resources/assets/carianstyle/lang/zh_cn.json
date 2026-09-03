@@ -295,5 +295,7 @@
   "carianstyle.hud.fire_style": "火焰流派",
   "carianstyle.hud.triggered": "已触发",
   "carianstyle.hud.broken_star_offense": "碎星·攻势",
-  "carianstyle.hud.broken_star_defense": "碎星·守势"
+  "carianstyle.hud.broken_star_defense": "碎星·守势",
+  "carianstyle.hud.eat_shit_debuff": "治疗削减",
+  "carianstyle.hud.stealth_active": "隐身中"
 }

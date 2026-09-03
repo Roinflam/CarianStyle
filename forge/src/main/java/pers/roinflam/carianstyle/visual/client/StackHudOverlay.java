@@ -9,6 +9,7 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
 import net.minecraftforge.client.gui.overlay.IGuiOverlay;
+import pers.roinflam.carianstyle.visual.CarianStyleConditionDisplay;
 import pers.roinflam.carianstyle.visual.CarianStyleStackDisplays;
 import pers.roinflam.carianstyle.visual.StackDisplayRegistry;
 import pers.roinflam.carianstyle.visual.StackHudManager;
@@ -27,8 +28,8 @@ import java.util.Map;
  * <b>计数文本三态：</b>
  * <ul>
  *     <li>冷却倒计时项 → 显示剩余秒数（如 "5s"）；</li>
- *     <li>联动徽标（血之共鸣 / 月之共鸣，以 {@code Stacks(1,0,false)} 注册）→ 显示「已触发」，
- *         因其表达布尔激活态而非可累加层数（详见 {@link #isResonanceBadge}）；</li>
+ *     <li>徽标行（血之共鸣 / 月之共鸣 / 隐身中，以 {@code Stacks(1,0,false)} 注册）→ 显示「已触发」，
+ *         因其表达布尔激活态而非可累加层数（详见 {@link #isBadgeRow}）；</li>
  *     <li>其余叠层项（连击数等）→ 显示 "×层数"。</li>
  * </ul>
  * <p>
@@ -64,7 +65,7 @@ import java.util.Map;
  * <pre>
  * "×" + a.lastCount              // 每行每帧一个新 String
  * seconds + "s"                  // 冷却项同上
- * translatableWithFallback(...).getString()   // 联动徽标：一个 Component + 一个 String
+ * translatableWithFallback(...).getString()   // 徽标：一个 Component + 一个 String
  * </pre>
  * <p>
  * 单帧的量不大（同屏叠层项通常几行），但这是<b>每帧都在跑的 UI 代码</b>，
@@ -73,7 +74,7 @@ import java.util.Map;
  * </p>
  * <p>
  * <b>做法：</b>全部改为<b>类加载时预建的 {@link Component} 数组</b>
- * （{@link #COUNT_LABELS} / {@link #SECOND_LABELS} / {@link #RESONANCE_BADGE}），
+ * （{@link #COUNT_LABELS} / {@link #SECOND_LABELS} / {@link #BADGE_LABEL}），
  * 渲染时按下标取用，零分配。相应地 {@link #drawScaledString} 的形参由
  * {@code String} 改为 {@link Component}——{@code Font.width(FormattedText)} 与
  * {@code GuiGraphics.drawString(Font, Component, ...)} 都有现成重载，改动很小。
@@ -81,7 +82,7 @@ import java.util.Map;
  *
  * <h4>为什么徽标能安全地缓存成一个常量</h4>
  * <p>
- * 这是本次唯一需要想一下的地方：{@link #RESONANCE_BADGE} 是
+ * 这是本次唯一需要想一下的地方：{@link #BADGE_LABEL} 是
  * {@code Component.translatableWithFallback(...)}，而<b>翻译组件是在渲染时才解析当前语言的</b>
  * ——它内部持有的是「翻译键 + 回退值」，不是某种语言的成品字符串。
  * 因此把实例缓存下来，玩家中途切换语言后<b>下一帧就会自动显示新语言</b>，不需要任何失效逻辑。
@@ -94,7 +95,7 @@ import java.util.Map;
  * <h4>缓存容量与回退</h4>
  * <p>
  * 两个数组都设了上限，超出范围时<b>回退到动态创建</b>（{@link #countLabel} /
- * {@link #secondLabel}）：
+ * {@link #cooldownLabel}）：
  * </p>
  * <ul>
  *     <li>{@link #COUNT_LABELS} 覆盖 0~{@value #COUNT_LABEL_CACHE_SIZE}-1。
@@ -114,8 +115,78 @@ import java.util.Map;
  * 那反而要多分配一个集合。一个迭代器换一份可读性，这笔交易不划算。
  * </p>
  *
+ * <h3>v3：行数溢出屏幕的三级兜底（自适应缩放 → 多列 → 折叠）</h3>
+ *
+ * <h4>这个问题不是「以后会有」，而是「一直都在」</h4>
+ * <p>
+ * 原实现把每一行硬排在 {@code ANCHOR_Y + index × ROW_STRIDE}，<b>没有任何上界检查</b>。
+ * 按 {@value #ROW_STRIDE} 像素的行距算，1080p + GUI 缩放 3 的逻辑高度只有 360 像素，
+ * 也就是说<b>超过 14 行就会直接画到屏幕外面去</b>，多出来的行连同它们承载的信息一起消失，
+ * 而且是<b>无声消失</b>——玩家不会知道自己少看了几行。
+ * </p>
+ * <p>
+ * 注册项当前已有三十余个，本次又新增八个。虽然「同时凑齐四十项」在实战中不太可能，
+ * 但十四行这个门槛<b>是随手就能碰到的</b>：一身叠层护甲 + 一把多附魔武器就有七八行，
+ * 再进一场群战（誓复仇、战士流血、冷却倒计时接连出现）立刻见顶。
+ * </p>
+ *
+ * <h4>三级兜底，逐级才降质</h4>
+ * <ol>
+ *     <li><b>缩放</b>——先整体缩小，直到 {@value #MIN_SCALE}。缩放是<b>唯一不损失信息</b>的手段，
+ *         所以排在第一位。下限取 {@value #MIN_SCALE} 是因为再小文字就开始糊了：
+ *         GUI 缩放 3 时 0.62 相当于有效缩放 1.86，仍在原版 GUI 缩放 2 之上；</li>
+ *     <li><b>多列</b>——缩到下限还放不下就往右开新列，最多 {@value #MAX_COLUMNS} 列。
+ *         多列同样不损失信息，只是吃屏幕宽度，所以排第二；</li>
+ *     <li><b>折叠</b>——列也开满了才丢行，并在最后一行显示 {@code +N} 告诉玩家
+ *         「还有 N 项没显示」。<b>关键在于「明示」</b>：原实现是无声吞掉，
+ *         而这里至少让玩家知道有东西被藏了。</li>
+ * </ol>
+ * <p>
+ * 正常游戏里第三级基本走不到——{@value #MAX_COLUMNS} 列 × 缩放后每列十几行，
+ * 容量在四五十项以上，已经超过注册总数。它存在的意义是<b>保证任何情况下都不会静默丢信息</b>。
+ * </p>
+ *
+ * <h4>被折叠掉的一定是最不重要的</h4>
+ * <p>
+ * 折叠丢的是<b>末尾</b>若干行，而 {@code StackHudManager} v1.1 的排序保证末尾一定是
+ * 「只显示数字的常驻状态」（穿着就一直亮着的减伤、档位之类），
+ * 冷却倒计时与带进度条的叠层排在前面、永远不会被折叠。
+ * <b>这两处改动是配套的，改一个必须看另一个。</b>
+ * </p>
+ *
+ * <h4>为什么缩放要包住整个渲染而不是逐元素乘系数</h4>
+ * <p>
+ * 卡片由几十次 {@code fill} / {@code fillGradient} / {@code drawString} 拼出来，
+ * 逐元素乘系数意味着每一处坐标都要改，且圆角描边、1px 高光棱边这类
+ * <b>本来就依赖整数像素</b>的元素会在乘完之后错位。
+ * </p>
+ * <p>
+ * 直接往 {@code PoseStack} 上压一个 {@code scale}，所有绘制自动跟着缩——
+ * {@code GuiGraphics} 的 fill / fillGradient / drawString 在 1.20.1 都走
+ * {@code pose.last().pose()}，全部受矩阵影响。代价是<b>逻辑坐标系被放大了</b>：
+ * 缩放 {@code s} 之后可用的逻辑高度变成 {@code height / s}，
+ * 布局计算必须用这个值而不是屏幕高度（见 {@link #computeLayout}）。
+ * </p>
+ * <p>
+ * <b>副作用：</b>火星、扫光这些按像素定义的细节会一起缩小。这是缩放方案的固有代价，
+ * 也正是把缩放下限卡在 {@value #MIN_SCALE} 的原因之一。
+ * </p>
+ *
+ * <h4>换列 / 换行都是平滑的</h4>
+ * <p>
+ * {@link Anim} 新增了 {@code x} / {@code targetX} 两个字段，与原有的 {@code y} 一样走
+ * 指数平滑。<b>没有让它瞬移</b>——行数变化时（某项消失导致后面的整体上移、
+ * 或列容量变化导致整列迁移）如果直接跳位，视觉上就是一堆卡片突然乱窜。
+ * 现在它们会斜着滑过去。
+ * </p>
+ * <p>
+ * 注意 {@code x} 与既有的 {@code exitX}（出现 / 消失时的水平滑动）是<b>两回事</b>，
+ * 相加后才是最终位置：前者是「我属于第几列」，后者是「我正在进场还是退场」。
+ * 合并成一个字段会让「新行在第二列淡入」变成从屏幕左边滑到第二列的长距离飞行。
+ * </p>
+ *
  * @author FlameForge
- * @version 2
+ * @version 3
  */
 @OnlyIn(Dist.CLIENT)
 public final class StackHudOverlay implements IGuiOverlay {
@@ -127,7 +198,7 @@ public final class StackHudOverlay implements IGuiOverlay {
      * 名称翻译组件缓存：serialId -> 已构建的 {@link Component}。
      * <p><b>性能（视觉零变化）：</b>原先每帧每行都 {@code Component.translatable(...)} 新建一次组件
      * （每帧分配）。翻译组件在渲染时才解析当前语言，缓存其实例可跨帧复用、且语言切换仍正确，
-     * 故按 serialId 缓存，仅每个附魔首帧分配一次。注册项数量极少（个位数），缓存有界、无需清理。
+     * 故按 serialId 缓存，仅每个附魔首帧分配一次。注册项数量有限（数十个），缓存有界、无需清理。
      * 仅客户端渲染线程访问，无并发问题。
      */
     private static final Map<Integer, Component> NAME_CACHE = new HashMap<>();
@@ -142,29 +213,71 @@ public final class StackHudOverlay implements IGuiOverlay {
     /** 出现/消失时的水平滑动距离（像素，负向为左） */
     private static final int SLIDE_PX = 18;
 
-    /**
-     * 联动徽标计数文本的翻译键（带回退值，无需额外补语言键即可显示「已触发」）。
-     * <p>如需自定义文案或多语言，可在语言文件中覆盖此键；缺省时由 {@link #RESONANCE_BADGE_FALLBACK}
-     * 兜底，不会显示原始键名。</p>
-     */
-    private static final String RESONANCE_BADGE_KEY = "carianstyle.hud.triggered";
-    /** 联动徽标计数文本的默认回退值。 */
-    private static final String RESONANCE_BADGE_FALLBACK = "已触发";
+    // ===== v3 溢出布局常量 =====
 
     /**
-     * 联动徽标的计数文本组件（<b>v2：全局缓存一份</b>）。
+     * 整体缩放下限。
+     * <p>
+     * 再小文字就开始糊了。GUI 缩放 3 时 {@value} 相当于有效缩放 1.86，
+     * 仍高于原版 GUI 缩放 2 的观感；而火星、1px 高光棱边这类按像素定义的细节
+     * 到这个比例已经接近可分辨极限。
+     * </p>
+     */
+    private static final float MIN_SCALE = 0.62f;
+
+    /**
+     * 最多开几列。
+     * <p>
+     * 每列 {@value #COLUMN_WIDTH} 逻辑像素宽，三列约 312 像素。
+     * 1080p + GUI 缩放 3 的逻辑宽度是 640，三列占掉不到一半，
+     * 不会挡住准星区域或右侧的原版药水图标。再多就开始碍事了。
+     * </p>
+     */
+    private static final int MAX_COLUMNS = 3;
+
+    /**
+     * 列宽（逻辑像素）。
+     * <p>
+     * 卡片实际宽度由文本长度决定、每行不同，因此列宽只能取一个固定值。
+     * {@value} 是按最宽的情况估的：竖条与间距 10 + 计数文本约 22
+     * + 间隔 6 + 进度条 {@value #BAR_WIDTH} + 右padding 7 ≈ 95，再留一点列间距。
+     * </p>
+     * <p>
+     * <b>名称过长的行会略微越过列边界</b>，压在下一列卡片的辉光上。
+     * 这是可接受的——多列本来就是「实在放不下」时才启用的降级路径，
+     * 而为了严格对齐去每帧测量所有行的最大宽度并不划算。
+     * </p>
+     */
+    private static final int COLUMN_WIDTH = 104;
+
+    /** 折叠提示卡的高度（逻辑像素）。比正常行矮，因为它只有一行文字、没有进度条 */
+    private static final int OVERFLOW_ROW_HEIGHT = 13;
+
+    /** 折叠提示卡的宽度（逻辑像素） */
+    private static final int OVERFLOW_ROW_WIDTH = 40;
+
+    /** 折叠提示卡的配色：中性灰，刻意不用任何附魔的主题色 */
+    private static final int COL_OVERFLOW = 0x9AA4B0;
+
+    /**
+     * 徽标计数文本的翻译键（带回退值，无需额外补语言键即可显示「已触发」）。
+     * <p>如需自定义文案或多语言，可在语言文件中覆盖此键；缺省时由 {@link #BADGE_FALLBACK}
+     * 兜底，不会显示原始键名。</p>
+     */
+    private static final String BADGE_KEY = "carianstyle.hud.triggered";
+    /** 徽标计数文本的默认回退值。 */
+    private static final String BADGE_FALLBACK = "已触发";
+
+    /**
+     * 徽标行的计数文本组件（<b>v2：全局缓存一份</b>）。
      * <p>
      * 翻译组件在<b>渲染时</b>才解析当前语言，因此缓存实例是安全的——
      * 玩家中途切换语言后下一帧自动显示新语言，无需任何失效逻辑
      * （详见类注释「为什么徽标能安全地缓存成一个常量」）。
      * </p>
-     * <p>
-     * 原实现每帧调 {@code .getString()} 把它拍平成当前语言的 String，
-     * 既产生垃圾、又白白丢掉了翻译组件的延迟解析特性。
-     * </p>
      */
-    private static final Component RESONANCE_BADGE =
-            Component.translatableWithFallback(RESONANCE_BADGE_KEY, RESONANCE_BADGE_FALLBACK);
+    private static final Component BADGE_LABEL =
+            Component.translatableWithFallback(BADGE_KEY, BADGE_FALLBACK);
 
     /**
      * "×层数" 文本组件的缓存容量（覆盖 0 ~ 本值-1）。
@@ -182,6 +295,12 @@ public final class StackHudOverlay implements IGuiOverlay {
     private static final int SECOND_LABEL_CACHE_SIZE = 601;
 
     /**
+     * "+N" 折叠提示文本的缓存容量（v3 新增）。
+     * <p>被折叠的行数不可能超过注册总数，{@value} 绰绰有余；越界仍有动态回退。</p>
+     */
+    private static final int OVERFLOW_LABEL_CACHE_SIZE = 64;
+
+    /**
      * 预建的 "×N" 文本组件表（v2 新增，索引即层数）。
      * <p>类加载时一次性建好，渲染时按下标取用、零分配。超出范围由 {@link #countLabel} 回退。</p>
      */
@@ -189,9 +308,15 @@ public final class StackHudOverlay implements IGuiOverlay {
 
     /**
      * 预建的 "Ns" 文本组件表（v2 新增，索引即剩余秒数）。
-     * <p>类加载时一次性建好，渲染时按下标取用、零分配。超出范围由 {@link #secondLabel} 回退。</p>
+     * <p>类加载时一次性建好，渲染时按下标取用、零分配。超出范围由 {@link #cooldownLabel} 回退。</p>
      */
     private static final Component[] SECOND_LABELS = new Component[SECOND_LABEL_CACHE_SIZE];
+
+    /**
+     * 预建的 "+N" 折叠提示文本表（v3 新增，索引即被折叠的行数）。
+     * <p>与前两张表同理：折叠提示每帧都要画，不该每帧拼字符串。</p>
+     */
+    private static final Component[] OVERFLOW_LABELS = new Component[OVERFLOW_LABEL_CACHE_SIZE];
 
     static {
         for (int i = 0; i < COUNT_LABEL_CACHE_SIZE; i++) {
@@ -199,6 +324,9 @@ public final class StackHudOverlay implements IGuiOverlay {
         }
         for (int i = 0; i < SECOND_LABEL_CACHE_SIZE; i++) {
             SECOND_LABELS[i] = Component.literal(i + "s");
+        }
+        for (int i = 0; i < OVERFLOW_LABEL_CACHE_SIZE; i++) {
+            OVERFLOW_LABELS[i] = Component.literal("+" + i);
         }
     }
 
@@ -219,6 +347,12 @@ public final class StackHudOverlay implements IGuiOverlay {
     private static final float SPEED_Y = 13f;
     private static final float SPEED_X = 14f;
     private static final float SPEED_FLASH = 6f;
+    /**
+     * 换列时的水平迁移速度（v3 新增）。
+     * <p>比 {@link #SPEED_X}（进出场滑动）慢一些：换列是一段较长的横向位移，
+     * 用同样的速度会显得太急、像是在弹射。</p>
+     */
+    private static final float SPEED_COLUMN = 9f;
 
     // ===== 基础配色 =====
     private static final int COL_TEXT = 0xFFFFFF;
@@ -284,11 +418,13 @@ public final class StackHudOverlay implements IGuiOverlay {
     private static final class Anim {
         float barFill;   // 当前进度条填充比例（平滑趋近目标）
         float alpha;     // 当前不透明度（淡入淡出）
+        float x;         // 当前列 X（平滑趋近目标列位；v3 新增）
         float y;         // 当前 Y（平滑趋近目标行位）
         float exitX;     // 当前水平偏移（出现/消失滑动；0=就位，负=偏左）
         float flash;     // 闪烁强度（增层时置 1，衰减）
         float heat;      // 满层火焰强度 0~1（平滑升降）
         float targetRatio;
+        float targetX;   // 目标列 X（v3 新增）
         float targetY;
         int lastCount;
         int lastMax;
@@ -305,6 +441,22 @@ public final class StackHudOverlay implements IGuiOverlay {
         float[] emberSeed;// 每粒子相位种子（横向飘动差异）
         float emberSpawnAcc; // 生成累加器
         long rngState;       // 每行独立的无分配伪随机状态
+    }
+
+    /**
+     * 一次布局解算的结果（v3 新增）。
+     * <p>
+     * 做成 record 而不是几个散落的局部变量，是因为解算逻辑本身有点绕
+     * （缩放会反过来影响可用高度、可用高度又决定要不要多列），
+     * 把它整块抽进 {@link #computeLayout} 之后 {@link #render} 那边就只剩「按结果排位」了。
+     * </p>
+     *
+     * @param scale     整体缩放系数（1 = 不缩放）
+     * @param rowsPerCol 缩放后每列能放下的行数（&ge;1）
+     * @param visible   实际显示的行数（&le; 总行数）
+     * @param hidden    被折叠掉的行数（0 表示没有折叠）
+     */
+    private record Layout(float scale, int rowsPerCol, int visible, int hidden) {
     }
 
     @Override
@@ -327,11 +479,27 @@ public final class StackHudOverlay implements IGuiOverlay {
             a.present = false;
         }
 
-        // 同步目标值（entries 已按 serialId 排序，索引即行序）
+        // ⭐ v3：先数一遍「元数据齐全、真的会画出来」的行数，再据此解算布局。
+        // 必须先数：缩放系数取决于总行数，而行位又取决于缩放系数，
+        // 一边遍历一边定位是算不出来的。列表最多几十项，多走一趟的成本可以忽略。
+        int total = 0;
+        for (StackHudManager.Entry entry : entries) {
+            if (StackDisplayRegistry.getInfo(entry.serialId()) != null) {
+                total++;
+            }
+        }
+        Layout layout = computeLayout(total, height);
+
+        // 同步目标值（entries 已由 StackHudManager 排好序，索引即显示次序）
         int index = 0;
         for (StackHudManager.Entry entry : entries) {
             StackDisplayRegistry.Info info = StackDisplayRegistry.getInfo(entry.serialId());
             if (info == null) {
+                continue;
+            }
+            // 超出可见容量的行不标记 present，会自然淡出；它们的数量由 layout.hidden 汇总成 "+N"
+            if (index >= layout.visible()) {
+                index++;
                 continue;
             }
             Anim a = anims.get(entry.serialId());
@@ -352,10 +520,15 @@ public final class StackHudOverlay implements IGuiOverlay {
             } else {
                 targetRatio = max > 0 ? Math.min(1f, (float) count / max) : 0f;
             }
-            float targetY = ANCHOR_Y + index * ROW_STRIDE;
+            // ⭐ v3：先分列再定行。列内行号 = index % rowsPerCol，列号 = index / rowsPerCol
+            int column = index / layout.rowsPerCol();
+            int rowInColumn = index % layout.rowsPerCol();
+            float targetX = ANCHOR_X + column * COLUMN_WIDTH;
+            float targetY = ANCHOR_Y + rowInColumn * ROW_STRIDE;
 
             if (!a.initialized) {
                 a.initialized = true;
+                a.x = targetX;
                 a.y = targetY;
                 a.barFill = targetRatio;
                 a.alpha = 0f;
@@ -370,9 +543,18 @@ public final class StackHudOverlay implements IGuiOverlay {
             a.lastMax = max;
             a.cooldown = cooldown;
             a.targetRatio = targetRatio;
+            a.targetX = targetX;
             a.targetY = targetY;
             a.present = true;
             index++;
+        }
+
+        // ⭐ v3：整体缩放。压一层 scale 之后所有 fill / fillGradient / drawString 自动跟着缩，
+        // 无需逐元素改坐标（详见类注释「为什么缩放要包住整个渲染」）。
+        boolean scaled = layout.scale() < 0.999f;
+        if (scaled) {
+            graphics.pose().pushPose();
+            graphics.pose().scale(layout.scale(), layout.scale(), 1f);
         }
 
         // 更新动画并渲染；消失的行（滑出+淡出后）移除
@@ -388,6 +570,7 @@ public final class StackHudOverlay implements IGuiOverlay {
             a.alpha = smooth(a.alpha, targetAlpha, SPEED_ALPHA, dt);
             a.exitX = smooth(a.exitX, targetExitX, SPEED_X, dt);
             a.barFill = smooth(a.barFill, a.targetRatio, SPEED_BAR, dt);
+            a.x = smooth(a.x, a.targetX, SPEED_COLUMN, dt);
             a.y = smooth(a.y, a.targetY, SPEED_Y, dt);
             // 消失中的行（present=false，正在淡出）不应再出现白闪：直接清零残留闪光
             // （可能来自消失前最后一次层数增长或满层刷新），否则它会在淡出头几帧与卡片一起闪一下。
@@ -400,13 +583,122 @@ public final class StackHudOverlay implements IGuiOverlay {
 
             StackDisplayRegistry.Info info = StackDisplayRegistry.getInfo(serialId);
             if (info != null) {
-                renderRow(graphics, font, ANCHOR_X + Math.round(a.exitX), Math.round(a.y),
+                renderRow(graphics, font, Math.round(a.x + a.exitX), Math.round(a.y),
                         a, info, serialId, dt, time);
             }
 
             // 记录本帧是否出现，供下一帧"误闪抑制"判断
             a.presentLastFrame = a.present;
         }
+
+        // ⭐ v3：折叠提示。放在最后一列最后一行之下，明确告诉玩家还有几项没显示 ——
+        // 无声吞掉才是最坏的结果。
+        if (layout.hidden() > 0) {
+            int column = Math.max(0, (layout.visible() - 1) / layout.rowsPerCol());
+            int rowInColumn = layout.visible() - column * layout.rowsPerCol();
+            renderOverflowHint(graphics, font,
+                    ANCHOR_X + column * COLUMN_WIDTH,
+                    ANCHOR_Y + rowInColumn * ROW_STRIDE,
+                    layout.hidden(), time);
+        }
+
+        if (scaled) {
+            graphics.pose().popPose();
+        }
+    }
+
+    /**
+     * 解算本帧的缩放系数、每列行数、可见行数与折叠行数（v3 新增）。
+     *
+     * <h4>三级兜底的顺序不能换</h4>
+     * <p>
+     * 缩放<b>不损失任何信息</b>，多列<b>也不损失信息、只吃宽度</b>，折叠<b>会丢行</b>。
+     * 因此必须先缩到下限、再开列到上限、最后才折叠。反过来（先开列再缩放）
+     * 会在只多出一两行时就把 HUD 铺到半个屏幕宽，那是过度反应。
+     * </p>
+     *
+     * <h4>缩放之后可用高度反而变大了</h4>
+     * <p>
+     * 这是本方法唯一容易搞错的地方。{@code PoseStack.scale(s)} 缩小的是<b>绘制结果</b>，
+     * 等价于把逻辑坐标系放大了 {@code 1/s} 倍——缩放 0.62 之后，
+     * 一个 360 像素高的屏幕在逻辑坐标里有 {@code 360 / 0.62 ≈ 580} 像素可用。
+     * 所以每列行数必须按 {@code height / scale} 算，按 {@code height} 算会白白浪费掉缩放的收益。
+     * </p>
+     *
+     * @param total  本帧要显示的总行数（已排除元数据缺失的项）
+     * @param height 屏幕逻辑高度（GUI 缩放后的值，由 Forge 传入）
+     * @return 布局解算结果
+     */
+    private static Layout computeLayout(int total, int height) {
+        // 上下各留一个 ANCHOR_Y 的边距，避免贴边
+        int usableH = Math.max(ROW_STRIDE, height - ANCHOR_Y * 2);
+        int rowsAtFullScale = Math.max(1, usableH / ROW_STRIDE);
+
+        // 常态：一列就够，不缩放
+        if (total <= rowsAtFullScale) {
+            return new Layout(1f, rowsAtFullScale, total, 0);
+        }
+
+        // 第一级：缩放。刚好把 total 行塞进一列所需的系数，钳到下限
+        float needed = (float) usableH / (total * ROW_STRIDE);
+        float scale = Math.max(MIN_SCALE, Math.min(1f, needed));
+
+        // 缩放后的逻辑可用高度（见方法注释：缩放会让逻辑坐标系变大）
+        int logicalH = Math.max(ROW_STRIDE, Math.round(height / scale) - ANCHOR_Y * 2);
+        int rowsPerCol = Math.max(1, logicalH / ROW_STRIDE);
+
+        if (total <= rowsPerCol) {
+            // 缩放就解决了，不用开列
+            return new Layout(scale, rowsPerCol, total, 0);
+        }
+
+        // 第二级：多列（向上取整，钳到列数上限）
+        int columns = Math.min(MAX_COLUMNS, (total + rowsPerCol - 1) / rowsPerCol);
+        int capacity = rowsPerCol * columns;
+
+        if (total <= capacity) {
+            return new Layout(scale, rowsPerCol, total, 0);
+        }
+
+        // 第三级：折叠。留一行的位置给 "+N" 提示，其余全部显示
+        int visible = Math.max(1, capacity - 1);
+        return new Layout(scale, rowsPerCol, visible, total - visible);
+    }
+
+    /**
+     * 渲染折叠提示卡「+N」（v3 新增）。
+     * <p>
+     * 刻意做得比正常行<b>矮一半、窄很多、颜色中性</b>：它不是一条信息，
+     * 而是「这里还有信息没显示」的标记。做得和正常卡片一样显眼，
+     * 反而会让人以为那是某个附魔的状态。
+     * </p>
+     * <p>
+     * 不走 {@link Anim} 状态机——它没有淡入淡出的必要（出现与消失都跟随行数变化，
+     * 而行数变化本身已经有卡片的滑动动画在表达），为它单开一份动画状态得不偿失。
+     * </p>
+     *
+     * @param g      渲染上下文
+     * @param font   字体
+     * @param x      左上角 X
+     * @param y      左上角 Y
+     * @param hidden 被折叠掉的行数（&gt;0）
+     * @param time   全局时间（秒，驱动呼吸）
+     */
+    private static void renderOverflowHint(GuiGraphics g, Font font,
+                                           int x, int y, int hidden, float time) {
+        int right = x + OVERFLOW_ROW_WIDTH;
+        int bottom = y + OVERFLOW_ROW_HEIGHT;
+
+        // 缓慢呼吸，让它区别于「静止的装饰」——它代表有东西被藏起来了，应该有一点存在感
+        float breath = 0.55f + 0.20f * (0.5f + 0.5f * Mth.sin(time * 1.8f));
+
+        g.fillGradient(x, y, right, bottom,
+                argb(COL_BG_TOP, 0.45f), argb(COL_BG_BOT, 0.55f));
+        drawRoundBorder(g, x, y, right, bottom, argb(COL_OVERFLOW, 0.30f * breath));
+
+        Component label = overflowLabel(hidden);
+        int textX = x + (OVERFLOW_ROW_WIDTH - font.width(label)) / 2;
+        g.drawString(font, label, textX, y + 3, argb(COL_OVERFLOW, 0.85f * breath), true);
     }
 
     /**
@@ -414,7 +706,7 @@ public final class StackHudOverlay implements IGuiOverlay {
      *
      * @param g        渲染上下文
      * @param font     字体
-     * @param x        卡片左上角 X（已含水平滑动动画）
+     * @param x        卡片左上角 X（已含列位与水平滑动动画）
      * @param y        卡片左上角 Y（已含行位滑动动画）
      * @param a        动画状态
      * @param info     显示元数据
@@ -445,16 +737,16 @@ public final class StackHudOverlay implements IGuiOverlay {
             NAME_CACHE.put(serialId, name);
         }
         int nameWidth = font.width(name);
-        // 计数文本三态：冷却项显示剩余秒数（如 "5s"）；联动徽标（血之/月之共鸣）显示「已触发」；
-        // 其余叠层项显示 "×层数"。联动徽标以 Stacks(1,0,false) 注册，表达布尔激活态而非可累加层数，
-        // 故不显示 "×1"（详见 isResonanceBadge）；连击数等其它非冷却项不受影响，仍为 "×层数"。
+        // 计数文本三态：冷却项显示剩余秒数（如 "5s"）；徽标行（血之/月之共鸣、隐身中）显示「已触发」；
+        // 其余叠层项显示 "×层数"。徽标行以 Stacks(1,0,false) 注册，表达布尔激活态而非可累加层数，
+        // 故不显示 "×1"（详见 isBadgeRow）；连击数等其它非冷却项不受影响，仍为 "×层数"。
         //
         // ⭐ v2：三类文本全部取自预建的 Component 缓存，不再每帧拼字符串（详见类注释）
         Component countText;
         if (a.cooldown) {
             countText = cooldownLabel(a.lastCount);
-        } else if (isResonanceBadge(serialId)) {
-            countText = RESONANCE_BADGE;
+        } else if (isBadgeRow(serialId)) {
+            countText = BADGE_LABEL;
         } else {
             countText = countLabel(a.lastCount);
         }
@@ -784,18 +1076,29 @@ public final class StackHudOverlay implements IGuiOverlay {
     }
 
     /**
-     * 是否为「联动徽标」行（血之共鸣 / 月之共鸣）。
-     * <p>这两项以 {@code Stacks(1, 0, false)} 注册，本应表达「已触发」的布尔激活态，
-     * 而非可累加的层数，故其计数文本显示「已触发」而非 "×1"。其余非冷却叠层项（连击数等）
-     * 仍显示 "×层数"，不受影响。serialId 直接引用 {@link CarianStyleStackDisplays} 的公开常量，
-     * 避免魔数（与 {@code AuraGroundRenderer} 引用光环序号常量的写法一致）。</p>
+     * 是否为「徽标行」（血之共鸣 / 月之共鸣 / 隐身中）。
+     * <p>
+     * 这几项都以 {@code Stacks(1, 0, false)} 注册，表达的是<b>布尔激活态</b>
+     * 而非可累加的层数，故其计数文本显示「已触发」而非 "×1"。
+     * 其余非冷却叠层项（连击数等）仍显示 "×层数"，不受影响。
+     * </p>
+     * <p>
+     * serialId 直接引用各注册类的公开常量，避免魔数
+     * （与 {@code AuraGroundRenderer} 引用光环序号常量的写法一致）。
+     * <b>v3 新增隐身中</b>——它同样是布尔态，显示「×1」毫无意义。
+     * </p>
+     * <p>
+     * <b>为什么用 if 串联而不是集合：</b>只有三项，串联的分支预测友好、零分配，
+     * 而且这是每帧每行都会走的路径。等到十项以上再考虑换 {@code IntSet} 不迟。
+     * </p>
      *
      * @param serialId 行序列号
-     * @return 是联动徽标返回 true
+     * @return 是徽标行返回 true
      */
-    private static boolean isResonanceBadge(int serialId) {
+    private static boolean isBadgeRow(int serialId) {
         return serialId == CarianStyleStackDisplays.BLOOD_RESONANCE
-                || serialId == CarianStyleStackDisplays.MOON_RESONANCE;
+                || serialId == CarianStyleStackDisplays.MOON_RESONANCE
+                || serialId == CarianStyleConditionDisplay.STEALTH_ACTIVE;
     }
 
     /**
@@ -833,6 +1136,19 @@ public final class StackHudOverlay implements IGuiOverlay {
             return SECOND_LABELS[seconds];
         }
         return Component.literal(seconds + "s");
+    }
+
+    /**
+     * 取折叠提示 "+N" 的文本组件（v3 新增）。
+     *
+     * @param hidden 被折叠掉的行数（&gt;0）
+     * @return 形如 "+5" 的文本组件
+     */
+    private static Component overflowLabel(int hidden) {
+        if (hidden >= 0 && hidden < OVERFLOW_LABEL_CACHE_SIZE) {
+            return OVERFLOW_LABELS[hidden];
+        }
+        return Component.literal("+" + hidden);
     }
 
     /**

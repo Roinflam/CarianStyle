@@ -21,8 +21,25 @@ import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
  * 攻击或受到攻击后3秒内无法隐身（战斗冷却）
  * </p>
  *
+ * <h3>v2.1：两个战斗冷却常量改为 public（行为零变化）</h3>
+ * <p>
+ * {@code CarianStyleConditionDisplay} 需要读这条冷却来显示 HUD 倒计时。
+ * 冷却记录在 {@link EnchantmentDataManager} 里是<b>按字符串键存的</b>，
+ * 读取方必须拿到与写入方完全相同的键。
+ * </p>
+ * <p>
+ * 与其在 HUD 那边复制一份 {@code "concealing_veil_battle"} 字面量，
+ * 不如把这里的常量公开——<b>复制字面量的问题在于它不会跟着改</b>：
+ * 哪天这里改了键名而那边没跟上，HUD 会安静地永远显示「无冷却」，
+ * 既不报错也不会被测试发现。改成 public 之后，键名只有一处定义，
+ * 改动会由编译器强制同步。
+ * </p>
+ * <p>
+ * <b>本次只改了这两个字段的可见性修饰符，其余逻辑一行未动。</b>
+ * </p>
+ *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "concealing_veil",
@@ -33,8 +50,18 @@ import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 )
 public class EnchantmentConcealingVeil extends EnchantmentBase {
 
-    private static final String BATTLE_COOLDOWN_KEY = "concealing_veil_battle";
-    private static final int BATTLE_DURATION = 60; // 3秒 (60 ticks)
+    /**
+     * 战斗冷却在 {@link EnchantmentDataManager} 中的键。
+     * <p><b>v2.1 由 private 改为 public</b>：HUD 需要用同一个键读取剩余时间，
+     * 公开出去比在两处各写一遍字面量安全（详见类注释）。</p>
+     */
+    public static final String BATTLE_COOLDOWN_KEY = "concealing_veil_battle";
+
+    /**
+     * 战斗冷却时长（tick）：3 秒。
+     * <p><b>v2.1 由 private 改为 public</b>：HUD 用它作为充能进度条的总长度。</p>
+     */
+    public static final int BATTLE_DURATION = 60; // 3秒 (60 ticks)
 
     public EnchantmentConcealingVeil() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
