@@ -10,6 +10,7 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.StackHudManager;
 
@@ -97,6 +98,22 @@ public final class AuraScanner {
             // 离开世界：清空光环与叠层 HUD，避免残留
             active = Collections.emptyList();
             StackHudManager.clear();
+
+            // ⭐ 修复 1：清空效果同步缓存（序列号 -> 实体网络 ID 集合）。
+            // 该缓存原先没有任何清理入口，退出世界后旧世界的实体 ID 会原样留着；
+            // 而实体网络 ID 是按世界分配、且会从小数字重新开始复用的。
+            // 于是重进世界 / 换服后，凡是撞上旧 ID 的实体都会凭空挂上腐败雾、
+            // 冻伤霜、血滴、刀痕、睡眠 Z 等特效——各渲染器的判定是
+            // 「hasEffect 或 shouldRenderEffect」的双重冗余，只要缓存命中就渲染，
+            // hasEffect 为 false 也拦不住。
+            // 服务端 syncDimensionToPlayer 的兜底只覆盖 KNOWN_SERIALS，
+            // 新世界从未触发过的序列号不会发包，因此拦不住这种残留。
+            ClientSyncEffectManager.clearClientCache();
+
+            // ⭐ 修复 2：清空每帧共享实体查询缓存。
+            // 该缓存持有上一帧查到的 LivingEntity / 辉剑列表，实体又反向持有其 Level，
+            // 不清就会让整个旧客户端世界（区块、方块实体等）在主菜单期间无法回收。
+            SharedEntityQuery.clear();
             return;
         }
         if (++counter < SCAN_INTERVAL) {
@@ -209,3 +226,4 @@ public final class AuraScanner {
         return active;
     }
 }
+
