@@ -1,14 +1,11 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
-import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -21,6 +18,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
@@ -45,6 +43,38 @@ import java.util.List;
 @Mod.EventBusSubscriber
 public class EnchantmentCalamity extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.calamity.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "calamity";
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
+                    10, 1, 100);
+
+    /**
+     * 灾祸生效时的伤害倍率
+     * <p>默认 1.5，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_MULTIPLIER =
+            EnchantmentValues.define(VALUE_ID, "damage_multiplier",
+                    1.5D, 0.0D, 10.0D);
+
+    /**
+     * 每 tick 的触发概率（百分比）
+     * <p>默认 2.0，允许范围 0.0 ~ 100.0。</p>
+     */
+    private static final EnchantmentValues.Handle TRIGGER_CHANCE =
+            EnchantmentValues.define(VALUE_ID, "trigger_chance",
+                    2.0D, 0.0D, 100.0D);
+
     public EnchantmentCalamity() {
         super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
@@ -55,14 +85,10 @@ public class EnchantmentCalamity extends EnchantmentBase {
             return 0;
         }
 
-        int totalLevel = 0;
-        for (ItemStack armor : entity.getArmorSlots()) {
-            if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(calamity, armor);
-            }
-        }
+        // v-cache：走中央装备缓存
+        int totalLevel = EnchantmentEventHandler.armorTotal(entity, calamity);
         if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
+            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
         }
         return totalLevel;
     }
@@ -73,21 +99,11 @@ public class EnchantmentCalamity extends EnchantmentBase {
             return 0;
         }
 
-        int totalLevel = 0;
-
-        ItemStack heldItem = entity.getItemInHand(InteractionHand.MAIN_HAND);
-        if (!heldItem.isEmpty()) {
-            totalLevel += EnchantmentHelper.getItemEnchantmentLevel(calamity, heldItem);
-        }
-
-        for (ItemStack armor : entity.getArmorSlots()) {
-            if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(calamity, armor);
-            }
-        }
+        // v-cache：走中央装备缓存（主手 + 四个护甲槽）
+        int totalLevel = EnchantmentEventHandler.armorAndMainHand(entity, calamity);
 
         if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
+            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
         }
         return totalLevel;
     }
@@ -105,7 +121,7 @@ public class EnchantmentCalamity extends EnchantmentBase {
 
         int totalLevel = getArmorLevel(victim);
         if (totalLevel > 0) {
-            evt.setAmount(evt.getAmount() * 1.5f);
+            evt.setAmount(evt.getAmount() * (float) DAMAGE_MULTIPLIER.get());
         }
     }
 
@@ -119,7 +135,7 @@ public class EnchantmentCalamity extends EnchantmentBase {
             return;
         }
 
-        if (!RandomUtil.percentageChance(2)) {
+        if (!RandomUtil.percentageChance(TRIGGER_CHANCE.get())) {
             return;
         }
 

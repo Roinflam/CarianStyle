@@ -2,10 +2,8 @@ package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
-import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -16,7 +14,9 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
  * 祝福露水护符附魔
@@ -38,11 +38,43 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 @Mod.EventBusSubscriber
 public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.blessed_dew_talisman.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "blessed_dew_talisman";
+
+    /**
+     * 回血结算间隔（tick）
+     * <p>默认 20，允许范围 1 ~ 600。</p>
+     */
+    private static final EnchantmentValues.Handle HEAL_INTERVAL =
+            EnchantmentValues.define(VALUE_ID, "heal_interval",
+                    20, 1, 600);
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
+                    10, 1, 100);
+
+    /**
+     * 每次结算每级回复的最大生命占比
+     * <p>默认 0.002，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle HEAL_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "heal_per_level",
+                    0.002D, 0.0D, 1.0D);
+
+
     /**
      * 治疗间隔(tick)
      * 20 tick = 1秒
      */
-    private static final int HEAL_INTERVAL = 20;
 
     /**
      * 计数器ID前缀
@@ -69,7 +101,7 @@ public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
 
         // ⭐ 优化1: 使用计数器控制执行频率,每20tick(1秒)执行一次
         int tickCounter = EnchantmentDataManager.incrementCounter(COUNTER_ID, player.getUUID());
-        if (tickCounter % HEAL_INTERVAL != 0) {
+        if (tickCounter % HEAL_INTERVAL.getInt() != 0) {
             return;
         }
 
@@ -90,17 +122,12 @@ public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
             return;
         }
 
-        // 计算总附魔等级
-        int totalLevel = 0;
-        for (ItemStack armor : player.getArmorSlots()) {
-            if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(blessedDewTalisman, armor);
-            }
-        }
+        // 计算总附魔等级（v-cache：走中央装备缓存）
+        int totalLevel = EnchantmentEventHandler.armorTotal(player, blessedDewTalisman);
 
         // 应用等级上限
         if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
+            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
         }
 
         // 执行治疗
@@ -108,7 +135,7 @@ public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
             // ⭐ 优化4: 因为改为每秒执行一次,所以不再除以20
             // 原公式: 最大血量 * 等级 * 0.002 / 20 每tick
             // 新公式: 最大血量 * 等级 * 0.002 每秒
-            float healAmount = player.getMaxHealth() * totalLevel * 0.002f;
+            float healAmount = player.getMaxHealth() * totalLevel * (float) HEAL_PER_LEVEL.get();
             player.heal(healAmount);
         }
     }

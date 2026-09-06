@@ -13,6 +13,7 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
  * 熔炉之羽附魔
@@ -38,6 +39,46 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 )
 public class EnchantmentFurnaceFeather extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.furnace_feather.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "furnace_feather";
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
+                    10, 1, 100);
+
+    /**
+     * 每级延长无敌帧的系数
+     * <p>默认 1.5，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle INVULNERABLE_FACTOR =
+            EnchantmentValues.define(VALUE_ID, "invulnerable_factor",
+                    1.5D, 0.0D, 10.0D);
+
+    /**
+     * 每级施加效果的持续时间（tick）
+     * <p>默认 40，允许范围 1 ~ 1200。</p>
+     */
+    private static final EnchantmentValues.Handle EFFECT_TICKS_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "effect_ticks_per_level",
+                    40, 1, 1200);
+
+    /**
+     * 每级的伤害倍率加成
+     * <p>默认 0.5，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "damage_per_level",
+                    0.5D, 0.0D, 5.0D);
+
     public EnchantmentFurnaceFeather() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
                 EquipmentSlot.HEAD,
@@ -58,28 +99,28 @@ public class EnchantmentFurnaceFeather extends EnchantmentBase {
         // 手动应用等级限制（虽然 EnchantmentBase 已经限制过了，但为了保险再限制一次）
         int effectiveLevel = level;
         if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, 10);
+            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
         }
 
         // 增加无敌帧
         victim.invulnerableTime = (int) (victim.invulnerableDuration +
-                victim.invulnerableDuration / 2.0 * effectiveLevel * 1.5);
+                victim.invulnerableDuration / 2.0 * effectiveLevel * INVULNERABLE_FACTOR.get());
 
         // 添加速度效果
         victim.addEffect(new MobEffectInstance(
                 MobEffects.MOVEMENT_SPEED,
-                effectiveLevel * 40,
+                effectiveLevel * EFFECT_TICKS_PER_LEVEL.getInt(),
                 effectiveLevel - 1
         ));
 
         // 添加跳跃提升效果
         victim.addEffect(new MobEffectInstance(
                 MobEffects.JUMP,
-                effectiveLevel * 40,
+                effectiveLevel * EFFECT_TICKS_PER_LEVEL.getInt(),
                 effectiveLevel - 1
         ));
 
-        ctx.multiplyDamage(1 + 0.5f * level);
+        ctx.multiplyDamage(1 + (float) DAMAGE_PER_LEVEL.get() * level);
     }
 
     @Override

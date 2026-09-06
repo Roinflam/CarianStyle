@@ -17,6 +17,8 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
+import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 
 import javax.annotation.Nullable;
 import java.util.HashMap;
@@ -299,6 +301,14 @@ public final class CarianRetaliationRenderer {
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
+            return;
+        }
+
+        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
+        // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
+        // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
+        if (!VisualToggle.isEnabled(VisualEffectType.CARIAN_RETALIATION)) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();

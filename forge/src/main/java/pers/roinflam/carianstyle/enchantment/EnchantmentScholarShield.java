@@ -20,6 +20,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
  * 学者盾附魔
@@ -40,6 +41,31 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentScholarShield extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.scholar_shield.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "scholar_shield";
+
+    /**
+     * 每级反弹给攻击者的伤害比例
+     * <p>默认 0.1，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle REFLECT_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "reflect_per_level",
+                    0.1D, 0.0D, 5.0D);
+
+    /**
+     * 每级的减伤比例
+     * <p>默认 0.075，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle REDUCTION_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "reduction_per_level",
+                    0.075D, 0.0D, 1.0D);
+
 
     /**
      * 线程级重入保护标记。
@@ -103,7 +129,7 @@ public class EnchantmentScholarShield extends EnchantmentBase {
         // try-finally 保证标记可靠复位，避免标记滞留导致学者盾反伤永久失效
         PROCESSING_RETALIATION.set(Boolean.TRUE);
         try {
-            attacker.hurt(attacker.damageSources().mobAttack(victim), evt.getAmount() * level * 0.1f);
+            attacker.hurt(attacker.damageSources().mobAttack(victim), evt.getAmount() * level * (float) REFLECT_PER_LEVEL.get());
         } finally {
             PROCESSING_RETALIATION.set(Boolean.FALSE);
         }
@@ -142,7 +168,7 @@ public class EnchantmentScholarShield extends EnchantmentBase {
         if (ConfigLoader.levelLimit) level = Math.min(level, 10);
         if (level <= 0) return;
 
-        evt.setAmount(evt.getAmount() - evt.getAmount() * level * 0.075f);
+        evt.setAmount(evt.getAmount() - evt.getAmount() * level * (float) REDUCTION_PER_LEVEL.get());
     }
 
     @Override

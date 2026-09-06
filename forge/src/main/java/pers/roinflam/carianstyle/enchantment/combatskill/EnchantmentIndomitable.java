@@ -19,6 +19,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
@@ -52,6 +53,22 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentIndomitable extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.indomitable.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "indomitable";
+
+    /**
+     * 免疫概率系数：概率 = 已损失生命百分比 × 100 × 本系数
+     * <p>默认 0.75，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle IMMUNE_CHANCE_FACTOR =
+            EnchantmentValues.define(VALUE_ID, "immune_chance_factor",
+                    0.75D, 0.0D, 1.0D);
 
     public EnchantmentIndomitable() {
         super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
@@ -89,7 +106,7 @@ public class EnchantmentIndomitable extends EnchantmentBase {
         }
 
         float missingHealthPercent = 1 - holder.getHealth() / holder.getMaxHealth();
-        double immuneChance = missingHealthPercent * 100 * 0.75;
+        double immuneChance = missingHealthPercent * 100 * IMMUNE_CHANCE_FACTOR.get();
 
         if (RandomUtil.percentageChance(immuneChance)) {
             evt.setCanceled(true);

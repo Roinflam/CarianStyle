@@ -15,6 +15,7 @@ import pers.roinflam.carianstyle.enchantment.EnchantmentFireGivesPower;
 import pers.roinflam.carianstyle.enchantment.EnchantmentScarletCorruption;
 import pers.roinflam.carianstyle.enchantment.EnchantmentVicDragonThunder;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 /**
@@ -55,6 +56,38 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 )
 public class EnchantmentBloodBlade extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.blood_blade.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "blood_blade";
+
+    /**
+     * 每级基于本次伤害的额外伤害倍率
+     * <p>默认 0.33，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "damage_per_level",
+                    0.33D, 0.0D, 5.0D);
+
+    /**
+     * 每级基于目标当前生命的额外伤害倍率
+     * <p>默认 0.033，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle VICTIM_HEALTH_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "victim_health_per_level",
+                    0.033D, 0.0D, 1.0D);
+
+    /**
+     * 每次触发自伤的最大生命占比
+     * <p>默认 0.15，允许范围 0.0 ~ 0.9。</p>
+     */
+    private static final EnchantmentValues.Handle SELF_DAMAGE_RATIO =
+            EnchantmentValues.define(VALUE_ID, "self_damage_ratio",
+                    0.15D, 0.0D, 0.9D);
+
     public EnchantmentBloodBlade() {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
@@ -85,12 +118,13 @@ public class EnchantmentBloodBlade extends EnchantmentBase {
         // 额外伤害 = (当前伤害×等级×0.33 + 目标当前生命值×等级×0.033) × 自身血量比例，上限为目标最大生命值
         float healthRatio = attacker.getHealth() / attacker.getMaxHealth();
         float bonusDamage = Math.min(
-                (ctx.getDamage() * level * 0.33f + victim.getHealth() * level * 0.033f) * healthRatio,
+                (ctx.getDamage() * level * (float) DAMAGE_PER_LEVEL.get()
+                        + victim.getHealth() * level * (float) VICTIM_HEALTH_PER_LEVEL.get()) * healthRatio,
                 victim.getMaxHealth()
         );
 
         // 消耗自身15%最大生命值
-        attacker.setHealth(attacker.getHealth() - attacker.getMaxHealth() * 0.15f);
+        attacker.setHealth(attacker.getHealth() - attacker.getMaxHealth() * (float) SELF_DAMAGE_RATIO.get());
 
         // ⭐ v2.1：血刃打击反馈。
         // 位置刻意放在 setHealth 之后 —— 只有代价真正付出去了才播，

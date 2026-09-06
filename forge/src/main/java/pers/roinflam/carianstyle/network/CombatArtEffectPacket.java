@@ -68,7 +68,34 @@ import java.util.function.Supplier;
  * 编号保留为空号。剩余五个为 10 血刃、12 挥石魔法、14 黄金律法、17 对空射击、18 硬箭。
  * </p>
  *
- * @version 1.4
+ * <h3>v1.5：解码期数值校验</h3>
+ * <p>
+ * 本包的解码只读定长基本类型，不含「先读长度、再按长度分配容器」的模式，
+ * 因此<b>没有内存耗尽风险</b>。需要防的只有非法数值流进渲染层：
+ * </p>
+ * <ul>
+ *   <li>{@code radius} 为 {@code NaN} 或无穷大时，刀光弧带的顶点会算成 NaN，
+ *       显卡通常直接丢弃这些三角形——表现是「特效偶尔整个不出现」，
+ *       而从这个现象完全反查不到「某个包里的一个 float」上；</li>
+ *   <li>{@code radius} 为巨大正数时，一道居合的弧带会横跨整个可视范围；</li>
+ *   <li>{@code yaw} 只进三角函数，任何有限值都安全，但 {@code NaN} 会污染整条弧的
+ *       全部顶点，同样需要挡掉；</li>
+ *   <li>{@code type} 为负数时不对应任何已定义演出，应尽早拒绝。
+ *       注意本包的类型编号<b>有空号</b>（11 / 13 / 15 / 16），
+ *       因此只校验范围、<b>不</b>校验「是否为已定义值」——
+ *       空号交给客户端分发的 default 分支静默忽略，与既有行为完全一致。</li>
+ * </ul>
+ * <p>
+ * <b>线格式没有变化</b>，新旧端可互通；各上限取的都是正常游戏绝不可能触及的量级。
+ * </p>
+ * <p>
+ * <b>方向声明：</b>本包已在 {@code VisualNetwork} 注册时声明为
+ * {@code NetworkDirection.PLAY_TO_CLIENT}。服务端收到反向包会被 Forge 在分发入口
+ * 直接拒绝，处理器根本不会进入——这从源头消除了下方 {@link #handle} 注释里提到的
+ * 「服务端引用 {@code @OnlyIn(CLIENT)} 类」的顾虑，比 {@code DistExecutor} 更彻底。
+ * </p>
+ *
+ * @version 1.5
  */
 public class CombatArtEffectPacket {
 
@@ -290,6 +317,22 @@ public class CombatArtEffectPacket {
      */
     private final float yaw;
 
+    // ===== v1.5 校验上限（正常游戏绝不会触及）=====
+
+    /**
+     * 允许的最大类型编号。
+     * <p>当前最大已用值是 {@link #TYPE_HARD_ARROW}(18)，留到 63 是为了以后追加新演出时
+     * 不必回来改这里；{@code byte} 能表达到 127，仍有余量。</p>
+     */
+    private static final int MAX_TYPE = 63;
+
+    /**
+     * 允许的最大半径（格）。
+     * <p>本模组最大的战技弧带也在个位数格，客户端渲染裁剪距离是 48 格，
+     * 64 已远超任何合理值。</p>
+     */
+    private static final float MAX_RADIUS = 64.0F;
+
     /**
      * 构造。
      *
@@ -356,11 +399,21 @@ public class CombatArtEffectPacket {
      */
     public static CombatArtEffectPacket decode(FriendlyByteBuf buf) {
         int type = buf.readByte();
-        double x = buf.readDouble();
-        double y = buf.readDouble();
-        double z = buf.readDouble();
-        float radius = buf.readFloat();
-        float yaw = buf.readFloat();
+        if (type < 0 || type > MAX_TYPE) {
+            throw new IllegalArgumentException("CombatArtEffectPacket 的效果类型非法：" + type);
+        }
+
+        double x = PacketGuard.sanitizeCoordinate(buf.readDouble());
+        double y = PacketGuard.sanitizeCoordinate(buf.readDouble());
+        double z = PacketGuard.sanitizeCoordinate(buf.readDouble());
+
+        // 半径为 NaN / 无穷大时回退到 1 格：画一个很小的特效，
+        // 比整个不画更容易在测试中被发现，也不会影响帧率
+        float radius = PacketGuard.sanitize(buf.readFloat(), 0.0F, MAX_RADIUS, 1.0F);
+
+        // yaw 是角度，任何有限值都合法（三角函数天然按周期取模），只需剔除 NaN / 无穷大
+        float yaw = PacketGuard.sanitize(buf.readFloat(), -360.0F, 360.0F, 0.0F);
+
         return new CombatArtEffectPacket(type, x, y, z, radius, yaw);
     }
 

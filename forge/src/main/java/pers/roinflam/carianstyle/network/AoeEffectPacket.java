@@ -56,8 +56,27 @@ import java.util.function.Supplier;
  * 当前已用到 8，{@code byte} 的容量（最多 127）远未触及。
  * </p>
  *
+ * <h3>v5.1：解码期数值校验</h3>
+ * <p>
+ * 本包的解码不含「按长度分配容器」的模式，因此没有内存耗尽风险；
+ * 需要防的是<b>非法数值流进渲染层</b>：
+ * </p>
+ * <ul>
+ *   <li>{@code radius} 若为 {@code NaN} 或无穷大，客户端不会崩，
+ *       但会画出整屏乱纹或干脆什么都不画，而且从现象完全反查不到「某个包里的一个 float」；</li>
+ *   <li>{@code radius} 若是个巨大的正数，{@code AoeEffectManager} 里的
+ *       {@code scaleFor} 放大后会得到一个覆盖整个可视范围的几何体，等同于一次显卡拒绝服务；</li>
+ *   <li>{@code durationMs} 若是个巨大值，该特效会永远留在 {@code ACTIVE} 列表里
+ *       （虽有 {@code MAX_ACTIVE} 上限兜底，但会持续占用绘制预算）；</li>
+ *   <li>{@code type} 为负数时不对应任何已定义类型，应尽早拒绝而非交给渲染层分发。</li>
+ * </ul>
+ * <p>
+ * 上述校验全部在 {@link #decode} 完成，<b>线格式没有变化</b>，新旧端可互通。
+ * 各上限取的都是「正常游戏绝不可能触及」的量级，因此不会影响任何既有演出。
+ * </p>
+ *
  * @author RoinFlam
- * @version 5.0
+ * @version 5.1
  */
 public class AoeEffectPacket {
 
@@ -97,6 +116,28 @@ public class AoeEffectPacket {
      * {@code AoeEffectManager.durationFor(type)} 的返回值——这是全部既有演出的行为。</p>
      */
     public static final int AUTO_DURATION = -1;
+
+    // ===== v5.1 校验上限（正常游戏绝不会触及）=====
+
+    /**
+     * 允许的最大类型编号。
+     * <p>比当前最大值 {@link #TYPE_SACRED_PURGE}(8) 留出余量，
+     * 这样以后追加新类型时不必同步改这里；但仍能挡住 {@code byte} 能表达的全部负数与远端垃圾值。</p>
+     */
+    private static final int MAX_TYPE = 63;
+
+    /**
+     * 允许的最大半径（格）。
+     * <p>模组内最大的演出（黄金树祝福 / 龙雷）半径也在个位数到十几格，
+     * 客户端渲染裁剪距离是 48 格，64 已远超任何合理值。</p>
+     */
+    private static final float MAX_RADIUS = 64.0F;
+
+    /**
+     * 允许的最大播放时长（毫秒）。
+     * <p>最长的演出（满月 20 秒回血）是 20000ms，60 秒是三倍余量。</p>
+     */
+    private static final int MAX_DURATION_MS = 60_000;
 
     /** 效果类型（见上方常量） */
     private final int type;
@@ -216,18 +257,37 @@ public class AoeEffectPacket {
 
     /**
      * 解码。
+     * <p>v5.1：全部数值经边界校验，详见类注释。线格式未变。</p>
      *
      * @param buf 源缓冲
      * @return 解码出的包
+     * @throws IllegalArgumentException 类型编号非法时抛出，由 Forge 断开该连接
      */
     public static AoeEffectPacket decode(FriendlyByteBuf buf) {
         int type = buf.readByte();
-        double x = buf.readDouble();
-        double y = buf.readDouble();
-        double z = buf.readDouble();
-        float radius = buf.readFloat();
+        if (type < 0 || type > MAX_TYPE) {
+            throw new IllegalArgumentException("AoeEffectPacket 的效果类型非法：" + type);
+        }
+
+        double x = PacketGuard.sanitizeCoordinate(buf.readDouble());
+        double y = PacketGuard.sanitizeCoordinate(buf.readDouble());
+        double z = PacketGuard.sanitizeCoordinate(buf.readDouble());
+
+        // 半径为 NaN / 无穷大时回退到 1 格：画一个很小的特效，
+        // 比不画更容易在测试中被发现，也不会影响帧率
+        float radius = PacketGuard.sanitize(buf.readFloat(), 0.0F, MAX_RADIUS, 1.0F);
+
+        // entityId 只区分「负数即不跟随」，统一归一到哨兵值，
+        // 避免 -7 这种值被 AoeEffectManager 当成实体 id 去查
         int entityId = buf.readInt();
+        if (entityId < 0) {
+            entityId = NO_ENTITY;
+        }
+
+        // durationMs：负数一律归一为 AUTO_DURATION（按类型取默认时长），正数收拢到上限
         int durationMs = buf.readInt();
+        durationMs = durationMs < 0 ? AUTO_DURATION : PacketGuard.clamp(durationMs, 0, MAX_DURATION_MS);
+
         return new AoeEffectPacket(type, x, y, z, radius, entityId, durationMs);
     }
 
@@ -239,6 +299,12 @@ public class AoeEffectPacket {
      * ——该方法只操作普通列表、不引用任何客户端专有渲染类，双端加载安全，
      * 因此无需 {@code DistExecutor} 包裹。这样可避免在 Mohist 等混合端因
      * 「服务端引用 {@code @OnlyIn(CLIENT)} 类」而引发的类加载问题。
+     * </p>
+     * <p>
+     * <b>v5.1 补充：</b>本包已在 {@code VisualNetwork} 注册时声明为
+     * {@code NetworkDirection.PLAY_TO_CLIENT}，服务端收到反向包会被 Forge
+     * 在分发入口直接拒绝，处理器根本不会进入——这从源头消除了上述类加载顾虑，
+     * 比 {@code DistExecutor} 更彻底。
      * </p>
      *
      * @param packet 收到的包

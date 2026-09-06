@@ -19,6 +19,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
@@ -44,6 +45,38 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 @Mod.EventBusSubscriber
 public class EnchantmentAncestralSpiritHorn extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.ancestral_spirit_horn.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "ancestral_spirit_horn";
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
+                    10, 1, 100);
+
+    /**
+     * 受到伤害的倍率（越小减伤越多）
+     * <p>默认 0.75，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_MULTIPLIER =
+            EnchantmentValues.define(VALUE_ID, "damage_multiplier",
+                    0.75D, 0.0D, 1.0D);
+
+    /**
+     * 每级把受到伤害转为持续治疗的比例
+     * <p>默认 0.05，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle HEAL_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "heal_per_level",
+                    0.05D, 0.0D, 2.0D);
+
     public EnchantmentAncestralSpiritHorn() {
         super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
@@ -61,7 +94,7 @@ public class EnchantmentAncestralSpiritHorn extends EnchantmentBase {
             }
         }
         if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
+            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
         }
         return totalLevel;
     }
@@ -89,9 +122,9 @@ public class EnchantmentAncestralSpiritHorn extends EnchantmentBase {
             return;
         }
 
-        evt.setAmount(evt.getAmount() * 0.75f);
+        evt.setAmount(evt.getAmount() * (float) DAMAGE_MULTIPLIER.get());
 
-        float healPerTick = evt.getAmount() * totalLevel * 0.05f / 20;
+        float healPerTick = evt.getAmount() * totalLevel * (float) HEAL_PER_LEVEL.get() / 20;
 
         new SynchronizationTask(10, 10) {
             private int tick = 0;

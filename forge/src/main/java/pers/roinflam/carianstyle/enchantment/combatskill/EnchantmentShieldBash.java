@@ -12,6 +12,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 /**
@@ -46,6 +47,22 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
         slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND}
 )
 public class EnchantmentShieldBash extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.shield_bash.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "shield_bash";
+
+    /**
+     * 每级的击退强度
+     * <p>默认 0.25，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle KNOCKBACK_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "knockback_per_level",
+                    0.25D, 0.0D, 5.0D);
 
     public EnchantmentShieldBash() {
         // 修复：BREAKABLE → SHIELD自定义类型
@@ -84,7 +101,7 @@ public class EnchantmentShieldBash extends EnchantmentBase {
         // 击退攻击者
         double x = holder.getX() - attacker.getX();
         double z = holder.getZ() - attacker.getZ();
-        attacker.knockback(level * 0.25f, x, z);
+        attacker.knockback(level * (float) KNOCKBACK_PER_LEVEL.get(), x, z);
 
         // ⭐ v2.2：播放「前向扇形冲击波」自绘特效。
         // 位置与朝向都取持有者——冲击波是从盾面推出去的（详见类注释）

@@ -8,7 +8,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
-import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -22,6 +21,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
@@ -48,6 +48,39 @@ import java.util.List;
 @Mod.EventBusSubscriber
 public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.dark_abandoned_child.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "dark_abandoned_child";
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
+                    10, 1, 100);
+
+    /**
+     * 夜间受到伤害的倍率
+     * <p>默认 0.9，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle NIGHT_DAMAGE_MULTIPLIER =
+            EnchantmentValues.define(VALUE_ID, "night_damage_multiplier",
+                    0.9D, 0.0D, 2.0D);
+
+    /**
+     * 夜间每秒回复的最大生命占比
+     * <p>默认 0.015，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle HEAL_RATIO_PER_SECOND =
+            EnchantmentValues.define(VALUE_ID, "heal_ratio_per_second",
+                    0.015D, 0.0D, 1.0D);
+
+
     private static final int RECOLLECT_ENCHANTABILITY = 35;
 
     public EnchantmentDarkAbandonedChild() {
@@ -65,7 +98,7 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
 
         int effectiveLevel = level;
         if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, 10);
+            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
         }
 
         if (ctx.isHolderPlayer()) {
@@ -126,10 +159,11 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getItemEnchantmentLevel(darkAbandonedChild, heldItem);
+        // v-cache：走中央装备缓存
+        int level = EnchantmentEventHandler.mainHand(victim, darkAbandonedChild);
 
         if (level > 0 && !victim.level().isDay()) {
-            evt.setAmount(evt.getAmount() * 0.9f);
+            evt.setAmount(evt.getAmount() * (float) NIGHT_DAMAGE_MULTIPLIER.get());
         }
     }
 
@@ -161,10 +195,11 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getItemEnchantmentLevel(darkAbandonedChild, heldItem);
+        // v-cache：走中央装备缓存
+        int level = EnchantmentEventHandler.mainHand(player, darkAbandonedChild);
 
         if (level > 0) {
-            player.heal(player.getMaxHealth() * 0.015f / 20);
+            player.heal(player.getMaxHealth() * (float) HEAL_RATIO_PER_SECOND.get() / 20);
         }
     }
 

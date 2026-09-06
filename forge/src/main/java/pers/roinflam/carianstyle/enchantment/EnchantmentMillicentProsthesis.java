@@ -12,6 +12,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
  * 米莉森义肢附魔
@@ -45,6 +46,30 @@ import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
         }
 )
 public class EnchantmentMillicentProsthesis extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.millicent_prosthesis.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "millicent_prosthesis";
+
+    /**
+     * 叠层满时每级的额外伤害倍率
+     * <p>默认 0.1，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL_FULL =
+            EnchantmentValues.define(VALUE_ID, "damage_per_level_full",
+                    0.1D, 0.0D, 5.0D);
+
+    /**
+     * 叠层未满时每级的额外伤害倍率
+     * <p>默认 0.05，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL_PARTIAL =
+            EnchantmentValues.define(VALUE_ID, "damage_per_level_partial",
+                    0.05D, 0.0D, 5.0D);
 
     public EnchantmentMillicentProsthesis() {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
@@ -88,10 +113,10 @@ public class EnchantmentMillicentProsthesis extends EnchantmentBase {
 
         if (currentAmplifier >= level * 7 - 1) {
             // 满层：增伤10%×等级
-            ctx.addDamage(ctx.getDamage() * level * 0.1f);
+            ctx.addDamage(ctx.getDamage() * level * (float) DAMAGE_PER_LEVEL_FULL.get());
         } else if (currentAmplifier >= 0) {
             // 未满层：增伤5%×等级
-            ctx.addDamage(ctx.getDamage() * level * 0.05f);
+            ctx.addDamage(ctx.getDamage() * level * (float) DAMAGE_PER_LEVEL_PARTIAL.get());
         }
     }
 

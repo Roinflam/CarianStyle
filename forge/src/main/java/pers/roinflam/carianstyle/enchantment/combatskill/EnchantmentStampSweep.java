@@ -12,6 +12,7 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
@@ -70,15 +71,52 @@ import java.util.List;
 )
 public class EnchantmentStampSweep extends EnchantmentBase {
 
-    /** 单次冲刺斩最大命中目标数：防止密集怪物场景下无上限 AOE 触发大量受击事件链 */
-    private static final int MAX_TARGETS = 20;
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.stamp_sweep.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "stamp_sweep";
+
+    /**
+     * 单次横扫的最大命中目标数
+     * <p>默认 20，允许范围 1 ~ 200。</p>
+     */
+    private static final EnchantmentValues.Handle MAX_TARGETS =
+            EnchantmentValues.define(VALUE_ID, "max_targets",
+                    20, 1, 200);
+
+    /**
+     * 横扫半径（格）
+     * <p>默认 3.0，允许范围 1.0 ~ 32.0。</p>
+     */
+    private static final EnchantmentValues.Handle SWEEP_RADIUS =
+            EnchantmentValues.define(VALUE_ID, "sweep_radius",
+                    3.0D, 1.0D, 32.0D);
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
+                    10, 1, 100);
+
+    /**
+     * 每级的横扫额外伤害倍率
+     * <p>默认 0.1，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "damage_per_level",
+                    0.1D, 0.0D, 5.0D);
+
 
     /**
      * AOE 作用半径（格）。
      * <p>v2.3：抽为常量，供伤害判定与视觉特效共用，避免两处各自写死导致以后改动漏改一处
      * （视觉与判定不一致会让玩家误判走位）。</p>
      */
-    private static final int SWEEP_RADIUS = 3;
 
     public EnchantmentStampSweep() {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
@@ -104,7 +142,7 @@ public class EnchantmentStampSweep extends EnchantmentBase {
         // 手动应用等级限制
         int effectiveLevel = level;
         if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, 10);
+            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
         }
 
         // 如果是玩家，执行旋转动画
@@ -118,13 +156,13 @@ public class EnchantmentStampSweep extends EnchantmentBase {
             CarianStyleCombatArtEffects.spinSlash(
                     serverLevel,
                     attacker.getX(), attacker.getY(), attacker.getZ(),
-                    attacker.getYRot(), SWEEP_RADIUS
+                    attacker.getYRot(), (float) SWEEP_RADIUS.get()
             );
         }
 
         // 计算额外伤害：原始伤害 × 10% × 等级
         float baseDamage = ctx.getDamage();
-        float bonusDamage = baseDamage * effectiveLevel * 0.1f;
+        float bonusDamage = baseDamage * effectiveLevel * (float) DAMAGE_PER_LEVEL.get();
 
         // 直接目标：增加额外伤害
         ctx.addDamage(bonusDamage);
@@ -133,7 +171,7 @@ public class EnchantmentStampSweep extends EnchantmentBase {
         List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 attacker,
-                SWEEP_RADIUS,
+                SWEEP_RADIUS.get(),
                 entity -> {
                     // 排除自己
                     if (entity.equals(attacker)) {
@@ -155,7 +193,7 @@ public class EnchantmentStampSweep extends EnchantmentBase {
         // ⭐ v2.2：命中数量硬上限，防止密集怪物场景下无上限 hurt 触发事件链风暴
         int hitCount = 0;
         for (LivingEntity target : nearbyEntities) {
-            if (hitCount >= MAX_TARGETS) {
+            if (hitCount >= MAX_TARGETS.getInt()) {
                 break;
             }
             DamageSource damageSource = attacker.damageSources().mobAttack(attacker);

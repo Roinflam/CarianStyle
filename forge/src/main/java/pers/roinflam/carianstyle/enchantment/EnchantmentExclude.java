@@ -19,6 +19,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.network.AoeEffectPacket;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
 
@@ -63,11 +64,61 @@ import java.util.List;
 @Mod.EventBusSubscriber
 public class EnchantmentExclude extends EnchantmentBase {
 
-    /** AOE 搜索半径硬上限（方块） */
-    private static final double MAX_SEARCH_RADIUS = 10.0;
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.exclude.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
-    /** 单次触发最大命中目标数 */
-    private static final int MAX_TARGETS = 20;
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "exclude";
+
+    /**
+     * AOE 搜索半径上限（格）
+     * <p>默认 10.0，允许范围 1.0 ~ 64.0。</p>
+     */
+    private static final EnchantmentValues.Handle MAX_SEARCH_RADIUS =
+            EnchantmentValues.define(VALUE_ID, "max_search_radius",
+                    10.0D, 1.0D, 64.0D);
+
+    /**
+     * 单次触发最大命中目标数
+     * <p>默认 20，允许范围 1 ~ 200。</p>
+     */
+    private static final EnchantmentValues.Handle MAX_TARGETS =
+            EnchantmentValues.define(VALUE_ID, "max_targets",
+                    20, 1, 200);
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
+                    10, 1, 100);
+
+    /**
+     * 基础作用半径（格）
+     * <p>默认 5.0，允许范围 0.5 ~ 64.0。</p>
+     */
+    private static final EnchantmentValues.Handle BASE_RANGE =
+            EnchantmentValues.define(VALUE_ID, "base_range",
+                    5.0D, 0.5D, 64.0D);
+
+    /**
+     * 每超过一级增加的作用半径（格）
+     * <p>默认 0.75，允许范围 0.0 ~ 16.0。</p>
+     */
+    private static final EnchantmentValues.Handle RANGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "range_per_level",
+                    0.75D, 0.0D, 16.0D);
+
+    /**
+     * 排斥的击退强度
+     * <p>默认 0.5，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle KNOCKBACK_STRENGTH =
+            EnchantmentValues.define(VALUE_ID, "knockback_strength",
+                    0.5D, 0.0D, 5.0D);
 
     public EnchantmentExclude() {
         super(EnchantmentCategory.ARMOR_LEGS, new EquipmentSlot[]{EquipmentSlot.LEGS});
@@ -107,15 +158,15 @@ public class EnchantmentExclude extends EnchantmentBase {
         }
 
         if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
+            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
         }
 
         if (totalLevel <= 0) {
             return;
         }
 
-        double range = 5 + (totalLevel - 1) * 0.75;
-        double searchRadius = Math.min(range, MAX_SEARCH_RADIUS);
+        double range = BASE_RANGE.get() + (totalLevel - 1) * RANGE_PER_LEVEL.get();
+        double searchRadius = Math.min(range, MAX_SEARCH_RADIUS.get());
 
         // ⭐ 受击触发范围击退时播放一发排斥冲击波（双环猛烈外推、约 520ms）。
         // 传实体重载 → 内部取脚底坐标，冲击环贴地（详见类注释）。
@@ -133,12 +184,12 @@ public class EnchantmentExclude extends EnchantmentBase {
 
         int hitCount = 0;
         for (LivingEntity target : targets) {
-            if (hitCount >= MAX_TARGETS) {
+            if (hitCount >= MAX_TARGETS.getInt()) {
                 break;
             }
             double x = victim.getX() - target.getX();
             double z = victim.getZ() - target.getZ();
-            target.knockback(0.5f, x, z);
+            target.knockback((float) KNOCKBACK_STRENGTH.get(), x, z);
             hitCount++;
         }
     }

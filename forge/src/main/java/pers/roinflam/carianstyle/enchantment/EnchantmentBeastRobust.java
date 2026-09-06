@@ -14,6 +14,7 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.api.IEffectModifier;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
  * 野兽强健附魔
@@ -37,10 +38,50 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 )
 public class EnchantmentBeastRobust extends EnchantmentBase implements IEffectModifier {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.beast_robust.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "beast_robust";
+
+    /**
+     * 转化后效果等级的上限
+     * <p>默认 100，允许范围 0 ~ 127。</p>
+     */
+    private static final EnchantmentValues.Handle MAX_AMPLIFIER =
+            EnchantmentValues.define(VALUE_ID, "max_amplifier",
+                    100, 0, 127);
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
+                    10, 1, 100);
+
+    /**
+     * 转化后效果时长相对原时长的比例
+     * <p>默认 0.4，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle DURATION_RATIO =
+            EnchantmentValues.define(VALUE_ID, "duration_ratio",
+                    0.4D, 0.0D, 5.0D);
+
+    /**
+     * 转化后效果等级的倍数（结果再 +1）
+     * <p>默认 2，允许范围 1 ~ 20。</p>
+     */
+    private static final EnchantmentValues.Handle AMPLIFIER_MULTIPLIER =
+            EnchantmentValues.define(VALUE_ID, "amplifier_multiplier",
+                    2, 1, 20);
+
+
     /**
      * 药水效果等级的最大上限
      */
-    private static final int MAX_AMPLIFIER = 100;
 
     public EnchantmentBeastRobust() {
         super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
@@ -58,7 +99,7 @@ public class EnchantmentBeastRobust extends EnchantmentBase implements IEffectMo
 
         // 应用等级限制
         if (ConfigLoader.levelLimit) {
-            level = Math.min(level, 10);
+            level = Math.min(level, LEVEL_CAP.getInt());
         }
 
         return level;
@@ -82,8 +123,8 @@ public class EnchantmentBeastRobust extends EnchantmentBase implements IEffectMo
         }
 
         // 计算新属性
-        int newDuration = (int) (effectInstance.getDuration() * 0.4);  // 时间缩短到 40%
-        int newAmplifier = Math.min(effectInstance.getAmplifier() * 2 + 1, MAX_AMPLIFIER);  // 等级翻倍+1，上限100
+        int newDuration = (int) (effectInstance.getDuration() * DURATION_RATIO.get());  // 时间缩短到 40%
+        int newAmplifier = Math.min(effectInstance.getAmplifier() * AMPLIFIER_MULTIPLIER.getInt() + 1, MAX_AMPLIFIER.getInt());  // 等级翻倍+1，上限100
 
         // 创建修改后的效果实例
         return new MobEffectInstance(

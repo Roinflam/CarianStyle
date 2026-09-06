@@ -105,6 +105,26 @@ public final class VisualLod {
     /** 本帧的拥挤系数，在 {@link #beginFrame()} 根据上一帧实例数算好 */
     private static float crowdFactor = 1f;
 
+    /**
+     * 「批次之前」已登记的实例数，由 {@link #countInstanceEarly()} 累加。
+     *
+     * <h3>为什么需要单独一个计数器</h3>
+     * <p>
+     * {@link #beginFrame()} 挂在 {@code RenderLevelStageEvent.AFTER_TRANSLUCENT_BLOCKS}
+     * 上，而<b>实体与手持物品的渲染发生在这个阶段之前</b>。
+     * {@link ShieldWardRenderer} 走的正是手持物品那条路（由 Mixin 从
+     * {@code ItemInHandLayer} 调进来），它若直接调 {@link #countInstance()}，
+     * 累加进 {@link #currentFrameInstances} 的值会在同一帧稍后被
+     * {@code beginFrame()} 的复位清零——等于白数。
+     * </p>
+     * <p>
+     * 因此单开一个计数器，在 {@code beginFrame()} 里<b>与上一帧的批次计数相加</b>
+     * 作为拥挤度依据，然后一并复位。二者相差半帧，但拥挤度本来就是个估算量，
+     * 而且它只影响「下一帧降多少细节」，半帧的偏差看不出来。
+     * </p>
+     */
+    private static int earlyFrameInstances = 0;
+
     private VisualLod() {
     }
 
@@ -113,9 +133,12 @@ public final class VisualLod {
      * <p>由 {@link VisualBatch#onBatchBegin} 在批次开启时调用，各渲染器不需要管。</p>
      */
     static void beginFrame() {
-        previousFrameInstances = currentFrameInstances;
+        // 批次计数来自上一帧、早期计数来自本帧的实体渲染阶段，两者相加作为拥挤度依据。
+        // 半帧的错位见 earlyFrameInstances 的说明。
+        previousFrameInstances = currentFrameInstances + earlyFrameInstances;
         crowdFactor = crowdFactorFor(previousFrameInstances);
         currentFrameInstances = 0;
+        earlyFrameInstances = 0;
     }
 
     /**
@@ -124,6 +147,18 @@ public final class VisualLod {
      */
     public static void countInstance() {
         currentFrameInstances++;
+    }
+
+    /**
+     * 登记一个「在共享批次开启之前」绘制的特效实例。
+     * <p>
+     * 供实体 / 手持物品渲染路径上的渲染器使用——目前只有
+     * {@link ShieldWardRenderer}。批次内的渲染器请继续用 {@link #countInstance()}。
+     * </p>
+     * <p>用错哪一个不会出错，只会让拥挤度估算差一帧，但没有理由不用对的那个。</p>
+     */
+    public static void countInstanceEarly() {
+        earlyFrameInstances++;
     }
 
     /**

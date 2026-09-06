@@ -9,6 +9,7 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
  * 奉剑附魔
@@ -36,6 +37,22 @@ import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 )
 public class EnchantmentOfferSword extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.offer_sword.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "offer_sword";
+
+    /**
+     * 每级额外伤害倍率
+     * <p>默认 0.1，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "damage_per_level",
+                    0.1D, 0.0D, 5.0D);
+
     public EnchantmentOfferSword() {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
@@ -50,7 +67,7 @@ public class EnchantmentOfferSword extends EnchantmentBase {
         }
 
         // 增伤 +10% × 等级
-        ctx.addDamage(ctx.getDamage() * level * 0.1f);
+        ctx.addDamage(ctx.getDamage() * level * (float) DAMAGE_PER_LEVEL.get());
     }
 
     @Override

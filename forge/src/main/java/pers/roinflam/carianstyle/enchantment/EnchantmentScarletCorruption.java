@@ -11,6 +11,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
  * 猩红腐败附魔
@@ -33,6 +34,22 @@ import pers.roinflam.carianstyle.init.CarianStylePotion;
 )
 public class EnchantmentScarletCorruption extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.scarlet_rot.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "scarlet_rot";
+
+    /**
+     * 每级猩红腐败的持续秒数
+     * <p>默认 20，允许范围 1 ~ 300。</p>
+     */
+    private static final EnchantmentValues.Handle SECONDS_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "seconds_per_level",
+                    20, 1, 300);
+
     public EnchantmentScarletCorruption() {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
@@ -50,7 +67,7 @@ public class EnchantmentScarletCorruption extends EnchantmentBase {
         // 给被攻击的目标施加猩红腐败
         victim.addEffect(new MobEffectInstance(
                 CarianStylePotion.SCARLET_ROT.get(),
-                level * 20 * 20,  // 等级 × 20秒 × 20tick
+                level * SECONDS_PER_LEVEL.getInt() * 20,  // 等级 × 20秒 × 20tick
                 0
         ));
     }

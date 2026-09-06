@@ -17,6 +17,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
  * 碎星附魔
@@ -56,6 +57,56 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 @AutoRegisterEnchantment(id = "broken_star", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantmentCategory.WEAPON, slots = {EquipmentSlot.MAINHAND})
 @Mod.EventBusSubscriber
 public class EnchantmentBrokenStar extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.broken_star.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "broken_star";
+
+    /**
+     * 触发所需的生命比例阈值
+     * <p>默认 0.5，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle HEALTH_THRESHOLD =
+            EnchantmentValues.define(VALUE_ID, "health_threshold",
+                    0.5D, 0.0D, 1.0D);
+
+    /**
+     * 夜间的攻击倍率
+     * <p>默认 2.0，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle ATTACK_MULTIPLIER_NIGHT =
+            EnchantmentValues.define(VALUE_ID, "attack_multiplier_night",
+                    2.0D, 0.0D, 10.0D);
+
+    /**
+     * 白天的攻击倍率
+     * <p>默认 1.5，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle ATTACK_MULTIPLIER_DAY =
+            EnchantmentValues.define(VALUE_ID, "attack_multiplier_day",
+                    1.5D, 0.0D, 10.0D);
+
+    /**
+     * 夜间受到伤害的倍率
+     * <p>默认 0.5，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle DEFENSE_MULTIPLIER_NIGHT =
+            EnchantmentValues.define(VALUE_ID, "defense_multiplier_night",
+                    0.5D, 0.0D, 2.0D);
+
+    /**
+     * 白天受到伤害的倍率
+     * <p>默认 0.75，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle DEFENSE_MULTIPLIER_DAY =
+            EnchantmentValues.define(VALUE_ID, "defense_multiplier_day",
+                    0.75D, 0.0D, 2.0D);
+
+
     private static final int RECOLLECT_ENCHANTABILITY = 35;
     public EnchantmentBrokenStar() { super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND}); }
 
@@ -73,8 +124,9 @@ public class EnchantmentBrokenStar extends EnchantmentBase {
                 if (!heldItem.isEmpty()) {
                     int level = EnchantmentHelper.getItemEnchantmentLevel(brokenStar, heldItem);
                     if (ConfigLoader.levelLimit) level = Math.min(level, 10);
-                    if (level > 0 && attacker.getHealth() >= attacker.getMaxHealth() / 2) {
-                        evt.setAmount(evt.getAmount() * (!attacker.level().isDay() ? 2 : 1.5f));
+                    if (level > 0 && attacker.getHealth() >= attacker.getMaxHealth() * (float) HEALTH_THRESHOLD.get()) {
+                        evt.setAmount(evt.getAmount() * (float) (!attacker.level().isDay()
+                    ? ATTACK_MULTIPLIER_NIGHT.get() : ATTACK_MULTIPLIER_DAY.get()));
                     }
                 }
             }
@@ -96,13 +148,14 @@ public class EnchantmentBrokenStar extends EnchantmentBase {
                 if (ConfigLoader.levelLimit) level = Math.min(level, 10);
                 // ⭐ v2.3 修复 C：改用严格小于，与攻击者分支的 >= 互补。
                 // 原来两边都含等号，生命值恰好半血时攻守两档会同时生效
-                if (level > 0 && victim.getHealth() < victim.getMaxHealth() / 2) {
+                if (level > 0 && victim.getHealth() < victim.getMaxHealth() * (float) HEALTH_THRESHOLD.get()) {
                     // ⭐ v2.3 修复 A：昼夜互换。
                     // 原为 (!isDay ? 0.75f : 0.5f) —— 夜晚只减伤 25%、白天减伤 50%，
                     // 与语言文件「夜晚翻倍」的描述正好相反，且与攻击者分支
                     // (!isDay ? 2 : 1.5f) 的昼夜方向自相矛盾。
                     // 现为白天 ×0.75（减伤 25%）、夜晚 ×0.5（减伤 50%），夜晚确实翻倍
-                    evt.setAmount(evt.getAmount() * (!victim.level().isDay() ? 0.5f : 0.75f));
+                    evt.setAmount(evt.getAmount() * (float) (!victim.level().isDay()
+                    ? DEFENSE_MULTIPLIER_NIGHT.get() : DEFENSE_MULTIPLIER_DAY.get()));
                 }
             }
         }

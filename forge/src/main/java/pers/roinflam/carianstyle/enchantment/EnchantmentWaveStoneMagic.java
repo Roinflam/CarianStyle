@@ -11,6 +11,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentDoomedDeath;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
@@ -45,6 +46,22 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 )
 public class EnchantmentWaveStoneMagic extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.wave_stone_magic.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "wave_stone_magic";
+
+    /**
+     * 触发时的伤害倍率
+     * <p>默认 1.5，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_MULTIPLIER =
+            EnchantmentValues.define(VALUE_ID, "damage_multiplier",
+                    1.5D, 0.0D, 10.0D);
+
     public EnchantmentWaveStoneMagic() {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
@@ -64,7 +81,7 @@ public class EnchantmentWaveStoneMagic extends EnchantmentBase {
         }
 
         // 伤害提升50%
-        ctx.multiplyDamage(1.5f);
+        ctx.multiplyDamage((float) DAMAGE_MULTIPLIER.get());
 
         // 移除魔法标签（改为波石魔法，不再是普通魔法）
         DamageSourceUtil.removeTag(ctx.getDamageSource(), net.minecraft.tags.DamageTypeTags.WITCH_RESISTANT_TO);

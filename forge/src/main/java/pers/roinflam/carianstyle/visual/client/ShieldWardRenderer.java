@@ -22,6 +22,8 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
+import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 
 import javax.annotation.Nullable;
 import java.util.HashMap;
@@ -123,6 +125,52 @@ public final class ShieldWardRenderer {
     private static final float CULL_DISTANCE = 40f;
     /** {@link #CULL_DISTANCE} 的平方，用于免开方比较 */
     private static final double CULL_DISTANCE_SQR = CULL_DISTANCE * CULL_DISTANCE;
+
+    // ==================== v6.1：接入 VisualLod 的拥挤度降级 ====================
+
+    /**
+     * 细节系数低于此值时，强制退到简化档（包围盒四条边）。
+     * <p>
+     * 本渲染器原本只按<b>距离</b>分档：{@link #SIMPLIFY_DISTANCE} 以内走完整轮廓、
+     * 以外走包围盒。距离分档在一对一时够用，但团战时不够——
+     * 二十个人都在十格内举着盾，每个都走完整档，轮廓边段几十条乘以四遍绘制，
+     * 恰好在最需要帧率的时候把顶点量顶到最高。
+     * </p>
+     * <p>
+     * {@link VisualLod#detail} 的拥挤维度正是为这种场景设计的。接进来之后，
+     * 同屏特效实例超过 {@link VisualLod#CROWD_FREE} 个时细节系数开始下滑，
+     * 触及本阈值就切到简化档——玩家看到的是「远处的盾变简单了」，
+     * 而不是「帧率掉了」。
+     * </p>
+     * <p>
+     * 取 0.75 的依据：{@link VisualLod#NEAR_FLOOR} 是 0.70，也就是
+     * <b>贴脸的目标永远不会低于 0.70</b>。若阈值取得比 0.70 低，近距离就永远触发不到，
+     * 拥挤降级对眼前这几个盾完全无效——而它们恰恰是顶点量的大头。
+     * 取 0.75 意味着：只要拥挤到让近处细节掉出保底之上一点点，就开始简化。
+     * </p>
+     */
+    private static final float DETAIL_LOD_THRESHOLD = 0.75f;
+
+    /**
+     * 细节系数低于此值时，去掉发光晕层。
+     * <p>
+     * 发光晕（{@link #drawHalo}）沿<b>全部轮廓边段</b>各铺一条 {@link #HALO_WIDTH} 宽的
+     * 四边形带，是单层里最费顶点的一个；而它的视觉贡献只是外缘一圈很淡的辉光
+     * （{@link #HALO_ALPHA} 仅 0.3），在拥挤场景下本来就被别的东西盖住了。
+     * 这是「先砍收益最低的那层」的典型例子。
+     * </p>
+     */
+    private static final float HALO_LOD_THRESHOLD = 0.55f;
+
+    /**
+     * 细节系数低于此值时，去掉背面那圈描边。
+     * <p>
+     * 背面描边（{@link #BACK_OUTLINE_RATIO}）本身就只有正面亮度的一半，
+     * 且被盾面挡住大半。类注释里给出的「嫌近距离太贵」的手动方案之一就是把
+     * {@link #BACK_OUTLINE_RATIO} 设为 0；这里等于把那个开关交给拥挤度自动去按。
+     * </p>
+     */
+    private static final float BACK_OUTLINE_LOD_THRESHOLD = 0.50f;
 
     // ==================== 余量与登场 ====================
 
@@ -347,6 +395,13 @@ public final class ShieldWardRenderer {
     public static void renderOnItem(LivingEntity entity, ItemStack stack,
                                     ItemDisplayContext displayContext, boolean leftHand,
                                     PoseStack poseStack, MultiBufferSource buffer) {
+        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉盾墙时整段跳过。
+        // 放在最前面——本方法由 Mixin 在每个持盾实体的每帧渲染中调进来，
+        // 后面紧跟着两次 getItemEnchantmentLevel（NBT 解析），不该白付。
+        if (!VisualToggle.isEnabled(VisualEffectType.SHIELD_WARD)) {
+            return;
+        }
+
         if (stack.isEmpty() || !stack.isEnchanted()) {
             return;
         }
@@ -370,6 +425,9 @@ public final class ShieldWardRenderer {
         boolean firstPerson = displayContext == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND
                 || displayContext == ItemDisplayContext.FIRST_PERSON_LEFT_HAND;
         boolean detailed = true;
+        // v6.1：细节系数。第一人称是玩家自己的盾，永远满档，不参与拥挤降级——
+        // 它只有一个，砍它省不下什么，却是玩家最常看的那一个
+        float lod = 1f;
         if (!firstPerson) {
             double distSqr = cameraDistanceSqr(mc, entity);
             if (distSqr > CULL_DISTANCE_SQR) {
@@ -377,7 +435,13 @@ public final class ShieldWardRenderer {
                 // 重新靠近时从头展开一次，可以接受
                 return;
             }
-            detailed = distSqr <= SIMPLIFY_DISTANCE_SQR;
+            // v6.1：登记一个实例，让盾墙也计入下一帧的拥挤度估算。
+            // 用 countInstanceEarly 而非 countInstance：本渲染器跑在实体渲染阶段，
+            // 早于 VisualBatch 开启批次，用后者会被同帧的复位清零。详见 VisualLod。
+            VisualLod.countInstanceEarly();
+            lod = VisualLod.detail(distSqr);
+            // 距离与拥挤任一不达标都退到简化档
+            detailed = distSqr <= SIMPLIFY_DISTANCE_SQR && lod >= DETAIL_LOD_THRESHOLD;
         }
 
         int stateKey = entity.getId() * 16 + displayContext.ordinal();
@@ -417,7 +481,7 @@ public final class ShieldWardRenderer {
 
             float blend = resolveBlend(hasScholar, hasImmutable, time, seedId);
             mixPalette(blend);
-            drawWard(vc, matrix, shape, value, time, seedId, detailed, margin);
+            drawWard(vc, matrix, shape, value, time, seedId, detailed, margin, lod);
         } finally {
             // 无论中途发生什么都必须配平，否则整个实体渲染的姿态栈会错乱
             poseStack.popPose();
@@ -453,10 +517,12 @@ public final class ShieldWardRenderer {
      * @param seedId   实体网络 id（错开各实体的动画相位）
      * @param detailed 完整档（近距离 / 第一人称）为 true
      * @param margin   当前余量（格），仅用于把 Z 方向也撑开
+     * @param lod      v6.1：{@link VisualLod#detail} 给出的细节系数，1 为满档。
+     *                 用于在拥挤时按「收益从低到高」依次砍掉发光晕与背面描边
      */
     private static void drawWard(VertexConsumer vc, Matrix4f m, ShieldWardShape.Baked shape,
                                  float value, float time, int seedId,
-                                 boolean detailed, float margin) {
+                                 boolean detailed, float margin, float lod) {
         float zf = shape.frontZ + margin;
         float zb = shape.backZ - margin;
         float alpha = value;
@@ -473,7 +539,10 @@ public final class ShieldWardRenderer {
         float step = shape.filmOnFront ? LAYER_STEP : -LAYER_STEP;
 
         // ===== 发光晕：最外层也最淡，先画，压在别的元素下面 =====
-        drawHalo(vc, m, edges, outerZ, MIX_MAIN, HALO_ALPHA * alpha * breath);
+        // v6.1：拥挤时第一个砍掉的就是它——顶点最多、视觉贡献最低
+        if (VisualLod.keepLayer(lod, HALO_LOD_THRESHOLD)) {
+            drawHalo(vc, m, edges, outerZ, MIX_MAIN, HALO_ALPHA * alpha * breath);
+        }
 
         if (detailed) {
             drawFilm(vc, m, shape, outerZ, step, alpha, time, seedId);
@@ -487,9 +556,13 @@ public final class ShieldWardRenderer {
         drawRim(vc, m, edges, outerZ, innerZ, MIX_CORE,
                 RIM_ALPHA * alpha * breath, RIM_ALPHA * RIM_BACK_RATIO * alpha);
         // ===== 描边：勾出轮廓，内外各一圈，外侧那圈更亮 =====
+        // 外侧这圈是护鞘的主要辨识特征，任何档位都保留
         drawOutline(vc, m, edges, outerZ, MIX_CORE, OUTLINE_ALPHA * alpha * breath);
-        drawOutline(vc, m, edges, innerZ, MIX_MAIN,
-                OUTLINE_ALPHA * BACK_OUTLINE_RATIO * alpha * breath);
+        // v6.1：背面那圈只有正面一半亮度且大半被盾面挡住，拥挤时第二个砍
+        if (VisualLod.keepLayer(lod, BACK_OUTLINE_LOD_THRESHOLD)) {
+            drawOutline(vc, m, edges, innerZ, MIX_MAIN,
+                    OUTLINE_ALPHA * BACK_OUTLINE_RATIO * alpha * breath);
+        }
 
         if (DEBUG_ORIGIN_MARKER) {
             drawOriginMarker(vc, m, outerZ + step * 8f);

@@ -15,6 +15,7 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
  * 隐形武器附魔
@@ -60,6 +61,30 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 )
 public class EnchantmentInvisibleWeapon extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.invisible_weapon.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "invisible_weapon";
+
+    /**
+     * 箭矢命中时额外增加的倍率（基础为 1）
+     * <p>默认 2，允许范围 0 ~ 20。</p>
+     */
+    private static final EnchantmentValues.Handle ARROW_BONUS_MAGNIFICATION =
+            EnchantmentValues.define(VALUE_ID, "arrow_bonus_magnification",
+                    2, 0, 20);
+
+    /**
+     * 每级提供的潜行时长（tick）
+     * <p>默认 20，允许范围 1 ~ 400。</p>
+     */
+    private static final EnchantmentValues.Handle STEALTH_TICKS_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "stealth_ticks_per_level",
+                    20, 1, 400);
+
     public EnchantmentInvisibleWeapon() {
         // v2.1：EnchantmentCategory.WEAPON → ARMS 自定义类型（剑+弓），与注解一致
         super(CarianStyleEnchantments.getCustomEnchantmentCategory("ARMS"),
@@ -74,12 +99,12 @@ public class EnchantmentInvisibleWeapon extends EnchantmentBase {
         // 计算持续时间倍率
         int magnification = 1;
         if (damageSource != null && damageSource.getDirectEntity() instanceof AbstractArrow) {
-            magnification += 2;  // 箭矢攻击倍率 = 3
+            magnification += ARROW_BONUS_MAGNIFICATION.getInt();  // 箭矢攻击倍率 = 3
         }
 
         // 施加隐身效果
         DynamicAttributeManager.apply(attacker,
-                DynamicAttributes.STEALTH.createInstance(level * 20 * magnification));
+                DynamicAttributes.STEALTH.createInstance(level * STEALTH_TICKS_PER_LEVEL.getInt() * magnification));
     }
 
     @Override

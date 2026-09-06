@@ -17,6 +17,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
@@ -40,6 +41,30 @@ import java.util.List;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentRealmOfMagic extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.realm_of_magic.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "realm_of_magic";
+
+    /**
+     * 友方搜索半径（格）
+     * <p>默认 6，允许范围 1 ~ 64。</p>
+     */
+    private static final EnchantmentValues.Handle ALLY_SEARCH_RADIUS =
+            EnchantmentValues.define(VALUE_ID, "ally_search_radius",
+                    6, 1, 64);
+
+    /**
+     * 附近有同类携带者时的额外伤害比例
+     * <p>默认 0.5，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_BONUS =
+            EnchantmentValues.define(VALUE_ID, "damage_bonus",
+                    0.5D, 0.0D, 10.0D);
 
     public EnchantmentRealmOfMagic() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
@@ -73,7 +98,7 @@ public class EnchantmentRealmOfMagic extends EnchantmentBase {
         List<LivingEntity> allies = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 attacker,
-                6,
+                ALLY_SEARCH_RADIUS.getInt(),
                 entity -> entity.getClass() == attacker.getClass()
         );
 
@@ -81,7 +106,7 @@ public class EnchantmentRealmOfMagic extends EnchantmentBase {
             for (ItemStack armor : ally.getArmorSlots()) {
                 if (!armor.isEmpty()) {
                     if (EnchantmentHelper.getItemEnchantmentLevel(realmOfMagic, armor) > 0) {
-                        evt.setAmount(evt.getAmount() + evt.getAmount() * 0.5f);
+                        evt.setAmount(evt.getAmount() + evt.getAmount() * (float) DAMAGE_BONUS.get());
                         return;
                     }
                 }

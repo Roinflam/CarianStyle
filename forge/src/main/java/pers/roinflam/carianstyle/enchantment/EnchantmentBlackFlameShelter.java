@@ -21,6 +21,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 /**
@@ -108,6 +109,39 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 @Mod.EventBusSubscriber
 public class EnchantmentBlackFlameShelter extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.black_flame_shelter.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "black_flame_shelter";
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
+                    10, 1, 100);
+
+    /**
+     * 每级对近战伤害的减免比例
+     * <p>默认 0.125，允许范围 0.0 ~ 0.5。</p>
+     */
+    private static final EnchantmentValues.Handle MELEE_REDUCTION_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "melee_reduction_per_level",
+                    0.125D, 0.0D, 0.5D);
+
+    /**
+     * 每级对弹射物伤害的减免比例
+     * <p>默认 0.25，允许范围 0.0 ~ 0.5。</p>
+     */
+    private static final EnchantmentValues.Handle PROJECTILE_REDUCTION_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "projectile_reduction_per_level",
+                    0.25D, 0.0D, 0.5D);
+
+
     /**
      * 参与计算的累加等级硬上限。
      * <p>
@@ -144,7 +178,7 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
             }
         }
         if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
+            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
         }
         // ⭐ v2.2：无条件硬上限，防止减伤系数归零（8级）乃至变负（9级+）。
         // 与上面的 levelLimit 是两回事：那个是可关闭的平衡开关，这个是正确性约束。
@@ -176,7 +210,7 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
             return;
         }
 
-        evt.setAmount(evt.getAmount() * (1 - totalLevel * 0.125f));
+        evt.setAmount(evt.getAmount() * (1 - totalLevel * (float) MELEE_REDUCTION_PER_LEVEL.get()));
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
@@ -195,7 +229,7 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
             return;
         }
 
-        evt.setAmount(evt.getAmount() * (1 - totalLevel * 0.25f));
+        evt.setAmount(evt.getAmount() * (1 - totalLevel * (float) PROJECTILE_REDUCTION_PER_LEVEL.get()));
     }
 
     @Override

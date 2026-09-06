@@ -20,6 +20,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
 import java.util.UUID;
@@ -87,6 +88,39 @@ import java.util.UUID;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentTimeReversal extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.time_reversal.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "time_reversal";
+
+    /**
+     * 时间逆转的冷却时间（tick）
+     * <p>默认 6000，允许范围 20 ~ 144000。</p>
+     */
+    private static final EnchantmentValues.Handle REVERSAL_COOLDOWN =
+            EnchantmentValues.define(VALUE_ID, "reversal_cooldown",
+                    6000, 20, 144000);
+
+    /**
+     * 伤害累积窗口（tick）
+     * <p>默认 100，允许范围 1 ~ 1200。</p>
+     */
+    private static final EnchantmentValues.Handle ACCUMULATE_WINDOW =
+            EnchantmentValues.define(VALUE_ID, "accumulate_window",
+                    100, 1, 1200);
+
+    /**
+     * 按累积伤害回复生命的比例
+     * <p>默认 0.25，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle HEAL_RATIO =
+            EnchantmentValues.define(VALUE_ID, "heal_ratio",
+                    0.25D, 0.0D, 5.0D);
+
 
     /**
      * 逆转状态的客户端同步序列号（v2.3 新增）。
@@ -197,7 +231,7 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
         holder.invulnerableTime = 20;
 
         // 设置冷却和逆转状态
-        EnchantmentDataManager.setCooldown(REVERSAL_COOLDOWN_KEY, uuid, 6000);
+        EnchantmentDataManager.setCooldown(REVERSAL_COOLDOWN_KEY, uuid, REVERSAL_COOLDOWN.getInt());
         EnchantmentDataManager.setData(REVERSAL_STATE_KEY, uuid, true);
         EnchantmentDataManager.setData(REVERSAL_DAMAGE_KEY, uuid, 0f);
 
@@ -207,14 +241,14 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
         ClientSyncEffectManager.addEntity(holder, TIME_REVERSAL_SERIAL);
 
         // 100tick后结束逆转状态
-        new SynchronizationTask(100) {
+        new SynchronizationTask(ACCUMULATE_WINDOW.getInt()) {
             @Override
             public void run() {
                 if (holder.isAlive()) {
                     Float accumulated = EnchantmentDataManager.getData(REVERSAL_DAMAGE_KEY, uuid);
                     if (accumulated != null) {
                         // 治疗累积伤害的25%
-                        holder.heal(accumulated * 0.25f);
+                        holder.heal(accumulated * (float) HEAL_RATIO.get());
                     }
                 }
                 EnchantmentDataManager.removeData(REVERSAL_STATE_KEY, uuid);

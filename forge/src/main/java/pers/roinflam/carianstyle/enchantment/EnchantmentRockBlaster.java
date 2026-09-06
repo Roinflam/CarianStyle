@@ -24,6 +24,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 import java.util.*;
 
@@ -73,6 +74,23 @@ import java.util.*;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentRockBlaster extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.rock_blaster.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "rock_blaster";
+
+    /**
+     * 参与计算的等级上限（连锁范围随等级增长）
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
+                    10, 1, 100);
+
 
     /**
      * 缓存的附魔实例，首次使用时懒加载，避免每次事件触发时重复查找注册表
@@ -262,7 +280,7 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
         int level = EnchantmentHelper.getItemEnchantmentLevel(cachedEnchantment, tool);
 
         if (ConfigLoader.levelLimit) {
-            level = Math.min(level, 10);
+            level = Math.min(level, LEVEL_CAP.getInt());
         }
 
         if (level <= 0) {

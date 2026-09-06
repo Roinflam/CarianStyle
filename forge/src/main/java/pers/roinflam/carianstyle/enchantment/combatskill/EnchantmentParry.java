@@ -21,6 +21,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 import java.util.UUID;
@@ -84,6 +85,39 @@ import java.util.UUID;
 @Mod.EventBusSubscriber
 public class EnchantmentParry extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.parry.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "parry";
+
+    /**
+     * 格挡成功后的反击窗口时长（tick）
+     * <p>默认 10，允许范围 1 ~ 200。</p>
+     */
+    private static final EnchantmentValues.Handle WINDOW_TICKS =
+            EnchantmentValues.define(VALUE_ID, "window_ticks",
+                    10, 1, 200);
+
+    /**
+     * 窗口内每级的额外伤害倍率
+     * <p>默认 0.25，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle BONUS_DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "bonus_damage_per_level",
+                    0.25D, 0.0D, 5.0D);
+
+    /**
+     * 格挡冷却时长（tick）
+     * <p>默认 40，允许范围 0 ~ 2400。</p>
+     */
+    private static final EnchantmentValues.Handle COOLDOWN_TICKS =
+            EnchantmentValues.define(VALUE_ID, "cooldown_ticks",
+                    40, 0, 2400);
+
+
     private static final String PARRY_LEVEL_KEY = "parry_level";
     private static final String PARRY_COOLDOWN_KEY = "parry_cooldown";
 
@@ -143,7 +177,7 @@ public class EnchantmentParry extends EnchantmentBase {
             return;
         }
 
-        EnchantmentDataManager.setData(PARRY_LEVEL_KEY, uuid, level, 10);
+        EnchantmentDataManager.setData(PARRY_LEVEL_KEY, uuid, level, WINDOW_TICKS.getInt());
 
         // ⭐ v2.4：架住成功，播放「格挡窗口」自绘特效。
         // 时长与上面那个 10 tick 严格对齐，准星收缩到零即窗口关闭（详见类注释）
@@ -174,11 +208,11 @@ public class EnchantmentParry extends EnchantmentBase {
             return;
         }
 
-        float bonusDamage = evt.getAmount() * parryLevel * 0.25f;
+        float bonusDamage = evt.getAmount() * parryLevel * (float) BONUS_DAMAGE_PER_LEVEL.get();
         evt.setAmount(evt.getAmount() + bonusDamage);
 
         EnchantmentDataManager.removeData(PARRY_LEVEL_KEY, uuid);
-        EnchantmentDataManager.setCooldown(PARRY_COOLDOWN_KEY, uuid, 40);
+        EnchantmentDataManager.setCooldown(PARRY_COOLDOWN_KEY, uuid, COOLDOWN_TICKS.getInt());
     }
 
     private static boolean isAttackFromFront(LivingEntity defender, LivingEntity attacker) {

@@ -22,6 +22,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 /**
@@ -45,7 +46,37 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 @Mod.EventBusSubscriber
 public class EnchantmentSkyShot extends EnchantmentBase {
 
-    private static final double HEIGHT_THRESHOLD = 5.0;
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.sky_shot.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "sky_shot";
+
+    /**
+     * 触发所需的目标高度差（格）
+     * <p>默认 5.0，允许范围 0.0 ~ 128.0。</p>
+     */
+    private static final EnchantmentValues.Handle HEIGHT_THRESHOLD =
+            EnchantmentValues.define(VALUE_ID, "height_threshold_blocks",
+                    5.0D, 0.0D, 128.0D);
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
+                    10, 1, 100);
+
+    /**
+     * 基于目标当前生命的额外伤害占比
+     * <p>默认 0.1，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle TARGET_HEALTH_DAMAGE =
+            EnchantmentValues.define(VALUE_ID, "target_health_damage",
+                    0.1D, 0.0D, 1.0D);
 
     public EnchantmentSkyShot() {
         super(EnchantmentCategory.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
@@ -105,17 +136,17 @@ public class EnchantmentSkyShot extends EnchantmentBase {
 
         int effectiveLevel = level;
         if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, 10);
+            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
         }
 
         double heightDifference = target.getY() - shooter.getY();
-        if (heightDifference < HEIGHT_THRESHOLD) {
+        if (heightDifference < HEIGHT_THRESHOLD.get()) {
             return;
         }
 
         double baseDamage = arrow.getBaseDamage();
         double bonusDamage1 = baseDamage * effectiveLevel;
-        double bonusDamage2 = target.getHealth() * 0.1;
+        double bonusDamage2 = target.getHealth() * TARGET_HEALTH_DAMAGE.get();
 
         arrow.setBaseDamage(baseDamage + bonusDamage1 + bonusDamage2);
 

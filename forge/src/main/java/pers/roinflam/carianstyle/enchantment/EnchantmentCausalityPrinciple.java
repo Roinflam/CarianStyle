@@ -21,6 +21,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.network.AoeEffectPacket;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.AoeHelper;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
@@ -78,23 +79,70 @@ import java.util.List;
 @Mod.EventBusSubscriber
 public class EnchantmentCausalityPrinciple extends EnchantmentBase {
 
-    /** AOE 反击搜索半径硬上限（方块） */
-    private static final int MAX_SEARCH_RADIUS = 10;
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.causality_principle.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
-    /** 单次 AOE 反击最大命中目标数 */
-    private static final int MAX_TARGETS = 20;
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "causality_principle";
+
+    /**
+     * AOE 反击搜索半径上限（格）
+     * <p>默认 10，允许范围 1 ~ 64。</p>
+     */
+    private static final EnchantmentValues.Handle MAX_SEARCH_RADIUS =
+            EnchantmentValues.define(VALUE_ID, "max_search_radius",
+                    10, 1, 64);
+
+    /**
+     * 单次 AOE 反击最大命中目标数
+     * <p>默认 20，允许范围 1 ~ 200。</p>
+     */
+    private static final EnchantmentValues.Handle MAX_TARGETS =
+            EnchantmentValues.define(VALUE_ID, "max_targets",
+                    20, 1, 200);
+
+    /**
+     * 触发 AOE 反击所需的受击累积次数
+     * <p>默认 5，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle TRIGGER_COUNT =
+            EnchantmentValues.define(VALUE_ID, "trigger_count",
+                    5, 1, 100);
+
+    /**
+     * AOE 反击触发冷却（tick）
+     * <p>默认 20，允许范围 0 ~ 1200。</p>
+     */
+    private static final EnchantmentValues.Handle TRIGGER_COOLDOWN =
+            EnchantmentValues.define(VALUE_ID, "trigger_cooldown",
+                    20, 0, 1200);
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
+                    10, 1, 100);
+
+    /**
+     * 每级的反击伤害倍率（基于本次受到的伤害）
+     * <p>默认 0.75，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "damage_per_level",
+                    0.75D, 0.0D, 10.0D);
+
 
     /** 受击累积计数器键 */
     private static final String COUNTER_KEY = "causality_principle";
 
-    /** 触发 AOE 反击所需的受击累积次数 */
-    private static final int TRIGGER_COUNT = 5;
 
     /** AOE 反击触发冷却键 */
     private static final String COOLDOWN_KEY = "causality_principle_cooldown";
 
-    /** AOE 反击触发冷却（tick）：1 秒（20 tick）最多触发一次 */
-    private static final int TRIGGER_COOLDOWN = 20;
 
     /**
      * 本附魔专属的线程级重入保护。
@@ -159,7 +207,7 @@ public class EnchantmentCausalityPrinciple extends EnchantmentBase {
         }
 
         if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
+            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
         }
 
         if (totalLevel <= 0) {
@@ -170,7 +218,7 @@ public class EnchantmentCausalityPrinciple extends EnchantmentBase {
 
         int currentCount = EnchantmentDataManager.incrementCounter(COUNTER_KEY, victim.getUUID());
 
-        if (currentCount >= TRIGGER_COUNT) {
+        if (currentCount >= TRIGGER_COUNT.getInt()) {
             // 触发冷却判断。冷却中保持计数不重置，冷却结束后下次受击立即触发，
             // 保证 AOE 反击 1 秒最多触发一次
             if (EnchantmentDataManager.isOnCooldown(COOLDOWN_KEY, victim.getUUID())) {
@@ -178,9 +226,9 @@ public class EnchantmentCausalityPrinciple extends EnchantmentBase {
             }
 
             EnchantmentDataManager.resetCounter(COUNTER_KEY, victim.getUUID());
-            EnchantmentDataManager.setCooldown(COOLDOWN_KEY, victim.getUUID(), TRIGGER_COOLDOWN);
+            EnchantmentDataManager.setCooldown(COOLDOWN_KEY, victim.getUUID(), TRIGGER_COOLDOWN.getInt());
 
-            int searchRadius = Math.min(effectiveLevel * 3, MAX_SEARCH_RADIUS);
+            int searchRadius = Math.min(effectiveLevel * 3, MAX_SEARCH_RADIUS.getInt());
 
             // ⭐ AOE 触发时播放一发因果律金紫六芒星法阵（约 1100ms）。
             // 特效半径取实际作用半径 searchRadius，保证「看到多大就打多大」。
@@ -201,7 +249,7 @@ public class EnchantmentCausalityPrinciple extends EnchantmentBase {
                     entity -> !entity.equals(victim)
             );
 
-            float damage = evt.getAmount() * effectiveLevel * 0.75f;
+            float damage = evt.getAmount() * effectiveLevel * (float) DAMAGE_PER_LEVEL.get();
 
             // 在守卫保护下执行 AOE 反击，确保 target.hurt 触发的二次伤害事件
             // 不会再次进入本方法形成级联；ReentrancyGuard 内部用 try-finally 复位标记，
@@ -209,7 +257,7 @@ public class EnchantmentCausalityPrinciple extends EnchantmentBase {
             AOE_GUARD.run(() -> {
                 int hitCount = 0;
                 for (LivingEntity target : targets) {
-                    if (hitCount >= MAX_TARGETS) {
+                    if (hitCount >= MAX_TARGETS.getInt()) {
                         break;
                     }
                     target.hurt(victim.damageSources().mobAttack(victim), damage);

@@ -25,6 +25,7 @@ import pers.roinflam.carianstyle.enchantment.EnchantmentVicDragonThunder;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 import java.util.UUID;
 
@@ -55,6 +56,47 @@ import java.util.UUID;
 @Mod.EventBusSubscriber
 public class EnchantmentCorpsePiler extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.corpse_piler.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "corpse_piler";
+
+    /**
+     * 每层击杀数每级提供的额外伤害倍率
+     * <p>默认 0.01，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_PER_KILL_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "damage_per_kill_per_level",
+                    0.01D, 0.0D, 1.0D);
+
+    /**
+     * 每层击杀数每级提供的最大生命回复占比
+     * <p>默认 0.0005，允许范围 0.0 ~ 0.1。</p>
+     */
+    private static final EnchantmentValues.Handle HEAL_PER_KILL_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "heal_per_kill_per_level",
+                    0.0005D, 0.0D, 0.1D);
+
+    /**
+     * 击杀层数上限
+     * <p>默认 50，允许范围 1 ~ 999。</p>
+     */
+    private static final EnchantmentValues.Handle MAX_KILL_COUNT =
+            EnchantmentValues.define(VALUE_ID, "max_kill_count",
+                    50, 1, 999);
+
+    /**
+     * 击杀层数的保持时长（tick）
+     * <p>默认 6000，允许范围 20 ~ 72000。</p>
+     */
+    private static final EnchantmentValues.Handle COUNT_DURATION_TICKS =
+            EnchantmentValues.define(VALUE_ID, "count_duration_ticks",
+                    6000, 20, 72000);
+
+
     private static final String KILL_COUNT_KEY = "corpse_piler_kills";
 
     public EnchantmentCorpsePiler() {
@@ -71,8 +113,8 @@ public class EnchantmentCorpsePiler extends EnchantmentBase {
             return;
         }
 
-        ctx.addDamage(ctx.getDamage() * killCount * level * 0.01f);
-        attacker.heal(attacker.getMaxHealth() * killCount * level * 0.0005f);
+        ctx.addDamage(ctx.getDamage() * killCount * level * (float) DAMAGE_PER_KILL_PER_LEVEL.get());
+        attacker.heal(attacker.getMaxHealth() * killCount * level * (float) HEAL_PER_KILL_PER_LEVEL.get());
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -101,8 +143,8 @@ public class EnchantmentCorpsePiler extends EnchantmentBase {
                     if (level > 0) {
                         if (killer.level().random.nextBoolean()) {
                             int current = EnchantmentDataManager.getCounter(KILL_COUNT_KEY, killer.getUUID());
-                            int newCount = Math.min(current + 1, 50);
-                            EnchantmentDataManager.setCounter(KILL_COUNT_KEY, killer.getUUID(), newCount, 6000);
+                            int newCount = Math.min(current + 1, MAX_KILL_COUNT.getInt());
+                            EnchantmentDataManager.setCounter(KILL_COUNT_KEY, killer.getUUID(), newCount, COUNT_DURATION_TICKS.getInt());
                         }
                     }
                 }
@@ -112,7 +154,7 @@ public class EnchantmentCorpsePiler extends EnchantmentBase {
         // 死亡者计数衰减（清理逻辑，无需开关）
         int deadCount = EnchantmentDataManager.getCounter(KILL_COUNT_KEY, dead.getUUID());
         if (deadCount > 0) {
-            EnchantmentDataManager.setCounter(KILL_COUNT_KEY, dead.getUUID(), deadCount / 2, 6000);
+            EnchantmentDataManager.setCounter(KILL_COUNT_KEY, dead.getUUID(), deadCount / 2, COUNT_DURATION_TICKS.getInt());
         }
     }
 

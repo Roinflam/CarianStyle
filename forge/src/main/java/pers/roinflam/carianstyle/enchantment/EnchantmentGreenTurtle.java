@@ -18,6 +18,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
  * 绿龟附魔
@@ -35,6 +36,30 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentGreenTurtle extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.green_turtle.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "green_turtle";
+
+    /**
+     * 每级按治疗量提供的额外治疗比例
+     * <p>默认 0.075，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle HEAL_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "heal_per_level",
+                    0.075D, 0.0D, 2.0D);
+
+    /**
+     * 每级按已损失生命比例提供的额外治疗系数
+     * <p>默认 0.15，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle MISSING_HEALTH_BONUS =
+            EnchantmentValues.define(VALUE_ID, "missing_health_bonus",
+                    0.15D, 0.0D, 5.0D);
 
     public EnchantmentGreenTurtle() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
@@ -71,8 +96,8 @@ public class EnchantmentGreenTurtle extends EnchantmentBase {
 
         float missingHealthPercent = 1 - entity.getHealth() / entity.getMaxHealth();
 
-        float bonusHeal = evt.getAmount() * totalLevel * 0.075f
-                + totalLevel * 0.15f * missingHealthPercent;
+        float bonusHeal = evt.getAmount() * totalLevel * (float) HEAL_PER_LEVEL.get()
+                + totalLevel * (float) MISSING_HEALTH_BONUS.get() * missingHealthPercent;
 
         evt.setAmount(evt.getAmount() + bonusHeal);
     }

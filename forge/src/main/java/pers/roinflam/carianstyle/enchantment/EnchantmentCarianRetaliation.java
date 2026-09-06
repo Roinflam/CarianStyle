@@ -23,6 +23,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
@@ -61,6 +62,63 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentCarianRetaliation extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.carian_retaliation.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "carian_retaliation";
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
+                    10, 1, 100);
+
+    /**
+     * 反击辉剑的数量（发射方位自动均分整圆）
+     * <p>默认 3，允许范围 1 ~ 32。</p>
+     */
+    private static final EnchantmentValues.Handle BLADE_COUNT =
+            EnchantmentValues.define(VALUE_ID, "blade_count",
+                    3, 1, 32);
+
+    /**
+     * 第一把剑的发射延迟（tick）
+     * <p>默认 40，允许范围 0 ~ 600。</p>
+     */
+    private static final EnchantmentValues.Handle BASE_DELAY =
+            EnchantmentValues.define(VALUE_ID, "base_delay",
+                    40, 0, 600);
+
+    /**
+     * 相邻两把剑的发射间隔（tick）
+     * <p>默认 5，允许范围 0 ~ 120。</p>
+     */
+    private static final EnchantmentValues.Handle DELAY_STEP =
+            EnchantmentValues.define(VALUE_ID, "delay_step",
+                    5, 0, 120);
+
+    /**
+     * 每级的辉剑伤害倍率
+     * <p>默认 0.2，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "damage_per_level",
+                    0.2D, 0.0D, 5.0D);
+
+    /**
+     * 辉剑的追踪强度
+     * <p>默认 0.15，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle TRACKING_STRENGTH =
+            EnchantmentValues.define(VALUE_ID, "tracking_strength",
+                    0.15D, 0.0D, 1.0D);
+
 
     /** 剑环半径（格），与原实现一致 */
     private static final double RING_RADIUS = 1.5;
@@ -116,7 +174,7 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
         int level = EnchantmentHelper.getItemEnchantmentLevel(carianRetaliation, heldItem);
 
         if (ConfigLoader.levelLimit) {
-            level = Math.min(level, 10);
+            level = Math.min(level, LEVEL_CAP.getInt());
         }
 
         if (level <= 0) {
@@ -126,10 +184,11 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
         final int effectiveLevel = level;
         final float baseDamage = evt.getAmount();
 
-        for (int i = 0; i < 3; i++) {
-            final int delay = 40 + i * 5;
+        for (int i = 0; i < BLADE_COUNT.getInt(); i++) {
+            final int delay = BASE_DELAY.getInt() + i * DELAY_STEP.getInt();
 
-            double angle = (i * 120) * Math.PI / 180.0;
+            // 方位按剑数均分整圆，改 blade_count 时不必再手动改这里的角度
+                double angle = (i * 360.0 / BLADE_COUNT.getInt()) * Math.PI / 180.0;
             // v3.0：相对持盾者的局部偏移（原实现在这里直接算成了绝对坐标）
             final double offsetX = Math.cos(angle) * RING_RADIUS;
             final double offsetY = RING_HEIGHT;
@@ -168,9 +227,9 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
                     EntityGlintblades attackBlade = new EntityGlintblades(holder, attacker)
                             .setSize(1.0f)
                             .setAimPoint(aimPoint)
-                            .setDamage(baseDamage * effectiveLevel * 0.2f)
+                            .setDamage(baseDamage * effectiveLevel * (float) DAMAGE_PER_LEVEL.get())
                             .setDamageSource(holder.damageSources().thrown(null, holder))
-                            .setTrackingStrength(0.15f)
+                            .setTrackingStrength((float) TRACKING_STRENGTH.get())
                             .setMaxLifetime(100);
 
                     DamageSourceUtil.setMagicDamage(attackBlade.getDamageSource());

@@ -12,6 +12,7 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
@@ -49,6 +50,30 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
         slots = {EquipmentSlot.MAINHAND}
 )
 public class EnchantmentLungeUp extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.lunge_up.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "lunge_up";
+
+    /**
+     * 每级的上挑击飞强度
+     * <p>默认 0.3，允许范围 0.0 ~ 3.0。</p>
+     */
+    private static final EnchantmentValues.Handle KNOCKUP_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "knockup_per_level",
+                    0.3D, 0.0D, 3.0D);
+
+    /**
+     * 每级额外伤害倍率
+     * <p>默认 0.15，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "damage_per_level",
+                    0.15D, 0.0D, 5.0D);
 
     public EnchantmentLungeUp() {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
@@ -91,7 +116,7 @@ public class EnchantmentLungeUp extends EnchantmentBase {
 
                 victim.setDeltaMovement(
                         victim.getDeltaMovement().x,
-                        level * 0.3,
+                        level * KNOCKUP_PER_LEVEL.get(),
                         victim.getDeltaMovement().z
                 );
                 victim.hurtMarked = true;
@@ -99,7 +124,7 @@ public class EnchantmentLungeUp extends EnchantmentBase {
         }.start();
 
         // 增伤 +15% × 等级
-        ctx.addDamage(ctx.getDamage() * level * 0.15f);
+        ctx.addDamage(ctx.getDamage() * level * (float) DAMAGE_PER_LEVEL.get());
     }
 
     @Override

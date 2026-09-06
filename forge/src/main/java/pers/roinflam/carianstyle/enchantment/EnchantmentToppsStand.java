@@ -17,6 +17,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
@@ -39,6 +40,22 @@ import java.util.List;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentToppsStand extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.topps_stand.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "topps_stand";
+
+    /**
+     * 友方搜索半径（格，受击方与攻击方各搜一次）
+     * <p>默认 6，允许范围 1 ~ 64。</p>
+     */
+    private static final EnchantmentValues.Handle SEARCH_RADIUS =
+            EnchantmentValues.define(VALUE_ID, "search_radius",
+                    6, 1, 64);
 
     public EnchantmentToppsStand() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
@@ -66,11 +83,11 @@ public class EnchantmentToppsStand extends EnchantmentBase {
             return;
         }
 
-        List<LivingEntity> entities = EntityUtil.getNearbyEntities(LivingEntity.class, victim, 6);
+        List<LivingEntity> entities = EntityUtil.getNearbyEntities(LivingEntity.class, victim, SEARCH_RADIUS.getInt());
 
         if (evt.getSource().getEntity() instanceof LivingEntity) {
             LivingEntity attacker = (LivingEntity) evt.getSource().getEntity();
-            entities.addAll(EntityUtil.getNearbyEntities(LivingEntity.class, attacker, 6));
+            entities.addAll(EntityUtil.getNearbyEntities(LivingEntity.class, attacker, SEARCH_RADIUS.getInt()));
         }
 
         for (LivingEntity entity : entities) {

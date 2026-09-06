@@ -24,6 +24,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
@@ -57,6 +58,47 @@ import java.util.List;
 @AutoRegisterEnchantment(id = "hard_arrow", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.UNCOMMON, type = EnchantmentCategory.BOW, slots = {EquipmentSlot.MAINHAND})
 @Mod.EventBusSubscriber
 public class EnchantmentHardArrow extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.hard_arrow.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "hard_arrow";
+
+    /**
+     * 每级的箭矢伤害倍率加成
+     * <p>默认 0.8，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle ARROW_DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "arrow_damage_per_level",
+                    0.8D, 0.0D, 10.0D);
+
+    /**
+     * 每级的近战伤害倍率加成
+     * <p>默认 0.8，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle MELEE_DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "melee_damage_per_level",
+                    0.8D, 0.0D, 10.0D);
+
+    /**
+     * 每级的击退强度加成
+     * <p>默认 0.75，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle KNOCKBACK_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "knockback_per_level",
+                    0.75D, 0.0D, 10.0D);
+
+    /**
+     * 范围搜索半径（格）
+     * <p>默认 12，允许范围 1 ~ 64。</p>
+     */
+    private static final EnchantmentValues.Handle AOE_RADIUS =
+            EnchantmentValues.define(VALUE_ID, "aoe_radius",
+                    12, 1, 64);
+
     public EnchantmentHardArrow() { super(EnchantmentCategory.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND}); }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
@@ -75,7 +117,8 @@ public class EnchantmentHardArrow extends EnchantmentBase {
         int level = EnchantmentHelper.getItemEnchantmentLevel(hardArrow, heldItem);
         if (ConfigLoader.levelLimit) level = Math.min(level, 10);
         if (level <= 0) return;
-        arrow.setBaseDamage(arrow.getBaseDamage() + arrow.getBaseDamage() * level * 0.8);
+        arrow.setBaseDamage(arrow.getBaseDamage()
+                + arrow.getBaseDamage() * level * ARROW_DAMAGE_PER_LEVEL.get());
 
         // ⭐ v2.3：冲击特效。
         // 本方法对「射中方块」与「射中实体」一视同仁地加伤，但特效需要一个命中实体
@@ -104,9 +147,9 @@ public class EnchantmentHardArrow extends EnchantmentBase {
     protected void onHurtAsVictimHighest(@NotNull EnchantmentContext ctx, int level) {
         if (ctx.getAttacker() == null) return;
         LivingEntity victim = ctx.getHolder();
-        List<LivingEntity> entities = EntityUtil.getNearbyEntities(LivingEntity.class, victim, 12, entity -> !entity.equals(victim));
+        List<LivingEntity> entities = EntityUtil.getNearbyEntities(LivingEntity.class, victim, AOE_RADIUS.getInt(), entity -> !entity.equals(victim));
         if (entities.isEmpty()) return;
-        ctx.addDamage(ctx.getDamage() * level * 0.8f);
+        ctx.addDamage(ctx.getDamage() * level * (float) MELEE_DAMAGE_PER_LEVEL.get());
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
@@ -124,9 +167,9 @@ public class EnchantmentHardArrow extends EnchantmentBase {
         int level = EnchantmentHelper.getItemEnchantmentLevel(hardArrow, heldItem);
         if (ConfigLoader.levelLimit) level = Math.min(level, 10);
         if (level <= 0) return;
-        List<LivingEntity> entities = EntityUtil.getNearbyEntities(LivingEntity.class, victim, 12, entity -> !entity.equals(victim));
+        List<LivingEntity> entities = EntityUtil.getNearbyEntities(LivingEntity.class, victim, AOE_RADIUS.getInt(), entity -> !entity.equals(victim));
         if (entities.isEmpty()) return;
-        evt.setStrength(evt.getStrength() + evt.getStrength() * level * 0.75f);
+        evt.setStrength(evt.getStrength() + evt.getStrength() * level * (float) KNOCKBACK_PER_LEVEL.get());
     }
 
     @Override public int getMinCost(int l) { return (int)((5 + (l - 1) * 10) * ConfigLoader.enchantingDifficulty); }

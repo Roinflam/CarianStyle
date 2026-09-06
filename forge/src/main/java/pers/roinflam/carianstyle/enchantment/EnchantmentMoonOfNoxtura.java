@@ -4,10 +4,8 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
-import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -15,9 +13,11 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.dead.EnchantmentAncientDragonLightning;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 import java.util.List;
@@ -34,6 +34,39 @@ import java.util.List;
 @AutoRegisterEnchantment(id = "moon_of_noxtura", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.VERY_RARE, type = EnchantmentCategory.ARMOR, slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}, conflictsWith = {EnchantmentHealingByFire.class, EnchantmentShelterOfFire.class, EnchantmentPreciseLightning.class, EnchantmentAncientDragonLightning.class}, forceTreasure = true)
 @Mod.EventBusSubscriber
 public class EnchantmentMoonOfNoxtura extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.moon_of_noxtura.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "moon_of_noxtura";
+
+    /**
+     * 仇恨转移的结算间隔（tick）
+     * <p>默认 20，允许范围 1 ~ 600。</p>
+     */
+    private static final EnchantmentValues.Handle TICK_INTERVAL =
+            EnchantmentValues.define(VALUE_ID, "tick_interval",
+                    20, 1, 600);
+
+    /**
+     * 每次结算的触发概率（百分比）
+     * <p>默认 2.5，允许范围 0.0 ~ 100.0。</p>
+     */
+    private static final EnchantmentValues.Handle TRIGGER_CHANCE =
+            EnchantmentValues.define(VALUE_ID, "trigger_chance",
+                    2.5D, 0.0D, 100.0D);
+
+    /**
+     * 仇恨转移的搜索半径（格）
+     * <p>默认 32，允许范围 1 ~ 64。</p>
+     */
+    private static final EnchantmentValues.Handle SEARCH_RADIUS =
+            EnchantmentValues.define(VALUE_ID, "search_radius",
+                    32, 1, 64);
+
     public EnchantmentMoonOfNoxtura() { super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}); }
 
     /**
@@ -45,7 +78,7 @@ public class EnchantmentMoonOfNoxtura extends EnchantmentBase {
     public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
         if (evt.player.level().isClientSide || evt.phase != TickEvent.Phase.START) return;
         // 每20tick（1秒）检查一次
-        if (evt.player.tickCount % 20 != 0) return;
+        if (evt.player.tickCount % TICK_INTERVAL.getInt() != 0) return;
         // 只在夜晚生效
         if (evt.player.level().isDay()) return;
 
@@ -55,19 +88,16 @@ public class EnchantmentMoonOfNoxtura extends EnchantmentBase {
         Enchantment moonOfNoxtura = EnchantmentRegistry.getEnchantmentByClass(EnchantmentMoonOfNoxtura.class);
         if (moonOfNoxtura == null) return;
 
-        // 检查护甲附魔
-        int totalLevel = 0;
-        for (ItemStack armor : player.getArmorSlots()) {
-            if (!armor.isEmpty()) totalLevel += EnchantmentHelper.getItemEnchantmentLevel(moonOfNoxtura, armor);
-        }
+        // 检查护甲附魔（v-cache：走中央装备缓存）
+        int totalLevel = EnchantmentEventHandler.armorTotal(player, moonOfNoxtura);
         if (ConfigLoader.levelLimit) totalLevel = Math.min(totalLevel, 10);
         if (totalLevel <= 0) return;
 
         // 2.5%概率触发
-        if (!RandomUtil.percentageChance(2.5)) return;
+        if (!RandomUtil.percentageChance(TRIGGER_CHANCE.get())) return;
 
         // 搜索周围32格内锁定自己的Mob
-        List<Mob> nearbyMobs = EntityUtil.getNearbyEntities(Mob.class, player, 32, mob -> {
+        List<Mob> nearbyMobs = EntityUtil.getNearbyEntities(Mob.class, player, SEARCH_RADIUS.getInt(), mob -> {
             LivingEntity target = mob.getTarget();
             return target != null && target.equals(player);
         });

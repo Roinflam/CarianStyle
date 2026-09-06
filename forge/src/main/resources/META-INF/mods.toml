@@ -28,3 +28,22 @@ mandatory=true
 versionRange="[${minecraft_version}]"
 ordering="NONE"
 side="BOTH"
+
+# ==================== 本次补充：Cloth Config 加载顺序 ====================
+# build.gradle 里 Cloth Config 是 modApi + include，会以 jar-in-jar 内嵌进本模组，
+# 因此【不存在缺失风险】，玩家不装也能正常玩——这一点此前我判断错了，特此更正。
+#
+# 但仍然需要这条声明，原因是【加载顺序】：Forge 依据依赖关系排序模组的构造阶段，
+# 未声明时本模组有可能先于 Cloth Config 完成构造，而 CarianStyle 的构造函数里
+# 就会通过 ConfigScreenHandler 注册 ClothConfigScreen。ordering="AFTER" 明确要求
+# Cloth Config 先加载完毕。
+#
+# mandatory 刻意设为 false：既然是内嵌的，它一定存在；写 false 可以确保
+# 万一将来某个整合包环境下 jar-in-jar 被剥离或被更高版本顶替，
+# 也只是配置界面不可用，而不会直接卡在「缺少前置」界面进不去游戏。
+[[dependencies.carianstyle]]
+modId="cloth_config"
+mandatory=false
+versionRange="[11.1.136,)"
+ordering="AFTER"
+side="BOTH"

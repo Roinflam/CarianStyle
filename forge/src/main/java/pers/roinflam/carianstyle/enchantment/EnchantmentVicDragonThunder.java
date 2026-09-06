@@ -20,6 +20,7 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
 
@@ -88,6 +89,46 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
 @Mod.EventBusSubscriber
 public class EnchantmentVicDragonThunder extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.vic_dragon_thunder.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "vic_dragon_thunder";
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
+                    10, 1, 100);
+
+    /**
+     * 每级对雷电伤害的减免比例
+     * <p>默认 0.15，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle REDUCTION_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "reduction_per_level",
+                    0.15D, 0.0D, 1.0D);
+
+    /**
+     * 每级的基础触发概率（百分比）
+     * <p>默认 5.0，允许范围 0.0 ~ 100.0。</p>
+     */
+    private static final EnchantmentValues.Handle CHANCE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "chance_per_level",
+                    5.0D, 0.0D, 100.0D);
+
+    /**
+     * 每级的雷击伤害倍率
+     * <p>默认 0.5，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "damage_per_level",
+                    0.5D, 0.0D, 10.0D);
+
     public EnchantmentVicDragonThunder() {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
@@ -119,14 +160,14 @@ public class EnchantmentVicDragonThunder extends EnchantmentBase {
                 if (!victimHeld.isEmpty()) {
                     int level = EnchantmentHelper.getItemEnchantmentLevel(vicDragonThunder, victimHeld);
                     if (ConfigLoader.levelLimit) {
-                        level = Math.min(level, 10);
+                        level = Math.min(level, LEVEL_CAP.getInt());
                     }
                     if (level > 0) {
-                        if (level * 0.15 >= 1) {
+                        if (level * REDUCTION_PER_LEVEL.get() >= 1) {
                             evt.setCanceled(true);
                             return;
                         }
-                        evt.setAmount(evt.getAmount() - evt.getAmount() * level * 0.15f);
+                        evt.setAmount(evt.getAmount() - evt.getAmount() * level * (float) REDUCTION_PER_LEVEL.get());
                     }
                 }
             }
@@ -147,19 +188,22 @@ public class EnchantmentVicDragonThunder extends EnchantmentBase {
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(vicDragonThunder, attackerHeld);
         if (ConfigLoader.levelLimit) {
-            level = Math.min(level, 10);
+            level = Math.min(level, LEVEL_CAP.getInt());
         }
         if (level <= 0) {
             return;
         }
 
-        int triggerChance;
+        // v-cfg：改为 double —— 触发概率一旦可配置就未必是整数
+        // （比如想设 2.5%），用 int 会把小数部分截掉。
+        // RandomUtil.percentageChance 本来就收 double，无需其它改动。
+        double triggerChance;
         if (attacker.level().isThundering()) {
             triggerChance = 100;
         } else if (attacker.level().isRaining()) {
-            triggerChance = level * 5 * 2;
+            triggerChance = level * CHANCE_PER_LEVEL.get() * 2;
         } else {
-            triggerChance = level * 5;
+            triggerChance = level * CHANCE_PER_LEVEL.get();
         }
 
         if (!RandomUtil.percentageChance(triggerChance)) {
@@ -186,7 +230,7 @@ public class EnchantmentVicDragonThunder extends EnchantmentBase {
             magnification = 2;
         }
 
-        victim.hurt(victim.damageSources().lightningBolt(), evt.getAmount() * level * 0.5f * magnification);
+        victim.hurt(victim.damageSources().lightningBolt(), evt.getAmount() * level * (float) DAMAGE_PER_LEVEL.get() * magnification);
     }
 
     @Override

@@ -17,6 +17,8 @@ import pers.roinflam.carianstyle.enchantment.combatskill.EnchantmentGravitas;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
 import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
+import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -39,7 +41,7 @@ import java.util.Map;
  *         收缩淡出动画</b>（{@link #FIELD_STATE} + {@link FieldAnimState}），与
  *         {@code AuraGroundRenderer} 里「圣域」等装备光环的出现/消失动画同一套逻辑——不再像
  *         早期版本那样跟随同步状态瞬间蹦出/消失。半径与实际判定半径共用同一个
- *         {@code EnchantmentGravitas.FIELD_RADIUS} 常量，不会出现「圈画的地方和实际生效范围
+ *         {@code EnchantmentGravitas.FIELD_RADIUS} 句柄（其值由服务端在登录时下发），不会出现「圈画的地方和实际生效范围
  *         对不上」的情况。</li>
  * </ol>
  * 两类视觉互不依赖、可同时出现。
@@ -93,7 +95,7 @@ import java.util.Map;
  *
  * <h4>力场圈的细节系数必须按「到边界的距离」算，不能按到中心的距离</h4>
  * <p>
- * 这是本次改造唯一需要偏离常规做法的地方。{@link #FIELD_RADIUS} 取自
+ * 这是本次改造唯一需要偏离常规做法的地方。{@link #fieldRadius()} 取自
  * {@code EnchantmentGravitas.FIELD_RADIUS}，<b>可能大于 {@link VisualLod#FULL_DETAIL_RANGE}(12)</b>。
  * 若照搬其它渲染器「按实体中心的平方距离算 detail」的写法，会出现这样的荒谬情况：
  * </p>
@@ -275,8 +277,31 @@ public final class GravitasDistortionRenderer {
     private static final float DUST_ALPHA = 0.65f;
 
     // ===== 施法者力场范围圈 =====
-    /** 范围圈半径（格），与 {@link EnchantmentGravitas#FIELD_RADIUS} 保持一致（int 隐式转 float） */
-    private static final float FIELD_RADIUS = EnchantmentGravitas.FIELD_RADIUS;
+    /**
+     * 取当前生效的范围圈半径（格）。
+     *
+     * <h3>为什么从常量改成方法</h3>
+     * <p>
+     * 原本是 {@code private static final float FIELD_RADIUS = EnchantmentGravitas.FIELD_RADIUS;}，
+     * 也就是在类初始化时把服务端常量抄一份下来。半径变成可配置之后这样做就不成立了：
+     * 配置文件是各端各一份的，客户端抄到的是<b>玩家自己电脑上</b>的值，
+     * 服主把半径改成 20，这里仍然按 12 画圈，玩家会看到圈外的人却被打中。
+     * </p>
+     * <p>
+     * 现在改为每次读句柄。半径值由服务端在玩家登录时下发
+     * （见 {@code ValueSyncHandler}），句柄内部会优先返回下发值，
+     * 所以这里拿到的一定是服务端正在用的那个数。
+     * </p>
+     * <p>
+     * 开销是一次 volatile 读加一次拆箱，相对本渲染器每帧的几何计算可以忽略；
+     * 也正因如此没有做每帧缓存——缓存要多一处状态，收益却看不见。
+     * </p>
+     *
+     * @return 当前生效的范围圈半径
+     */
+    private static float fieldRadius() {
+        return EnchantmentGravitas.FIELD_RADIUS.getInt();
+    }
     /** 范围圈分段数（半径较大，适当提高分段避免多边形感） */
     private static final int FIELD_RING_SEGMENTS = 48;
     private static final float FIELD_RING_HALF_WIDTH = 0.09f;
@@ -348,6 +373,14 @@ public final class GravitasDistortionRenderer {
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
+            return;
+        }
+
+        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
+        // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
+        // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
+        if (!VisualToggle.isEnabled(VisualEffectType.GRAVITAS)) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
@@ -506,11 +539,11 @@ public final class GravitasDistortionRenderer {
             }
 
             // ⭐ v3：力场圈的细节系数必须按「到圆环边界的距离」取，不能按到圈心的距离。
-            // FIELD_RADIUS 可能大于 VisualLod.FULL_DETAIL_RANGE(12)，若按圈心距离算，
+            // 力场半径可能大于 VisualLod.FULL_DETAIL_RANGE(12)，若按圈心距离算，
             // 玩家站在圈内侧边缘时（到圈心 ≈ 半径）会被判定为"远"并大幅削减，
             // 但那圈线其实就在脚边、削减清晰可见。改用到边界的近似距离后，
             // 贴着圈边时该值为 0、detail 恒为 1.0。开方成本可忽略（同屏力场圈通常 0~2 个）。
-            float currentRadius = FIELD_RADIUS * radiusFactor;
+            float currentRadius = fieldRadius() * radiusFactor;
             double edgeDist = Math.max(0.0, Math.sqrt(distSqr) - currentRadius);
             float detail = VisualLod.detail(edgeDist * edgeDist);
             VisualLod.countInstance();
@@ -681,7 +714,7 @@ public final class GravitasDistortionRenderer {
     // ==================== 施法者力场范围圈 ====================
 
     /**
-     * 施法者力场范围圈：以施法者为中心、半径 {@link #FIELD_RADIUS}×{@code radiusFactor} 格的
+     * 施法者力场范围圈：以施法者为中心、半径 {@link #fieldRadius()}×{@code radiusFactor} 格的
      * 地面警示环。{@code radiusFactor} / {@code animAlpha} 由调用方按「出现展开 / 消失收缩淡出」
      * 的动画状态传入，不再跟随同步状态瞬间出现/消失。由「淡色底色填充」+「边界主环（双层辉光）」+
      * 「持续向心收拢的塌陷环」+「沿边界起伏明灭的立体压制柱栅栏」四部分组成。
@@ -708,7 +741,7 @@ public final class GravitasDistortionRenderer {
         if (animAlpha <= 0.01f || radiusFactor <= 0.02f) {
             return;
         }
-        float radius = FIELD_RADIUS * radiusFactor;
+        float radius = fieldRadius() * radiusFactor;
         final float[] deep = C_GRAVITY_DEEP;
         final float[] mid = C_GRAVITY_MID;
         final float[] core = C_GRAVITY_CORE;

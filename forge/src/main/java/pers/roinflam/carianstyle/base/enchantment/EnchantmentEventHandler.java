@@ -147,7 +147,38 @@ public class EnchantmentEventHandler {
         private List<TickEnchantmentEntry> tickEntries = Collections.emptyList();
         private int ticksSinceForceRescan = 0;
 
+        /**
+         * 上次重扫时玩家的 {@code tickCount}；-1 表示尚未扫过。
+         * <p>用于让 {@link #getOrRescan} 在同一 tick 内幂等，详见该方法注释。</p>
+         */
+        private int lastTickStamp = -1;
+
+        /**
+         * 取本 tick 的附魔快照，必要时重扫。
+         *
+         * <h3>v3.3：同一 tick 内幂等</h3>
+         * <p>
+         * 原实现每次调用都 {@code ticksSinceForceRescan++}。此前它只被 tick 分发调用一次，
+         * 所以「20 tick 强制重扫一次」是准确的。但 v3.3 把本缓存对外开放给独立监听器之后，
+         * 同一 tick 内会被调用 N 次，那个计数器就会以 N 倍速前进——
+         * 「20 tick 一次」实际变成「20/N tick 一次」，强制重扫的兜底频率被悄悄放大 N 倍。
+         * </p>
+         * <p>
+         * 因此加一个 tick 戳记：本 tick 已经扫过就直接返回快照，
+         * 装备哈希比对和计数器推进都只在每 tick 的<b>第一次</b>调用时发生。
+         * 谁先调用无所谓——玩家的装备在一个 tick 内不会变，快照对所有调用者都一样。
+         * </p>
+         *
+         * @param player 玩家
+         * @return 该玩家当前的附魔快照
+         */
         List<TickEnchantmentEntry> getOrRescan(Player player) {
+            int now = player.tickCount;
+            if (now == lastTickStamp) {
+                return tickEntries;
+            }
+            lastTickStamp = now;
+
             ticksSinceForceRescan++;
 
             boolean equipmentChanged = false;
@@ -206,7 +237,7 @@ public class EnchantmentEventHandler {
                     if (base.isDisabled()) continue;
                     int level = base.applyLevelLimit(entry.getValue());
                     if (level <= 0) continue;
-                    entries.add(new TickEnchantmentEntry(base, level, stack));
+                    entries.add(new TickEnchantmentEntry(base, level, stack, slot));
                 }
             }
             return entries;
@@ -220,12 +251,186 @@ public class EnchantmentEventHandler {
         final EnchantmentBase enchantment;
         final int level;
         final ItemStack stack;
+        /**
+         * 该附魔所在的槽位（v3.3 新增）。
+         * <p>对外的等级查询需要按槽位筛选（「只看护甲」「只看主手」），
+         * 而快照里混着全部六个槽位，光有 {@link #stack} 反推不出它来自哪个槽。</p>
+         */
+        final EquipmentSlot slot;
 
-        TickEnchantmentEntry(EnchantmentBase enchantment, int level, ItemStack stack) {
+        TickEnchantmentEntry(EnchantmentBase enchantment, int level, ItemStack stack,
+                             EquipmentSlot slot) {
             this.enchantment = enchantment;
             this.level = level;
             this.stack = stack;
+            this.slot = slot;
         }
+    }
+
+    // ==================== 对外的附魔等级查询（v3.3 新增） ====================
+
+    /**
+     * 全部护甲槽位，供 {@link #armorTotal} 使用。
+     * <p>抽成常量避免每次调用都新建数组——这些方法会被 tick 监听器每 tick 调用。</p>
+     */
+    private static final EquipmentSlot[] ARMOR_SLOTS = {
+            EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
+    };
+
+    /** 护甲 + 主手，供 {@link #armorAndMainHand} 使用 */
+    private static final EquipmentSlot[] ARMOR_AND_MAINHAND = {
+            EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET,
+            EquipmentSlot.MAINHAND
+    };
+
+    /**
+     * 查询某个实体身上指定槽位的附魔等级（走缓存）。
+     *
+     * <h3>为什么需要这组方法</h3>
+     * <p>
+     * 本类的 v3.0 装备缓存只服务于「走模板方法分发」的附魔。113 个附魔里有 70 个
+     * 挂了自己的 {@code @SubscribeEvent}，它们各自调
+     * {@link EnchantmentHelper#getItemEnchantmentLevel}——<b>每次都要反序列化物品的附魔 ListTag</b>。
+     * 其中十几个还是挂在 {@code PlayerTickEvent} 上的，也就是每玩家每 tick 都要付这个代价。
+     * </p>
+     * <p>
+     * 这组方法让那些独立监听器共用同一份快照：一个 tick 内无论多少个监听器来问，
+     * 装备只扫一遍。
+     * </p>
+     *
+     * <h3>⚠ 与直接调 EnchantmentHelper 的两点行为差异</h3>
+     * <p>
+     * 快照是由 {@code scanPlayerEnchantments} 构建的，它做了两件直接调用不会做的事：
+     * </p>
+     * <ol>
+     *   <li><b>跳过被禁用的附魔</b>（{@code isDisabled()}）——直接调用会无视黑名单配置，
+     *       也就是说服主把某个附魔加进黑名单后，独立监听器仍然会触发它。
+     *       改用本方法后这个洞被堵上了。</li>
+     *   <li><b>应用等级上限</b>（{@code applyLevelLimit}）——直接调用返回的是 NBT 里的原始等级，
+     *       指令给的 32767 级附魔会原样进入伤害公式。</li>
+     * </ol>
+     * <p>
+     * 这两点都是<b>修复</b>而非退化，但确实是行为变化，迁移时需要知道。
+     * </p>
+     *
+     * <h3>非玩家实体</h3>
+     * <p>
+     * 缓存按玩家 UUID 维护，生命周期挂在玩家登出事件上。怪物没有对应的清理时机，
+     * 为它们建缓存会引入一个需要额外管理的无界 Map，收益却很小——
+     * 绝大多数独立监听器一开头就用 {@link #shouldBlockMobTrigger} 把怪物挡掉了。
+     * 因此非玩家实体<b>回退到直接查询</b>，行为与原来完全一致。
+     * </p>
+     *
+     * @param holder      持有者
+     * @param enchantment 要查的附魔
+     * @param slot        槽位
+     * @return 该槽位上的附魔等级；没有则为 0
+     */
+    public static int levelIn(@Nonnull LivingEntity holder, @Nonnull Enchantment enchantment,
+                              @Nonnull EquipmentSlot slot) {
+        if (!(holder instanceof Player player)) {
+            return EnchantmentHelper.getItemEnchantmentLevel(enchantment, holder.getItemBySlot(slot));
+        }
+        for (TickEnchantmentEntry entry : snapshotOf(player)) {
+            if (entry.slot == slot && entry.enchantment == enchantment) {
+                return entry.level;
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * 查询某个实体手上的附魔等级（走缓存）。
+     *
+     * @param holder      持有者
+     * @param enchantment 要查的附魔
+     * @param hand        主手或副手
+     * @return 该手上的附魔等级；没有则为 0
+     */
+    public static int levelInHand(@Nonnull LivingEntity holder, @Nonnull Enchantment enchantment,
+                                  @Nonnull InteractionHand hand) {
+        return levelIn(holder, enchantment,
+                hand == InteractionHand.MAIN_HAND ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND);
+    }
+
+    /**
+     * 查询主手上的附魔等级（走缓存）。
+     *
+     * @param holder      持有者
+     * @param enchantment 要查的附魔
+     * @return 主手上的附魔等级；没有则为 0
+     */
+    public static int mainHand(@Nonnull LivingEntity holder, @Nonnull Enchantment enchantment) {
+        return levelIn(holder, enchantment, EquipmentSlot.MAINHAND);
+    }
+
+    /**
+     * 汇总若干槽位上的附魔等级（走缓存）。
+     *
+     * @param holder      持有者
+     * @param enchantment 要查的附魔
+     * @param slots       要汇总的槽位
+     * @return 各槽位等级之和
+     */
+    public static int totalIn(@Nonnull LivingEntity holder, @Nonnull Enchantment enchantment,
+                              @Nonnull EquipmentSlot... slots) {
+        if (!(holder instanceof Player player)) {
+            int sum = 0;
+            for (EquipmentSlot slot : slots) {
+                sum += EnchantmentHelper.getItemEnchantmentLevel(enchantment, holder.getItemBySlot(slot));
+            }
+            return sum;
+        }
+        int sum = 0;
+        for (TickEnchantmentEntry entry : snapshotOf(player)) {
+            if (entry.enchantment != enchantment) {
+                continue;
+            }
+            for (EquipmentSlot slot : slots) {
+                if (entry.slot == slot) {
+                    sum += entry.level;
+                    break;
+                }
+            }
+        }
+        return sum;
+    }
+
+    /**
+     * 汇总四个护甲槽位上的附魔等级（走缓存）。
+     * <p>等价于原来的 {@code for (ItemStack armor : entity.getArmorSlots())} 循环。</p>
+     *
+     * @param holder      持有者
+     * @param enchantment 要查的附魔
+     * @return 四个护甲槽的等级之和
+     */
+    public static int armorTotal(@Nonnull LivingEntity holder, @Nonnull Enchantment enchantment) {
+        return totalIn(holder, enchantment, ARMOR_SLOTS);
+    }
+
+    /**
+     * 汇总四个护甲槽位加主手上的附魔等级（走缓存）。
+     *
+     * @param holder      持有者
+     * @param enchantment 要查的附魔
+     * @return 五个槽位的等级之和
+     */
+    public static int armorAndMainHand(@Nonnull LivingEntity holder, @Nonnull Enchantment enchantment) {
+        return totalIn(holder, enchantment, ARMOR_AND_MAINHAND);
+    }
+
+    /**
+     * 取某个玩家当前的附魔快照，必要时重扫。
+     * <p>同一 tick 内多次调用只扫一次，见 {@code PlayerEquipmentCache#getOrRescan}。</p>
+     *
+     * @param player 玩家
+     * @return 附魔快照（只读语义，调用方不得修改）
+     */
+    @Nonnull
+    private static List<TickEnchantmentEntry> snapshotOf(@Nonnull Player player) {
+        return PLAYER_TICK_CACHE
+                .computeIfAbsent(player.getUUID(), uuid -> new PlayerEquipmentCache())
+                .getOrRescan(player);
     }
 
     // ==================== 怪物附魔触发开关工具方法（v3.2新增） ====================

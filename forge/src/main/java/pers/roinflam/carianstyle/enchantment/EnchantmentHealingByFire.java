@@ -19,6 +19,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 
 import java.util.ArrayList;
@@ -33,6 +34,30 @@ import java.util.List;
 @AutoRegisterEnchantment(id = "healing_by_fire", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.UNCOMMON, type = EnchantmentCategory.ARMOR, slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET})
 @Mod.EventBusSubscriber
 public class EnchantmentHealingByFire extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.healing_by_fire.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "healing_by_fire";
+
+    /**
+     * 每级的触发概率（百分比）
+     * <p>默认 2.5，允许范围 0.0 ~ 100.0。</p>
+     */
+    private static final EnchantmentValues.Handle CHANCE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "chance_per_level",
+                    2.5D, 0.0D, 100.0D);
+
+    /**
+     * 触发时获得的伤害吸收占最大生命的比例
+     * <p>默认 0.1，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle ABSORPTION_RATIO =
+            EnchantmentValues.define(VALUE_ID, "absorption_ratio",
+                    0.1D, 0.0D, 2.0D);
 
     public EnchantmentHealingByFire() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
@@ -62,7 +87,7 @@ public class EnchantmentHealingByFire extends EnchantmentBase {
         }
         if (ConfigLoader.levelLimit) totalLevel = Math.min(totalLevel, 10);
         if (totalLevel <= 0) return;
-        if (!RandomUtil.percentageChance(totalLevel * 2.5)) return;
+        if (!RandomUtil.percentageChance(totalLevel * CHANCE_PER_LEVEL.get())) return;
 
         List<MobEffectInstance> badEffects = new ArrayList<>(victim.getActiveEffects());
         badEffects.removeIf(effect ->
@@ -75,7 +100,8 @@ public class EnchantmentHealingByFire extends EnchantmentBase {
 
         MobEffectInstance toRemove = badEffects.get(RandomUtil.getInt(0, badEffects.size() - 1));
         victim.removeEffect(toRemove.getEffect());
-        victim.setAbsorptionAmount(victim.getAbsorptionAmount() + victim.getMaxHealth() * 0.1f);
+        victim.setAbsorptionAmount(victim.getAbsorptionAmount()
+                + victim.getMaxHealth() * (float) ABSORPTION_RATIO.get());
     }
 
     @Override

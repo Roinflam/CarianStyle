@@ -213,7 +213,26 @@ public final class CarianStyleConditionDisplay {
      * 隐匿面纱战斗冷却的总时长（tick），用于画充能进度条。
      * <p>直接引用附魔自身的常量，不复制字面量——那边改了这边会跟着变。</p>
      */
-    private static final int CONCEALING_VEIL_TOTAL_TICKS = EnchantmentConcealingVeil.BATTLE_DURATION;
+    /**
+     * 取隐匿面纱的战斗计时总时长（tick）。
+     *
+     * <h3>为什么从常量改成方法</h3>
+     * <p>
+     * 原本是 {@code private static final int CONCEALING_VEIL_TOTAL_TICKS =
+     * EnchantmentConcealingVeil.BATTLE_DURATION;}，在类初始化时抄一份。
+     * 时长变成可配置之后这样不再成立：配置文件各端各一份，客户端抄到的是本地值，
+     * 服主改了时长，进度条就会与实际状态对不上——条走完了人还在战斗中，或者反过来。
+     * </p>
+     * <p>
+     * 现在每次读句柄，值由服务端在登录时下发（见 {@code ValueSyncHandler}）。
+     * 这个方法每帧最多调用一次，开销可以忽略。
+     * </p>
+     *
+     * @return 当前生效的战斗计时总时长
+     */
+    private static int concealingVeilTotalTicks() {
+        return EnchantmentConcealingVeil.BATTLE_DURATION.getInt();
+    }
 
     /**
      * 快步的速度等级换算除数。
@@ -311,7 +330,7 @@ public final class CarianStyleConditionDisplay {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     return new StackDisplayRegistry.Stacks(
-                            remaining, CONCEALING_VEIL_TOTAL_TICKS, true);
+                            remaining, concealingVeilTotalTicks(), true);
                 });
 
         // ===================== 34 吃屎：治疗削减剩余 =====================

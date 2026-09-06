@@ -20,6 +20,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 import java.util.UUID;
@@ -46,6 +47,47 @@ import java.util.UUID;
 @Mod.EventBusSubscriber
 public class EnchantmentGiantFlame extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.giant_flame.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "giant_flame";
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
+                    10, 1, 100);
+
+    /**
+     * 燃烧时反弹给攻击者的伤害比例
+     * <p>默认 0.5，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle REFLECT_RATIO =
+            EnchantmentValues.define(VALUE_ID, "reflect_ratio",
+                    0.5D, 0.0D, 5.0D);
+
+    /**
+     * 按已损失生命比例提供的减伤系数
+     * <p>默认 0.25，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle REDUCTION_RATIO =
+            EnchantmentValues.define(VALUE_ID, "reduction_ratio",
+                    0.25D, 0.0D, 1.0D);
+
+    /**
+     * 燃烧治疗的结算冷却（tick）
+     * <p>默认 10，允许范围 1 ~ 600。</p>
+     */
+    private static final EnchantmentValues.Handle HEAL_COOLDOWN =
+            EnchantmentValues.define(VALUE_ID, "heal_cooldown",
+                    10, 1, 600);
+
+
     private static final String FLAME_HEAL_COOLDOWN_KEY = "giant_flame_heal_cooldown";
     private static final int RECOLLECT_ENCHANTABILITY = 35;
 
@@ -66,7 +108,7 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
             }
         }
         if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
+            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
         }
         return totalLevel;
     }
@@ -101,7 +143,8 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
             return;
         }
 
-        attacker.hurt(holder.damageSources().inFire(), evt.getAmount() * 0.5f);
+        attacker.hurt(holder.damageSources().inFire(),
+                    evt.getAmount() * (float) REFLECT_RATIO.get());
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
@@ -125,7 +168,7 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
         }
 
         float healthRatio = holder.getHealth() / holder.getMaxHealth();
-        evt.setAmount(evt.getAmount() - evt.getAmount() * healthRatio * 0.25f);
+        evt.setAmount(evt.getAmount() - evt.getAmount() * healthRatio * (float) REDUCTION_RATIO.get());
     }
 
     @SubscribeEvent(priority = EventPriority.HIGH)
@@ -162,7 +205,7 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
 
         if (!EnchantmentDataManager.isOnCooldown(FLAME_HEAL_COOLDOWN_KEY, uuid)) {
             holder.heal(evt.getAmount());
-            EnchantmentDataManager.setCooldown(FLAME_HEAL_COOLDOWN_KEY, uuid, 10);
+            EnchantmentDataManager.setCooldown(FLAME_HEAL_COOLDOWN_KEY, uuid, HEAL_COOLDOWN.getInt());
         }
     }
 

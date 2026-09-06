@@ -29,6 +29,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.EnchantmentScarletCorruption;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 import java.util.UUID;
@@ -59,6 +60,79 @@ import java.util.UUID;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentPrayerfulStrike extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.prayerful_strike.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "prayerful_strike";
+
+    /**
+     * 蓄力所需的时长（tick）
+     * <p>默认 160，允许范围 1 ~ 12000。</p>
+     */
+    private static final EnchantmentValues.Handle CHARGING_COOLDOWN =
+            EnchantmentValues.define(VALUE_ID, "charging_cooldown",
+                    160, 1, 12000);
+
+    /**
+     * 未就绪状态的时长（tick）。⚠ 应小于 charging_cooldown，二者共同决定可用节奏
+     * <p>默认 80，允许范围 1 ~ 12000。</p>
+     */
+    private static final EnchantmentValues.Handle NOT_READY_COOLDOWN =
+            EnchantmentValues.define(VALUE_ID, "not_ready_cooldown",
+                    80, 1, 12000);
+
+    /**
+     * 按自身最大生命计算的额外伤害比例
+     * <p>默认 0.025，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle SELF_HEALTH_RATIO =
+            EnchantmentValues.define(VALUE_ID, "self_health_ratio",
+                    0.025D, 0.0D, 2.0D);
+
+    /**
+     * 按目标当前生命计算的额外伤害比例
+     * <p>默认 0.075，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle VICTIM_HEALTH_RATIO =
+            EnchantmentValues.define(VALUE_ID, "victim_health_ratio",
+                    0.075D, 0.0D, 2.0D);
+
+    /**
+     * 额外伤害的上限（占目标最大生命的比例）
+     * <p>默认 0.1，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_CAP_RATIO =
+            EnchantmentValues.define(VALUE_ID, "damage_cap_ratio",
+                    0.1D, 0.0D, 2.0D);
+
+    /**
+     * 额外伤害转化为治疗的除数（2 表示一半）
+     * <p>默认 2.0，允许范围 0.1 ~ 100.0。</p>
+     */
+    private static final EnchantmentValues.Handle HEAL_DIVISOR =
+            EnchantmentValues.define(VALUE_ID, "heal_divisor",
+                    2.0D, 0.1D, 100.0D);
+
+    /**
+     * 单次治疗量的最大生命占比上限
+     * <p>默认 0.05，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle HEAL_CAP_RATIO =
+            EnchantmentValues.define(VALUE_ID, "heal_cap_ratio",
+                    0.05D, 0.0D, 2.0D);
+
+    /**
+     * 就绪提示音的结算间隔（tick）
+     * <p>默认 20，允许范围 1 ~ 600。</p>
+     */
+    private static final EnchantmentValues.Handle TICK_INTERVAL =
+            EnchantmentValues.define(VALUE_ID, "tick_interval",
+                    20, 1, 600);
+
 
     private static final UUID MAX_HEALTH_MODIFIER_ID = UUID.fromString("b55a7c8a-df03-bca7-b5ea-ec703b261525");
     private static final String MAX_HEALTH_MODIFIER_NAME = "enchantment.prayerful_strike";
@@ -120,12 +194,12 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
         if (inChargingPeriod) {
             if (!stillWaiting) {
                 triggerPrayerfulStrike(evt, attacker, victim);
-                EnchantmentDataManager.setCooldown(CHARGING_COOLDOWN_KEY, uuid, 160);
-                EnchantmentDataManager.setCooldown(NOT_READY_COOLDOWN_KEY, uuid, 80);
+                EnchantmentDataManager.setCooldown(CHARGING_COOLDOWN_KEY, uuid, CHARGING_COOLDOWN.getInt());
+                EnchantmentDataManager.setCooldown(NOT_READY_COOLDOWN_KEY, uuid, NOT_READY_COOLDOWN.getInt());
             }
         } else {
-            EnchantmentDataManager.setCooldown(CHARGING_COOLDOWN_KEY, uuid, 160);
-            EnchantmentDataManager.setCooldown(NOT_READY_COOLDOWN_KEY, uuid, 80);
+            EnchantmentDataManager.setCooldown(CHARGING_COOLDOWN_KEY, uuid, CHARGING_COOLDOWN.getInt());
+            EnchantmentDataManager.setCooldown(NOT_READY_COOLDOWN_KEY, uuid, NOT_READY_COOLDOWN.getInt());
         }
     }
 
@@ -135,17 +209,18 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
         boolean stillWaiting = EnchantmentDataManager.isOnCooldown(NOT_READY_COOLDOWN_KEY, uuid);
 
         if (inChargingPeriod && !stillWaiting) {
-            EnchantmentDataManager.setCooldown(NOT_READY_COOLDOWN_KEY, uuid, 80);
+            EnchantmentDataManager.setCooldown(NOT_READY_COOLDOWN_KEY, uuid, NOT_READY_COOLDOWN.getInt());
         } else if (!inChargingPeriod) {
-            EnchantmentDataManager.setCooldown(CHARGING_COOLDOWN_KEY, uuid, 160);
-            EnchantmentDataManager.setCooldown(NOT_READY_COOLDOWN_KEY, uuid, 80);
+            EnchantmentDataManager.setCooldown(CHARGING_COOLDOWN_KEY, uuid, CHARGING_COOLDOWN.getInt());
+            EnchantmentDataManager.setCooldown(NOT_READY_COOLDOWN_KEY, uuid, NOT_READY_COOLDOWN.getInt());
         }
     }
 
     private static void triggerPrayerfulStrike(LivingDamageEvent evt, LivingEntity attacker, LivingEntity victim) {
         float bonusDamage = Math.min(
-                attacker.getMaxHealth() * 0.025f + victim.getHealth() * 0.075f,
-                victim.getMaxHealth() * 0.1f
+                attacker.getMaxHealth() * (float) SELF_HEALTH_RATIO.get()
+                        + victim.getHealth() * (float) VICTIM_HEALTH_RATIO.get(),
+                victim.getMaxHealth() * (float) DAMAGE_CAP_RATIO.get()
         );
         evt.setAmount(evt.getAmount() + bonusDamage);
         applyMaxHealthBonus(attacker, bonusDamage);
@@ -166,8 +241,8 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
             return;
         }
 
-        float healthBonus = bonusDamage / 2;
-        float maxBonus = attacker.getMaxHealth() * 0.05f;
+        float healthBonus = (float) (bonusDamage / HEAL_DIVISOR.get());
+        float maxBonus = attacker.getMaxHealth() * (float) HEAL_CAP_RATIO.get();
         AttributeModifier existing = attribute.getModifier(MAX_HEALTH_MODIFIER_ID);
 
         if (existing == null) {
@@ -209,7 +284,7 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
 
     @SubscribeEvent
     public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
-        if (evt.phase != TickEvent.Phase.START || evt.player.tickCount % 20 != 0) {
+        if (evt.phase != TickEvent.Phase.START || evt.player.tickCount % TICK_INTERVAL.getInt() != 0) {
             return;
         }
         Player player = evt.player;

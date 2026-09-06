@@ -13,6 +13,8 @@ import pers.roinflam.carianstyle.visual.CarianStyleConditionDisplay;
 import pers.roinflam.carianstyle.visual.CarianStyleStackDisplays;
 import pers.roinflam.carianstyle.visual.StackDisplayRegistry;
 import pers.roinflam.carianstyle.visual.StackHudManager;
+import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
+import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -463,6 +465,15 @@ public final class StackHudOverlay implements IGuiOverlay {
     public void render(ForgeGui gui, GuiGraphics graphics, float partialTick, int width, int height) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.options.hideGui) {
+            return;
+        }
+
+        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉叠层 HUD 时整段跳过。
+        // 紧跟在 hideGui 判断之后是刻意的——两者语义一致（都是「这一帧不画 HUD」），
+        // 排在一起便于日后一眼看全所有「不画」的条件。
+        // 与 hideGui 一样，这里 return 之前不推进动画状态机：重新打开时各行从当前值继续，
+        // 不会突然弹出一段补播的动画。
+        if (!VisualToggle.isEnabled(VisualEffectType.STACK_HUD)) {
             return;
         }
 

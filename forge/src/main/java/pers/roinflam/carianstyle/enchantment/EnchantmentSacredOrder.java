@@ -22,6 +22,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
  * 神圣秩序附魔
@@ -40,6 +41,54 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentSacredOrder extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.sacred_order.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "sacred_order";
+
+    /**
+     * 伤害吸收上限相对最大生命的倍数
+     * <p>默认 3.0，允许范围 0.0 ~ 20.0。</p>
+     */
+    private static final EnchantmentValues.Handle ABSORPTION_CAP_RATIO =
+            EnchantmentValues.define(VALUE_ID, "absorption_cap_ratio",
+                    3.0D, 0.0D, 20.0D);
+
+    /**
+     * 每次击杀获得的伤害吸收占最大生命的比例
+     * <p>默认 0.1，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle ABSORPTION_PER_KILL =
+            EnchantmentValues.define(VALUE_ID, "absorption_per_kill",
+                    0.1D, 0.0D, 2.0D);
+
+    /**
+     * 自身有吸收护盾时受到伤害的倍率
+     * <p>默认 0.75，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle SHIELDED_DAMAGE_MULTIPLIER =
+            EnchantmentValues.define(VALUE_ID, "shielded_damage_multiplier",
+                    0.75D, 0.0D, 1.0D);
+
+    /**
+     * 按目标剩余吸收量反弹给攻击者的伤害比例
+     * <p>默认 0.05，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle REFLECT_RATIO =
+            EnchantmentValues.define(VALUE_ID, "reflect_ratio",
+                    0.05D, 0.0D, 2.0D);
+
+    /**
+     * 攻击带吸收护盾的目标时的伤害倍率
+     * <p>默认 1.5，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle VS_SHIELDED_MULTIPLIER =
+            EnchantmentValues.define(VALUE_ID, "vs_shielded_multiplier",
+                    1.5D, 0.0D, 10.0D);
 
     public EnchantmentSacredOrder() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
@@ -78,9 +127,9 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
             return;
         }
 
-        if (killer.getAbsorptionAmount() < killer.getMaxHealth() * 3) {
-            float newAbsorption = Math.min(killer.getMaxHealth() * 3,
-                    killer.getAbsorptionAmount() + killer.getMaxHealth() * 0.1f);
+        if (killer.getAbsorptionAmount() < killer.getMaxHealth() * (float) ABSORPTION_CAP_RATIO.get()) {
+            float newAbsorption = Math.min(killer.getMaxHealth() * (float) ABSORPTION_CAP_RATIO.get(),
+                    killer.getAbsorptionAmount() + killer.getMaxHealth() * (float) ABSORPTION_PER_KILL.get());
             killer.setAbsorptionAmount(newAbsorption);
         }
     }
@@ -111,11 +160,11 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
                 }
 
                 if (victimLevel > 0) {
-                    evt.setAmount(evt.getAmount() * 0.75f);
+                    evt.setAmount(evt.getAmount() * (float) SHIELDED_DAMAGE_MULTIPLIER.get());
 
                     if (damageSource.getEntity() instanceof LivingEntity) {
                         LivingEntity attacker = (LivingEntity) damageSource.getEntity();
-                        attacker.hurt(attacker.damageSources().magic(), victim.getAbsorptionAmount() * 0.05f);
+                        attacker.hurt(attacker.damageSources().magic(), victim.getAbsorptionAmount() * (float) REFLECT_RATIO.get());
                     }
                 }
             }
@@ -137,7 +186,7 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
                 }
 
                 if (attackerLevel > 0) {
-                    evt.setAmount(evt.getAmount() * 1.5f);
+                    evt.setAmount(evt.getAmount() * (float) VS_SHIELDED_MULTIPLIER.get());
                 }
             }
         }

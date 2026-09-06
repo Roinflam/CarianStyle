@@ -21,6 +21,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 /**
@@ -40,8 +41,37 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 @Mod.EventBusSubscriber
 public class EnchantmentDragoncrestGreatshield extends EnchantmentBase {
 
-    private static final int MAX_SHIELD_LEVEL = 19;
-    private static final int SHIELD_DURATION = 600;
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.dragoncrest_greatshield.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "dragoncrest_greatshield";
+
+    /**
+     * 护盾叠加的最高层数
+     * <p>默认 19，允许范围 0 ~ 127。</p>
+     */
+    private static final EnchantmentValues.Handle MAX_SHIELD_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "max_shield_level",
+                    19, 0, 127);
+
+    /**
+     * 护盾持续时间（tick）
+     * <p>默认 600，允许范围 20 ~ 12000。</p>
+     */
+    private static final EnchantmentValues.Handle SHIELD_DURATION =
+            EnchantmentValues.define(VALUE_ID, "shield_duration",
+                    600, 20, 12000);
+
+    /**
+     * 护盾生效时受到伤害的倍率（越小减伤越多）
+     * <p>默认 0.75，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_MULTIPLIER =
+            EnchantmentValues.define(VALUE_ID, "damage_multiplier",
+                    0.75D, 0.0D, 1.0D);
 
     public EnchantmentDragoncrestGreatshield() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
@@ -88,14 +118,14 @@ public class EnchantmentDragoncrestGreatshield extends EnchantmentBase {
 
         if (currentAmplifier < 0) {
             DynamicAttributeManager.apply(victim,
-                    DynamicAttributes.DRAGONCREST_GREATSHIELD.createInstance(SHIELD_DURATION, 0));
-        } else if (currentAmplifier < MAX_SHIELD_LEVEL) {
+                    DynamicAttributes.DRAGONCREST_GREATSHIELD.createInstance(SHIELD_DURATION.getInt(), 0));
+        } else if (currentAmplifier < MAX_SHIELD_LEVEL.getInt()) {
             DynamicAttributeManager.apply(victim,
-                    DynamicAttributes.DRAGONCREST_GREATSHIELD.createInstance(SHIELD_DURATION, currentAmplifier + 1));
+                    DynamicAttributes.DRAGONCREST_GREATSHIELD.createInstance(SHIELD_DURATION.getInt(), currentAmplifier + 1));
         } else {
             DynamicAttributeManager.apply(victim,
-                    DynamicAttributes.DRAGONCREST_GREATSHIELD.createInstance(SHIELD_DURATION, MAX_SHIELD_LEVEL));
-            evt.setAmount(evt.getAmount() * 0.75f);
+                    DynamicAttributes.DRAGONCREST_GREATSHIELD.createInstance(SHIELD_DURATION.getInt(), MAX_SHIELD_LEVEL.getInt()));
+            evt.setAmount(evt.getAmount() * (float) DAMAGE_MULTIPLIER.get());
         }
     }
 

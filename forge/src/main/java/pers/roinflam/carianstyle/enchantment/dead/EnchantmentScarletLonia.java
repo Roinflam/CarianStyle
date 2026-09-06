@@ -21,6 +21,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
@@ -111,14 +112,110 @@ import java.util.List;
 )
 public class EnchantmentScarletLonia extends EnchantmentBase {
 
-    /** 第一次击退阶段 AOE 搜索半径硬上限（方块） */
-    private static final int MAX_KNOCKBACK_RADIUS = 16;
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.scarlet_lonia.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
-    /** 第二次伤害阶段 AOE 搜索半径硬上限（方块） */
-    private static final int MAX_DAMAGE_RADIUS = 12;
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "scarlet_lonia";
 
-    /** 单次触发最大命中目标数：防止密集怪物场景下事件风暴 */
-    private static final int MAX_TARGETS = 24;
+    /**
+     * 击退效果的搜索半径上限（格）
+     * <p>默认 16，允许范围 1 ~ 64。</p>
+     */
+    private static final EnchantmentValues.Handle MAX_KNOCKBACK_RADIUS =
+            EnchantmentValues.define(VALUE_ID, "max_knockback_radius",
+                    16, 1, 64);
+
+    /**
+     * 伤害效果的搜索半径上限（格）
+     * <p>默认 12，允许范围 1 ~ 64。</p>
+     */
+    private static final EnchantmentValues.Handle MAX_DAMAGE_RADIUS =
+            EnchantmentValues.define(VALUE_ID, "max_damage_radius",
+                    12, 1, 64);
+
+    /**
+     * 单次触发最大命中目标数
+     * <p>默认 24，允许范围 1 ~ 200。</p>
+     */
+    private static final EnchantmentValues.Handle MAX_TARGETS =
+            EnchantmentValues.define(VALUE_ID, "max_targets",
+                    24, 1, 200);
+
+    /**
+     * 濒死标记的过期时长（tick）
+     * <p>默认 72000，允许范围 20 ~ 432000。</p>
+     */
+    private static final EnchantmentValues.Handle PENDING_DEATH_EXPIRY =
+            EnchantmentValues.define(VALUE_ID, "pending_death_expiry",
+                    72000, 20, 432000);
+
+    /**
+     * 濒死判定的延迟（tick）
+     * <p>默认 20，允许范围 1 ~ 1200。</p>
+     */
+    private static final EnchantmentValues.Handle PENDING_DEATH_DELAY =
+            EnchantmentValues.define(VALUE_ID, "pending_death_delay",
+                    20, 1, 1200);
+
+    /**
+     * 触发冷却时间（tick）
+     * <p>默认 1800，允许范围 20 ~ 144000。</p>
+     */
+    private static final EnchantmentValues.Handle COOLDOWN =
+            EnchantmentValues.define(VALUE_ID, "cooldown",
+                    1800, 20, 144000);
+
+    /**
+     * 每级增加的击退半径（格，受上限截断）
+     * <p>默认 4，允许范围 1 ~ 32。</p>
+     */
+    private static final EnchantmentValues.Handle KNOCKBACK_RADIUS_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "knockback_radius_per_level",
+                    4, 1, 32);
+
+    /**
+     * 每级增加的伤害半径（格，受上限截断）
+     * <p>默认 2，允许范围 1 ~ 32。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_RADIUS_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "damage_radius_per_level",
+                    2, 1, 32);
+
+    /**
+     * 每级的击退强度系数
+     * <p>默认 0.7，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle KNOCKBACK_STRENGTH_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "knockback_strength_per_level",
+                    0.7D, 0.0D, 5.0D);
+
+    /**
+     * 每级按目标当前生命计算的伤害比例
+     * <p>默认 0.05，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "damage_per_level",
+                    0.05D, 0.0D, 2.0D);
+
+    /**
+     * 每级猩红腐败的持续秒数
+     * <p>默认 10，允许范围 1 ~ 120。</p>
+     */
+    private static final EnchantmentValues.Handle ROT_SECONDS_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "rot_seconds_per_level",
+                    10, 1, 120);
+
+    /**
+     * 每级的最终击飞强度
+     * <p>默认 0.75，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle FINAL_KNOCKBACK_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "final_knockback_per_level",
+                    0.75D, 0.0D, 5.0D);
+
 
     /**
      * 「待补刀」标记键。
@@ -132,14 +229,12 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
      * <p>72000 tick = 1 小时。取得足够长以覆盖「打完就下线、隔天再上」之外的绝大多数情况；
      * 由于是纯内存存储，服务器重启即失效（见类注释「已知局限」）。</p>
      */
-    private static final int PENDING_DEATH_EXPIRY = 72000;
 
     /**
      * 重登补刀的延迟（tick）。
      * <p>1 秒。等客户端完成进入世界的初始化再执行死亡，
      * 避免死亡画面在加载过程中弹出导致 UI 异常。</p>
      */
-    private static final int PENDING_DEATH_DELAY = 20;
 
     public EnchantmentScarletLonia() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
@@ -174,7 +269,7 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
         }
 
         EnchantmentDataManager.setData("scarlet_lonia_active", hurter.getUUID(), true);
-        EnchantmentDataManager.setCooldown("scarlet_lonia_cooldown", hurter.getUUID(), 1800);
+        EnchantmentDataManager.setCooldown("scarlet_lonia_cooldown", hurter.getUUID(), COOLDOWN.getInt());
 
         ctx.cancelEvent();
         hurter.setHealth(1);
@@ -189,7 +284,7 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
         }
 
         // 第一次击退搜索半径硬上限（原式 level * 4，100 级 = 400 格）
-        int knockbackRadius = Math.min(level * 4, MAX_KNOCKBACK_RADIUS);
+        int knockbackRadius = Math.min(level * KNOCKBACK_RADIUS_PER_LEVEL.getInt(), MAX_KNOCKBACK_RADIUS.getInt());
 
         List<LivingEntity> entities = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
@@ -201,14 +296,15 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
         // 第一次击退命中数量硬上限
         int knockbackHitCount = 0;
         for (LivingEntity entityLivingBase : entities) {
-            if (knockbackHitCount >= MAX_TARGETS) {
+            if (knockbackHitCount >= MAX_TARGETS.getInt()) {
                 break;
             }
             // 方向须为 hurter - entity（从 entity 指向 hurter），
             // knockback 内部取反后才能把 entity 推离 hurter
             double x = hurter.getX() - entityLivingBase.getX();
             double z = hurter.getZ() - entityLivingBase.getZ();
-            float stronge = (float) (level * 0.7 * Math.max(Math.abs(x), Math.abs(z)) / 14);
+            float stronge = (float) (level * KNOCKBACK_STRENGTH_PER_LEVEL.get()
+                            * Math.max(Math.abs(x), Math.abs(z)) / 14);
             entityLivingBase.knockback(stronge, x, z);
             knockbackHitCount++;
         }
@@ -221,7 +317,7 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
                 // 此处只有 AOE 伤害 / 击退 / 自身死亡逻辑。
 
                 // 第二次伤害搜索半径硬上限（原式 finalLevel * 2，100 级 = 200 格）
-                int damageRadius = Math.min(finalLevel * 2, MAX_DAMAGE_RADIUS);
+                int damageRadius = Math.min(finalLevel * DAMAGE_RADIUS_PER_LEVEL.getInt(), MAX_DAMAGE_RADIUS.getInt());
 
                 List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
                         LivingEntity.class,
@@ -234,21 +330,22 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
                     // 第二次伤害命中数量硬上限
                     int damageHitCount = 0;
                     for (Entity entity : nearbyEntities) {
-                        if (damageHitCount >= MAX_TARGETS) {
+                        if (damageHitCount >= MAX_TARGETS.getInt()) {
                             break;
                         }
                         LivingEntity entityLivingBase = (LivingEntity) entity;
                         // 使用真伤系统
-                        float damage = entityLivingBase.getHealth() * finalLevel * 0.05f;
+                        float damage = entityLivingBase.getHealth() * finalLevel * (float) DAMAGE_PER_LEVEL.get();
                         EntityLivingUtil.damageHealthDirectly(entityLivingBase, damage);
 
                         entityLivingBase.addEffect(new MobEffectInstance(
-                                CarianStylePotion.SCARLET_ROT.get(), finalLevel * 10 * 20, finalLevel - 1));
+                                CarianStylePotion.SCARLET_ROT.get(),
+                                    finalLevel * ROT_SECONDS_PER_LEVEL.getInt() * 20, finalLevel - 1));
 
                         // 第二次击退方向原本就正确（hurter - entity）
                         double x = hurter.getX() - entityLivingBase.getX();
                         double z = hurter.getZ() - entityLivingBase.getZ();
-                        entityLivingBase.knockback(finalLevel * 0.75f, x, z);
+                        entityLivingBase.knockback(finalLevel * (float) FINAL_KNOCKBACK_PER_LEVEL.get(), x, z);
                         damageHitCount++;
                     }
                 }
@@ -261,7 +358,7 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
                     EntityLivingUtil.kill(hurter, NewDamageSource.scarletRot(hurter.level()));
                 } else if (hurter instanceof Player) {
                     EnchantmentDataManager.setData(
-                            PENDING_DEATH_KEY, hurter.getUUID(), true, PENDING_DEATH_EXPIRY);
+                            PENDING_DEATH_KEY, hurter.getUUID(), true, PENDING_DEATH_EXPIRY.getInt());
                 }
             }
         }.start();
@@ -334,7 +431,7 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
             // 先清标记再补刀：即使补刀因任何原因失败也不会陷入「每次登录都被杀」的死循环
             EnchantmentDataManager.removeData(PENDING_DEATH_KEY, player.getUUID());
 
-            new SynchronizationTask(PENDING_DEATH_DELAY) {
+            new SynchronizationTask(PENDING_DEATH_DELAY.getInt()) {
                 @Override
                 public void run() {
                     if (player.isAlive()) {

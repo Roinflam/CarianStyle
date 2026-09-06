@@ -22,6 +22,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
  * 吃屎附魔
@@ -48,6 +49,39 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 @Mod.EventBusSubscriber
 public class EnchantmentEatShit extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.eat_shit.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "eat_shit";
+
+    /**
+     * 每级施加给目标的效果时长（tick）
+     * <p>默认 80，允许范围 1 ~ 1200。</p>
+     */
+    private static final EnchantmentValues.Handle VICTIM_TICKS_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "victim_ticks_per_level",
+                    80, 1, 1200);
+
+    /**
+     * 每级施加给自身的混乱时长（tick）
+     * <p>默认 30，允许范围 1 ~ 1200。</p>
+     */
+    private static final EnchantmentValues.Handle SELF_TICKS_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "self_ticks_per_level",
+                    30, 1, 1200);
+
+    /**
+     * 触发时的伤害倍率
+     * <p>默认 0.25，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_MULTIPLIER =
+            EnchantmentValues.define(VALUE_ID, "damage_multiplier",
+                    0.25D, 0.0D, 5.0D);
+
+
     /**
      * 治疗削减 debuff 在 {@link EnchantmentDataManager} 中的键。
      * <p><b>v2.3 由 private 改为 public</b>：HUD 需要用同一个键读取剩余时间。
@@ -73,9 +107,9 @@ public class EnchantmentEatShit extends EnchantmentBase {
         int level = EnchantmentHelper.getItemEnchantmentLevel(eatShit, heldItem);
         if (ConfigLoader.levelLimit) level = Math.min(level, 10);
         if (level <= 0) return;
-        int victimDuration = level * 80;
+        int victimDuration = level * VICTIM_TICKS_PER_LEVEL.getInt();
         victim.addEffect(new MobEffectInstance(MobEffects.CONFUSION, victimDuration));
-        attacker.addEffect(new MobEffectInstance(MobEffects.CONFUSION, level * 30));
+        attacker.addEffect(new MobEffectInstance(MobEffects.CONFUSION, level * SELF_TICKS_PER_LEVEL.getInt()));
         EnchantmentDataManager.setCooldown(DEBUFF_KEY, victim.getUUID(), victimDuration);
     }
 
@@ -87,7 +121,7 @@ public class EnchantmentEatShit extends EnchantmentBase {
         if (EnchantmentEventHandler.shouldBlockMobTrigger(evt.getEntity(), false)) return;
 
         if (EnchantmentDataManager.isOnCooldown(DEBUFF_KEY, evt.getEntity().getUUID())) {
-            evt.setAmount(evt.getAmount() * 0.25f);
+            evt.setAmount(evt.getAmount() * (float) DAMAGE_MULTIPLIER.get());
         }
     }
 

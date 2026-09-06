@@ -13,6 +13,7 @@ import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
@@ -97,7 +98,7 @@ import java.util.List;
  *       目标越多这个现象越明显，反而不如封顶后好看。</li>
  * </ol>
  * <p>
- * 现封顶 {@value #MAX_TARGETS}：既远高于常规战斗场景（正常不会有 100 个敌人同时在 60 格内），
+ * 现封顶 {@link #MAX_TARGETS}：既远高于常规战斗场景（正常不会有 100 个敌人同时在 60 格内），
  * 保留「大范围降雷」的设计意图，又能在密集场景下守住并发任务数、包量峰值与客户端特效名额。
  * </p>
  * <p>
@@ -129,6 +130,87 @@ import java.util.List;
 )
 public class EnchantmentAncientDragonLightning extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.ancient_dragon_lightning.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "ancient_dragon_lightning";
+
+    /**
+     * 单次触发最大命中目标数
+     * <p>默认 100，允许范围 1 ~ 500。</p>
+     */
+    private static final EnchantmentValues.Handle MAX_TARGETS =
+            EnchantmentValues.define(VALUE_ID, "max_targets",
+                    100, 1, 500);
+
+    /**
+     * 水平搜索半径（格）
+     * <p>默认 60，允许范围 1 ~ 128。</p>
+     */
+    private static final EnchantmentValues.Handle SEARCH_RADIUS =
+            EnchantmentValues.define(VALUE_ID, "search_radius",
+                    60, 1, 128);
+
+    /**
+     * 垂直搜索半高（格）
+     * <p>默认 15，允许范围 1 ~ 128。</p>
+     */
+    private static final EnchantmentValues.Handle SEARCH_HEIGHT =
+            EnchantmentValues.define(VALUE_ID, "search_height",
+                    15, 1, 128);
+
+    /**
+     * 触发冷却时间（tick）
+     * <p>默认 1800，允许范围 20 ~ 144000。</p>
+     */
+    private static final EnchantmentValues.Handle COOLDOWN =
+            EnchantmentValues.define(VALUE_ID, "cooldown",
+                    1800, 20, 144000);
+
+    /**
+     * 按目标当前生命计算的雷击伤害比例
+     * <p>默认 0.05，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_HEALTH_RATIO =
+            EnchantmentValues.define(VALUE_ID, "damage_health_ratio",
+                    0.05D, 0.0D, 2.0D);
+
+    /**
+     * 按目标最大生命计算的雷击伤害比例
+     * <p>默认 0.005，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_MAX_HEALTH_RATIO =
+            EnchantmentValues.define(VALUE_ID, "damage_max_health_ratio",
+                    0.005D, 0.0D, 1.0D);
+
+    /**
+     * 雷击的击退强度
+     * <p>默认 0.2，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle KNOCKBACK_STRENGTH =
+            EnchantmentValues.define(VALUE_ID, "knockback_strength",
+                    0.2D, 0.0D, 5.0D);
+
+    /**
+     * 高倍率档的伤害放大倍数
+     * <p>默认 4，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle MAGNIFICATION_HIGH =
+            EnchantmentValues.define(VALUE_ID, "magnification_high",
+                    4, 1, 100);
+
+    /**
+     * 中倍率档的伤害放大倍数
+     * <p>默认 2，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle MAGNIFICATION_MID =
+            EnchantmentValues.define(VALUE_ID, "magnification_mid",
+                    2, 1, 100);
+
+
     /**
      * 单次触发最大命中目标数。
      * <p>
@@ -143,13 +225,6 @@ public class EnchantmentAncientDragonLightning extends EnchantmentBase {
      * 并发任务与瞬时包量。
      * </p>
      */
-    private static final int MAX_TARGETS = 100;
-
-    /** AOE 搜索水平半径（格）。死亡一次性触发 + 1800 tick 冷却，该开销可接受 */
-    private static final int SEARCH_RADIUS = 60;
-
-    /** AOE 搜索垂直半径（格） */
-    private static final int SEARCH_HEIGHT = 15;
 
     public EnchantmentAncientDragonLightning() {
         super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
@@ -169,13 +244,13 @@ public class EnchantmentAncientDragonLightning extends EnchantmentBase {
             return;
         }
 
-        EnchantmentDataManager.setCooldown("ancient_dragon_lightning", hurter.getUUID(), 1800);
+        EnchantmentDataManager.setCooldown("ancient_dragon_lightning", hurter.getUUID(), COOLDOWN.getInt());
 
         List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
                 LivingEntity.class,
                 hurter,
-                SEARCH_RADIUS,
-                SEARCH_HEIGHT,
+                SEARCH_RADIUS.getInt(),
+                SEARCH_HEIGHT.getInt(),
                 entityLivingBase -> !entityLivingBase.equals(hurter)
         );
 
@@ -188,8 +263,8 @@ public class EnchantmentAncientDragonLightning extends EnchantmentBase {
         // 否则 level*100 的落雷总量会被摊给不存在的目标（详见类注释）。
         // 复制成新列表而非用 subList 视图，避免持有原大列表的引用。
         final List<LivingEntity> entities;
-        if (nearbyEntities.size() > MAX_TARGETS) {
-            entities = new ArrayList<>(nearbyEntities.subList(0, MAX_TARGETS));
+        if (nearbyEntities.size() > MAX_TARGETS.getInt()) {
+            entities = new ArrayList<>(nearbyEntities.subList(0, MAX_TARGETS.getInt()));
         } else {
             entities = nearbyEntities;
         }
@@ -243,15 +318,15 @@ public class EnchantmentAncientDragonLightning extends EnchantmentBase {
                     // 累乘会导致雷暴变成 8x；互斥后雷暴 4x、下雨 2x、晴天 1x
                     int magnification = 1;
                     if (entityLivingBase.level().isThundering()) {
-                        magnification = 4;
+                        magnification = MAGNIFICATION_HIGH.getInt();
                     } else if (entityLivingBase.level().isRaining()) {
-                        magnification = 2;
+                        magnification = MAGNIFICATION_MID.getInt();
                     }
 
                     entityLivingBase.hurt(
                             entityLivingBase.damageSources().lightningBolt(),
-                            entityLivingBase.getHealth() * 0.05f
-                                    + entityLivingBase.getMaxHealth() * 0.005f * magnification
+                            entityLivingBase.getHealth() * (float) DAMAGE_HEALTH_RATIO.get()
+                                    + entityLivingBase.getMaxHealth() * (float) DAMAGE_MAX_HEALTH_RATIO.get() * magnification
                     );
 
                     if (entityLivingBase.onGround()) {
@@ -261,7 +336,7 @@ public class EnchantmentAncientDragonLightning extends EnchantmentBase {
                         double z = RandomUtils.nextBoolean() ?
                                 hurter.getZ() - entityLivingBase.getZ() :
                                 entityLivingBase.getZ() - hurter.getZ();
-                        entityLivingBase.knockback(0.2f, x, z);
+                        entityLivingBase.knockback((float) KNOCKBACK_STRENGTH.get(), x, z);
                     }
                 }
             }.start();

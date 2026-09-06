@@ -19,6 +19,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
 
 /**
@@ -66,11 +67,56 @@ import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
 @Mod.EventBusSubscriber
 public class EnchantmentWarrior extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.warrior.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "warrior";
+
+    /**
+     * 持续伤害的总时长（tick）
+     * <p>默认 60，允许范围 1 ~ 1200。</p>
+     */
+    private static final EnchantmentValues.Handle DOT_DURATION =
+            EnchantmentValues.define(VALUE_ID, "dot_duration",
+                    60, 1, 1200);
+
+    /**
+     * 持续伤害的起始延迟（tick）
+     * <p>默认 5，允许范围 0 ~ 200。</p>
+     */
+    private static final EnchantmentValues.Handle DOT_DELAY =
+            EnchantmentValues.define(VALUE_ID, "dot_delay",
+                    5, 0, 200);
+
+    /**
+     * 输出伤害的倍率
+     * <p>默认 1.25，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_MULTIPLIER =
+            EnchantmentValues.define(VALUE_ID, "damage_multiplier",
+                    1.25D, 0.0D, 10.0D);
+
+    /**
+     * 受到伤害的倍率
+     * <p>默认 0.5，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle REDUCTION_MULTIPLIER =
+            EnchantmentValues.define(VALUE_ID, "reduction_multiplier",
+                    0.5D, 0.0D, 2.0D);
+
+    /**
+     * 击杀时回复已损失生命的比例
+     * <p>默认 0.25，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle KILL_HEAL_RATIO =
+            EnchantmentValues.define(VALUE_ID, "kill_heal_ratio",
+                    0.25D, 0.0D, 2.0D);
+
+
     private static final int RECOLLECT_ENCHANTABILITY = 35;
-    /** 持续伤害时长（tick） */
-    private static final int DOT_DURATION = 60;
-    /** 持续伤害初始延迟（tick） */
-    private static final int DOT_DELAY = 5;
 
     /**
      * 本附魔在 {@link DamageOverTimeManager} 中的来源标签（v3.3 新增）。
@@ -113,7 +159,7 @@ public class EnchantmentWarrior extends EnchantmentBase {
         if (ConfigLoader.levelLimit) level = Math.min(level, 10);
 
         if (level > 0) {
-            evt.setAmount(evt.getAmount() * 1.25f);
+            evt.setAmount(evt.getAmount() * (float) DAMAGE_MULTIPLIER.get());
         }
     }
 
@@ -144,18 +190,18 @@ public class EnchantmentWarrior extends EnchantmentBase {
         if (level <= 0) return;
 
         // 即时伤害降为50%
-        evt.setAmount(evt.getAmount() * 0.5f);
+        evt.setAmount(evt.getAmount() * (float) REDUCTION_MULTIPLIER.get());
 
         // 剩余50%分60tick持续扣血
-        float damagePerTick = evt.getAmount() / DOT_DURATION;
+        float damagePerTick = evt.getAmount() / DOT_DURATION.getInt();
 
         // ⭐ v3.2：改用带来源标签的重载，使 HUD 能查到「本附魔造成的」剩余流血。
         // 行为与不带标签的重载完全一致，只是多记一个字符串引用
         DamageOverTimeManager.applyLinear(
                 victim,
                 damagePerTick,
-                DOT_DURATION,
-                DOT_DELAY,
+                DOT_DURATION.getInt(),
+                DOT_DELAY.getInt(),
                 evt.getSource(),
                 true,
                 DOT_TAG
@@ -184,7 +230,7 @@ public class EnchantmentWarrior extends EnchantmentBase {
         if (ConfigLoader.levelLimit) level = Math.min(level, 10);
 
         if (level > 0) {
-            killer.heal((killer.getMaxHealth() - killer.getHealth()) * 0.25f);
+            killer.heal((killer.getMaxHealth() - killer.getHealth()) * (float) KILL_HEAL_RATIO.get());
         }
     }
 

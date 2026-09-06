@@ -18,6 +18,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
@@ -57,6 +58,39 @@ import java.util.UUID;
 @Mod.EventBusSubscriber
 public class EnchantmentUnsheathe extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.unsheathe.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "unsheathe";
+
+    /**
+     * 居合基础触发概率（百分比）
+     * <p>默认 1.0，允许范围 0.0 ~ 100.0。</p>
+     */
+    private static final EnchantmentValues.Handle BASE_TRIGGER_CHANCE =
+            EnchantmentValues.define(VALUE_ID, "base_trigger_chance",
+                    1.0D, 0.0D, 100.0D);
+
+    /**
+     * 每累积一次攻击增加的触发概率（百分比）
+     * <p>默认 0.5，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle CHANCE_PER_ATTACK =
+            EnchantmentValues.define(VALUE_ID, "chance_per_attack",
+                    0.5D, 0.0D, 10.0D);
+
+    /**
+     * 触发时每级的伤害倍率
+     * <p>默认 3.3，允许范围 0.0 ~ 50.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "damage_per_level",
+                    3.3D, 0.0D, 50.0D);
+
+
     private static final UUID ATTACK_SPEED_MODIFIER_ID = UUID.fromString("a9f7b1c6-4c2d-4f0e-9f2c-3a8b3f7d0a5b");
     private static final String ATTACK_SPEED_MODIFIER_NAME = "enchantment.unsheathe";
     private static final String ATTACK_COUNT_KEY = "unsheathe_attack_count";
@@ -91,12 +125,12 @@ public class EnchantmentUnsheathe extends EnchantmentBase {
         int attackCount = EnchantmentDataManager.getCounter(ATTACK_COUNT_KEY, player.getUUID());
 
         // 触发概率：1% + 攻击次数 × 0.5%
-        double triggerChance = 1.0 + attackCount * 0.5;
+        double triggerChance = BASE_TRIGGER_CHANCE.get() + attackCount * CHANCE_PER_ATTACK.get();
 
         if (RandomUtil.percentageChance(triggerChance)) {
             // 触发居合斩
             EnchantmentDataManager.resetCounter(ATTACK_COUNT_KEY, player.getUUID());
-            ctx.multiplyDamage(level * 3.3f);
+            ctx.multiplyDamage(level * (float) DAMAGE_PER_LEVEL.get());
             applyAttackSpeedPenalty(player, level);
 
             // ⭐ v2.1 视觉：拔刀斩的银白弧形刀光（纯服务端广播，不影响任何机制）

@@ -23,6 +23,7 @@ import pers.roinflam.carianstyle.enchantment.EnchantmentBlackFlameBlade;
 import pers.roinflam.carianstyle.enchantment.EnchantmentDeathBlade;
 import pers.roinflam.carianstyle.enchantment.EnchantmentScarletCorruption;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
 
 import java.util.UUID;
@@ -119,6 +120,39 @@ import java.util.UUID;
 @Mod.EventBusSubscriber
 public class EnchantmentSacredBlade extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.sacred_blade.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "sacred_blade";
+
+    /**
+     * 对亡灵每级的额外伤害倍率
+     * <p>默认 0.25，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle BONUS_DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "bonus_damage_per_level",
+                    0.25D, 0.0D, 5.0D);
+
+    /**
+     * 额外伤害转化为治疗的比例
+     * <p>默认 0.2，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle LIFESTEAL_RATIO =
+            EnchantmentValues.define(VALUE_ID, "lifesteal_ratio",
+                    0.2D, 0.0D, 1.0D);
+
+    /**
+     * 单次治疗量的最大生命占比上限
+     * <p>默认 0.1，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle LIFESTEAL_CAP_RATIO =
+            EnchantmentValues.define(VALUE_ID, "lifesteal_cap_ratio",
+                    0.1D, 0.0D, 1.0D);
+
+
     /**
      * 攻击力削弱修正器的 UUID。
      * <p>
@@ -153,11 +187,12 @@ public class EnchantmentSacredBlade extends EnchantmentBase {
         if (victim.getMobType() == MobType.UNDEAD) {
             // 对亡灵：额外伤害 = 当前伤害 × 等级 × 0.25 × 目标血量比例
             float healthRatio = victim.getHealth() / victim.getMaxHealth();
-            float bonusDamage = ctx.getDamage() * level * 0.25f * healthRatio;
+            float bonusDamage = ctx.getDamage() * level * (float) BONUS_DAMAGE_PER_LEVEL.get() * healthRatio;
             ctx.addDamage(bonusDamage);
 
             // 治疗攻击者（上限为最大血量的10%）
-            float healAmount = Math.min(bonusDamage * 0.2f, attacker.getMaxHealth() * 0.1f);
+            float healAmount = Math.min(bonusDamage * (float) LIFESTEAL_RATIO.get(),
+                attacker.getMaxHealth() * (float) LIFESTEAL_CAP_RATIO.get());
             attacker.heal(healAmount);
 
             // ⭐ v3.0 修复：削弱的是【被砍的亡灵】，不是持有者。

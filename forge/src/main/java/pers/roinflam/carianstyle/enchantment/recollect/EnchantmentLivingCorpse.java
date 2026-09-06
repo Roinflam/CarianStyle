@@ -20,6 +20,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
@@ -49,6 +50,39 @@ import java.util.UUID;
 @Mod.EventBusSubscriber
 public class EnchantmentLivingCorpse extends EnchantmentBase {
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.living_corpse.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "living_corpse";
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
+                    10, 1, 100);
+
+    /**
+     * 复活的冷却时间（tick）
+     * <p>默认 4800，允许范围 20 ~ 144000。</p>
+     */
+    private static final EnchantmentValues.Handle REVIVE_COOLDOWN =
+            EnchantmentValues.define(VALUE_ID, "revive_cooldown",
+                    4800, 20, 144000);
+
+    /**
+     * 复活后每秒流失的最大生命占比基数
+     * <p>默认 0.01，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle DRAIN_RATIO_PER_SECOND =
+            EnchantmentValues.define(VALUE_ID, "drain_ratio_per_second",
+                    0.01D, 0.0D, 1.0D);
+
+
     private static final String REVIVE_COOLDOWN_KEY = "living_corpse_cooldown";
     private static final String BLEEDING_STATE_KEY = "living_corpse_bleeding";
     private static final int RECOLLECT_ENCHANTABILITY = 35;
@@ -76,7 +110,7 @@ public class EnchantmentLivingCorpse extends EnchantmentBase {
             }
         }
         if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
+            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
         }
         return totalLevel;
     }
@@ -119,7 +153,7 @@ public class EnchantmentLivingCorpse extends EnchantmentBase {
         holder.invulnerableTime = 20;
 
         // 设置冷却和流血状态
-        EnchantmentDataManager.setCooldown(REVIVE_COOLDOWN_KEY, uuid, 4800);
+        EnchantmentDataManager.setCooldown(REVIVE_COOLDOWN_KEY, uuid, REVIVE_COOLDOWN.getInt());
         EnchantmentDataManager.setData(BLEEDING_STATE_KEY, uuid, true);
 
         DamageSource originalSource = evt.getSource();
@@ -135,7 +169,7 @@ public class EnchantmentLivingCorpse extends EnchantmentBase {
                     return;
                 }
 
-                float baseDamage = holder.getMaxHealth() * 0.01f / 20;
+                float baseDamage = holder.getMaxHealth() * (float) DRAIN_RATIO_PER_SECOND.get() / 20;
                 float damage = baseDamage * 5 + baseDamage * ++tick / 75;
 
                 if (holder.getHealth() - damage * 2 > 0) {
@@ -187,7 +221,7 @@ public class EnchantmentLivingCorpse extends EnchantmentBase {
                     return;
                 }
 
-                float baseDamage = holder.getMaxHealth() * 0.01f / 20;
+                float baseDamage = holder.getMaxHealth() * (float) DRAIN_RATIO_PER_SECOND.get() / 20;
                 float damage = baseDamage * 6 + baseDamage * ++tick / 30;
 
                 if (holder.getHealth() - damage * 2 > 0) {
