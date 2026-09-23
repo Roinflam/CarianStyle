@@ -120,6 +120,10 @@ public class EffectModifierHandler {
      * <p>
      * 找到实体装备上所有的 IEffectModifier 附魔，依次调用它们的修改方法
      * </p>
+     * <p>
+     * Mohist 系服务端正在 tick 该实体的药水效果时原样返回：那次调用只入队，
+     * 重放时会再进来一次并在那时改写，保证每个效果只被改一次（2026-09-23，见 {@link BukkitTickingEffectsProbe}）。
+     * </p>
      *
      * @param entity 接受药水效果的实体
      * @param effectInstance 原始药水效果实例
@@ -129,6 +133,12 @@ public class EffectModifierHandler {
                                                              @NotNull MobEffectInstance effectInstance) {
         // 客户端不处理
         if (entity.level().isClientSide) {
+            return effectInstance;
+        }
+
+        // Mohist（CraftBukkit 系）药水 tick 期间：这次 addEffect 只会入队，tickEffects 末尾重放时会再从方法头进来一次，
+        // 交给那一次改；这里就改的话同一个效果会被改两次。原版 Forge、非 Mohist 结构的混合端上恒为 false。详见 BukkitTickingEffectsProbe
+        if (BukkitTickingEffectsProbe.isTickingEffects(entity)) {
             return effectInstance;
         }
 
