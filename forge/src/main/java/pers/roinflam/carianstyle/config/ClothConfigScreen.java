@@ -16,6 +16,7 @@ import java.util.List;
  * <p>v2.3新增：怪物附魔触发分类（两个开关：通用 / 死亡类）。</p>
  * <p>v2.4新增：游戏平衡分类下的两个开关
  * （useVanillaRarityWeight 附魔台权重映射 / allowVillagerBookTrade 村民附魔书交易）。</p>
+ * <p>v2.5新增：隐身分类（hideStealthHitbox 隐身玩家碰撞箱屏蔽）。</p>
  *
  * @author RoinFlam
  */
@@ -205,6 +206,20 @@ public class ClothConfigScreen {
                 .setDefaultValue(false)
                 .setTooltip(Component.translatable("config.carianstyle.allowMobTriggerDeathEnchantments.tooltip"))
                 .setSaveConsumer(ConfigLoader.COMMON.allowMobTriggerDeathEnchantments::set)
+                .build());
+
+        // ═══════════════════════════════════════════════════════════════
+        // 隐身配置 / Stealth Configuration（v2.5新增）
+        // ═══════════════════════════════════════════════════════════════
+        ConfigCategory stealthCategory = builder.getOrCreateCategory(
+                Component.translatable("config.carianstyle.category.stealth"));
+
+        stealthCategory.addEntry(entryBuilder.startBooleanToggle(
+                        Component.translatable("config.carianstyle.hideStealthHitbox"),
+                        ConfigLoader.COMMON.hideStealthHitbox.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.translatable("config.carianstyle.hideStealthHitbox.tooltip"))
+                .setSaveConsumer(ConfigLoader.COMMON.hideStealthHitbox::set)
                 .build());
 
         return builder.build();

@@ -10,6 +10,7 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
 import net.minecraftforge.client.gui.overlay.IGuiOverlay;
 import pers.roinflam.carianstyle.visual.CarianStyleConditionDisplay;
+import pers.roinflam.carianstyle.config.ClientVisualConfig;
 import pers.roinflam.carianstyle.visual.CarianStyleStackDisplays;
 import pers.roinflam.carianstyle.visual.StackDisplayRegistry;
 import pers.roinflam.carianstyle.visual.StackHudManager;
@@ -499,7 +500,12 @@ public final class StackHudOverlay implements IGuiOverlay {
                 total++;
             }
         }
-        Layout layout = computeLayout(total, height);
+        // 配置坐标是 GUI 像素，缩放时固定锚点，窗口变小时限制到可用区域。
+        int anchorX = Math.min(ClientVisualConfig.hudX, Math.max(0, width - COLUMN_WIDTH));
+        int anchorY = Math.min(ClientVisualConfig.hudY, Math.max(0, height - ROW_STRIDE));
+        Layout layout = computeLayout(total, width - anchorX, height - anchorY);
+        int rowStride = ROW_HEIGHT + ClientVisualConfig.hudRowGap;
+        int columnWidth = ClientVisualConfig.hudColumnWidth;
 
         // 同步目标值（entries 已由 StackHudManager 排好序，索引即显示次序）
         int index = 0;
@@ -534,8 +540,8 @@ public final class StackHudOverlay implements IGuiOverlay {
             // ⭐ v3：先分列再定行。列内行号 = index % rowsPerCol，列号 = index / rowsPerCol
             int column = index / layout.rowsPerCol();
             int rowInColumn = index % layout.rowsPerCol();
-            float targetX = ANCHOR_X + column * COLUMN_WIDTH;
-            float targetY = ANCHOR_Y + rowInColumn * ROW_STRIDE;
+            float targetX = ANCHOR_X + column * columnWidth;
+            float targetY = ANCHOR_Y + rowInColumn * rowStride;
 
             if (!a.initialized) {
                 a.initialized = true;
@@ -562,58 +568,58 @@ public final class StackHudOverlay implements IGuiOverlay {
 
         // ⭐ v3：整体缩放。压一层 scale 之后所有 fill / fillGradient / drawString 自动跟着缩，
         // 无需逐元素改坐标（详见类注释「为什么缩放要包住整个渲染」）。
-        boolean scaled = layout.scale() < 0.999f;
-        if (scaled) {
-            graphics.pose().pushPose();
-            graphics.pose().scale(layout.scale(), layout.scale(), 1f);
-        }
+        graphics.pose().pushPose();
+        graphics.pose().translate(anchorX - ANCHOR_X * layout.scale(),
+                anchorY - ANCHOR_Y * layout.scale(), 0);
+        graphics.pose().scale(layout.scale(), layout.scale(), 1f);
+        try {
+            // 更新动画并渲染；消失的行（滑出+淡出后）移除
+            Font font = mc.font;
+            Iterator<Map.Entry<Integer, Anim>> it = anims.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<Integer, Anim> e = it.next();
+                int serialId = e.getKey();
+                Anim a = e.getValue();
 
-        // 更新动画并渲染；消失的行（滑出+淡出后）移除
-        Font font = mc.font;
-        Iterator<Map.Entry<Integer, Anim>> it = anims.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<Integer, Anim> e = it.next();
-            int serialId = e.getKey();
-            Anim a = e.getValue();
+                float targetAlpha = a.present ? 1f : 0f;
+                float targetExitX = a.present ? 0f : -SLIDE_PX;
+                a.alpha = smooth(a.alpha, targetAlpha, SPEED_ALPHA, dt);
+                a.exitX = smooth(a.exitX, targetExitX, SPEED_X, dt);
+                a.barFill = smooth(a.barFill, a.targetRatio, SPEED_BAR, dt);
+                a.x = smooth(a.x, a.targetX, SPEED_COLUMN, dt);
+                a.y = smooth(a.y, a.targetY, SPEED_Y, dt);
+                // 消失中的行（present=false，正在淡出）不应再出现白闪：直接清零残留闪光
+                // （可能来自消失前最后一次层数增长或满层刷新），否则它会在淡出头几帧与卡片一起闪一下。
+                a.flash = a.present ? smooth(a.flash, 0f, SPEED_FLASH, dt) : 0f;
 
-            float targetAlpha = a.present ? 1f : 0f;
-            float targetExitX = a.present ? 0f : -SLIDE_PX;
-            a.alpha = smooth(a.alpha, targetAlpha, SPEED_ALPHA, dt);
-            a.exitX = smooth(a.exitX, targetExitX, SPEED_X, dt);
-            a.barFill = smooth(a.barFill, a.targetRatio, SPEED_BAR, dt);
-            a.x = smooth(a.x, a.targetX, SPEED_COLUMN, dt);
-            a.y = smooth(a.y, a.targetY, SPEED_Y, dt);
-            // 消失中的行（present=false，正在淡出）不应再出现白闪：直接清零残留闪光
-            // （可能来自消失前最后一次层数增长或满层刷新），否则它会在淡出头几帧与卡片一起闪一下。
-            a.flash = a.present ? smooth(a.flash, 0f, SPEED_FLASH, dt) : 0f;
+                if (!a.present && a.alpha < 0.01f) {
+                    it.remove();
+                    continue;
+                }
 
-            if (!a.present && a.alpha < 0.01f) {
-                it.remove();
-                continue;
+                StackDisplayRegistry.Info info = StackDisplayRegistry.getInfo(serialId);
+                if (info != null) {
+                    renderRow(graphics, font, Math.round(a.x + a.exitX), Math.round(a.y),
+                            a, info, serialId, dt, time);
+                }
+
+                // 记录本帧是否出现，供下一帧"误闪抑制"判断
+                a.presentLastFrame = a.present;
             }
 
-            StackDisplayRegistry.Info info = StackDisplayRegistry.getInfo(serialId);
-            if (info != null) {
-                renderRow(graphics, font, Math.round(a.x + a.exitX), Math.round(a.y),
-                        a, info, serialId, dt, time);
+            // ⭐ v3：折叠提示。放在最后一列最后一行之下，明确告诉玩家还有几项没显示 ——
+            // 无声吞掉才是最坏的结果。
+            if (layout.hidden() > 0) {
+                int column = Math.max(0, (layout.visible() - 1) / layout.rowsPerCol());
+                int rowInColumn = layout.visible() - column * layout.rowsPerCol();
+                renderOverflowHint(graphics, font,
+                        ANCHOR_X + column * columnWidth,
+                        ANCHOR_Y + rowInColumn * rowStride,
+                        layout.hidden(), time);
             }
 
-            // 记录本帧是否出现，供下一帧"误闪抑制"判断
-            a.presentLastFrame = a.present;
-        }
-
-        // ⭐ v3：折叠提示。放在最后一列最后一行之下，明确告诉玩家还有几项没显示 ——
-        // 无声吞掉才是最坏的结果。
-        if (layout.hidden() > 0) {
-            int column = Math.max(0, (layout.visible() - 1) / layout.rowsPerCol());
-            int rowInColumn = layout.visible() - column * layout.rowsPerCol();
-            renderOverflowHint(graphics, font,
-                    ANCHOR_X + column * COLUMN_WIDTH,
-                    ANCHOR_Y + rowInColumn * ROW_STRIDE,
-                    layout.hidden(), time);
-        }
-
-        if (scaled) {
+        } finally {
+            // 即使第三方字体或渲染扩展抛出异常，也不污染后续 HUD 的坐标矩阵。
             graphics.pose().popPose();
         }
     }
@@ -637,42 +643,32 @@ public final class StackHudOverlay implements IGuiOverlay {
      * </p>
      *
      * @param total  本帧要显示的总行数（已排除元数据缺失的项）
-     * @param height 屏幕逻辑高度（GUI 缩放后的值，由 Forge 传入）
+     * @param width 锚点右侧可用 GUI 像素宽度
+     * @param height 锚点下方可用 GUI 像素高度
      * @return 布局解算结果
      */
-    private static Layout computeLayout(int total, int height) {
-        // 上下各留一个 ANCHOR_Y 的边距，避免贴边
-        int usableH = Math.max(ROW_STRIDE, height - ANCHOR_Y * 2);
-        int rowsAtFullScale = Math.max(1, usableH / ROW_STRIDE);
-
-        // 常态：一列就够，不缩放
-        if (total <= rowsAtFullScale) {
-            return new Layout(1f, rowsAtFullScale, total, 0);
+    private static Layout computeLayout(int total, int width, int height) {
+        int stride = ROW_HEIGHT + ClientVisualConfig.hudRowGap;
+        int usableHeight = Math.max(1, height - ANCHOR_Y);
+        int usableWidth = Math.max(1, width - ANCHOR_X);
+        float preferred = ClientVisualConfig.hudScale;
+        float minimum = Math.min(preferred, ClientVisualConfig.hudMinScale);
+        float scale = preferred;
+        if (ClientVisualConfig.hudAutoScale && total > 0) {
+            scale = Math.max(minimum, Math.min(preferred, (float) usableHeight / (total * stride)));
         }
-
-        // 第一级：缩放。刚好把 total 行塞进一列所需的系数，钳到下限
-        float needed = (float) usableH / (total * ROW_STRIDE);
-        float scale = Math.max(MIN_SCALE, Math.min(1f, needed));
-
-        // 缩放后的逻辑可用高度（见方法注释：缩放会让逻辑坐标系变大）
-        int logicalH = Math.max(ROW_STRIDE, Math.round(height / scale) - ANCHOR_Y * 2);
-        int rowsPerCol = Math.max(1, logicalH / ROW_STRIDE);
-
-        if (total <= rowsPerCol) {
-            // 缩放就解决了，不用开列
-            return new Layout(scale, rowsPerCol, total, 0);
-        }
-
-        // 第二级：多列（向上取整，钳到列数上限）
-        int columns = Math.min(MAX_COLUMNS, (total + rowsPerCol - 1) / rowsPerCol);
+        // 极小窗口也必须容得下一张卡片；这是屏幕兜底，不改变用户保存的倍率。
+        scale = Math.min(scale, Math.min((float) usableHeight / ROW_HEIGHT,
+                (float) usableWidth / ClientVisualConfig.hudColumnWidth));
+        int rowsPerCol = Math.max(1, (int) (usableHeight / scale) / stride);
+        int columns = Math.max(1, Math.min(ClientVisualConfig.hudMaxColumns,
+                (int) (usableWidth / scale) / ClientVisualConfig.hudColumnWidth));
         int capacity = rowsPerCol * columns;
-
         if (total <= capacity) {
             return new Layout(scale, rowsPerCol, total, 0);
         }
-
-        // 第三级：折叠。留一行的位置给 "+N" 提示，其余全部显示
-        int visible = Math.max(1, capacity - 1);
+        // 给折叠提示留一个位置，容量仅一格时只显示提示，避免画到屏幕外。
+        int visible = Math.max(0, capacity - 1);
         return new Layout(scale, rowsPerCol, visible, total - visible);
     }
 
@@ -697,6 +693,10 @@ public final class StackHudOverlay implements IGuiOverlay {
      */
     private static void renderOverflowHint(GuiGraphics g, Font font,
                                            int x, int y, int hidden, float time) {
+        float opacity = ClientVisualConfig.hudOpacity;
+        if (!ClientVisualConfig.hudDecorations) {
+            time = 0f;
+        }
         int right = x + OVERFLOW_ROW_WIDTH;
         int bottom = y + OVERFLOW_ROW_HEIGHT;
 
@@ -704,12 +704,12 @@ public final class StackHudOverlay implements IGuiOverlay {
         float breath = 0.55f + 0.20f * (0.5f + 0.5f * Mth.sin(time * 1.8f));
 
         g.fillGradient(x, y, right, bottom,
-                argb(COL_BG_TOP, 0.45f), argb(COL_BG_BOT, 0.55f));
-        drawRoundBorder(g, x, y, right, bottom, argb(COL_OVERFLOW, 0.30f * breath));
+                argb(COL_BG_TOP, 0.45f * opacity), argb(COL_BG_BOT, 0.55f * opacity));
+        drawRoundBorder(g, x, y, right, bottom, argb(COL_OVERFLOW, 0.30f * breath * opacity));
 
         Component label = overflowLabel(hidden);
         int textX = x + (OVERFLOW_ROW_WIDTH - font.width(label)) / 2;
-        g.drawString(font, label, textX, y + 3, argb(COL_OVERFLOW, 0.85f * breath), true);
+        g.drawString(font, label, textX, y + 3, argb(COL_OVERFLOW, 0.85f * breath * opacity), true);
     }
 
     /**
@@ -727,13 +727,20 @@ public final class StackHudOverlay implements IGuiOverlay {
      */
     private void renderRow(GuiGraphics g, Font font, int x, int y, Anim a,
                            StackDisplayRegistry.Info info, int serialId, float dt, float time) {
-        float alpha = a.alpha;
+        float alpha = a.alpha * ClientVisualConfig.hudOpacity;
+        boolean decorations = ClientVisualConfig.hudDecorations;
+        if (!decorations) {
+            // 关闭装饰时保留数值更新、进退场与进度平滑，仅清除装饰状态。
+            a.flash = 0f;
+            a.heat = 0f;
+            time = 0f;
+        }
         int accent = info.color();
         int accentBright = brighten(accent, 0.35f);
         boolean hasBar = a.lastMax > 0;
         // 冷却项不参与「满层燃烧」：其 count 是剩余 tick，count>=max 只在冷却刚开始的瞬间成立、
         // 会误触发燃烧；且冷却结束（count 归 0）时该行直接消失、不会停在满条。故冷却项 atMax 恒 false。
-        boolean atMax = hasBar && !a.cooldown && a.lastCount >= a.lastMax;
+        boolean atMax = decorations && hasBar && !a.cooldown && a.lastCount >= a.lastMax;
 
         // —— 火焰强度 heat 平滑（只有有进度条的行才会"燃烧"）——
         if (hasBar) {
@@ -797,7 +804,7 @@ public final class StackHudOverlay implements IGuiOverlay {
         // ===== 5. 玻璃扫光（周期掠过，按行错相）=====
         float glintCycle = frac((time + serialId * 0.61f) / GLINT_PERIOD);
         // 仅对仍在显示的行做扫光；淡出中的行不再扫光，避免消失瞬间又掠过一道高光。
-        if (a.present && glintCycle < GLINT_SWEEP) {
+        if (decorations && a.present && glintCycle < GLINT_SWEEP) {
             renderGlint(g, x, y + 1, cardRight, cardBottom - 1, glintCycle / GLINT_SWEEP, accent, alpha);
         }
 
@@ -869,7 +876,9 @@ public final class StackHudOverlay implements IGuiOverlay {
                     g.fillGradient(barX, barY, barX + fillW, barY + BAR_HEIGHT,
                             argb(accentBright, 0.95f * alpha), argb(accent, 0.95f * alpha));
                     g.fill(barX, barY, barX + fillW, barY + 1, argb(COL_WHITE, 0.28f * alpha));
-                    renderBarFlow(g, barX, barY, fillW, time, serialId, alpha);
+                    if (decorations) {
+                        renderBarFlow(g, barX, barY, fillW, time, serialId, alpha);
+                    }
                 }
                 // 领头亮条（两种情况共用）
                 if (fillW >= 2) {

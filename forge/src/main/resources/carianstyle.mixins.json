@@ -10,7 +10,8 @@
   "client": [
     "client.MixinPlayerHurtTo",
     "client.MixinItemInHandLayer",
-    "client.MixinItemInHandRenderer"
+    "client.MixinItemInHandRenderer",
+    "client.MixinEntityRenderDispatcher"
   ],
   "server": [
   ],

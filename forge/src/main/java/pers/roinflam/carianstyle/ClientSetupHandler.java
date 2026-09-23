@@ -14,12 +14,23 @@ import pers.roinflam.carianstyle.init.CarianStyleEntity;
 import pers.roinflam.carianstyle.init.CarianStyleItem;
 import pers.roinflam.carianstyle.visual.client.CarianStyleAuraDisplays;
 import pers.roinflam.carianstyle.visual.client.VisualRangeCheck;
+import pers.roinflam.carianstyle.config.ClientVisualConfig;
+import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 
+/** 客户端初始化：加载本机视觉配置并注册实体、火焰和光环渲染。 */
 @OnlyIn(Dist.CLIENT)
 public class ClientSetupHandler {
 
+    /**
+     * 在客户端初始化队列中加载配置和注册渲染器。
+     * @param event 客户端初始化事件
+     */
     public static void onClientSetup(final FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
+            // 客户端启动即加载，避免必须先打开百科才能应用特效开关。
+            ClientVisualConfig.load();
+            VisualToggle.ensureLoaded();
+
             // 注册实体渲染器
             EntityRenderers.register(
                     CarianStyleEntity.GLINTBLADES.get(),
@@ -41,4 +52,3 @@ public class ClientSetupHandler {
         });
     }
 }
-

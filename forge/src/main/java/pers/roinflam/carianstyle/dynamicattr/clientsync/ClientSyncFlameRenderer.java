@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.client.VisualLod;
+import pers.roinflam.carianstyle.config.ClientVisualConfig;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -499,7 +500,7 @@ public class ClientSyncFlameRenderer {
      */
     @SubscribeEvent
     public static void onRenderLiving(@Nonnull RenderLivingEvent.Post<?, ?> event) {
-        if (renderDisabled) {
+        if (renderDisabled || !ClientVisualConfig.enabled || !ClientVisualConfig.flamesEnabled) {
             return;
         }
         // ⭐ v3 检查一：必须处于主实体渲染的阶段窗口内。
@@ -671,7 +672,7 @@ public class ClientSyncFlameRenderer {
      */
     @SubscribeEvent
     public static void onRenderHand(@Nonnull RenderHandEvent event) {
-        if (renderDisabled) {
+        if (renderDisabled || !ClientVisualConfig.enabled || !ClientVisualConfig.flamesEnabled) {
             return;
         }
         MultiBufferSource bufferSource = event.getMultiBufferSource();
@@ -695,7 +696,7 @@ public class ClientSyncFlameRenderer {
                 // 用 break 而不是 continue —— 第三人称那边同样是「命中第一个就 break」，
                 // 若这里改用 continue 往下找，会出现「第三人称烧白焰、第一人称烧黄焰」
                 // 这种两个视角不一致的情况。跳过就是彻底不画，不找替补。
-                if (!config.renderInFirstPerson) {
+                if (!config.renderInFirstPerson || !ClientVisualConfig.firstPersonFlames) {
                     break;
                 }
                 try {
@@ -895,6 +896,10 @@ public class ClientSyncFlameRenderer {
             float sidePhase = i * 2.5F;
 
             poseStack.pushPose();
+            // 第一人称整体位置与大小，只改变显示，不改变实体或伤害范围。
+            poseStack.translate(ClientVisualConfig.firstPersonFlameX, ClientVisualConfig.firstPersonFlameY, 0f);
+            poseStack.scale(ClientVisualConfig.firstPersonFlameScale,
+                    ClientVisualConfig.firstPersonFlameScale, 1f);
             poseStack.translate((float) (-(i * 2 - 1)) * 0.24F, -0.3F, 0.0F);
             poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees((float) (i * 2 - 1) * 10.0F));
 

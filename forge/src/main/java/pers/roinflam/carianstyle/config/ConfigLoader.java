@@ -46,6 +46,15 @@ import java.util.List;
  * 两项的背景与影响详见 {@code EnchantmentBase} 的类注释。
  * </p>
  *
+ * <p>
+ * v2.5新增（模组 2.2.0）：隐身碰撞箱屏蔽开关
+ * <ul>
+ *   <li>{@link #hideStealthHitbox}：处于卡利亚式隐身的玩家，其碰撞箱在所有客户端的 F3+B 中都不显示，默认开启。
+ *       由服务端决定并逐实体下发，多人游戏中客户端本地的这一项不起作用。
+ *       机制详见 {@code StealthHitboxSyncHelper} 的类注释。</li>
+ * </ul>
+ * </p>
+ *
  * @author RoinFlam
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
@@ -105,6 +114,10 @@ public final class ConfigLoader {
         public final ForgeConfigSpec.BooleanValue allowMobTriggerEnchantments;
         public final ForgeConfigSpec.BooleanValue allowMobTriggerDeathEnchantments;
 
+        // ==================== 隐身配置（v2.5新增） ====================
+
+        public final ForgeConfigSpec.BooleanValue hideStealthHitbox;
+
         /**
          * 构造配置
          *
@@ -116,6 +129,8 @@ public final class ConfigLoader {
             builder.comment("═══════════════════════════════════════════════════════════════")
                     .comment("Logging System Configuration")
                     .comment("日志系统配置")
+                    .comment("Client-only HUD / visual settings: config/carianstyle/client_visual.json and visual_toggle.json. Edit them on each client.")
+                    .comment("客户端专属 HUD/特效设置：config/carianstyle/client_visual.json 和 visual_toggle.json，请在各玩家客户端修改。")
                     .comment("═══════════════════════════════════════════════════════════════")
                     .push("logging");
 
@@ -316,6 +331,31 @@ public final class ConfigLoader {
                     .define("allowMobTriggerDeathEnchantments", false);
 
             builder.pop();
+
+            // ========== 隐身配置（v2.5新增） ==========
+            builder.comment("")
+                    .comment("═══════════════════════════════════════════════════════════════")
+                    .comment("Stealth Configuration")
+                    .comment("隐身配置")
+                    .comment("═══════════════════════════════════════════════════════════════")
+                    .push("stealth");
+
+            hideStealthHitbox = builder
+                    .comment("Hide the hitbox (F3+B) of players under CarianStyle stealth on every client.")
+                    .comment("是否让处于卡利亚式隐身状态的玩家，其碰撞箱在所有客户端的 F3+B 中都不显示。")
+                    .comment("Stealth only hides the player model; vanilla F3+B still draws the hitbox,")
+                    .comment("隐身只会隐藏玩家模型，原版 F3+B 仍会画出碰撞箱，")
+                    .comment("so anyone can see through stealth in PvP just by pressing F3+B.")
+                    .comment("PvP 中任何人按一下 F3+B 就能看穿隐身。")
+                    .comment("Decided by the server and synced to clients; in multiplayer a client's own value has no effect.")
+                    .comment("由服务端决定并同步给客户端；多人游戏中客户端本地的这一项不起作用。")
+                    .comment("Can be changed while the server is running; players already in stealth follow within half a second.")
+                    .comment("可在服务器运行中修改，正在隐身的玩家会在半秒内跟上新设置。")
+                    .comment("Default: true (hidden)")
+                    .comment("默认值：true（隐藏）")
+                    .define("hideStealthHitbox", true);
+
+            builder.pop();
         }
     }
 
@@ -416,12 +456,22 @@ public final class ConfigLoader {
     public static boolean allowMobTriggerDeathEnchantments = false;
 
     /**
+     * 是否对所有客户端隐藏隐身玩家的碰撞箱（v2.5新增）
+     * <p>
+     * 默认 true。只在服务端读取：由 {@code StealthHitboxSyncHelper} 据此决定
+     * 是否给隐身玩家挂上碰撞箱屏蔽序列号，客户端只认序列号、不读本字段。
+     * </p>
+     */
+    public static boolean hideStealthHitbox = true;
+
+    /**
      * 从配置规范同步到静态字段
      * <p>
      * 在配置加载或修改后调用。
      * v2.2修复：末尾清除所有附魔的禁用状态缓存，确保黑名单变更立即生效。
      * v2.3新增：同步两个怪物附魔触发开关。
      * v2.4新增：同步权重映射与村民交易两个开关。
+     * v2.5新增：同步隐身碰撞箱屏蔽开关。
      * </p>
      */
     public static void bake() {
@@ -450,6 +500,9 @@ public final class ConfigLoader {
         // v2.3新增：同步怪物附魔触发开关
         allowMobTriggerEnchantments = COMMON.allowMobTriggerEnchantments.get();
         allowMobTriggerDeathEnchantments = COMMON.allowMobTriggerDeathEnchantments.get();
+
+        // v2.5新增：同步隐身碰撞箱屏蔽开关
+        hideStealthHitbox = COMMON.hideStealthHitbox.get();
 
         // v2.2修复：清除所有附魔的禁用状态缓存
         // 确保 uninstallEnchantment 配置变更后，isDisabled() 会重新计算

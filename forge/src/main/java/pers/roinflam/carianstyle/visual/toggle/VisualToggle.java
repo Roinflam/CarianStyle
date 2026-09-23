@@ -8,6 +8,7 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.fml.loading.FMLPaths;
 import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.config.ClientVisualConfig;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
 import javax.annotation.Nonnull;
@@ -77,7 +78,7 @@ public final class VisualToggle {
      * @return 是否启用
      */
     public static boolean isEnabled(@Nonnull VisualEffectType type) {
-        return enabled[type.ordinal()];
+        return ClientVisualConfig.enabled && enabled[type.ordinal()];
     }
 
     /**
@@ -204,7 +205,10 @@ public final class VisualToggle {
         } catch (Exception e) {
             LogUtil.error("卡利亚式附魔 - 读取 " + FILE_NAME + " 失败，已回落到全部启用", e);
             enabled = defaults();
+            return;
         }
+        // 旧文件成功解析后补齐双语说明，保留原有开关值。
+        save();
     }
 
     /**
@@ -213,6 +217,57 @@ public final class VisualToggle {
     private static void save() {
         Path path = resolvePath();
         JsonObject root = new JsonObject();
+        root.addProperty("_comment_en", "CLIENT ONLY. Local visual switches; no damage or server changes. HUD layout and master switch: client_visual.json. Restart after manual edits.");
+        root.addProperty("_comment_zh", "客户端专属。仅改变本机显示，不影响伤害和服务端。HUD 布局及总开关见 client_visual.json；手动修改后重启客户端。");
+        root.addProperty("_hemorrhage_en", "Hemorrhage — Blood spray and pools on afflicted entities");
+        root.addProperty("_hemorrhage_zh", "出血 — 患者身上的飙血与血泊");
+        root.addProperty("_scarlet_rot_en", "Scarlet Rot — Rot spore mist");
+        root.addProperty("_scarlet_rot_zh", "猩红腐败 — 猩红腐败的孢子雾");
+        root.addProperty("_frostbite_en", "Frostbite — Frost mist and ice crystals");
+        root.addProperty("_frostbite_zh", "冻伤 — 冻伤的冰雾与霜晶");
+        root.addProperty("_incision_en", "Incision — Laceration wound effect");
+        root.addProperty("_incision_zh", "切割 — 切割的伤口特效");
+        root.addProperty("_sleep_en", "Sleep — Floating sleep symbols");
+        root.addProperty("_sleep_zh", "睡眠 — 睡眠状态的漂浮符号");
+        root.addProperty("_bad_omen_en", "Bad Omen — Ominous dark haze");
+        root.addProperty("_bad_omen_zh", "不祥预感 — 不祥预感的黑雾");
+        root.addProperty("_gravitas_en", "Gravitas — Gravity field distortion and range ring");
+        root.addProperty("_gravitas_zh", "重力压制 — 重力力场的空间扭曲与范围圈");
+        root.addProperty("_golden_tree_en", "Erdtree Blessing — Golden radiance of the Erdtree");
+        root.addProperty("_golden_tree_zh", "黄金树祝福 — 黄金树祝福的金色光辉");
+        root.addProperty("_combat_art_burst_en", "Combat Art Burst — Burst effect on combat art release");
+        root.addProperty("_combat_art_burst_zh", "战技爆发 — 战技释放瞬间的爆发特效");
+        root.addProperty("_combat_art_effect_en", "Combat Art Effect — Generic combat art trails and impacts");
+        root.addProperty("_combat_art_effect_zh", "战技特效 — 战技的通用轨迹与冲击特效");
+        root.addProperty("_combat_art_extra_en", "Combat Art Extras — Additional decorative combat art visuals");
+        root.addProperty("_combat_art_extra_zh", "战技附加特效 — 战技的额外装饰性特效");
+        root.addProperty("_hard_arrow_range_en", "Hard Arrow Range — Range indicator for the hard arrow art");
+        root.addProperty("_hard_arrow_range_zh", "硬箭范围 — 硬箭战技的射程指示");
+        root.addProperty("_waterfowl_flurry_en", "Waterfowl Dance — Blade trails of the waterfowl dance");
+        root.addProperty("_waterfowl_flurry_zh", "猎犬连击 — 猎犬连击的刀光");
+        root.addProperty("_carian_retaliation_en", "Carian Retaliation — Magic barrier of Carian retaliation");
+        root.addProperty("_carian_retaliation_zh", "卡利亚反击 — 卡利亚反击的魔法屏障");
+        root.addProperty("_shield_ward_en", "Shield Ward — Protective ward around the shield");
+        root.addProperty("_shield_ward_zh", "盾墙 — 盾牌防护的护壁");
+        root.addProperty("_aoe_en", "Area Effects — Ground visuals for fixed and follow AOE");
+        root.addProperty("_aoe_zh", "范围特效 — 定点与跟随型范围伤害的地面特效");
+        root.addProperty("_aura_ground_en", "Aura Circles — Ground rune circles for aura enchantments");
+        root.addProperty("_aura_ground_zh", "地面法阵 — 光环类附魔的地面符文法阵");
+        root.addProperty("_glintblades_en", "Glintblades — Trails and glow of glintblade projectiles");
+        root.addProperty("_glintblades_zh", "辉剑 — 辉剑投射物的拖尾与光效");
+        root.addProperty("_calamity_en", "Calamity — Full-screen calamity spectacle");
+        root.addProperty("_calamity_zh", "灾祸 — 灾祸大招的全屏演出");
+        root.addProperty("_dark_moon_en", "Dark Moon — Dark moon orb spectacle");
+        root.addProperty("_dark_moon_zh", "暗月 — 暗月的月轮演出");
+        root.addProperty("_daedicar_woe_en", "Daedicar's Woe — Wailing effect of Daedicar's Woe");
+        root.addProperty("_daedicar_woe_zh", "妲德凯尔之殇 — 妲德凯尔之殇的哀嚎特效");
+        root.addProperty("_howl_shabriri_en", "Howl of Shabriri — Madness effect of Shabriri's howl");
+        root.addProperty("_howl_shabriri_zh", "夏布利利之嚎 — 夏布利利之嚎的疯狂特效");
+        root.addProperty("_time_reversal_en", "Time Reversal — Rewind afterimages");
+        root.addProperty("_time_reversal_zh", "时间逆转 — 时间逆转的回溯残影");
+        root.addProperty("_stack_hud_en", "Stack HUD — On-screen stacks and cooldown timers");
+        root.addProperty("_stack_hud_zh", "叠层 HUD — 屏幕上的叠层与冷却倒计时");
+
 
         boolean[] snapshot = enabled;
         for (VisualEffectType type : VisualEffectType.values()) {

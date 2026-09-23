@@ -504,6 +504,8 @@ public final class EnchantmentValues {
         for (String line : README) {
             readme.add(line);
         }
+        readme.add("Client-only HUD / visual settings: config/carianstyle/client_visual.json and visual_toggle.json; configure on each client, not here.");
+        readme.add("客户端专属 HUD/特效设置见 config/carianstyle/client_visual.json 和 visual_toggle.json；由各玩家在客户端修改，不在本文件配置。");
         root.add(COMMENT_KEY, readme);
 
         List<Handle> all = new ArrayList<>(HANDLES.values());

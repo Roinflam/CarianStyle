@@ -5,9 +5,6 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.AABB;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderPlayerEvent;
 import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -16,8 +13,8 @@ import pers.roinflam.carianstyle.dynamicattr.ClientSyncAttribute;
 import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttribute;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
-import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
 import pers.roinflam.carianstyle.network.HowlShabririSyncHelper;
+import pers.roinflam.carianstyle.network.StealthHitboxSyncHelper;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import java.util.List;
@@ -208,11 +205,24 @@ public class DynamicAttributes {
      * <p>
      * v2.1：清仇恨由原来的 per-entity {@code LivingTickEvent} 处理器
      * 改为框架自带的 onTick 回调（每 {@value #STEALTH_AGGRO_CLEAR_INTERVAL} tick 触发）。
-     * 事件处理器保留，仍负责拦截目标锁定与客户端渲染。
+     * 事件处理器保留，仍负责拦截目标锁定。
      * </p>
+     * <p>
+     * 2.2.0：
+     * </p>
+     * <ul>
+     *     <li>隐藏模型改由客户端静态订阅 {@code ClientSyncStealthRenderer} 查序列号 4。
+     *         此前它挂在事件处理器上，独立服务器的客户端根本没注册过，模型对其他玩家始终可见；</li>
+     *     <li>新增碰撞箱屏蔽——隐身玩家在 F3+B 中也不显示碰撞箱（服务端配置
+     *         {@code hideStealthHitbox}，默认开）。同一个 onTick 顺带做开关的周期对账，
+     *         使热重载配置对正在隐身的玩家也生效。详见 {@link StealthHitboxSyncHelper}。</li>
+     * </ul>
      */
     public static final DynamicAttribute STEALTH = new DynamicAttribute("carianstyle_stealth")
-            .onTick(context -> clearNearbyAggroTowards(context.getEntity()))
+            .onTick(context -> {
+                clearNearbyAggroTowards(context.getEntity());
+                StealthHitboxSyncHelper.sync(context.getEntity());
+            })
             .setTickInterval(STEALTH_AGGRO_CLEAR_INTERVAL)
             .withEventHandler(StealthEventHandler::new);
 
@@ -263,9 +273,16 @@ public class DynamicAttributes {
                 .onRemoved(ClientSyncEffectHelper::onAttributeRemoved);
 
         // 为隐身效果添加生命周期回调
+        // 2.2.0：回调是单槽的（后设覆盖先设），碰撞箱屏蔽只能和序列号 4 的同步写在同一个回调里
         STEALTH
-                .onApplied(ClientSyncEffectHelper::onAttributeApplied)
-                .onRemoved(ClientSyncEffectHelper::onAttributeRemoved);
+                .onApplied((entity, attribute) -> {
+                    ClientSyncEffectHelper.onAttributeApplied(entity, attribute);
+                    StealthHitboxSyncHelper.sync(entity);
+                })
+                .onRemoved((entity, attribute) -> {
+                    ClientSyncEffectHelper.onAttributeRemoved(entity, attribute);
+                    StealthHitboxSyncHelper.clear(entity);
+                });
 
         // ⭐ v2.2：嘶吼的层数同步。
         // 刻意不走 ClientSyncAttribute + ClientSyncEffectHelper 那套——
@@ -370,8 +387,13 @@ public class DynamicAttributes {
      * <p>
      * v2.1：原先的 {@code LivingTickEvent} 监听（首次 tick 清仇恨）已移除，
      * 改由 {@link #STEALTH} 的 onTick 回调周期执行——详见类注释。
-     * 本处理器现仅保留两项：拦截生物锁定目标、客户端隐藏玩家渲染。
-     * 二者都是低频事件，挂在全局总线上没有性能问题。
+     * </p>
+     * <p>
+     * 2.2.0：原先这里还有一个 {@code RenderPlayerEvent.Pre} 监听负责隐藏玩家模型，已移到
+     * {@code ClientSyncStealthRenderer}。本处理器只在 {@code DynamicAttributeManager.apply}
+     * 里注册到事件总线，而 apply 只在服务端执行——单人游戏里服务端和客户端共用一条总线，
+     * 所以一直看起来正常；<b>独立服务器上客户端从来没注册过它，隐身者的模型对其他玩家始终可见</b>。
+     * 现在本处理器只剩拦截生物锁定目标一项（纯服务端逻辑）。
      * </p>
      */
     private static class StealthEventHandler {
@@ -391,19 +413,6 @@ public class DynamicAttributes {
             if (!event.getNewTarget().getUUID().equals(boundEntityId)) return;
 
             if (DynamicAttributeManager.has(event.getNewTarget(), DynamicAttributes.STEALTH)) {
-                event.setCanceled(true);
-            }
-        }
-
-        /**
-         * 客户端：隐藏玩家渲染
-         * 使用客户端同步管理器检查是否应该渲染
-         */
-        @OnlyIn(Dist.CLIENT)
-        @SubscribeEvent
-        public void onRenderPlayer(RenderPlayerEvent.Pre event) {
-            // 检查被渲染的玩家是否在隐身列表中（序列号4）
-            if (ClientSyncEffectManager.shouldRenderEffect(4, event.getEntity().getId())) {
                 event.setCanceled(true);
             }
         }
