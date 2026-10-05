@@ -148,7 +148,7 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
         int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);
         if (ConfigLoader.levelLimit) level = Math.min(level, 10);
         if (level <= 0) return;
-        if (attacker instanceof Player && ((Player) attacker).getAttackStrengthScale(0.5f) != 1) return;
+        if (!isFullyCharged(attacker)) return;
         boolean hasFullMoon = hasFullMoonEnchantment(attacker);
         float damageBonus = ratio(hasFullMoon);
         evt.setAmount(evt.getAmount() * (1 + damageBonus));

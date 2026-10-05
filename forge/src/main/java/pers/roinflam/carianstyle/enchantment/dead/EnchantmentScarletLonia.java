@@ -22,6 +22,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
@@ -253,7 +254,8 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
      */
     @Override
     protected void onDeath(@NotNull EnchantmentContext ctx, int level) {
-        if (ctx.canHarmInCreative()) {
+        // 夏玻利利 / 癫火反噬致死的那一击也挂着「无视无敌」，但它以前是直接处决、照样会触发本附魔，这里保持不变
+        if (ctx.canHarmInCreative() && !DamageOverTimeManager.isSelfLethalBlow(ctx.getDamageSource())) {
             return;
         }
 

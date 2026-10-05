@@ -84,6 +84,11 @@ public class EnchantmentGodskinSwaddling extends EnchantmentBase {
     protected void onDamageAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
         LivingEntity attacker = ctx.getHolder();
 
+        // 计数与这一下打多少无关，连点（尤其打一群时）能成倍刷出回血，要求满蓄力，未满蓄力不计数
+        if (!isFullyCharged(attacker)) {
+            return;
+        }
+
         int currentCount = EnchantmentDataManager.getCounter(ATTACK_COUNTER, attacker.getUUID());
 
         if (currentCount == TRIGGER_COUNT.getInt()) {

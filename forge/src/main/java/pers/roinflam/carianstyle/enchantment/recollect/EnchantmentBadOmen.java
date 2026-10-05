@@ -21,9 +21,13 @@ import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
  * 攻击时给敌人施加凶兆效果
  * 敌人已有凶兆时，额外造成50%伤害（直接扣血），可触发斩杀
  * </p>
+ * <p>
+ * v2.1：玩家必须满蓄力才追加真伤、挂凶兆；未满蓄力的一下只付「目标已有凶兆时本体伤害折半」的代价、拿不到好处，
+ * 怪物持有者不受影响
+ * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "bad_omen",
@@ -87,6 +91,16 @@ public class EnchantmentBadOmen extends EnchantmentBase {
 
         LivingEntity victim = ctx.getVictim();
         if (victim == null) {
+            return;
+        }
+
+        // 连点会让每一下都挂上凶兆（受伤 +25%、治疗减半），要求满蓄力。
+        // 未满蓄力的一下拿不到追加真伤和凶兆，但目标已有凶兆时「本体伤害折半」这个代价照样付，
+        // 否则连点反而比满蓄力多吃一份本体伤害
+        if (!isFullyCharged(ctx.getHolder())) {
+            if (victim.hasEffect(CarianStylePotion.BAD_OMEN.get())) {
+                ctx.multiplyDamage((float) DAMAGE_MULTIPLIER.get());
+            }
             return;
         }
 

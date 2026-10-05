@@ -24,8 +24,10 @@ import java.util.UUID;
 /**
  * 米凯拉之刃附魔
  * <p>v2.2：攻击者+受击者计数器累积均接入怪物附魔触发开关</p>
+ * <p>v2.3：攻击者一侧的叠层（加层、刷新过期、按层数增伤）要求玩家满蓄力；
+ * 未满蓄力的一下只吃基础倍率，不加层也不吃层数加成，连点不会比正常节奏更强。受击者一侧不受影响</p>
  *
- * @version 2.2
+ * @version 2.3
  */
 @AutoRegisterEnchantment(id = "mikaela_blade", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantmentCategory.WEAPON, slots = {EquipmentSlot.MAINHAND})
 @Mod.EventBusSubscriber
@@ -91,11 +93,19 @@ public class EnchantmentMikaelaBlade extends EnchantmentBase {
                     int level = EnchantmentHelper.getItemEnchantmentLevel(mikaelaBlade, heldItem);
                     if (ConfigLoader.levelLimit) level = Math.min(level, 10);
                     if (level > 0) {
-                        UUID uuid = attacker.getUUID();
-                        int combo = EnchantmentDataManager.getCounter(COMBO_COUNT_KEY, uuid);
-                        evt.setAmount(evt.getAmount() * (float) BASE_MULTIPLIER.get()
-                    + evt.getAmount() * combo * (float) MULTIPLIER_PER_COMBO.get());
-                        EnchantmentDataManager.setCounter(COMBO_COUNT_KEY, uuid, combo + 1, COMBO_DURATION.getInt());
+                        // ⭐ v2.3：连点会让每一下都叠一层连击（倍率不封顶），叠层要求满蓄力；
+                        // 未满蓄力的一下只吃基础倍率（它是首击的代价），不加层、不刷新，也拿不到层数加成。
+                        // 不能整段跳过：那样低层数时连点的伤害（×1.0）反而比满蓄力（×0.4 起）更高。
+                        // 下面的受击者分支照常执行
+                        if (EnchantmentBase.isFullyCharged(attacker)) {
+                            UUID uuid = attacker.getUUID();
+                            int combo = EnchantmentDataManager.getCounter(COMBO_COUNT_KEY, uuid);
+                            evt.setAmount(evt.getAmount() * (float) BASE_MULTIPLIER.get()
+                                    + evt.getAmount() * combo * (float) MULTIPLIER_PER_COMBO.get());
+                            EnchantmentDataManager.setCounter(COMBO_COUNT_KEY, uuid, combo + 1, COMBO_DURATION.getInt());
+                        } else {
+                            evt.setAmount(evt.getAmount() * (float) BASE_MULTIPLIER.get());
+                        }
                     }
                 }
             }

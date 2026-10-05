@@ -14,6 +14,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.helper.AttackCooldownHelper;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
@@ -51,8 +52,24 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
  * 相比它本身触发的 4 次完整伤害管线可以忽略。
  * </p>
  *
+ * <h3>v2.2：攻击冷却改为延后清零</h3>
+ * <p>
+ * <b>问题：</b>本附魔在 LivingHurtEvent HIGHEST 里过了蓄力判断就立刻清零攻击冷却，
+ * 同一下挥击里排在后面的蓄力判断（命定之死在 LOWEST）读到的都是清零后的值，全部失效——
+ * 带水鸟乱舞的武器打不出命定之死，普通武器和拔刀剑都一样。
+ * </p>
+ * <p>
+ * <b>为什么这么改：</b>清零是为了让补刀段读到低蓄力、不把被蓄力拦着的附魔每段都再触发一遍，这个作用要保留。
+ * 改用 {@link AttackCooldownHelper#resetNextTick}，在下一个服务端 tick 开头（HIGHEST，早于驱动补刀段的
+ * {@link SynchronizationTask}）清零：首段的事件链读到出手前的蓄力，补刀段读到清零后的蓄力。
+ * </p>
+ * <p>
+ * <b>行为影响：</b>首段上的命定之死等满蓄力附魔恢复生效；补刀段与之前一样不会重复触发它们；
+ * 拆段方式、段数、间隔都没有变化。
+ * </p>
+ *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "waterfowl_flurry",
@@ -117,7 +134,8 @@ public class EnchantmentWaterfowlFlurry extends EnchantmentBase {
             if (!isJustSwung((Player) attacker)) {
                 return;
             }
-            ((Player) attacker).resetAttackStrengthTicker();
+            // v2.2：延后到下一 tick 开头清零（见类注释），不在本次事件链中途清零
+            AttackCooldownHelper.resetNextTick((Player) attacker);
         }
 
         // 防止递归：使用DataManager检查

@@ -64,6 +64,11 @@ public class EnchantmentScarletCorruption extends EnchantmentBase {
             return;
         }
 
+        // 连点能一下一个地给一群目标挂上腐败，要求满蓄力
+        if (!isFullyCharged(ctx.getHolder())) {
+            return;
+        }
+
         // 给被攻击的目标施加猩红腐败
         victim.addEffect(new MobEffectInstance(
                 CarianStylePotion.SCARLET_ROT.get(),

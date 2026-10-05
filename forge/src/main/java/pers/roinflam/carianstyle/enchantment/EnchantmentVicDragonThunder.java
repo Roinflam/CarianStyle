@@ -71,8 +71,15 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
  * 雷暴 100% 概率 / 4x 伤害，下雨 {@code level*10}% / 2x，晴天 {@code level*5}% / 1x。
  * </p>
  *
+ * <h3>v3.2：攻击端要求满蓄力</h3>
+ * <p>
+ * 攻击端原先每次造成伤害都掷一次落雷，雷暴天连点就是每下一道雷。
+ * 现在玩家必须满蓄力（{@link EnchantmentBase#isFullyCharged}）才会召雷；怪物持有者不受影响。
+ * 防御端的雷电减免与蓄力无关，照常生效。
+ * </p>
+ *
  * @author RoinFlam
- * @version 3.1
+ * @version 3.2
  */
 @AutoRegisterEnchantment(
         id = "vic_dragon_thunder",
@@ -191,6 +198,11 @@ public class EnchantmentVicDragonThunder extends EnchantmentBase {
             level = Math.min(level, LEVEL_CAP.getInt());
         }
         if (level <= 0) {
+            return;
+        }
+
+        // ⭐ v3.2：连点会让每一下都掷一次落雷（雷暴天每下必出），要求满蓄力
+        if (!EnchantmentBase.isFullyCharged(attacker)) {
             return;
         }
 

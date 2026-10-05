@@ -13,6 +13,7 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.utils.helper.AttackCooldownHelper;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
@@ -71,8 +72,11 @@ public class EnchantmentDoubleSlash extends EnchantmentBase {
             return;
         }
 
-        // 重置攻击冷却
-        player.resetAttackStrengthTicker();
+        // 消耗这一下挥击：冷却延后到下一 tick 开头清零（直接清零会让同一下挥击里后面的蓄力判断，如命定之死，全部失效），
+        // 同一 tick 内只结算一次——横扫副目标、范围伤害的其它目标、主副手都带本附魔的重复分发都不再各结算一遍
+        if (!AttackCooldownHelper.spendSwing(player)) {
+            return;
+        }
 
         // 概率触发：等级×5 + 20%
         if (!RandomUtil.percentageChance(level * 5 + 20)) {

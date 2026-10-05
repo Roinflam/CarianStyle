@@ -111,10 +111,8 @@ public class EnchantmentHowlShabriri extends EnchantmentBase {
             return;
         }
 
-        if (attacker instanceof Player) {
-            if (((Player) attacker).getAttackStrengthScale(0.5F) < 0.9F) {
-                return;
-            }
+        if (!isFullyCharged(attacker)) {
+            return;
         }
 
         // 获取当前沙布里里嚎叫等级
@@ -139,10 +137,11 @@ public class EnchantmentHowlShabriri extends EnchantmentBase {
             ClientSyncEffectHelper.onAttributeApplied(attacker, DynamicAttributes.EPILEPSY_FIRE_BURNING);
 
             // v3.0优化：自损 5%最大生命值 / 60tick
+            // 按自损登记：被反噬耗死时致死一击走原版伤害管线，死亡消息、死因和伤害事件链与原版伤害致死一致
             float selfDamagePerTick = attacker.getMaxHealth() * (float) SELF_DAMAGE_RATIO.get() / SELF_DOT_DURATION.getInt();
-            DamageOverTimeManager.applyLinear(
+            DamageOverTimeManager.applySelfLinear(
                     attacker, selfDamagePerTick, SELF_DOT_DURATION.getInt(), SELF_DOT_DELAY.getInt(),
-                    NewDamageSource.epilepsyFire(attacker.level()), true
+                    NewDamageSource.epilepsyFire(attacker.level())
             );
         }
     }

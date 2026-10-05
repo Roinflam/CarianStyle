@@ -19,6 +19,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.helper.AttackCooldownHelper;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
@@ -118,8 +119,11 @@ public class EnchantmentUnsheathe extends EnchantmentBase {
             return;
         }
 
-        // 重置攻击冷却
-        player.resetAttackStrengthTicker();
+        // 消耗这一下挥击：冷却延后到下一 tick 开头清零（直接清零会让同一下挥击里后面的蓄力判断，如命定之死，全部失效），
+        // 同一 tick 内只结算一次——横扫副目标、范围伤害的其它目标、主副手都带本附魔的重复分发都不再各结算一遍
+        if (!AttackCooldownHelper.spendSwing(player)) {
+            return;
+        }
 
         // 获取攻击计数
         int attackCount = EnchantmentDataManager.getCounter(ATTACK_COUNT_KEY, player.getUUID());
@@ -131,7 +135,14 @@ public class EnchantmentUnsheathe extends EnchantmentBase {
             // 触发居合斩
             EnchantmentDataManager.resetCounter(ATTACK_COUNT_KEY, player.getUUID());
             ctx.multiplyDamage(level * (float) DAMAGE_PER_LEVEL.get());
-            applyAttackSpeedPenalty(player, level);
+            // 攻速惩罚和清零一样延后到下一 tick：攻速 -75% 会让蓄力立刻降到原来的 1/4，
+            // 同一下挥击里排在后面的蓄力判断（命定之死、横扫副目标上的附魔）就全部失效了
+            new SynchronizationTask(1) {
+                @Override
+                public void run() {
+                    applyAttackSpeedPenalty(player, level);
+                }
+            }.start();
 
             // ⭐ v2.1 视觉：拔刀斩的银白弧形刀光（纯服务端广播，不影响任何机制）
             if (player.level() instanceof ServerLevel serverLevel) {

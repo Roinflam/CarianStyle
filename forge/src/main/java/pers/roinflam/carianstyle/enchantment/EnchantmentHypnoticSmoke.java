@@ -81,6 +81,11 @@ public class EnchantmentHypnoticSmoke extends EnchantmentBase {
             return;
         }
 
+        // 连点等于多掷几次骰子，刷出睡眠后再补一记满蓄力就能吃到加倍伤害，要求满蓄力
+        if (!isFullyCharged(ctx.getHolder())) {
+            return;
+        }
+
         if (!RandomUtil.percentageChance(level * CHANCE_PER_LEVEL.get())) {
             return;
         }

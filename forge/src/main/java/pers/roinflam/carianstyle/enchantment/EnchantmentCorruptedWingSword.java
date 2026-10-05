@@ -87,9 +87,11 @@ public class EnchantmentCorruptedWingSword extends EnchantmentBase {
         }
 
         int currentCombo = EnchantmentDataManager.getCounter(COMBO_COUNTER_KEY, ctx.getHolder().getUUID());
+        int maxCombo = MAX_COMBO.getInt();
 
-        if (currentCombo < MAX_COMBO.getInt()) {
-            int newCombo = EnchantmentDataManager.incrementCounter(COMBO_COUNTER_KEY, ctx.getHolder().getUUID());
+        int newCombo;
+        if (currentCombo < maxCombo) {
+            newCombo = EnchantmentDataManager.incrementCounter(COMBO_COUNTER_KEY, ctx.getHolder().getUUID());
 
             new SynchronizationTask(DECAY_DELAY.getInt()) {
                 @Override
@@ -102,11 +104,15 @@ public class EnchantmentCorruptedWingSword extends EnchantmentBase {
                     }
                 }
             }.start();
-
-            float damageBonus = ctx.getDamage() * (float) (newCombo / COMBO_DIVISOR.get())
-                * (float) DAMAGE_PER_LEVEL.get() * level;
-            ctx.addDamage(damageBonus);
+        } else {
+            // 连击已到上限：不再叠加、也不再追加衰减任务，但增伤按上限计算。
+            // 原来增伤只写在上面的分支里，连击打满（默认 20）后增伤反而消失，要等衰减掉一层才回来
+            newCombo = maxCombo;
         }
+
+        float damageBonus = ctx.getDamage() * (float) (newCombo / COMBO_DIVISOR.get())
+            * (float) DAMAGE_PER_LEVEL.get() * level;
+        ctx.addDamage(damageBonus);
     }
 
     @Override

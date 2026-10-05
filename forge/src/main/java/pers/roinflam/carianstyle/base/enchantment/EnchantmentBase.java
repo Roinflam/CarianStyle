@@ -4,6 +4,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
@@ -116,11 +117,14 @@ public abstract class EnchantmentBase extends Enchantment {
     /**
      * 缓存禁用状态，避免每次调用都遍历数组
      * <p>
-     * null = 未检查过（配置可能还没加载），true = 已确认禁用，false = 已确认启用
-     * 配置重载后通过 invalidateDisabledCache() 清除缓存
+     * 最低位是结果（1 = 禁用），其余位是算出它时的配置版本号 {@link ConfigLoader#bakeGeneration()}。
+     * 0 = 未检查过；版本号对不上就当作没缓存、重新计算。
+     * 结果和版本号压在同一个 int 里，一次读写就是一个整体：配置重载在文件监视线程上执行，
+     * 拆成两个字段的话，服务端线程可能读到「新版本号 + 旧结果」。
+     * 配置重载后也可以通过 invalidateDisabledCache() 直接清除。
      * </p>
      */
-    private Boolean disabledCache = null;
+    private int disabledCacheStamp = 0;
 
     /**
      * 主构造函数（注解注册方式）
@@ -218,8 +222,17 @@ public abstract class EnchantmentBase extends Enchantment {
     /**
      * 检查此附魔是否被配置黑名单禁用
      * <p>
-     * 读取 ConfigLoader.uninstallEnchantment 数组，匹配注解中的 id。
-     * 结果会被缓存，配置重载后需调用 invalidateDisabledCache() 清除。
+     * 读取 ConfigLoader.uninstallEnchantment 数组，匹配注解中的 id
+     * （匹配规则见 {@link ConfigLoader#isEnchantmentUninstalled(String)}，容忍命名空间、大小写等写法差异）。
+     * </p>
+     * <p>
+     * 结果按配置版本号缓存：
+     * <ul>
+     *   <li>配置还没加载（版本号为 0）时不缓存。以前这时算出的「未禁用」会一直留在缓存里，
+     *       要等 bake() 末尾的 invalidateAllDisabledCaches() 才清掉；</li>
+     *   <li>bake() 先换数组、再递增版本号。文件监视线程重载配置的同时服务端线程正在计算的话，
+     *       用旧数组算出的结果带的是旧版本号，下次调用发现对不上就会重算，不会把旧结果一直留着。</li>
+     * </ul>
      * </p>
      *
      * @return true 表示此附魔已被禁用，不应产生任何效果
@@ -230,32 +243,25 @@ public abstract class EnchantmentBase extends Enchantment {
             return false;
         }
 
-        // 使用缓存避免每次遍历
-        if (disabledCache != null) {
-            return disabledCache;
+        // 先读版本号再读数组：读到新版本号时一定能看到新数组
+        int generation = ConfigLoader.bakeGeneration();
+        int stamp = disabledCacheStamp;
+        if (generation != 0 && (stamp >>> 1) == generation) {
+            return (stamp & 1) != 0;
         }
 
-        // 遍历黑名单检查
-        String[] blacklist = ConfigLoader.uninstallEnchantment;
-        if (blacklist != null && blacklist.length > 0) {
-            String myId = annotation.id();
-            for (String disabledId : blacklist) {
-                if (myId.equals(disabledId)) {
-                    disabledCache = true;
-                    return true;
-                }
-            }
+        boolean disabled = ConfigLoader.isEnchantmentUninstalled(annotation.id());
+        if (generation != 0) {
+            disabledCacheStamp = (generation << 1) | (disabled ? 1 : 0);
         }
-
-        disabledCache = false;
-        return false;
+        return disabled;
     }
 
     /**
      * 清除禁用状态缓存（配置重载时调用）
      */
     public void invalidateDisabledCache() {
-        disabledCache = null;
+        disabledCacheStamp = 0;
     }
 
     /**
@@ -502,12 +508,67 @@ public abstract class EnchantmentBase extends Enchantment {
 
     /**
      * 判断玩家是否刚完成满蓄力攻击
+     * <p>
+     * 委托给 {@link #isFullyCharged(LivingEntity)}。原来要求蓄力恰好等于 1，
+     * 网络抖动时客户端蓄力条已满、服务端可能只有 0.95，满蓄力也会被判成没满；
+     * 现在与其它蓄力判断统一为 &gt; 0.9。
+     * </p>
      *
      * @param player 玩家
      * @return 是否满蓄力
      */
     protected boolean isJustSwung(@Nonnull Player player) {
-        return player.getAttackStrengthScale(0.5f) == 1;
+        return isFullyCharged(player);
+    }
+
+    /**
+     * 判断持有者这一下是否满蓄力（附魔的统一蓄力判断入口）
+     * <p>
+     * 不是玩家（怪物等没有攻击冷却）一律返回 true；玩家以
+     * {@code getAttackStrengthScale(0.5F) > 0.9F} 为准，与原版暴击、横扫判断满蓄力的阈值一致。
+     * </p>
+     * <p>
+     * Forge 47.4.13 的 {@code Player#attack} 在方法最末尾才清零攻击冷却，
+     * 同一下近战挥击的整条事件链（AttackEntityEvent、CriticalHitEvent、LivingAttack/Hurt/Damage/Death）
+     * 里读到的都是出手前的蓄力值，在这些事件里直接调用即可。
+     * 附魔需要「消耗」蓄力时不要在事件里直接清零（会让同一下后面的判断全部失效），
+     * 改用 {@link pers.roinflam.carianstyle.utils.helper.AttackCooldownHelper#resetNextTick(Player)}
+     * （需要「一下挥击只结算一次」时用 {@link pers.roinflam.carianstyle.utils.helper.AttackCooldownHelper#spendSwing(Player)}）。
+     * </p>
+     *
+     * @param holder 附魔持有者，可为 null
+     * @return 是否满蓄力
+     */
+    public static boolean isFullyCharged(@Nullable LivingEntity holder) {
+        if (!(holder instanceof Player player)) {
+            return true;
+        }
+        return player.getAttackStrengthScale(0.5F) > 0.9F;
+    }
+
+    /**
+     * 范围伤害 / 范围减益要不要放过这个实体：自己、同类、队友、自己养的宠物。
+     * <p>
+     * 「同类」指和持有者同一种实体：玩家持有时不波及别的玩家，怪物持有时不波及同种怪物（僵尸不烧僵尸）。
+     * 队友按原版 {@code isAlliedTo}（同一记分板队伍）判断；宠物 / 坐骑（狼、猫、鹦鹉、马……凡是有主人的实体）只放过持有者自己的。
+     * 被直接命中的目标不走这里（它是这一下的受击者，该吃什么由各附魔自己决定）。
+     * </p>
+     *
+     * @param attacker 附魔持有者，可为 null（null 时谁也不放过，返回 false）
+     * @param other    候选的波及对象
+     * @return true 表示应当放过它（不波及）
+     */
+    public static boolean isSameKindOrAlly(@Nullable LivingEntity attacker, @Nonnull LivingEntity other) {
+        if (attacker == null) {
+            return false;
+        }
+        if (other == attacker || other.getType() == attacker.getType()) {
+            return true;
+        }
+        if (attacker.isAlliedTo(other)) {
+            return true;
+        }
+        return other instanceof OwnableEntity pet && attacker.getUUID().equals(pet.getOwnerUUID());
     }
 
     // ==================== LivingAttackEvent 模板方法 (10个) ====================

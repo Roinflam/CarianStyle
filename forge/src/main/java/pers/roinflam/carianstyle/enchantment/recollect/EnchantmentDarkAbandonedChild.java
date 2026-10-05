@@ -101,10 +101,8 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
             effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
         }
 
-        if (ctx.isHolderPlayer()) {
-            if (ctx.getHolderAsPlayer().getAttackStrengthScale(0.5F) < 0.9F) {
-                return;
-            }
+        if (!isFullyCharged(ctx.getHolder())) {
+            return;
         }
 
         if (ctx.getDamageSource() != null) {

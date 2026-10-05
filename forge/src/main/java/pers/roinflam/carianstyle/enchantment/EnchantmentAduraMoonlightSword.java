@@ -14,6 +14,7 @@ import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -33,8 +34,12 @@ import java.util.List;
  *
  * <p>本附魔每次攻击触发，触发频率极高，必须严格封顶。</p>
  *
+ * <h3>v2.2：不冻同类</h3>
+ * <p>被打的目标照常吃冻伤；周围只波及「别人」：同类（玩家不冻别的玩家，怪物不冻同种怪物）、队友和自己养的宠物不冻。
+ * 原来只排除持有者自己，会把队友和宠物一起冻上。</p>
+ *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "adura_moonlight_sword",
@@ -122,11 +127,9 @@ public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
             effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
         }
 
-        // 玩家需要刚挥剑，非玩家直接触发
-        if (ctx.isHolderPlayer()) {
-            if (ctx.getHolderAsPlayer().getAttackStrengthScale(0.5F) < 0.9F) {
-                return;
-            }
+        // 玩家需要满蓄力，非玩家直接触发
+        if (!isFullyCharged(ctx.getHolder())) {
+            return;
         }
 
         // 伤害变为魔法伤害
@@ -143,8 +146,15 @@ public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
                 LivingEntity.class,
                 victim,
                 searchRadius,
-                entity -> !entity.equals(attacker)
+                // 被打的目标一定吃冻伤；周围只波及「别人」：同类（玩家不冻别的玩家）、队友和自己养的宠物不冻
+                entity -> entity.equals(victim) || !isSameKindOrAlly(attacker, entity)
         );
+
+        // 被打的目标排到最前面：下面有命中数量上限，周围怪多时它不能被挤到上限之外，说好了它一定吃冻伤
+        nearbyEntities = new ArrayList<>(nearbyEntities);
+        if (nearbyEntities.remove(victim)) {
+            nearbyEntities.add(0, victim);
+        }
 
         // 施加冻伤效果
         boolean isNight = !attacker.level().isDay();

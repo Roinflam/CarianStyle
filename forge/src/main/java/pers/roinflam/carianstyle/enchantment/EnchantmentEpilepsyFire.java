@@ -3,7 +3,6 @@ package pers.roinflam.carianstyle.enchantment;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
@@ -137,10 +136,8 @@ public class EnchantmentEpilepsyFire extends EnchantmentBase {
             return;
         }
 
-        if (attacker instanceof Player) {
-            if (((Player) attacker).getAttackStrengthScale(0.5F) < 0.9F) {
-                return;
-            }
+        if (!isFullyCharged(attacker)) {
+            return;
         }
 
         final int effectiveLevel = level;
@@ -149,10 +146,11 @@ public class EnchantmentEpilepsyFire extends EnchantmentBase {
                 DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(BURN_VISUAL_DURATION.getInt(), 0));
         ClientSyncEffectHelper.onAttributeApplied(attacker, DynamicAttributes.EPILEPSY_FIRE_BURNING);
 
+        // 自损：被反噬耗死时致死一击走原版伤害管线（见 DamageOverTimeManager v1.2）
         float attackerDmgPerTick = attacker.getMaxHealth() * (float) SELF_DAMAGE_RATIO.get() / DAMAGE_TICKS.getInt();
-        DamageOverTimeManager.applyLinear(
+        DamageOverTimeManager.applySelfLinear(
                 attacker, attackerDmgPerTick, DAMAGE_TICKS.getInt(), DOT_DELAY.getInt(),
-                NewDamageSource.epilepsyFire(attacker.level()), true
+                NewDamageSource.epilepsyFire(attacker.level())
         );
 
         DynamicAttributeManager.apply(victim,

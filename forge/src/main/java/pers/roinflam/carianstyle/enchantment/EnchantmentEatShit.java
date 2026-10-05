@@ -43,7 +43,13 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * <b>本次只改了这一个字段的可见性修饰符，其余逻辑一行未动。</b>
  * </p>
  *
- * @version 2.3
+ * <h3>v2.4：施加 debuff 要求满蓄力</h3>
+ * <p>
+ * 玩家必须满蓄力挥击才会给目标上反胃与治疗削减（自己吃反胃的代价也一起跳过）；
+ * 怪物持有者不受影响。{@link #onLivingHeal} 的治疗削减结算不变。
+ * </p>
+ *
+ * @version 2.4
  */
 @AutoRegisterEnchantment(id = "eat_shit", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.UNCOMMON, type = EnchantmentCategory.WEAPON, slots = {EquipmentSlot.MAINHAND})
 @Mod.EventBusSubscriber
@@ -107,6 +113,8 @@ public class EnchantmentEatShit extends EnchantmentBase {
         int level = EnchantmentHelper.getItemEnchantmentLevel(eatShit, heldItem);
         if (ConfigLoader.levelLimit) level = Math.min(level, 10);
         if (level <= 0) return;
+        // ⭐ v2.4：连点会让每一下都挂上反胃和治疗削减，要求满蓄力
+        if (!EnchantmentBase.isFullyCharged(attacker)) return;
         int victimDuration = level * VICTIM_TICKS_PER_LEVEL.getInt();
         victim.addEffect(new MobEffectInstance(MobEffects.CONFUSION, victimDuration));
         attacker.addEffect(new MobEffectInstance(MobEffects.CONFUSION, level * SELF_TICKS_PER_LEVEL.getInt()));

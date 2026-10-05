@@ -27,9 +27,10 @@ import java.util.UUID;
  * 连击附魔
  * <p>v2.2：onDamageAsAttackerHighest 走中央事件分发器，已被 scanEntity 拦截。
  * onLivingDeath 是清理逻辑（清除目标死亡时的连击叠层），不影响触发行为，无需开关。</p>
+ * <p>v2.3：加层与增伤要求玩家满蓄力；换目标清层、击杀清理的逻辑不变。</p>
  *
  * @author RoinFlam
- * @version 2.2
+ * @version 2.3
  */
 @AutoRegisterEnchantment(
         id = "repeating_thrust",
@@ -95,6 +96,16 @@ public class EnchantmentRepeatingThrust extends EnchantmentBase {
         int currentStacks = EnchantmentDataManager.getCounter(STACK_COUNT_KEY, attackerUUID);
 
         boolean isSameTarget = victimUUID.toString().equals(storedTargetUUID);
+
+        // ⭐ v2.3：叠层与这一下打多少无关，连点能先攒层再一刀兑现，加层和增伤要求满蓄力。
+        // 换目标清层不受蓄力限制：否则满蓄力打首领、轻点打小怪，首领身上的层数一直保得住
+        if (!isFullyCharged(attacker)) {
+            if (!isSameTarget) {
+                EnchantmentDataManager.setData(CURRENT_TARGET_KEY, attackerUUID, victimUUID.toString(), STACK_DURATION);
+                EnchantmentDataManager.setCounter(STACK_COUNT_KEY, attackerUUID, 0, STACK_DURATION);
+            }
+            return;
+        }
 
         if (isSameTarget) {
             currentStacks++;

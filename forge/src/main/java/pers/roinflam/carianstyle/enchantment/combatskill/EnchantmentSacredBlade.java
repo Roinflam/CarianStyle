@@ -102,8 +102,23 @@ import java.util.UUID;
  * 那种情况下放净化特效会误导玩家以为打出了强力一击。
  * </p>
  *
+ * <h3>v3.1：削弱与回血要求满蓄力</h3>
+ * <p>
+ * <b>问题：</b>永久削弱是每命中一次亡灵就固定叠一档（{@code 等级 × 5%}），和这一下打了多少无关。
+ * 5 级时连点 4 下就能把一只亡灵削到 -99%，打一群时每次点击削一只。
+ * </p>
+ * <p>
+ * <b>修改：</b>亡灵分支里只把「回血 + 永久削弱」包进 {@link EnchantmentBase#isFullyCharged} 判断，
+ * 玩家未满蓄力时跳过这两项；怪物持有者不受影响。
+ * </p>
+ * <ul>
+ *     <li>对亡灵的增伤照常结算——它按本次伤害成比例，连点本来就不占便宜；</li>
+ *     <li>对非亡灵的 ×0.2 惩罚<b>不受蓄力影响</b>。如果在方法开头按蓄力直接 return，
+ *         连点反而能躲掉惩罚，满蓄力却吃满，那就弄反了。</li>
+ * </ul>
+ *
  * @author RoinFlam
- * @version 3.0
+ * @version 3.1
  */
 @AutoRegisterEnchantment(
         id = "sacred_blade",
@@ -190,15 +205,19 @@ public class EnchantmentSacredBlade extends EnchantmentBase {
             float bonusDamage = ctx.getDamage() * level * (float) BONUS_DAMAGE_PER_LEVEL.get() * healthRatio;
             ctx.addDamage(bonusDamage);
 
-            // 治疗攻击者（上限为最大血量的10%）
-            float healAmount = Math.min(bonusDamage * (float) LIFESTEAL_RATIO.get(),
-                attacker.getMaxHealth() * (float) LIFESTEAL_CAP_RATIO.get());
-            attacker.heal(healAmount);
+            // ⭐ v3.1：永久削弱每下固定叠一档、与这一下打多少无关，连点几下就能把亡灵削到底，
+            // 回血和削弱一起要求满蓄力。增伤按本次伤害成比例，不拦（详见类注释「v3.1」小节）
+            if (isFullyCharged(attacker)) {
+                // 治疗攻击者（上限为最大血量的10%）
+                float healAmount = Math.min(bonusDamage * (float) LIFESTEAL_RATIO.get(),
+                    attacker.getMaxHealth() * (float) LIFESTEAL_CAP_RATIO.get());
+                attacker.heal(healAmount);
 
-            // ⭐ v3.0 修复：削弱的是【被砍的亡灵】，不是持有者。
-            // 旧代码传的是 attacker，导致玩家每砍一刀亡灵自己就弱 5%×等级、
-            // 累积到 -99% 后砍普通骷髅都要砍半天（详见类注释「v3.0 修复」小节）。
-            applyAttackPenalty(victim, level);
+                // ⭐ v3.0 修复：削弱的是【被砍的亡灵】，不是持有者。
+                // 旧代码传的是 attacker，导致玩家每砍一刀亡灵自己就弱 5%×等级、
+                // 累积到 -99% 后砍普通骷髅都要砍半天（详见类注释「v3.0 修复」小节）。
+                applyAttackPenalty(victim, level);
+            }
 
             // 神圣净化特效（定点，锁在命中坐标）。
             // 严格放在亡灵分支内——对非亡灵是 -80% 伤害的负收益，

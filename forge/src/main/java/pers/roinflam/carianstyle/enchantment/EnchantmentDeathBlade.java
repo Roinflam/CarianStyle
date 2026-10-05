@@ -25,9 +25,12 @@ import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
  * <p>
  * 性能优化 v3.0：使用 DamageOverTimeManager 替代 SynchronizationTask(1, 1)
  * </p>
+ * <p>
+ * v3.1：玩家必须满蓄力才有持续伤害和注定死亡；未满蓄力的一下只付「即时伤害折半」的代价、拿不到好处，怪物持有者不受影响
+ * </p>
  *
  * @author RoinFlam
- * @version 3.0
+ * @version 3.1
  */
 @AutoRegisterEnchantment(
         id = "death_blade",
@@ -109,6 +112,14 @@ public class EnchantmentDeathBlade extends EnchantmentBase {
         }
 
         if (ctx.getVictim() == null) {
+            return;
+        }
+
+        // v3.1：最大生命 -25% 与这一下打多少无关，连点能飞快给一群目标挂上，要求满蓄力。
+        // 未满蓄力的一下拿不到持续伤害和最大生命减益，但即时伤害折半这个代价照样付，
+        // 否则连点的即时伤害（×1.0）反而比满蓄力（×0.5 + 持续伤害）更高，收残血时更划算
+        if (!isFullyCharged(ctx.getHolder())) {
+            ctx.multiplyDamage((float) DIRECT_MULTIPLIER.get());
             return;
         }
 

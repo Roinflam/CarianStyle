@@ -24,7 +24,7 @@
   "enchantment.carianstyle.doomed_death": "Destined Death",
   "enchantment.carianstyle.doomed_death.desc": "Attacks burn the target for 50% of the original damage plus 10% of its current HP over 5s, and reduce its max HP by 25% for 10s.",
   "enchantment.carianstyle.warrior": "Warrior",
-  "enchantment.carianstyle.warrior.desc": "Damage dealt +30%. On killing a creature, restore 50% of lost HP. Half of the damage you take is converted into a slow drain over 3s.",
+  "enchantment.carianstyle.warrior.desc": "Damage dealt +25%. On killing a creature, restore 25% of lost HP. Half of the damage you take is converted into a slow drain over 3s.",
   "enchantment.carianstyle.golden_law": "Golden Order",
   "enchantment.carianstyle.golden_law.desc": "Damage dealt +15%, scaling with lost HP up to +60%. Gain 15% damage negation. Immune to any single hit dealing 15% or less of your max HP, at most once every 5s.",
   "enchantment.carianstyle.offer_sword": "Offering Blade",

@@ -34,9 +34,10 @@ import java.util.UUID;
  * <p>v2.2：击杀计数器（killer视角）入口接入怪物附魔触发开关。
  * 死亡者计数衰减为清理逻辑，无需开关。
  * onDamageAsAttackerHighest 走中央分发器，已被 scanEntity 拦截。</p>
+ * <p>v2.3：增伤与回血要求玩家满蓄力；击杀计数不受影响。</p>
  *
  * @author RoinFlam
- * @version 2.2
+ * @version 2.3
  */
 @AutoRegisterEnchantment(
         id = "corpse_piler",
@@ -106,6 +107,12 @@ public class EnchantmentCorpsePiler extends EnchantmentBase {
     @Override
     protected void onDamageAsAttackerHighest(@NotNull EnchantmentContext ctx, int level) {
         LivingEntity attacker = ctx.getHolder();
+
+        // ⭐ v2.3：回血按最大生命算、与这一下打多少无关，连点每下都回，要求满蓄力（增伤一并跳过）
+        if (!isFullyCharged(attacker)) {
+            return;
+        }
+
         UUID uuid = attacker.getUUID();
 
         int killCount = EnchantmentDataManager.getCounter(KILL_COUNT_KEY, uuid);

@@ -67,7 +67,7 @@ public class EnchantmentAeonia extends EnchantmentBase {
         LivingEntity attacker = ctx.getHolder();
         LivingEntity victim = ctx.getVictim();
         if (victim == null || victim.getEffect(CarianStylePotion.SCARLET_ROT.get()) == null) return;
-        if (ctx.isHolderPlayer() && ctx.getHolderAsPlayer().getAttackStrengthScale(0.5F) < 0.9F) return;
+        if (!isFullyCharged(ctx.getHolder())) return;
         attacker.heal(attacker.getMaxHealth() * (float) HEAL_RATIO.get());
     }
 

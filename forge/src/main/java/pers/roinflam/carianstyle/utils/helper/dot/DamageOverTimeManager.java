@@ -3,9 +3,12 @@ package pers.roinflam.carianstyle.utils.helper.dot;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
@@ -60,8 +63,56 @@ import java.util.function.BiFunction;
  * 六个尚未打标签的附魔一行都不用改，只是查不到而已。
  * </p>
  *
+ * <h3>v1.2：自损类持续伤害的致死一击改走原版伤害管线</h3>
+ * <p>
+ * <b>问题：</b>致死分支一律调用 {@link EntityLivingUtil#kill}——先把血量直接扣到 0，再直接调用
+ * {@code die()}，完全不经过 {@code LivingEntity.hurt()}。对照原版伤害致死，第三方模组能看到的差别是：
+ * </p>
+ * <ul>
+ *     <li>收不到这一击的 {@code LivingAttackEvent} / {@code LivingHurtEvent} / {@code LivingDamageEvent}，
+ *         死亡凭空出现（{@code LivingDeathEvent} 与 {@code LivingDropsEvent} 本身照常触发，掉落列表也一致）；</li>
+ *     <li>战斗记录（{@code CombatTracker}）里没有这一击，死亡消息退化成「xx 死了」；
+ *         死前不久挨过别人一下的话，还会被记成「被那个人杀死」；</li>
+ *     <li>死后 {@code getLastDamageSource()} 仍是之前那一下（或 null），受伤统计、受伤类进度触发器都没有。</li>
+ * </ul>
+ * <p>
+ * 只看 {@code LivingDeathEvent} / {@code LivingDropsEvent} 的坟墓模组在两条路径下表现相同；
+ * 读死亡消息、死因、受伤阶段状态的模组，以及混合端（Mohist 等）上依赖 {@code EntityDamageEvent}
+ * （同样在伤害管线里触发，{@code getLastDamageCause()} 由它填写）的插件，看到的直接处决是一次来路不明的死亡。
+ * </p>
+ * <p>
+ * <b>为什么只改自损：</b>夏玻利利的嘶吼、癫火、空癫火给攻击者自己挂的反噬 DoT，伤害源不带任何实体，
+ * 致命一击进 {@code hurt()} 不会让任何人的攻击类附魔（吸血、叠层、再挂 DoT……）对它起反应。
+ * 对敌 DoT（注定死亡、死亡之刃、黑焰刃、战士）用的是命中时的原始伤害源，攻击者就是出手的人，
+ * 致命一击一旦进伤害管线，攻击者当前武器上的攻击类附魔会按「10 倍最大生命」的伤害量再结算一遍，
+ * 所以它们仍保持直接处决；癫火 / 空癫火挂给目标的那一份同样不动。
+ * </p>
+ * <p>
+ * <b>怎么保证「谁会死」不变：</b>
+ * </p>
+ * <ul>
+ *     <li>致命一击用原伤害源的副本，额外挂上 {@code BYPASSES_INVULNERABILITY / COOLDOWN / ARMOR / EFFECTS / SHIELD}，
+ *         和原版 {@code /kill} 一个思路：不死图腾、创造模式、出生保护、抗性、护甲、保护附魔、盾牌都拦不住；
+ *         本模组里遵守「无视无敌就不介入」约定的免死 / 免伤附魔（无敌、发狂扩散等）也不会出手，
+ *         结果与原来的直接处决一致——不挂这些标签的话，穿无敌的玩家濒死时有很大概率免疫这一击
+ *         （概率随缺失生命升高），穿发狂扩散的不在冷却时会被它救下，等于凭空多出一条命；</li>
+ *     <li>伤害量取最大生命的 10 倍，与出血 / 切腹的致死路径相同，不用 {@code Float.MAX_VALUE}，避免后续乘算溢出；</li>
+ *     <li>这一击如果压根没走到死亡判定（被某个监听取消、被减到不致命、实体本身不吃这类伤害），
+ *         退回原来的 {@link EntityLivingUtil#kill}，结果与改动前完全相同；</li>
+ *     <li>走到了死亡判定、但 {@code LivingDeathEvent} 被取消（满月、死诞者、普拉顿桑克斯的回溯这类复活）时不补刀，
+ *         与原来直接处决时这些复活照样生效一致；</li>
+ *     <li>受击侧附魔把这一击转成的持续伤害（战士）在这一击结算完就丢掉，见 {@link #discardEntriesFrom}；
+ *         死亡事件里同样能看到「无视无敌」，入口检查它的死亡触发附魔（洛尼亚）要另用
+ *         {@link #isSelfLethalBlow} 认出这一击，照旧触发。</li>
+ * </ul>
+ * <p>
+ * <b>行为影响：</b>自损致死时第三方能看到完整的 攻击 → 受伤 → 伤害 → 死亡 → 掉落 事件链，
+ * 死亡消息变成该伤害类型自己的（如「心中的癫火发作后死亡了」），{@code getLastDamageSource()} 正确；
+ * 死者的受伤统计会多记一笔 10 倍最大生命的伤害。逐 tick 的持续扣血仍然直扣血量，不变。
+ * </p>
+ *
  * @author RoinFlam
- * @version 1.1
+ * @version 1.2
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class DamageOverTimeManager {
@@ -89,6 +140,32 @@ public class DamageOverTimeManager {
      * 是否正在遍历中
      */
     private static boolean iterating = false;
+
+    /**
+     * 自损致死一击的伤害倍率（× 最大生命，v1.2）
+     * <p>与出血 / 切腹的致死路径取同一个值：足以压过吸收与各类百分比减伤，
+     * 又不会像 {@code Float.MAX_VALUE} 那样在后续乘算里变成无穷大。</p>
+     */
+    private static final float SELF_LETHAL_DAMAGE_MULTIPLIER = 10.0f;
+
+    /**
+     * 正在挨致命一击的实体（v1.2）
+     * <p>只在 {@link #killThroughDamagePipeline} 调用 {@code hurt()} 期间非 null，
+     * 供 {@link #onLivingDeath} 判断这一击有没有走到死亡判定。</p>
+     */
+    @Nullable
+    private static LivingEntity lethalTarget = null;
+
+    /**
+     * {@link #lethalTarget} 在这一击里是否触发过 {@code LivingDeathEvent}（被取消也算）
+     */
+    private static boolean lethalDeathPosted = false;
+
+    /**
+     * 正在结算的致命一击所用的伤害源副本，与 {@link #lethalTarget} 同时设置、同时清空
+     */
+    @Nullable
+    private static DamageSource lethalSource = null;
 
     // ==================== 公开API ====================
 
@@ -128,7 +205,32 @@ public class DamageOverTimeManager {
                                    int durationTicks, int initialDelay,
                                    @Nonnull DamageSource source, boolean canKill,
                                    @Nullable String tag) {
-        DoTEntry entry = new DoTEntry(target, damagePerTick, durationTicks, initialDelay, source, canKill, null, tag);
+        DoTEntry entry = new DoTEntry(target, damagePerTick, durationTicks, initialDelay, source, canKill, null, tag, false);
+        addEntry(entry);
+    }
+
+    /**
+     * 注册一个「自损」的固定伤害持续效果（v1.2 新增）
+     * <p>
+     * 用于攻击者给自己挂的反噬伤害（夏玻利利的嘶吼、癫火、空癫火）。可以致死；
+     * 逐 tick 扣血与 {@link #applyLinear} 相同，区别只在致死那一击走原版伤害管线，
+     * 让第三方看到的死亡与原版无异，详见类注释 v1.2。
+     * </p>
+     * <p>
+     * 伤害源请传不带实体的那种（如 {@code NewDamageSource.epilepsyFire(level)}）。
+     * 带攻击者的伤害源进伤害管线会触发攻击者的攻击类附魔，不适合走这里。
+     * </p>
+     *
+     * @param holder        承受反噬的实体（通常就是攻击者自己）
+     * @param damagePerTick 每tick伤害值
+     * @param durationTicks 持续时间（tick）
+     * @param initialDelay  初始延迟（tick）
+     * @param source        伤害来源（决定死亡消息）
+     */
+    public static void applySelfLinear(@Nonnull LivingEntity holder, float damagePerTick,
+                                       int durationTicks, int initialDelay,
+                                       @Nonnull DamageSource source) {
+        DoTEntry entry = new DoTEntry(holder, damagePerTick, durationTicks, initialDelay, source, true, null, null, true);
         addEntry(entry);
     }
 
@@ -175,7 +277,7 @@ public class DamageOverTimeManager {
                                     @Nonnull DamageSource source, boolean canKill,
                                     @Nonnull BiFunction<Float, Integer, Float> scalingFunction,
                                     @Nullable String tag) {
-        DoTEntry entry = new DoTEntry(target, baseDamagePerTick, durationTicks, initialDelay, source, canKill, scalingFunction, tag);
+        DoTEntry entry = new DoTEntry(target, baseDamagePerTick, durationTicks, initialDelay, source, canKill, scalingFunction, tag, false);
         addEntry(entry);
     }
 
@@ -315,6 +417,92 @@ public class DamageOverTimeManager {
         }
     }
 
+    // ==================== 自损致死（v1.2） ====================
+
+    /**
+     * 记录致命一击有没有走到死亡判定
+     * <p>
+     * 最低优先级 + 接收已取消事件：前面的复活类监听取消了死亡也照样记上，
+     * 这样被复活的实体不会再被补刀。
+     * </p>
+     *
+     * @param event 死亡事件
+     */
+    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
+    public static void onLivingDeath(@Nonnull LivingDeathEvent event) {
+        if (lethalTarget != null && event.getEntity() == lethalTarget) {
+            lethalDeathPosted = true;
+        }
+    }
+
+    /**
+     * 自损 DoT 的致死一击：走原版 {@code hurt()}，拦不住时退回直接处决
+     * <p>
+     * 用伤害源副本而不是原对象挂临时标签，退回 {@link EntityLivingUtil#kill} 时
+     * 死亡事件里的伤害源与改动前完全一样。做法与边界情况见类注释 v1.2。
+     * </p>
+     *
+     * @param target 目标
+     * @param source 条目登记时的伤害源
+     */
+    private static void killThroughDamagePipeline(@Nonnull LivingEntity target, @Nonnull DamageSource source) {
+        DamageSource lethal = new DamageSource(source.typeHolder(), source.getDirectEntity(),
+                source.getEntity(), source.sourcePositionRaw());
+        DamageSourceUtil.setBypassesInvulnerability(lethal);
+        DamageSourceUtil.setBypassesCooldown(lethal);
+        DamageSourceUtil.setBypassesArmor(lethal);
+        DamageSourceUtil.setBypassesEffects(lethal);
+        DamageSourceUtil.setBypassesShield(lethal);
+
+        lethalTarget = target;
+        lethalSource = lethal;
+        lethalDeathPosted = false;
+        try {
+            target.hurt(lethal, target.getMaxHealth() * SELF_LETHAL_DAMAGE_MULTIPLIER);
+        } finally {
+            lethalTarget = null;
+            lethalSource = null;
+            discardEntriesFrom(lethal);
+        }
+
+        // 没走到死亡判定（被取消 / 被减到不致命 / 免疫这类伤害）：按原来的方式处决，结果不变
+        if (!lethalDeathPosted && target.isAlive()) {
+            EntityLivingUtil.kill(target, source);
+        }
+    }
+
+    /**
+     * 当前是不是自损 DoT 的致命一击（v1.2）
+     * <p>
+     * 这一击的伤害源挂着「无视无敌」，好让免伤附魔不介入；但死亡触发类附魔（猩红腐败的洛尼亚）
+     * 在直接处决时一直是会触发的，要用这个方法把这一击认出来，别把它当成 /kill 跳过。
+     * </p>
+     *
+     * @param source 死亡事件里的伤害源
+     * @return 是这一击的伤害源副本时为 true
+     */
+    public static boolean isSelfLethalBlow(@Nullable DamageSource source) {
+        return source != null && source == lethalSource;
+    }
+
+    /**
+     * 丢掉以致命一击的伤害源副本登记的持续伤害
+     * <p>
+     * 受击侧附魔会把这一击转成持续伤害（战士：一半伤害 60 tick 内扣完），伤害源就是这个副本。
+     * 直接处决时根本不会有这些条目；留着的话，被满月、死诞者、时间逆转复活的持有者，
+     * 会在接下来几 tick 里被按「10 倍最大生命」折算出来的残留伤害再杀一次。
+     * 这一击发生在 {@link #onServerTick} 遍历期间，新条目都还在 {@link #PENDING} 里。
+     * </p>
+     *
+     * @param lethal 致命一击的伤害源副本
+     */
+    private static void discardEntriesFrom(@Nonnull DamageSource lethal) {
+        PENDING.removeIf(dot -> dot.source == lethal);
+        if (!iterating) {
+            ACTIVE_DOTS.removeIf(dot -> dot.source == lethal);
+        }
+    }
+
     // ==================== DoT 效果条目 ====================
 
     /**
@@ -339,6 +527,11 @@ public class DamageOverTimeManager {
          */
         @Nullable
         final String tag;
+        /**
+         * 是否为自损（v1.2 新增）
+         * <p>true 时致死一击走 {@link #killThroughDamagePipeline}，否则仍直接处决。</p>
+         */
+        final boolean selfInflicted;
 
         int remainingDelay;
         int remainingTicks;
@@ -347,7 +540,7 @@ public class DamageOverTimeManager {
         DoTEntry(@Nonnull LivingEntity target, float baseDamagePerTick, int durationTicks,
                  int initialDelay, @Nonnull DamageSource source, boolean canKill,
                  @Nullable BiFunction<Float, Integer, Float> scalingFunction,
-                 @Nullable String tag) {
+                 @Nullable String tag, boolean selfInflicted) {
             this.targetId = target.getId();
             this.target = target;
             this.baseDamagePerTick = baseDamagePerTick;
@@ -357,6 +550,7 @@ public class DamageOverTimeManager {
             this.canKill = canKill;
             this.scalingFunction = scalingFunction;
             this.tag = tag;
+            this.selfInflicted = selfInflicted;
             this.elapsedDamageTicks = 0;
         }
 
@@ -412,7 +606,11 @@ public class DamageOverTimeManager {
 
             // 应用伤害
             if (canKill && target.getHealth() - damage * 2 <= 0) {
-                EntityLivingUtil.kill(target, source);
+                if (selfInflicted) {
+                    killThroughDamagePipeline(target, source);
+                } else {
+                    EntityLivingUtil.kill(target, source);
+                }
                 return true;
             } else {
                 EntityLivingUtil.damageHealthDirectly(target, damage);

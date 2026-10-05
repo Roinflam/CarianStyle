@@ -38,9 +38,10 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
  * 顺带：放在触发处而不是延迟任务里，也就不必操心「延迟期间目标死了 / 世界卸载了」
  * 这类边界——那正是 v2.1 修复过的坑。
  * </p>
+ * <p>v2.3：玩家必须满蓄力疾跑攻击才触发（急停、缓慢、挑飞、增伤整段跳过），怪物持有者不受影响</p>
  *
  * @author RoinFlam
- * @version 2.2
+ * @version 2.3
  */
 @AutoRegisterEnchantment(
         id = "lunge_up",
@@ -90,6 +91,11 @@ public class EnchantmentLungeUp extends EnchantmentBase {
 
         // 必须疾跑中
         if (!attacker.isSprinting()) {
+            return;
+        }
+
+        // ⭐ v2.3：武器不带击退附魔时，原版低蓄力命中不会打断疾跑，疾跑中连点能把一群怪挨个挑飞，要求满蓄力
+        if (!isFullyCharged(attacker)) {
             return;
         }
 

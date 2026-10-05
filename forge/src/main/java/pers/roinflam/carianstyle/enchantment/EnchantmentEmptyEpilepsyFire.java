@@ -161,10 +161,11 @@ public class EnchantmentEmptyEpilepsyFire extends EnchantmentBase {
                 DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(BURN_VISUAL_DURATION.getInt(), 0));
         ClientSyncEffectHelper.onAttributeApplied(attacker, DynamicAttributes.EPILEPSY_FIRE_BURNING);
 
+        // 自损：被反噬耗死时致死一击走原版伤害管线（见 DamageOverTimeManager v1.2）
         float attackerDmgPerTick = attacker.getMaxHealth() * (float) SELF_DAMAGE_RATIO.get() / DAMAGE_TICKS.getInt();
-        DamageOverTimeManager.applyLinear(
+        DamageOverTimeManager.applySelfLinear(
                 attacker, attackerDmgPerTick, DAMAGE_TICKS.getInt(), DOT_DELAY.getInt(),
-                NewDamageSource.epilepsyFire(attacker.level()), true
+                NewDamageSource.epilepsyFire(attacker.level())
         );
 
         DynamicAttributeManager.apply(victim,

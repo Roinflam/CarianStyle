@@ -84,7 +84,7 @@ public class EnchantmentBloodSlash extends EnchantmentBase {
         if (victim == null) return;
         int effectiveLevel = level;
         if (ConfigLoader.levelLimit) effectiveLevel = Math.min(effectiveLevel, 10);
-        if (ctx.isHolderPlayer() && ctx.getHolderAsPlayer().getAttackStrengthScale(0.5F) < 0.9F) return;
+        if (!isFullyCharged(ctx.getHolder())) return;
         float bonusDamage = Math.min(
                 victim.getHealth() * effectiveLevel * (float) BONUS_DAMAGE_PER_LEVEL.get(),
                 victim.getMaxHealth());

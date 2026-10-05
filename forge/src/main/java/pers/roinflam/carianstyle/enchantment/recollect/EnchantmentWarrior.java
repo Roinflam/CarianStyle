@@ -54,6 +54,25 @@ import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
  * 从七个附魔共用的 DoT 池子里挑出来。<b>行为完全不变。</b>
  * </p>
  *
+ * <h3>结算时机：哪些读数里看不到加成</h3>
+ * <p>
+ * 攻击者视角的倍率挂在 {@link LivingDamageEvent} 的 LOW 优先级，这时护甲、保护附魔、抗性
+ * 和伤害吸收（黄心）都已经结算完。下面几种现象都是这个时机带来的现有行为，不是没生效：
+ * </p>
+ * <ul>
+ *     <li>{@code LivingHurtEvent} 的所有优先级、{@code LivingDamageEvent} 的 HIGHEST ~ NORMAL
+ *     读到的都是乘倍率之前的数值，只在这些阶段取伤害的显示或统计看不到加成，要以目标实际掉的血为准。
+ *     钻石剑满蓄力打无甲僵尸 6.888 → 8.61，打全套钻石甲僵尸 1.4 → 1.75，都正好 ×1.25。</li>
+ *     <li>倍率只乘在穿过吸收值之后的那部分上：吸收值吃得下整次伤害时这一下没有加成，
+ *     吃不下时只有溢出到生命值的部分 ×1.25（目标有 4 点吸收时 6.888 → 7.61，不是 8.61）。</li>
+ *     <li>只认直接实体是生物、附魔在它主手上的伤害：箭矢、投掷物，以及以召唤物 / 斩击实体为直接实体的伤害
+ *     （拔刀剑的幻影剑之类）不吃加成，副手拿战士剑也不生效。</li>
+ *     <li>数值与等级无关（最高 1 级），2、3 级和 1 级完全一样。</li>
+ *     <li>双方都持有战士时，攻击者 ×1.25 先算、受击者 ×0.5 后算：即时掉血只有普通一击的 0.625 倍，
+ *     另一半在 3 秒内流失完，合计仍是 ×1.25。</li>
+ *     <li>×1.25 不一定跨过「几刀砍死」的断点：下界合金剑打 20 血僵尸，两刀后还剩 0.32 血，照样要三刀。</li>
+ * </ul>
+ *
  * @author RoinFlam
  * @version 3.2
  */
@@ -140,6 +159,7 @@ public class EnchantmentWarrior extends EnchantmentBase {
     /**
      * 攻击者视角：伤害×1.25
      * <p>v3.1：怪物作为攻击者时，由通用开关 allowMobTriggerEnchantments 控制</p>
+     * <p>乘在护甲、抗性、吸收都算完之后的数值上，详见类注释「结算时机」。</p>
      */
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onLivingDamage_attack(@NotNull LivingDamageEvent evt) {

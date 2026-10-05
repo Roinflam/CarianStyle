@@ -59,8 +59,21 @@ import java.util.List;
  * 特效为纯服务端广播，不生成实体、不触发任何事件。触发条件是「冲刺攻击」，
  * 频率天然受控，不会刷屏。</p>
  *
+ * <h3>v2.4：AOE 重入连锁 + 满蓄力门槛</h3>
+ * <p><b>问题一：AOE 会把自己再触发一遍。</b>周围目标挨的是 {@code mobAttack(attacker)}，
+ * 直接实体就是攻击者本人，于是每个 AOE 目标的 LivingDamageEvent 都会重新分发到本附魔；
+ * 而原版要等 {@code hurt} 返回之后才取消疾跑，嵌套那一层里攻击者仍在疾跑，条件全部满足。
+ * 结果是沿着怪群深度优先地一层套一层：每层再对周围最多 {@link #MAX_TARGETS} 个目标各 hurt 一次，
+ * 伤害每层再乘 {@code 1 + 10% × 等级}，旋转任务和刀光也每层各放一次，
+ * 身边挤着 12 只僵尸时，一下冲刺斩实测打出 1600 多次 LivingAttackEvent（命中数量上限只管一层，管不住层数）。</p>
+ * <p><b>修复：</b>AOE 循环前后置位 / 清除 {@link #IN_SWEEP}（try/finally，异常也会清掉），
+ * 进入本方法时已置位就直接返回。AOE 目标照常挨这一下，只是不再从它身上再放一圈。</p>
+ * <p><b>问题二：连点刷 AOE。</b>武器不带击退附魔时，原版低蓄力命中不会打断疾跑，疾跑中连点每一下都放一圈 AOE、
+ * 再拉一次旋转。现在玩家必须满蓄力（{@link EnchantmentBase#isFullyCharged}）才触发，
+ * 未满蓄力就当没有这个附魔；怪物持有者不受影响。</p>
+ *
  * @author RoinFlam
- * @version 2.3
+ * @version 2.4
  */
 @AutoRegisterEnchantment(
         id = "stamp_sweep",
@@ -118,6 +131,13 @@ public class EnchantmentStampSweep extends EnchantmentBase {
      * （视觉与判定不一致会让玩家误判走位）。</p>
      */
 
+    /**
+     * 正在结算 AOE 时置位（v2.4）。
+     * <p>AOE 循环里的 {@code target.hurt} 会同步触发新的 LivingDamageEvent 并回到本附魔，
+     * 置位期间直接放行，保证一次冲刺斩只放一圈。只在服务端线程读写，用 ThreadLocal 是为了不和别的线程互相干扰。</p>
+     */
+    private static final ThreadLocal<Boolean> IN_SWEEP = ThreadLocal.withInitial(() -> Boolean.FALSE);
+
     public EnchantmentStampSweep() {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
@@ -127,6 +147,11 @@ public class EnchantmentStampSweep extends EnchantmentBase {
      */
     @Override
     protected void onDamageAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
+        // ⭐ v2.4：AOE 自己打出的伤害会再次进入这里，正在结算 AOE 时直接放行（详见类注释）
+        if (IN_SWEEP.get()) {
+            return;
+        }
+
         LivingEntity attacker = ctx.getHolder();
         LivingEntity directTarget = ctx.getVictim();
 
@@ -136,6 +161,11 @@ public class EnchantmentStampSweep extends EnchantmentBase {
 
         // 必须在冲刺状态
         if (!attacker.isSprinting()) {
+            return;
+        }
+
+        // ⭐ v2.4：武器不带击退附魔时，原版低蓄力命中不会打断疾跑，疾跑中连点每下都放一圈 AOE，要求满蓄力
+        if (!isFullyCharged(attacker)) {
             return;
         }
 
@@ -192,13 +222,18 @@ public class EnchantmentStampSweep extends EnchantmentBase {
         // 对周围其他敌人造成伤害
         // ⭐ v2.2：命中数量硬上限，防止密集怪物场景下无上限 hurt 触发事件链风暴
         int hitCount = 0;
-        for (LivingEntity target : nearbyEntities) {
-            if (hitCount >= MAX_TARGETS.getInt()) {
-                break;
+        IN_SWEEP.set(Boolean.TRUE);
+        try {
+            for (LivingEntity target : nearbyEntities) {
+                if (hitCount >= MAX_TARGETS.getInt()) {
+                    break;
+                }
+                DamageSource damageSource = attacker.damageSources().mobAttack(attacker);
+                target.hurt(damageSource, baseDamage + bonusDamage);
+                hitCount++;
             }
-            DamageSource damageSource = attacker.damageSources().mobAttack(attacker);
-            target.hurt(damageSource, baseDamage + bonusDamage);
-            hitCount++;
+        } finally {
+            IN_SWEEP.set(Boolean.FALSE);
         }
     }
 

@@ -11,6 +11,8 @@ import pers.roinflam.carianstyle.utils.Reference;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 卡利亚风格模组配置类
@@ -367,6 +369,12 @@ public final class ConfigLoader {
     /** 禁用的附魔ID列表 */
     public static String[] uninstallEnchantment = new String[0];
 
+    /**
+     * 配置版本号：每次 {@link #bake()} 同步完静态字段后加一，0 表示配置还没加载过。
+     * {@code EnchantmentBase#isDisabled()} 用它判断自己缓存的禁用状态是不是过期了。
+     */
+    private static final AtomicInteger BAKE_GENERATION = new AtomicInteger();
+
     /** 碎岩者最大范围 */
     public static int rockBlasterMaxRange = 10;
 
@@ -504,9 +512,94 @@ public final class ConfigLoader {
         // v2.5新增：同步隐身碰撞箱屏蔽开关
         hideStealthHitbox = COMMON.hideStealthHitbox.get();
 
+        // 静态字段全部换完再递增版本号：isDisabled() 读到新版本号时一定能看到新的 uninstallEnchantment
+        BAKE_GENERATION.incrementAndGet();
+
         // v2.2修复：清除所有附魔的禁用状态缓存
         // 确保 uninstallEnchantment 配置变更后，isDisabled() 会重新计算
         EnchantmentBase.invalidateAllDisabledCaches();
+    }
+
+    /**
+     * 配置版本号，0 表示配置还没加载过（详见 {@link #BAKE_GENERATION}）。
+     */
+    public static int bakeGeneration() {
+        return BAKE_GENERATION.get();
+    }
+
+    /**
+     * uninstallEnchantment 里有没有写到这个附魔。
+     * <p>
+     * <b>问题：</b>以前是拿注解 id 和配置项做 {@code equals}，只认一模一样的 {@code prayerful_strike}。
+     * 下面这些写法都会悄无声息地不生效，「禁用」的附魔照样能从战利品、附魔台里出来，日志里也没有任何提示：
+     * <ul>
+     *   <li>带命名空间：{@code carianstyle:prayerful_strike}（/enchant、/give 指令里写的，物品 NBT 里存的，都是这种）</li>
+     *   <li>大小写不同、首尾多了空格</li>
+     *   <li>照着示例 {@code ["scarlet_rot", "doomed_death"]}，把引号、方括号一起填进了配置界面的一格，
+     *       或者在一格里用逗号写了好几个</li>
+     *   <li>照着注释去 en_us.json 里找，抄成了键名 {@code enchantment.carianstyle.prayerful_strike}</li>
+     * </ul>
+     * </p>
+     * <p>
+     * <b>现在：</b>每一项按逗号拆开，去掉首尾的空白、引号、方括号，转小写，
+     * 再去掉 {@code carianstyle:} 或 {@code enchantment.carianstyle.} 前缀后比较。
+     * 附魔 id 只由小写字母、数字和下划线组成，不会含这些字符，所以放宽之后不会误伤别的附魔；
+     * 别的命名空间（如 {@code minecraft:xxx}）仍然对不上。
+     * </p>
+     *
+     * @param id 附魔注解里的 id（即注册名的路径部分），如 {@code prayerful_strike}
+     */
+    public static boolean isEnchantmentUninstalled(String id) {
+        String[] list = uninstallEnchantment;
+        if (list == null || list.length == 0 || id == null) {
+            return false;
+        }
+        for (String entry : list) {
+            if (entryNamesEnchantment(entry, id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * uninstallEnchantment 的某一项是否写到了这个附魔，规则同 {@link #isEnchantmentUninstalled(String)}。
+     */
+    public static boolean entryNamesEnchantment(String entry, String id) {
+        if (entry == null || id == null) {
+            return false;
+        }
+        for (String part : entry.split("[,，]")) {
+            if (id.equals(normalizeEnchantmentId(part))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String normalizeEnchantmentId(String raw) {
+        int begin = 0;
+        int end = raw.length();
+        while (begin < end && isIdWrapper(raw.charAt(begin))) {
+            begin++;
+        }
+        while (end > begin && isIdWrapper(raw.charAt(end - 1))) {
+            end--;
+        }
+        String id = raw.substring(begin, end).toLowerCase(Locale.ROOT);
+        String namespace = Reference.MOD_ID + ":";
+        String langKey = "enchantment." + Reference.MOD_ID + ".";
+        if (id.startsWith(namespace)) {
+            return id.substring(namespace.length());
+        }
+        if (id.startsWith(langKey)) {
+            return id.substring(langKey.length());
+        }
+        return id;
+    }
+
+    private static boolean isIdWrapper(char c) {
+        return Character.isWhitespace(c) || c == '"' || c == '\'' || c == '[' || c == ']' || c == '“' || c == '”';
     }
 
     /**

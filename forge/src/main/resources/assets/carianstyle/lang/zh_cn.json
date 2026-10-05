@@ -24,7 +24,7 @@
   "enchantment.carianstyle.doomed_death": "命定之死",
   "enchantment.carianstyle.doomed_death.desc": "攻击目标后：5秒内燃烧50%原伤害+10%当前生命值；10秒内最大生命值-25%",
   "enchantment.carianstyle.warrior": "战士",
-  "enchantment.carianstyle.warrior.desc": "造成伤害+30%；击杀生物后回复50%已损失生命值；受到的50%伤害转为3秒内缓慢流失",
+  "enchantment.carianstyle.warrior.desc": "造成伤害+25%；击杀生物后回复25%已损失生命值；受到的50%伤害转为3秒内缓慢流失",
   "enchantment.carianstyle.golden_law": "黄金律法",
   "enchantment.carianstyle.golden_law.desc": "造成伤害+15%，基于已损失生命值至多+60%；获得15%伤害减免；免疫不超过15%最大生命值的伤害；每5秒免疫一次伤害",
   "enchantment.carianstyle.offer_sword": "献斗剑",

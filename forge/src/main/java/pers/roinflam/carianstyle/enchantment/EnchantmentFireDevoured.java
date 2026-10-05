@@ -34,8 +34,15 @@ import java.util.List;
  * 每次 hurt 再走一整条 LivingHurtEvent → l2library → l2damagetracker → l2hostility 事件链，
  * 单个 tick 耗时轻松突破 60 秒，触发 Spigot Watchdog 崩服。</p>
  *
+ * <h3>v2.2：要求满蓄力</h3>
+ * <p>玩家必须满蓄力挥击才触发火焰 AOE 与点燃；连点时整段跳过。怪物持有者不受影响。</p>
+ *
+ * <h3>v2.3：不烧同类</h3>
+ * <p>范围伤害只波及「别人」：持有者自己、同类（玩家不烧别的玩家，怪物不烧同种怪物）、队友和自己养的宠物都不烧。
+ * 原来的筛选条件 {@code !e.equals(victim) || e.equals(attacker)} 等于除被打的目标外全部，连持有者自己也会烧到。</p>
+ *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.3
  */
 @AutoRegisterEnchantment(
         id = "fire_devoured",
@@ -114,6 +121,11 @@ public class EnchantmentFireDevoured extends EnchantmentBase {
             return;
         }
 
+        // ⭐ v2.2：每次命中最多 16 次 hurt 加点燃，连点等于成倍放大事件风暴，要求满蓄力
+        if (!isFullyCharged(attacker)) {
+            return;
+        }
+
         int effectiveLevel = level;
         if (ConfigLoader.levelLimit) {
             effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
@@ -131,7 +143,9 @@ public class EnchantmentFireDevoured extends EnchantmentBase {
                 LivingEntity.class,
                 victim,
                 searchRadius,
-                entity -> !entity.equals(victim) || entity.equals(attacker)
+                // 除了被打的目标，只波及「别人」：持有者自己、同类、队友和自己养的宠物都不烧
+                // （原来的写法 !e.equals(victim) || e.equals(attacker) 等于除目标外全部，连持有者自己也会烧到）
+                entity -> !entity.equals(victim) && !isSameKindOrAlly(attacker, entity)
         );
 
         // 伤害倍率保留原有线性等级加成（游戏设计不变）

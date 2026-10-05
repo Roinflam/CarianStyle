@@ -1,6 +1,7 @@
 package pers.roinflam.carianstyle;
 
 import net.minecraft.client.renderer.entity.EntityRenderers;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.client.ConfigScreenHandler;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -9,6 +10,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.registries.ForgeRegistries;
 import pers.roinflam.carianstyle.config.ClothConfigScreen;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
@@ -177,6 +179,20 @@ public class CarianStyle {
         if (ConfigLoader.uninstallEnchantment != null && ConfigLoader.uninstallEnchantment.length > 0) {
             LogUtil.warn("卡利亚式附魔 - 检测到 %d 个被禁用的附魔", ConfigLoader.uninstallEnchantment.length);
             LogUtil.debug("卡利亚式附魔 - 禁用的附魔列表：%s", Arrays.toString(ConfigLoader.uninstallEnchantment));
+
+            // 对不上任何附魔的条目不会报错，只会悄悄不生效（例如填了显示名、拼错了 id），逐条点名
+            for (String entry : ConfigLoader.uninstallEnchantment) {
+                boolean known = false;
+                for (ResourceLocation key : ForgeRegistries.ENCHANTMENTS.getKeys()) {
+                    if (Reference.MOD_ID.equals(key.getNamespace()) && ConfigLoader.entryNamesEnchantment(entry, key.getPath())) {
+                        known = true;
+                        break;
+                    }
+                }
+                if (!known) {
+                    LogUtil.warn("卡利亚式附魔 - uninstallEnchantment 中的「%s」没有对应的附魔，这一项不会生效（应填附魔 id，例如 prayerful_strike）", entry);
+                }
+            }
         }
 
         // 检查碎岩者范围
