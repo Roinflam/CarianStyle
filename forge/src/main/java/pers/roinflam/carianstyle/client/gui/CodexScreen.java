@@ -5,6 +5,8 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.codex.CodexTheme;
@@ -15,6 +17,7 @@ import pers.roinflam.carianstyle.codex.EnchantmentMeta;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
 import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
+import org.lwjgl.glfw.GLFW;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -32,6 +35,14 @@ import java.util.List;
  *       冲突关系 / 数值）。冲突条目可点击跳转，带前进后退历史。</li>
  *   <li><b>特效开关</b>：按分组列出全部世界特效与 HUD，逐项开关，默认全开。</li>
  * </ul>
+ *
+ * <h3>放入物品</h3>
+ * <p>
+ * 搜索框右边的物品槽：点开弹出背包，挑一件放上去，两个百科页的列表就只剩与它有关的附魔，
+ * 按「可以附上 / 已经有了 / 被已有附魔挡住」分组，详情最上方给出结论。
+ * 玩家最常问的就是「我这把东西能附什么」，以前得把一百多个附魔的适用物品挨个对一遍。
+ * 判定逻辑见 {@link pers.roinflam.carianstyle.codex.ItemFit}，状态见 {@link ItemFilter}。
+ * </p>
  *
  * <h3>为什么不是暂停界面</h3>
  * <p>
@@ -202,6 +213,24 @@ public final class CodexScreen extends Screen {
     /** 「重载数值」按钮矩形 */
     private final int[] reloadRect = new int[4];
 
+    /** 「放入物品」槽的矩形 */
+    private final int[] filterRect = new int[4];
+
+    /** 「放入物品」槽右侧的清除按钮矩形；只在放了物品时出现 */
+    private final int[] filterClearRect = new int[4];
+
+    /** 窄窗口：物品槽挤进搜索框右端，旁边不写说明文字（改为悬停提示） */
+    private boolean filterCompact;
+
+    /** 本帧鼠标是否停在物品槽上（由 renderFilterSlot 写入，render 末尾据此画提示） */
+    private boolean filterHovered;
+
+    /** 放入物品筛选 */
+    private final ItemFilter filter = new ItemFilter();
+
+    /** 背包选择器 */
+    private final InventoryPicker picker = new InventoryPicker();
+
     /**
      * 搜索框的外框矩形。
      * <p>
@@ -236,9 +265,14 @@ public final class CodexScreen extends Screen {
     @Override
     protected void init() {
         VisualToggle.ensureLoaded();
-        if (openedAt == 0L) {
+        boolean firstInit = openedAt == 0L;
+        if (firstInit) {
             openedAt = System.currentTimeMillis();
         }
+        // 改窗口大小会重新 init，选择器的位置是按旧布局算的，直接收起
+        picker.close();
+        detail.setFilter(filter);
+        foreignDetail.setFilter(filter);
 
         int contentTop = MARGIN + HEADER_HEIGHT;
         int contentHeight = this.height - contentTop - MARGIN;
@@ -255,8 +289,20 @@ public final class CodexScreen extends Screen {
 
         // ==================== 顶栏控件 ====================
 
+        // 放入物品槽（20）+ 清除按钮（12）+ 间隙，共 34px。
+        // 窗口够宽时放在搜索框右边；缩放后宽度不到四百左右时，靠右对齐的「返回 / 重载数值」
+        // 会压到它们身上——被盖住的槽还会抢走按钮的点击。这时改从搜索框右端让出位置，
+        // 两组控件在任何宽度下都不重叠
+        int filterBlock = 20 + 2 + 12;
+        int buttonsLeft = this.width - MARGIN - 132;
+        filterCompact = buttonsLeft < contentLeft + LIST_WIDTH + 8 + filterBlock + 6;
+        // 紧凑时左侧控件（搜索框 + 物品槽）整体只用到按钮左边 6px 为止，搜索框吃剩下的宽度。
+        // 最窄的 320 宽下按钮从 172 开始，而左栏本来要到 206——只挪物品槽不缩搜索框的话还是会撞
+        int leftEnd = filterCompact ? Math.min(contentLeft + LIST_WIDTH, buttonsLeft - 6) : 0;
+
         // 外框 20px 高；字高 8px，所以文本 y 要落在 框顶 + 6 才是居中
-        setRect(searchRect, contentLeft + 1, MARGIN + 30, LIST_WIDTH - 2, 20);
+        setRect(searchRect, contentLeft + 1, MARGIN + 30,
+                filterCompact ? leftEnd - 1 - filterBlock - 4 - (contentLeft + 1) : LIST_WIDTH - 2, 20);
         searchBox = new EditBox(this.font,
                 searchRect[0] + 6, searchRect[1] + 6, searchRect[2] - 12, 8,
                 Component.translatable("carianstyle.codex.search"));
@@ -269,6 +315,12 @@ public final class CodexScreen extends Screen {
         setRect(backRect, this.width - MARGIN - 132, MARGIN + 31, 62, 18);
         setRect(reloadRect, this.width - MARGIN - 66, MARGIN + 31, 66, 18);
 
+        // 放入物品槽紧挨搜索框右边、与它同高：两者都是「缩小左栏范围」的手段，放在一起
+        setRect(filterRect, filterCompact
+                ? leftEnd - 1 - filterBlock
+                : contentLeft + LIST_WIDTH + 8, searchRect[1], 20, 20);
+        setRect(filterClearRect, filterRect[0] + filterRect[2] + 2, searchRect[1], 12, 20);
+
         // 标签页命中区域
         tabY = MARGIN + 4;
         int cursorX = contentLeft;
@@ -277,6 +329,10 @@ public final class CodexScreen extends Screen {
             tabX[value.ordinal()] = cursorX;
             tabWidth[value.ordinal()] = width;
             cursorX += width + 4;
+        }
+
+        if (firstInit && this.minecraft != null && this.minecraft.player != null) {
+            filter.restore(this.minecraft.player.getInventory());
         }
 
         refreshList();
@@ -324,12 +380,39 @@ public final class CodexScreen extends Screen {
      */
     private void refreshList() {
         String keyword = searchBox == null ? "" : searchBox.getValue();
-        list.setEntries(EnchantmentCodex.search(keyword, (CodexTheme) null));
+        // 放入物品筛选叠在搜索之上：先按关键字筛，再按物品筛并重新分组
+        List<EnchantmentMeta> ownHits = EnchantmentCodex.search(keyword, (CodexTheme) null);
+        list.setEntries(filter.apply(ownHits));
         list.select(list.getSelectedId());
+        list.setEmptyHint(emptyHint(keyword, ownHits.isEmpty()));
         // 两个标签页共用同一个搜索框：切过去时结果已经是筛好的，
         // 不必再输一遍关键字
-        foreignList.setEntries(ForeignCodex.search(keyword));
+        List<ForeignMeta> foreignHits = ForeignCodex.search(keyword);
+        foreignList.setEntries(filter.apply(foreignHits));
         foreignList.select(foreignList.getSelectedId());
+        foreignList.setEmptyHint(emptyHint(keyword, foreignHits.isEmpty()));
+    }
+
+    /**
+     * 列表为空时的提示，按「是搜不到，还是搜到了但放不上去」区分。
+     * <p>
+     * 两个列表各自判断：同一个关键字可能在一边搜到、另一边搜不到。
+     * 搜到了却被物品筛掉时若还说「没有匹配的附魔」，玩家会以为是关键字打错了，
+     * 而真正的答案——「这个附魔上不了这件东西」——正是这个功能要回答的问题。
+     * </p>
+     *
+     * @param keyword     搜索词
+     * @param searchEmpty 按关键字搜索的结果是否为空
+     * @return 提示
+     */
+    @Nonnull
+    private Component emptyHint(@Nonnull String keyword, boolean searchEmpty) {
+        if (searchEmpty || !filter.isActive()) {
+            return Component.translatable("carianstyle.codex.list.empty_search");
+        }
+        return Component.translatable(keyword.trim().isEmpty()
+                ? "carianstyle.codex.list.empty_fit"
+                : "carianstyle.codex.list.empty_search_fit");
     }
 
     /**
@@ -519,6 +602,7 @@ public final class CodexScreen extends Screen {
         if (tab != target) {
             tab = target;
             lastTab = target;
+            picker.close();
             // 切页时收起搜索框焦点：否则切到「特效开关」后输入框已经不画了，
             // 那个闪动的光标却还留在原处
             if (searchBox != null) {
@@ -552,6 +636,8 @@ public final class CodexScreen extends Screen {
         EnchantmentValues.reload();
         EnchantmentCodex.invalidate();
         ForeignCodex.invalidate();
+        // 数值表与配置变了，宝藏与否、禁用与否都可能跟着变，物品判定要重算
+        filter.reevaluate();
         history.clear();
         refreshList();
         String selected = list.getSelectedId();
@@ -668,19 +754,26 @@ public final class CodexScreen extends Screen {
         float slide = closingAt > 0L ? this.height * CLOSE_SLIDE_RATIO : OPEN_SLIDE;
         g.pose().translate(0f, (1f - p) * slide, 0f);
 
-        renderHeader(g, mouseX, mouseY, time);
+        // 选择器开着时它是模态的：底下的东西不响应悬停，免得鼠标移过选择器外的列表时
+        // 那边也亮起来，让人以为点下去会选中那一行（实际只会收起选择器）
+        boolean modal = picker.isOpen();
+        int underX = modal ? -1 : mouseX;
+        int underY = modal ? -1 : mouseY;
+
+        filterHovered = false;
+        renderHeader(g, underX, underY, time);
 
         if (tab == Tab.CODEX) {
-            list.render(g, this.font, mouseX, mouseY);
-            detail.render(g, this.font, mouseX, mouseY);
+            list.render(g, this.font, underX, underY);
+            detail.render(g, this.font, underX, underY);
         } else if (tab == Tab.OTHERS) {
-            foreignList.render(g, this.font, mouseX, mouseY);
-            foreignDetail.render(g, this.font, mouseX, mouseY);
+            foreignList.render(g, this.font, underX, underY);
+            foreignDetail.render(g, this.font, underX, underY);
         } else {
-            togglePanel.render(g, this.font, mouseX, mouseY);
+            togglePanel.render(g, this.font, underX, underY);
         }
 
-        super.render(g, mouseX, mouseY, partialTick);
+        super.render(g, underX, underY, partialTick);
 
         // 搜索框占位提示：自绘而不用 EditBox 自带的 hint，
         // 因为要画在 super.render 之后才不会被输入框自身的背景盖住
@@ -690,6 +783,14 @@ public final class CodexScreen extends Screen {
             // 差 2px 就会看出占位文字和真实输入不在一条线上
             g.drawString(this.font, Component.translatable("carianstyle.codex.search"),
                     searchBox.getX(), searchBox.getY(), UiTheme.OFF, false);
+        }
+
+        // 选择器最后画，压在一切之上
+        if (modal && this.minecraft != null && this.minecraft.player != null) {
+            picker.render(g, this.font, this.minecraft.player.getInventory(), mouseX, mouseY,
+                    filter.getSourceSlot());
+        } else if (filterHovered && closingAt == 0L) {
+            renderFilterTooltip(g, mouseX, mouseY);
         }
 
         g.pose().popPose();
@@ -744,6 +845,10 @@ public final class CodexScreen extends Screen {
                     searchBox.isFocused() ? UiTheme.ACCENT : UiTheme.BORDER);
         }
 
+        if (isCodexTab()) {
+            renderFilterSlot(g, mouseX, mouseY);
+        }
+
         // 返回：只在真的能返回时才画出来。
         //
         // 原来是常驻显示、无处可回时置灰。问题是绝大多数时候它就是灰的——
@@ -786,6 +891,183 @@ public final class CodexScreen extends Screen {
     }
 
     /**
+     * 绘制「放入物品」槽及其右侧的说明。
+     *
+     * <h3>说明文字为什么写两行</h3>
+     * <p>
+     * 空着的时候，一个空方框谁也看不懂是干嘛的——第二行直接写出用途「看它能附哪些附魔」。
+     * 放了物品之后第一行是物品名，第二行换成两份百科合计的结果，
+     * 不用切标签页就知道原版那边还有几个能附。
+     * </p>
+     *
+     * @param g      绘制上下文
+     * @param mouseX 鼠标 X
+     * @param mouseY 鼠标 Y
+     */
+    private void renderFilterSlot(@Nonnull GuiGraphics g, int mouseX, int mouseY) {
+        int fx = filterRect[0];
+        int fy = filterRect[1];
+        int fw = filterRect[2];
+        int fh = filterRect[3];
+        boolean hovered = UiTheme.hit(mouseX, mouseY, fx, fy, fw, fh);
+        ItemStack stack = filter.getStack();
+
+        g.fill(fx, fy, fx + fw, fy + fh, hovered ? UiTheme.PANEL_HOVER : UiTheme.PANEL);
+        UiTheme.border(g, fx, fy, fw, fh,
+                picker.isOpen() || hovered ? UiTheme.ACCENT : (stack != null ? UiTheme.TEXT_DIM : UiTheme.BORDER));
+
+        int textX = fx + fw + 6;
+        if (stack != null) {
+            g.renderItem(stack, fx + 2, fy + 2);
+            g.renderItemDecorations(this.font, stack, fx + 2, fy + 2);
+
+            // 清除按钮：一个小「×」，只在放了东西时出现
+            int[] c = filterClearRect;
+            boolean clearHovered = UiTheme.hit(mouseX, mouseY, c[0], c[1], c[2], c[3]);
+            g.fill(c[0], c[1], c[0] + c[2], c[1] + c[3], clearHovered ? UiTheme.PANEL_HOVER : UiTheme.PANEL);
+            UiTheme.border(g, c[0], c[1], c[2], c[3], clearHovered ? UiTheme.DANGER : UiTheme.BORDER);
+            g.drawString(this.font, "×", c[0] + (c[2] - this.font.width("×")) / 2 + 1, c[1] + 6,
+                    clearHovered ? UiTheme.DANGER : UiTheme.TEXT_DIM, false);
+            textX = c[0] + c[2] + 6;
+        } else {
+            // 空槽里画一个淡淡的加号，表示「可以往这里放东西」
+            int cx = fx + fw / 2;
+            int cy = fy + fh / 2;
+            int plus = hovered ? UiTheme.ACCENT : UiTheme.OFF;
+            g.fill(cx - 4, cy, cx + 4, cy + 1, plus);
+            g.fill(cx, cy - 4, cx + 1, cy + 4, plus);
+        }
+
+        // 窄窗口里槽挤在搜索框右端，旁边没地方写字，说明改由悬停提示承担（见 render 末尾）
+        filterHovered = hovered;
+        if (filterCompact) {
+            return;
+        }
+
+        // 右边界停在这一帧实际画出来的最左那个按钮左侧（条件与 renderHeader 里的绘制条件一致）。
+        // 不能一律按「返回」按钮算：它大部分时候不显示，按它算的话窄屏上只剩十几像素，物品名一个字都放不下
+        int limit = this.width - MARGIN;
+        if (!history.isEmpty()) {
+            limit = backRect[0];
+        } else if (tab == Tab.CODEX) {
+            limit = reloadRect[0];
+        }
+        int textWidth = limit - 8 - textX;
+        if (textWidth < 24) {
+            return;
+        }
+        if (stack != null) {
+            UiTheme.trimmed(g, this.font, stack.getHoverName(), textX, fy + 1, textWidth, UiTheme.TEXT);
+            UiTheme.trimmed(g, this.font, filterSummary(), textX, fy + 11, textWidth,
+                    filter.getFitCount() > 0 ? UiTheme.ON : UiTheme.TEXT_DIM);
+        } else {
+            UiTheme.trimmed(g, this.font, Component.translatable("carianstyle.codex.filter.empty_title"),
+                    textX, fy + 1, textWidth, hovered ? UiTheme.ACCENT : UiTheme.TEXT_DIM);
+            UiTheme.trimmed(g, this.font, Component.translatable("carianstyle.codex.filter.empty_hint"),
+                    textX, fy + 11, textWidth, UiTheme.OFF);
+        }
+    }
+
+    /**
+     * @return 顶栏那一行合计：可附 N · 被挡 M（有「铁砧过于昂贵」的再加一段）
+     */
+    @Nonnull
+    private Component filterSummary() {
+        if (filter.getExpensiveCount() > 0) {
+            return Component.translatable("carianstyle.codex.filter.summary_expensive",
+                    filter.getFitCount(), filter.getBlockedCount(), filter.getExpensiveCount());
+        }
+        return Component.translatable("carianstyle.codex.filter.summary",
+                filter.getFitCount(), filter.getBlockedCount());
+    }
+
+    /**
+     * 物品槽的悬停提示：空槽时说用途，放了物品时给出合计与操作方式。
+     * <p>
+     * 宽窗口旁边已经写着这些，提示只是重复；但窄窗口下槽旁没有文字，
+     * 不靠提示的话一个带加号的小方框没人知道是干什么的。两种宽度统一都给，行为一致。
+     * </p>
+     *
+     * @param g      绘制上下文
+     * @param mouseX 鼠标 X
+     * @param mouseY 鼠标 Y
+     */
+    private void renderFilterTooltip(@Nonnull GuiGraphics g, int mouseX, int mouseY) {
+        List<Component> lines = new ArrayList<>(3);
+        ItemStack stack = filter.getStack();
+        if (stack == null) {
+            lines.add(Component.translatable("carianstyle.codex.filter.empty_title"));
+            lines.add(Component.translatable("carianstyle.codex.filter.empty_hint")
+                    .withStyle(style -> style.withColor(UiTheme.TEXT_DIM & 0xFFFFFF)));
+        } else {
+            lines.add(stack.getHoverName());
+            lines.add(filterSummary().copy().withStyle(style -> style.withColor(UiTheme.ON & 0xFFFFFF)));
+            lines.add(Component.translatable("carianstyle.codex.filter.slot_tip")
+                    .withStyle(style -> style.withColor(UiTheme.TEXT_DIM & 0xFFFFFF)));
+        }
+        // 抬高深度：顶栏槽里的物品图标、详情里的图标都画在 z≈150，提示框要压在它们上面
+        g.pose().pushPose();
+        g.pose().translate(0f, 0f, 200f);
+        g.renderComponentTooltip(this.font, lines, mouseX, mouseY);
+        g.pose().popPose();
+    }
+
+    /**
+     * 打开或收起背包选择器。
+     */
+    private void togglePicker() {
+        if (picker.isOpen()) {
+            picker.close();
+            return;
+        }
+        if (this.minecraft == null || this.minecraft.player == null) {
+            return;
+        }
+        picker.open(filterRect[0], filterRect[1] + filterRect[3] + 4, this.width, this.height,
+                this.minecraft.player.getInventory());
+    }
+
+    /**
+     * 放入某一格的物品。
+     *
+     * @param inventory 玩家背包
+     * @param slot      格子
+     */
+    private void putItem(@Nonnull Inventory inventory, int slot) {
+        filter.set(inventory.getItem(slot), slot);
+        refreshList();
+    }
+
+    /**
+     * 取下放入的物品，恢复完整列表。
+     */
+    private void clearItem() {
+        filter.clear();
+        refreshList();
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        // 百科不暂停游戏：开着界面时来源那一格的附魔可能变了（多人服里被服务端重新同步背包等），
+        // 跟着更新，免得结论和手里的东西对不上
+        if (filter.isActive() && this.minecraft != null && this.minecraft.player != null
+                && filter.follow(this.minecraft.player.getInventory())) {
+            refreshList();
+        }
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        // ESC 先收起选择器，再按一次才关界面——和原版下拉菜单的习惯一致
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE && picker.isOpen()) {
+            picker.close();
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    /**
      * @return 当前启用的特效数量
      */
     private static int enabledEffectCount() {
@@ -806,6 +1088,24 @@ public final class CodexScreen extends Screen {
             return true;
         }
 
+        // 选择器开着时它独占点击：点格子放入物品，点外面只收起选择器、不穿透到底下
+        if (picker.isOpen()) {
+            if (this.minecraft == null || this.minecraft.player == null) {
+                picker.close();
+                return true;
+            }
+            Inventory inventory = this.minecraft.player.getInventory();
+            int result = picker.mouseClicked(mouseX, mouseY, inventory);
+            if (result >= 0) {
+                picker.close();
+                putItem(inventory, result);
+            } else if (result == InventoryPicker.CLEAR) {
+                picker.close();
+                clearItem();
+            }
+            return true;
+        }
+
         // 搜索框：命中范围由外框决定，而不是 EditBox 自己的（很窄的）边界
         if (searchBox != null && searchBox.visible
                 && UiTheme.hit(mouseX, mouseY, searchRect[0], searchRect[1],
@@ -819,7 +1119,8 @@ public final class CodexScreen extends Screen {
             searchBox.setFocused(false);
         }
 
-        // 自绘按钮：判定条件与 renderHeader 中的绘制条件保持一致
+        // 自绘按钮：判定条件与 renderHeader 中的绘制条件保持一致。
+        // 放在物品槽之前：布局已保证两者不重叠，万一重叠，也该由画在上面的按钮接住点击
         if (tab == Tab.CODEX
                 && UiTheme.hit(mouseX, mouseY, reloadRect[0], reloadRect[1], reloadRect[2], reloadRect[3])) {
             reloadAll();
@@ -829,6 +1130,24 @@ public final class CodexScreen extends Screen {
                 && UiTheme.hit(mouseX, mouseY, backRect[0], backRect[1], backRect[2], backRect[3])) {
             navigateBack();
             return true;
+        }
+
+        // 放入物品槽：左键开选择器，右键直接清除（与 JEI 之类幽灵物品槽的习惯一致）；
+        // 判定条件与 renderHeader 中的绘制条件保持一致
+        if (isCodexTab()) {
+            if (filter.isActive() && UiTheme.hit(mouseX, mouseY, filterClearRect[0], filterClearRect[1],
+                    filterClearRect[2], filterClearRect[3])) {
+                clearItem();
+                return true;
+            }
+            if (UiTheme.hit(mouseX, mouseY, filterRect[0], filterRect[1], filterRect[2], filterRect[3])) {
+                if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+                    clearItem();
+                } else {
+                    togglePicker();
+                }
+                return true;
+            }
         }
 
         // 标签页切换
@@ -880,6 +1199,10 @@ public final class CodexScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (picker.isOpen()) {
+            // 选择器是模态的，底下的列表不该在它开着时被滚走
+            return true;
+        }
         if (tab == Tab.CODEX) {
             if (list.mouseScrolled(mouseX, mouseY, delta) || detail.mouseScrolled(mouseX, mouseY, delta)) {
                 return true;

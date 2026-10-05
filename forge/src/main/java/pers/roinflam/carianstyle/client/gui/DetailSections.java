@@ -3,12 +3,20 @@ package pers.roinflam.carianstyle.client.gui;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentInstance;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
+import pers.roinflam.carianstyle.codex.ItemFit;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -140,5 +148,220 @@ public final class DetailSections {
         cursorY = UiTheme.wrapped(g, font, Component.translatable("carianstyle.codex.items.hint"),
                 left, cursorY, innerWidth, UiTheme.OFF);
         return cursorY + 8;
+    }
+
+    /**
+     * 放入物品后，在详情最上方画「这个附魔对这件东西怎么样」的结论卡片。
+     *
+     * <h3>为什么放在最上面</h3>
+     * <p>
+     * 玩家放物品进来就是为了问这一个问题，答案不该埋在描述和数值下面。
+     * 卡片边框用结论的颜色（绿 / 金 / 红 / 灰），不读字也能先看出个大概。
+     * </p>
+     * <p>
+     * 两个详情面板共用这一份，理由同 {@link #itemTypes}。
+     * </p>
+     *
+     * @param g           绘制上下文
+     * @param font        字体
+     * @param filter      放入物品筛选；未启用时不画
+     * @param enchantment 当前附魔
+     * @param left        内容左边界
+     * @param cursorY     当前纵坐标
+     * @param innerWidth  可用宽度
+     * @return 绘制后的纵坐标
+     */
+    public static int fitCard(@Nonnull GuiGraphics g, @Nonnull Font font, @Nullable ItemFilter filter,
+                              @Nonnull Enchantment enchantment, int left, int cursorY, int innerWidth) {
+        if (filter == null || !filter.isActive()) {
+            return cursorY;
+        }
+        ItemStack stack = filter.getStack();
+        ItemFit fit = filter.fitOf(enchantment);
+        if (stack == null || fit == null) {
+            return cursorY;
+        }
+
+        Component verdict;
+        int color;
+        List<Component> body = new ArrayList<>(2);
+        switch (fit.getStatus()) {
+            case FITS:
+                if (fit.isActionable()) {
+                    verdict = Component.translatable("carianstyle.codex.fit.card.fits");
+                    color = UiTheme.ON;
+                    body.add(fitsText(fit));
+                } else {
+                    // 这类物品收它，但这一件附过魔（进不了附魔台）、铁砧又嫌贵：哪条路都走不通
+                    verdict = Component.translatable("carianstyle.codex.fit.card.expensive");
+                    color = UiTheme.WARN;
+                    body.add(expensiveText(filter, fit, 1));
+                    if (fit.isViaTable()) {
+                        body.add(Component.translatable("carianstyle.codex.fit.card.expensive.table_hint"));
+                    }
+                }
+                break;
+            case OWNED:
+                verdict = Component.translatable("carianstyle.codex.fit.card.owned",
+                        UiTheme.roman(fit.getOwnedLevel()));
+                color = fit.isActionable() ? UiTheme.ACCENT : UiTheme.TEXT_DIM;
+                int next = Math.min(fit.getOwnedLevel() + 1, fit.getMaxLevel());
+                if (!fit.getBlockers().isEmpty()) {
+                    // 物品上带着和它互斥的附魔（命令、旧版本留下的）：铁砧升级同样出不了结果
+                    body.add(Component.translatable("carianstyle.codex.fit.card.owned.blocked",
+                            blockerNames(fit)));
+                } else if (!fit.isViaAnvil()) {
+                    body.add(Component.translatable("carianstyle.codex.fit.card.owned.stuck",
+                            UiTheme.roman(fit.getMaxLevel())));
+                } else if (fit.isAnvilTooExpensive()) {
+                    body.add(expensiveText(filter, fit, next));
+                } else {
+                    body.add(Component.translatable("carianstyle.codex.fit.card.owned.upgrade",
+                            UiTheme.roman(fit.getOwnedLevel()), UiTheme.roman(next),
+                            UiTheme.roman(fit.getMaxLevel())));
+                }
+                break;
+            case MAXED:
+                verdict = Component.translatable("carianstyle.codex.fit.card.maxed",
+                        UiTheme.roman(fit.getOwnedLevel()));
+                color = UiTheme.TEXT_DIM;
+                body.add(Component.translatable("carianstyle.codex.fit.card.maxed.detail"));
+                break;
+            case BLOCKED:
+                verdict = Component.translatable("carianstyle.codex.fit.card.blocked");
+                color = UiTheme.DANGER;
+                body.add(Component.translatable("carianstyle.codex.fit.card.blocked.detail",
+                        blockerNames(fit)));
+                // 附魔书被砂轮洗掉非诅咒附魔后会变回普通书，而普通书在铁砧上合不了任何附魔书——
+                // 对附魔书说「洗掉再附」是把人往死路上引
+                body.add(Component.translatable(stack.is(Items.ENCHANTED_BOOK)
+                        ? "carianstyle.codex.fit.card.blocked.tip_book"
+                        : "carianstyle.codex.fit.card.blocked.tip"));
+                break;
+            case NONE:
+            default:
+                verdict = Component.translatable("carianstyle.codex.fit.card.none");
+                color = UiTheme.OFF;
+                body.add(Component.translatable(fit.isViaTable()
+                        ? "carianstyle.codex.fit.card.none.enchanted"
+                        : "carianstyle.codex.fit.card.none.detail"));
+                break;
+        }
+
+        // 先排版再画：背景得在文字之前画，而背景多高要看正文折成几行
+        int pad = 6;
+        int textWidth = innerWidth - pad * 2;
+        List<FormattedCharSequence> lines = new ArrayList<>();
+        for (Component paragraph : body) {
+            lines.addAll(font.split(paragraph, Math.max(1, textWidth)));
+        }
+
+        // 标题行：图标 + 物品名 + 靠右的结论。面板太窄、结论放不进图标右边时，
+        // 结论单独起一行放在图标下面——宁可卡片高一行，也不能让结论钻到图标底下或和名字叠在一起
+        int verdictWidth = font.width(verdict);
+        int nameX = left + pad + ICON_SIZE + 4;
+        int verdictX = left + innerWidth - pad - verdictWidth;
+        boolean verdictInline = verdictX >= nameX;
+        int headHeight = verdictInline ? ICON_SIZE : ICON_SIZE + font.lineHeight + 1;
+        int cardHeight = pad + headHeight + 3 + lines.size() * (font.lineHeight + 1) + pad - 1;
+
+        g.fill(left, cursorY, left + innerWidth, cursorY + cardHeight, UiTheme.PANEL_ALT);
+        UiTheme.border(g, left, cursorY, innerWidth, cardHeight, UiTheme.withAlpha(color, 0.7f));
+        g.fill(left, cursorY, left + 2, cursorY + cardHeight, color);
+
+        int headY = cursorY + pad;
+        g.renderItem(stack, left + pad, headY - 1);
+
+        int textY = headY + (ICON_SIZE - font.lineHeight) / 2;
+        int nameRight;
+        if (verdictInline) {
+            g.drawString(font, verdict, verdictX, textY, color, false);
+            nameRight = verdictX - 8;
+        } else {
+            g.drawString(font, verdict, left + pad, headY + ICON_SIZE + 1, color, false);
+            nameRight = left + innerWidth - pad;
+        }
+        // 名字放不下「...」就干脆不画：图标已经说明了是哪件东西
+        if (nameRight - nameX >= font.width("...") + 2) {
+            UiTheme.trimmed(g, font, stack.getHoverName(), nameX, textY, nameRight - nameX, UiTheme.TEXT);
+        }
+
+        int lineY = headY + headHeight + 3;
+        for (FormattedCharSequence line : lines) {
+            g.drawString(font, line, left + pad, lineY, UiTheme.TEXT_DIM, false);
+            lineY += font.lineHeight + 1;
+        }
+        return cursorY + cardHeight + 10;
+    }
+
+    /**
+     * 「可以附上」时说走哪条路。按这一件现在实际能走的路说，与列表行备注的判断一致。
+     *
+     * @param fit 判定结果（FITS 且能实际附上）
+     * @return 说明
+     */
+    @Nonnull
+    private static Component fitsText(@Nonnull ItemFit fit) {
+        boolean table = fit.isViaTable() && !fit.isStackEnchanted();
+        boolean anvil = fit.isViaAnvil() && !fit.isAnvilTooExpensive();
+        if (table && anvil) {
+            return Component.translatable("carianstyle.codex.fit.card.fits.both");
+        }
+        if (table) {
+            // 铁砧本来收它、只是这一件惩罚太高，和「物品不收附魔书」是两回事，分开说
+            return fit.isViaAnvil()
+                    ? Component.translatable("carianstyle.codex.fit.card.fits.table_expensive",
+                    fit.getAnvilCost())
+                    : Component.translatable("carianstyle.codex.fit.card.fits.table");
+        }
+        return Component.translatable(fit.isViaTable()
+                ? "carianstyle.codex.fit.card.fits.both_enchanted"
+                : "carianstyle.codex.fit.card.fits.anvil");
+    }
+
+    /**
+     * 「铁砧过于昂贵」的说明。
+     *
+     * @param filter      筛选（取累计惩罚、是否整组）
+     * @param fit         判定结果
+     * @param resultLevel 合完之后的等级
+     * @return 说明
+     */
+    @Nonnull
+    private static Component expensiveText(@Nonnull ItemFilter filter, @Nonnull ItemFit fit, int resultLevel) {
+        if (filter.isStackMultiple()) {
+            return Component.translatable("carianstyle.codex.fit.card.expensive.stack");
+        }
+        return Component.translatable("carianstyle.codex.fit.card.expensive.detail",
+                filter.getBaseRepairCost(), UiTheme.roman(resultLevel), fit.getAnvilCost());
+    }
+
+    /**
+     * 把挡路的附魔拼成一串「锋利 V、亡灵杀手 III」。
+     *
+     * @param fit 判定结果
+     * @return 拼好的名字
+     */
+    @Nonnull
+    private static Component blockerNames(@Nonnull ItemFit fit) {
+        MutableComponent names = Component.empty();
+        Component separator = Component.translatable("carianstyle.codex.fit.card.separator");
+        boolean first = true;
+        for (EnchantmentInstance blocker : fit.getBlockers()) {
+            if (!first) {
+                names.append(separator);
+            }
+            first = false;
+            Enchantment other = blocker.enchantment;
+            MutableComponent name = Component.translatable(other.getDescriptionId());
+            // 与原版 getFullname 一致：只有一级的附魔不写等级
+            if (blocker.level != 1 || other.getMaxLevel() != 1) {
+                name.append(" ").append(UiTheme.roman(blocker.level));
+            }
+            // 名字用正文亮色、诅咒用红色，从灰色的说明文字里跳出来
+            int nameColor = (other.isCurse() ? UiTheme.DANGER : UiTheme.TEXT) & 0xFFFFFF;
+            names.append(name.withStyle(style -> style.withColor(nameColor)));
+        }
+        return names;
     }
 }

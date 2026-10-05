@@ -54,6 +54,10 @@ public final class ForeignDetail {
     /** 当前展示的附魔 */
     private ForeignMeta meta;
 
+    /** 界面的放入物品筛选，见 {@link #setFilter} */
+    @Nullable
+    private ItemFilter filter;
+
     /** 滚动偏移 */
     private int scroll;
 
@@ -83,6 +87,15 @@ public final class ForeignDetail {
     private int y;
     private int width;
     private int height;
+
+    /**
+     * 接上界面的放入物品筛选。启用时详情最上方多一张「对这件物品怎么样」的卡片。
+     *
+     * @param filter 筛选；null 表示不显示卡片
+     */
+    public void setFilter(@Nullable ItemFilter filter) {
+        this.filter = filter;
+    }
 
     /**
      * 设置布局区域。
@@ -137,6 +150,8 @@ public final class ForeignDetail {
 
         int cursorY = y + PADDING - scroll;
         cursorY = renderTitle(g, font, cursorY, innerWidth);
+        cursorY = DetailSections.fitCard(g, font, filter, meta.getEnchantment(),
+                x + PADDING, cursorY, innerWidth);
         cursorY = renderDescription(g, font, cursorY, innerWidth);
         cursorY = renderBasics(g, font, cursorY, innerWidth);
         cursorY = renderItems(g, font, cursorY, innerWidth);
@@ -147,6 +162,12 @@ public final class ForeignDetail {
         g.disableScissor();
 
         contentHeight = cursorY - (y + PADDING - scroll) + PADDING;
+        // 内容变矮时（放入物品的结论卡片消失、换成更短的卡片）把滚动收回来，
+        // 否则底部会空出一截，滚动条的滑块还会画到面板外面。只收不放：变高不会越界
+        int maxScroll = Math.max(0, contentHeight - height + PADDING);
+        if (scroll > maxScroll) {
+            scroll = maxScroll;
+        }
         UiTheme.scrollbar(g, x + width - 4, y + 1, height - 2, contentHeight, scroll);
     }
 

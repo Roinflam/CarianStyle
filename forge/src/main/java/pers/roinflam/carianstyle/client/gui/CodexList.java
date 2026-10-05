@@ -52,6 +52,10 @@ public final class CodexList {
     /** 内容总高度，随 {@link #setEntries} 重算 */
     private int contentHeight;
 
+    /** 列表为空时的提示，见 {@link #setEmptyHint} */
+    @Nullable
+    private Component emptyHint;
+
     // 布局区域，由 {@link CodexScreen} 在 init 时写入
     private int x;
     private int y;
@@ -181,7 +185,22 @@ public final class CodexList {
 
         g.disableScissor();
 
+        // 空列表给一句话。以前搜不到东西时就是一整块空面板，
+        // 分不清是没结果、还没加载完，还是界面坏了；放入物品筛选之后空列表更常见，必须说清楚
+        if (rows.isEmpty() && emptyHint != null) {
+            UiTheme.wrapped(g, font, emptyHint, x + 10, y + 12, width - 20, UiTheme.TEXT_DIM);
+        }
+
         UiTheme.scrollbar(g, x + width - 4, y + 1, height - 2, contentHeight, scroll);
+    }
+
+    /**
+     * 设置列表为空时显示的提示。
+     *
+     * @param hint 提示；null 表示空列表时什么都不画
+     */
+    public void setEmptyHint(@Nullable Component hint) {
+        this.emptyHint = hint;
     }
 
     /**
@@ -225,7 +244,7 @@ public final class CodexList {
             UiTheme.gradientRow(g, x + 1, rowY, width - 5, ROW_HEIGHT, UiTheme.PANEL_HOVER);
         }
 
-        int nameColor = selected ? UiTheme.ACCENT : UiTheme.TEXT;
+        int nameColor = selected ? UiTheme.ACCENT : (meta.isRowDimmed() ? UiTheme.TEXT_DIM : UiTheme.TEXT);
         UiTheme.trimmed(g, font, meta.getDisplayName(), x + 9, rowY + 3, width - 30, nameColor);
 
         // 副行分成左右两栏。
@@ -245,8 +264,14 @@ public final class CodexList {
                 UiTheme.roman(meta.getMaxLevel())).getString();
         g.drawString(font, level, x + 9 + font.width(rarity) + 6, subY, UiTheme.OFF, false);
 
+        // 条目自带说明时（放入物品筛选）占用冲突数的位置：
+        // 那时候要回答的是「对这件东西怎么样」，全局冲突数是另一个问题
+        Component note = meta.getRowNote();
         int conflicts = meta.getConflictCount();
-        if (conflicts > 0) {
+        if (note != null) {
+            String text = note.getString();
+            g.drawString(font, text, x + width - 20 - font.width(text), subY, meta.getRowNoteColor(), false);
+        } else if (conflicts > 0) {
             String text = Component.translatable(
                     "carianstyle.codex.list.conflicts", conflicts).getString();
             g.drawString(font, text, x + width - 20 - font.width(text), subY, UiTheme.OFF, false);

@@ -1,6 +1,7 @@
 package pers.roinflam.carianstyle.codex;
 
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.enchantment.Enchantment;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -95,4 +96,39 @@ public interface CodexEntry {
      * @return 是否匹配
      */
     boolean matches(@Nullable String lowerKeyword);
+
+    /**
+     * @return 附魔实例；「放入物品」筛选要拿它去问物品能不能附
+     */
+    @Nonnull
+    Enchantment getEnchantment();
+
+    /**
+     * 列表副行右端的补充说明。
+     * <p>
+     * 默认为 null，列表在那个位置显示冲突数。放入物品筛选时由包装条目改成
+     * 「附魔台 / 仅铁砧 / 已有 II / 冲突」——那时候玩家关心的是这件物品，
+     * 而不是这个附魔在全局上跟多少个附魔冲突。
+     * </p>
+     *
+     * @return 说明文字；null 表示按默认显示冲突数
+     */
+    @Nullable
+    default Component getRowNote() {
+        return null;
+    }
+
+    /**
+     * @return {@link #getRowNote()} 的颜色（ARGB）
+     */
+    default int getRowNoteColor() {
+        return 0xFF6A6255;
+    }
+
+    /**
+     * @return 条目名是否压暗显示（例如被物品上已有附魔挡住、实际附不上去的那些）
+     */
+    default boolean isRowDimmed() {
+        return false;
+    }
 }
