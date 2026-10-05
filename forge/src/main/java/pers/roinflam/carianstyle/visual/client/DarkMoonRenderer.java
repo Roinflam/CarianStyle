@@ -19,6 +19,7 @@ import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
 import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
+import pers.roinflam.carianstyle.utils.util.DayNightUtil;
 
 import javax.annotation.Nullable;
 import java.util.List;
@@ -37,7 +38,8 @@ import java.util.List;
  * 暗月的生效条件只有两个，而<b>客户端两样都能自己读到</b>：
  * </p>
  * <ol>
- *     <li><b>夜晚</b> —— {@code level.isDay()} 在客户端同样可用（世界时间是同步的）；</li>
+ *     <li><b>夜晚</b> —— 用 {@code DayNightUtil.isDay} 按世界时间与天气现算（原版 {@code level.isDay()}
+ *         在客户端永远是白天，见该类说明）；</li>
  *     <li><b>主手带 dark_moon</b> —— 附魔存在于物品 NBT 中，而装备栏物品对所有观察者都正常同步，
  *         客户端可直接 {@code EnchantmentHelper.getItemEnchantmentLevel} 读出。</li>
  * </ol>
@@ -377,8 +379,8 @@ public final class DarkMoonRenderer {
         }
 
         // ⭐ 白天直接整个跳过——暗月只在夜晚生效，这一行省掉全部后续开销。
-        // level.isDay() 在客户端同样可用（世界时间随原版正常同步）
-        if (mc.level.isDay()) {
+        // 不能用 level.isDay()：客户端的 skyDarken 从进世界起就没更新过，永远是白天
+        if (DayNightUtil.isDay(mc.level)) {
             return;
         }
 

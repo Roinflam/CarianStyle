@@ -13,6 +13,7 @@ import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentWarrior;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
+import pers.roinflam.carianstyle.utils.util.DayNightUtil;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -385,13 +386,14 @@ public final class CarianStyleCombatStateDisplay {
 
     /**
      * 是否处于夜晚。
-     * <p>与碎星附魔的 {@code !level().isDay()} 口径完全一致。</p>
+     * <p>与碎星附魔在服务端的 {@code !level().isDay()} 口径完全一致；
+     * 客户端的 {@code isDay()} 永远是白天，所以走 {@link DayNightUtil}。</p>
      *
      * @param player 目标玩家
      * @return 夜晚返回 true
      */
     private static boolean isNight(@Nonnull Player player) {
-        return !player.level().isDay();
+        return !DayNightUtil.isDay(player.level());
     }
 
     /**

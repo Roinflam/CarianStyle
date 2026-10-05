@@ -15,6 +15,7 @@ import pers.roinflam.carianstyle.enchantment.EnchantmentBlackFlameShelter;
 import pers.roinflam.carianstyle.enchantment.EnchantmentConcealingVeil;
 import pers.roinflam.carianstyle.enchantment.EnchantmentEatShit;
 import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.utils.util.DayNightUtil;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -466,13 +467,14 @@ public final class CarianStyleConditionDisplay {
 
     /**
      * 是否处于白天。
-     * <p>与诺克斯之月、暗弃子两个附魔的 {@code level().isDay()} 口径完全一致。</p>
+     * <p>与诺克斯之月、暗弃子两个附魔在服务端的 {@code level().isDay()} 口径完全一致；
+     * 客户端的 {@code isDay()} 永远是白天，所以走 {@link DayNightUtil}。</p>
      *
      * @param player 目标玩家
      * @return 白天返回 true
      */
     private static boolean isDay(@Nonnull Player player) {
-        return player.level().isDay();
+        return DayNightUtil.isDay(player.level());
     }
 
     /**
