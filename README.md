@@ -184,6 +184,8 @@ Absolutely! Free to use in any modpack without asking permission.
 **Developer:** Roinflam  
 **Inspired by:** Elden Ring (FromSoftware)
 
+**Bundled library:** [Cloth Config API](https://github.com/shedaniel/cloth-config) by shedaniel, licensed under GNU LGPLv3. It is bundled unmodified as a separate jar-in-jar (under `META-INF/jars/`) and is used only for the in-game config screen; it can be replaced with another compatible build.
+
 ### 💖 Support
 
 If you enjoy this mod, please give it a ⭐ **Star** on GitHub!
@@ -361,6 +363,8 @@ If you enjoy this mod, please give it a ⭐ **Star** on GitHub!
 
 **开发者：** Roinflam  
 **灵感来源：** 艾尔登法环(FromSoftware)
+
+**内嵌库：** [Cloth Config API](https://github.com/shedaniel/cloth-config)（作者 shedaniel，GNU LGPLv3 许可）。以独立 jar-in-jar 的形式内嵌（位于 `META-INF/jars/`），未作任何修改，只用于游戏内配置界面，可自行替换为其它兼容版本。
 
 ### 💖 支持我们
 

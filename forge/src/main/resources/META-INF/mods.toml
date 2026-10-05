@@ -9,7 +9,7 @@ displayName="${mod_name}"
 updateJSONURL="https://www.curseforge.com/minecraft/mc-mods/carianstyle"
 displayURL="https://www.curseforge.com/minecraft/mc-mods/carianstyle"
 logoFile="logo.png"
-credits=""
+credits="Cloth Config API by shedaniel (GNU LGPLv3) is bundled unmodified as a separate jar-in-jar for the config screen. / 内嵌 shedaniel 的 Cloth Config API（GNU LGPLv3），未作修改，以独立 jar-in-jar 形式提供配置界面。"
 authors="${mod_author}"
 description='''
 Carian Style!
