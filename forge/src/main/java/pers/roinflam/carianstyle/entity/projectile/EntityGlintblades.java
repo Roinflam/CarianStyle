@@ -678,6 +678,11 @@ public class EntityGlintblades extends ThrowableProjectile {
         }
 
         Entity hitEntity = result.getEntity();
+        // 多部位生物（末影龙、灾变的下界合金巨兽等）被撞到的是部位实体，它不是 LivingEntity，
+        // 伤害要转给本体，否则这一剑什么也不做
+        if (hitEntity instanceof net.minecraftforge.entity.PartEntity<?> part && part.getParent() != null) {
+            hitEntity = part.getParent();
+        }
 
         // 不伤害投掷者
         if (hitEntity.equals(this.getOwner())) {
