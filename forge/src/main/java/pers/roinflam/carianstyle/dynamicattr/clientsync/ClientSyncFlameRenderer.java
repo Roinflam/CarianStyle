@@ -205,13 +205,15 @@ import javax.annotation.Nullable;
  *         实体渲染循环正好夹在 {@code AFTER_CUTOUT_BLOCKS} 与 {@code AFTER_ENTITIES} 之间，
  *         因此窗口精确覆盖主实体渲染，把<b>粒子阶段的残影</b>与
  *         <b>GUI 里的实体预览</b>（都在窗口之外）全部挡在门外；</li>
- *     <li><b>缓冲身份比对</b>（{@link #isMainBufferSource}）——主渲染流程传下来的
- *         必然是 {@code Minecraft.renderBuffers().bufferSource()} <b>那一个实例</b>。
- *         这道检查负责挡住「在实体渲染窗口<b>之内</b>做二次渲染、但换了缓冲」的情况。</li>
+ *     <li><b>只写主缓冲</b>（{@link #isMainBufferSource}）——事件传来的不是
+ *         {@code Minecraft.renderBuffers().bufferSource()} 那一个实例时，改写主缓冲，
+ *         不往别人包装的缓冲里写顶点。（v3 是直接跳过；但 Oculus 对每次实体渲染都会包一层，
+ *         跳过等于装了 Oculus 就永远不画，v4 改成换缓冲。）</li>
  * </ol>
  * <p>
- * <b>为什么两道都要：</b>身份比对单独用挡不住 GUI 预览——{@code GuiGraphics} 持有的
- * 恰恰就是同一个 {@code bufferSource}；窗口单独用挡不住窗口内的重入。二者互补。
+ * <b>为什么两道都要：</b>只写主缓冲挡不住 GUI 预览——{@code GuiGraphics} 持有的
+ * 恰恰就是同一个 {@code bufferSource}；窗口单独用挡不住窗口内换了缓冲的重入。二者互补。
+ * 窗口内的重入（例如残影）现在会在主缓冲里多画一团火，位置和本体相同或相近，不影响观感。
  * </p>
  *
  * <h4>失败方向是安全的</h4>
@@ -221,8 +223,8 @@ import javax.annotation.Nullable;
  * 而不是崩溃或花屏——这正是防御代码该有的失败方向。
  * </p>
  * <p>
- * 同理，若某个模组<b>合法地</b>替换了主 {@code bufferSource} 实例（目前已知的光影模组
- * 不会这么做，它们在 RenderType / shader 层做手脚），火焰同样只是不显示。
+ * Oculus 会把实体渲染用的缓冲包一层（不开光影也包），所以不能按身份比对决定画不画，
+ * 只能决定往哪里画（见上）。
  * <b>排查「火焰突然不见了」时，这两处检查是第一个该看的地方。</b>
  * </p>
  *
@@ -508,13 +510,18 @@ public class ClientSyncFlameRenderer {
         if (!inMainEntityPass) {
             return;
         }
-        // ⭐ v3 检查二：必须是主渲染流程那一个 bufferSource 实例。
-        // 挡住「在窗口之内做二次渲染、但换了缓冲」的情况——
-        // 那种缓冲往往忽略我们请求的 RenderType，返回顶点格式不匹配的 consumer，
-        // 写进去会在 endVertex() 抛 "Not filled all elements of the vertex"
+        // ⭐ v4：不再要求事件传来的就是主缓冲本身，而是统一画进主缓冲。
+        // Oculus 会在 EntityRenderDispatcher 里把实体渲染用的缓冲包一层（不开光影也包），
+        // v3 的身份比对因此永远不通过，装了 Oculus 的客户端完全看不到自定义火焰。
+        // 已经确认处于主实体渲染窗口内，直接写主缓冲：顶点格式由我们请求的 RenderType 决定，
+        // 不会落进别人包装的、格式不匹配的 consumer（v3 要防的 "Not filled all elements of the vertex"）。
         MultiBufferSource bufferSource = event.getMultiBufferSource();
         if (!isMainBufferSource(bufferSource)) {
-            return;
+            Minecraft main = Minecraft.getInstance();
+            if (main.renderBuffers() == null) {
+                return;
+            }
+            bufferSource = main.renderBuffers().bufferSource();
         }
 
         LivingEntity entity = event.getEntity();
