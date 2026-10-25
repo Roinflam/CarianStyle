@@ -91,7 +91,7 @@ public class EnchantmentLorettaTrick extends EnchantmentBase {
         Enchantment lorettaTrick = EnchantmentRegistry.getEnchantmentByClass(EnchantmentLorettaTrick.class);
         if (lorettaTrick == null) return;
         int level = EnchantmentHelper.getItemEnchantmentLevel(lorettaTrick, heldItem);
-        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        level = applyLevelLimit(lorettaTrick, level, 10);
         if (level <= 0) return;
 
         arrow.setBaseDamage(arrow.getBaseDamage()
@@ -111,6 +111,8 @@ public class EnchantmentLorettaTrick extends EnchantmentBase {
                 double offsetZ = -2.5 + RandomUtil.getInt(0, 5);
                 attacker.level().explode(attacker, arrow.getX() + offsetX, arrow.getY(), arrow.getZ() + offsetZ,
                         explosionStrength, false, net.minecraft.world.level.Level.ExplosionInteraction.NONE);
+                // 不破坏方块的爆炸原版只画一小团烟，补一团大爆炸云（见罗蕾塔的大弓）
+                EnchantmentLorettaBigBow.spawnBlastCloud(attacker.level(), arrow.getX() + offsetX, arrow.getY(), arrow.getZ() + offsetZ);
             }
         }.start();
     }

@@ -1,5 +1,7 @@
 package pers.roinflam.carianstyle.enchantment;
 
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.AbstractArrow;
@@ -7,6 +9,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.level.Level;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.ProjectileImpactEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -123,9 +126,7 @@ public class EnchantmentLorettaBigBow extends EnchantmentBase {
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(lorettaBigBow, heldItem);
 
-        if (ConfigLoader.levelLimit) {
-            level = Math.min(level, LEVEL_CAP.getInt());
-        }
+        level = applyLevelLimit(lorettaBigBow, level, LEVEL_CAP.getInt());
 
         if (level > 0) {
             arrow.setBaseDamage(arrow.getBaseDamage() * ARROW_DAMAGE_MULTIPLIER.get());
@@ -173,9 +174,7 @@ public class EnchantmentLorettaBigBow extends EnchantmentBase {
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(lorettaBigBow, heldItem);
 
-        if (ConfigLoader.levelLimit) {
-            level = Math.min(level, LEVEL_CAP.getInt());
-        }
+        level = applyLevelLimit(lorettaBigBow, level, LEVEL_CAP.getInt());
 
         if (level <= 0) {
             return;
@@ -192,6 +191,20 @@ public class EnchantmentLorettaBigBow extends EnchantmentBase {
                 false,
                 net.minecraft.world.level.Level.ExplosionInteraction.NONE
         );
+        spawnBlastCloud(attacker.level(), arrow.getX(), arrow.getY(), arrow.getZ());
+    }
+
+    /**
+     * 补一团大爆炸云
+     * <p>问题：爆炸用的是 {@code ExplosionInteraction.NONE}（不破坏方块），原版客户端对这种爆炸
+     * 只画一个小的 {@code EXPLOSION} 粒子，强度 2~4 的爆炸看上去只冒一小团烟。</p>
+     * <p>做法：服务端在爆炸点再发一个 {@code EXPLOSION_EMITTER}（TNT 同款的大爆炸云），只是画面，
+     * 伤害、击退、范围都不变。罗蕾塔的绝招也调这里。</p>
+     */
+    static void spawnBlastCloud(Level level, double x, double y, double z) {
+        if (level instanceof ServerLevel serverLevel) {
+            serverLevel.sendParticles(ParticleTypes.EXPLOSION_EMITTER, x, y, z, 1, 0.0D, 0.0D, 0.0D, 0.0D);
+        }
     }
 
     @Override
