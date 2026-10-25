@@ -83,7 +83,7 @@ public class EnchantmentBloodSlash extends EnchantmentBase {
         LivingEntity victim = ctx.getVictim();
         if (victim == null) return;
         int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) effectiveLevel = Math.min(effectiveLevel, 10);
+        effectiveLevel = capLevel(effectiveLevel, 10);
         if (!isFullyCharged(ctx.getHolder())) return;
         float bonusDamage = Math.min(
                 victim.getHealth() * effectiveLevel * (float) BONUS_DAMAGE_PER_LEVEL.get(),
@@ -113,7 +113,7 @@ public class EnchantmentBloodSlash extends EnchantmentBase {
         Enchantment bloodSlash = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBloodSlash.class);
         if (bloodSlash == null) return;
         int level = EnchantmentHelper.getItemEnchantmentLevel(bloodSlash, heldItem);
-        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        level = applyLevelLimit(bloodSlash, level, 10);
         if (level <= 0) return;
         Enchantment bloodCollection = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBloodCollection.class);
         if (bloodCollection != null && EnchantmentHelper.getItemEnchantmentLevel(bloodCollection, heldItem) > 0) {

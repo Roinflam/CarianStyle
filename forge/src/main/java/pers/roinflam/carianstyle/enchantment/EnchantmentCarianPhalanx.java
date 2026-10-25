@@ -176,7 +176,7 @@ public class EnchantmentCarianPhalanx extends EnchantmentBase {
         Enchantment carianPhalanx = EnchantmentRegistry.getEnchantmentByClass(EnchantmentCarianPhalanx.class);
         if (carianPhalanx == null) return;
         int level = EnchantmentHelper.getItemEnchantmentLevel(carianPhalanx, heldItem);
-        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        level = applyLevelLimit(carianPhalanx, level, 10);
         if (level <= 0 || !RandomUtil.percentageChance(level * TRIGGER_CHANCE_PER_LEVEL.get())) return;
 
         final int effectiveLevel = level;

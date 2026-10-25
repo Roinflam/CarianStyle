@@ -177,9 +177,7 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
                 totalLevel += EnchantmentHelper.getItemEnchantmentLevel(blackFlameShelter, armor);
             }
         }
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
-        }
+        totalLevel = applyLevelLimit(blackFlameShelter, totalLevel, LEVEL_CAP.getInt());
         // ⭐ v2.2：无条件硬上限，防止减伤系数归零（8级）乃至变负（9级+）。
         // 与上面的 levelLimit 是两回事：那个是可关闭的平衡开关，这个是正确性约束。
         // 详见 MAX_EFFECTIVE_LEVEL 与类注释。

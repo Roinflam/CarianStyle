@@ -279,9 +279,7 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(cachedEnchantment, tool);
 
-        if (ConfigLoader.levelLimit) {
-            level = Math.min(level, LEVEL_CAP.getInt());
-        }
+        level = applyLevelLimit(cachedEnchantment, level, LEVEL_CAP.getInt());
 
         if (level <= 0) {
             return;

@@ -157,9 +157,7 @@ public class EnchantmentExclude extends EnchantmentBase {
             }
         }
 
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
-        }
+        totalLevel = applyLevelLimit(exclude, totalLevel, LEVEL_CAP.getInt());
 
         if (totalLevel <= 0) {
             return;

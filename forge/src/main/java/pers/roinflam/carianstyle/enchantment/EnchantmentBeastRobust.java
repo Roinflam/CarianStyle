@@ -98,9 +98,7 @@ public class EnchantmentBeastRobust extends EnchantmentBase implements IEffectMo
         int level = EnchantmentHelper.getItemEnchantmentLevel(this, chest);
 
         // 应用等级限制
-        if (ConfigLoader.levelLimit) {
-            level = Math.min(level, LEVEL_CAP.getInt());
-        }
+        level = applyLevelLimit(this, level, LEVEL_CAP.getInt());
 
         return level;
     }

@@ -85,7 +85,7 @@ public class EnchantmentHealingByFire extends EnchantmentBase {
         for (ItemStack armor : victim.getArmorSlots()) {
             if (!armor.isEmpty()) totalLevel += EnchantmentHelper.getItemEnchantmentLevel(healingByFire, armor);
         }
-        if (ConfigLoader.levelLimit) totalLevel = Math.min(totalLevel, 10);
+        totalLevel = applyLevelLimit(healingByFire, totalLevel, 10);
         if (totalLevel <= 0) return;
         if (!RandomUtil.percentageChance(totalLevel * CHANCE_PER_LEVEL.get())) return;
 

@@ -115,7 +115,7 @@ public class EnchantmentHardArrow extends EnchantmentBase {
         Enchantment hardArrow = EnchantmentRegistry.getEnchantmentByClass(EnchantmentHardArrow.class);
         if (hardArrow == null) return;
         int level = EnchantmentHelper.getItemEnchantmentLevel(hardArrow, heldItem);
-        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        level = applyLevelLimit(hardArrow, level, 10);
         if (level <= 0) return;
         arrow.setBaseDamage(arrow.getBaseDamage()
                 + arrow.getBaseDamage() * level * ARROW_DAMAGE_PER_LEVEL.get());
@@ -165,7 +165,7 @@ public class EnchantmentHardArrow extends EnchantmentBase {
         Enchantment hardArrow = EnchantmentRegistry.getEnchantmentByClass(EnchantmentHardArrow.class);
         if (hardArrow == null) return;
         int level = EnchantmentHelper.getItemEnchantmentLevel(hardArrow, heldItem);
-        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        level = applyLevelLimit(hardArrow, level, 10);
         if (level <= 0) return;
         List<LivingEntity> entities = EntityUtil.getNearbyEntities(LivingEntity.class, victim, AOE_RADIUS.getInt(), entity -> !entity.equals(victim));
         if (entities.isEmpty()) return;

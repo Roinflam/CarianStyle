@@ -176,7 +176,7 @@ public class EnchantmentWarrior extends EnchantmentBase {
         if (warrior == null) return;
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(warrior, heldItem);
-        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        level = applyLevelLimit(warrior, level, 10);
 
         if (level > 0) {
             evt.setAmount(evt.getAmount() * (float) DAMAGE_MULTIPLIER.get());
@@ -206,7 +206,7 @@ public class EnchantmentWarrior extends EnchantmentBase {
         if (warrior == null) return;
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(warrior, heldItem);
-        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        level = applyLevelLimit(warrior, level, 10);
         if (level <= 0) return;
 
         // 即时伤害降为50%
@@ -247,7 +247,7 @@ public class EnchantmentWarrior extends EnchantmentBase {
         if (warrior == null) return;
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(warrior, heldItem);
-        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        level = applyLevelLimit(warrior, level, 10);
 
         if (level > 0) {
             killer.heal((killer.getMaxHealth() - killer.getHealth()) * (float) KILL_HEAL_RATIO.get());

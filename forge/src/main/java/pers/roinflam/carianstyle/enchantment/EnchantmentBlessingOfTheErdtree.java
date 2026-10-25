@@ -89,9 +89,7 @@ public class EnchantmentBlessingOfTheErdtree extends EnchantmentBase {
                 totalLevel += EnchantmentHelper.getItemEnchantmentLevel(blessingOfTheErdtree, armor);
             }
         }
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
-        }
+        totalLevel = applyLevelLimit(blessingOfTheErdtree, totalLevel, LEVEL_CAP.getInt());
         return totalLevel;
     }
 

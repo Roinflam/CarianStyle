@@ -116,9 +116,7 @@ public class EnchantmentProtectionOfTheErdtree extends EnchantmentBase {
                 }
             }
 
-            if (ConfigLoader.levelLimit) {
-                victimLevel = Math.min(victimLevel, VICTIM_LEVEL_CAP.getInt());
-            }
+            victimLevel = applyLevelLimit(protection, victimLevel, VICTIM_LEVEL_CAP.getInt());
 
             if (victimLevel > 0) {
                 int duration = (int) (DURATION_SECONDS_PER_LEVEL.get() * victimLevel * 20);
@@ -141,9 +139,7 @@ public class EnchantmentProtectionOfTheErdtree extends EnchantmentBase {
             }
         }
 
-        if (ConfigLoader.levelLimit) {
-            attackerLevel = Math.min(attackerLevel, ATTACKER_LEVEL_CAP.getInt());
-        }
+        attackerLevel = applyLevelLimit(protection, attackerLevel, ATTACKER_LEVEL_CAP.getInt());
 
         if (attackerLevel > 0) {
             attackerLevel = Math.min(attackerLevel, ATTACKER_AMPLIFIER_CAP.getInt());

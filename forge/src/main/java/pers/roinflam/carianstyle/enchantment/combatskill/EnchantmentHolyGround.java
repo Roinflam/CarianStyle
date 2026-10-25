@@ -128,6 +128,7 @@ public class EnchantmentHolyGround extends EnchantmentBase {
 
             // v-cache：走中央装备缓存。非玩家实体会自动回退到直接查询，行为不变
             int level = EnchantmentEventHandler.levelInHand(entity, holyGround, entity.getUsedItemHand());
+            level = decayLevel(holyGround, level);
 
             if (level > 0) {
                 evt.setAmount(evt.getAmount() - evt.getAmount() * level * (float) DAMAGE_REDUCTION_PER_LEVEL.get());
@@ -169,6 +170,7 @@ public class EnchantmentHolyGround extends EnchantmentBase {
 
         // v-cache：走中央装备缓存
         int level = EnchantmentEventHandler.levelInHand(holder, holyGround, holder.getUsedItemHand());
+        level = decayLevel(holyGround, level);
         if (level <= 0) {
             return;
         }

@@ -102,9 +102,7 @@ public class EnchantmentBlackFlameBlade extends EnchantmentBase {
         }
 
         int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
-        }
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
 
         // 施加灭绝火焰效果（白色火焰视觉）
         DynamicAttributeManager.apply(

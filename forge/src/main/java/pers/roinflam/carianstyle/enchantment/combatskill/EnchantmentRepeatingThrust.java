@@ -85,9 +85,7 @@ public class EnchantmentRepeatingThrust extends EnchantmentBase {
         }
 
         int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
-        }
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
 
         UUID attackerUUID = attacker.getUUID();
         UUID victimUUID = victim.getUUID();

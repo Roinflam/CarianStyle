@@ -83,9 +83,7 @@ public class EnchantmentMagicScorpionCharm extends EnchantmentBase {
 
         // 手动应用等级限制
         int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
-        }
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
 
         // 增加魔法伤害 10% × 等级
         ctx.multiplyDamage(1 + effectiveLevel * (float) DAMAGE_PER_LEVEL.get());
@@ -112,9 +110,7 @@ public class EnchantmentMagicScorpionCharm extends EnchantmentBase {
 
         // 手动应用等级限制
         int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
-        }
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
 
         // 受到的物理伤害增加 10% × 等级
         ctx.multiplyDamage(1 + effectiveLevel * (float) DAMAGE_PER_LEVEL.get());

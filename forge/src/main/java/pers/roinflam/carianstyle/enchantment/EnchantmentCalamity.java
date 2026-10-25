@@ -87,9 +87,7 @@ public class EnchantmentCalamity extends EnchantmentBase {
 
         // v-cache：走中央装备缓存
         int totalLevel = EnchantmentEventHandler.armorTotal(entity, calamity);
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
-        }
+        totalLevel = applyLevelLimit(calamity, totalLevel, LEVEL_CAP.getInt());
         return totalLevel;
     }
 
@@ -102,9 +100,7 @@ public class EnchantmentCalamity extends EnchantmentBase {
         // v-cache：走中央装备缓存（主手 + 四个护甲槽）
         int totalLevel = EnchantmentEventHandler.armorAndMainHand(entity, calamity);
 
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
-        }
+        totalLevel = applyLevelLimit(calamity, totalLevel, LEVEL_CAP.getInt());
         return totalLevel;
     }
 

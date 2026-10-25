@@ -123,7 +123,7 @@ public class EnchantmentBrokenStar extends EnchantmentBase {
                 ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
                 if (!heldItem.isEmpty()) {
                     int level = EnchantmentHelper.getItemEnchantmentLevel(brokenStar, heldItem);
-                    if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+                    level = applyLevelLimit(brokenStar, level, 10);
                     if (level > 0 && attacker.getHealth() >= attacker.getMaxHealth() * (float) HEALTH_THRESHOLD.get()) {
                         evt.setAmount(evt.getAmount() * (float) (!attacker.level().isDay()
                     ? ATTACK_MULTIPLIER_NIGHT.get() : ATTACK_MULTIPLIER_DAY.get()));
@@ -145,7 +145,7 @@ public class EnchantmentBrokenStar extends EnchantmentBase {
                 // ⭐ v2.3 修复 B：补上等级上限，与攻击者分支保持一致。
                 // 当前减伤系数不随等级变化，所以这一行暂时不影响结果，
                 // 但缺了它意味着以后一旦把减伤做成随等级递增，就会绕过 levelLimit
-                if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+                level = applyLevelLimit(brokenStar, level, 10);
                 // ⭐ v2.3 修复 C：改用严格小于，与攻击者分支的 >= 互补。
                 // 原来两边都含等号，生命值恰好半血时攻守两档会同时生效
                 if (level > 0 && victim.getHealth() < victim.getMaxHealth() * (float) HEALTH_THRESHOLD.get()) {

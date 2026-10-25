@@ -5,6 +5,7 @@ import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import pers.roinflam.carianstyle.base.enchantment.LevelDecay;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -156,6 +157,43 @@ public class ClothConfigScreen {
                 .setDefaultValue(false)
                 .setTooltip(Component.translatable("config.carianstyle.levelLimit.tooltip"))
                 .setSaveConsumer(ConfigLoader.COMMON.levelLimit::set)
+                .build());
+
+        // 高等级衰减
+        balanceCategory.addEntry(entryBuilder.startBooleanToggle(
+                        Component.translatable("config.carianstyle.levelDecay.enabled"),
+                        ConfigLoader.COMMON.levelDecayEnabled.get())
+                .setDefaultValue(false)
+                .setTooltip(Component.translatable("config.carianstyle.levelDecay.enabled.tooltip"))
+                .setSaveConsumer(ConfigLoader.COMMON.levelDecayEnabled::set)
+                .build());
+
+        balanceCategory.addEntry(entryBuilder.startIntField(
+                        Component.translatable("config.carianstyle.levelDecay.threshold"),
+                        ConfigLoader.COMMON.levelDecayThreshold.get())
+                .setDefaultValue(0)
+                .setMin(0)
+                .setMax(10000)
+                .setTooltip(Component.translatable("config.carianstyle.levelDecay.threshold.tooltip"))
+                .setSaveConsumer(ConfigLoader.COMMON.levelDecayThreshold::set)
+                .build());
+
+        balanceCategory.addEntry(entryBuilder.startStrList(
+                        Component.translatable("config.carianstyle.levelDecay.curve"),
+                        new ArrayList<>(ConfigLoader.COMMON.levelDecayCurve.get()))
+                .setDefaultValue(new ArrayList<>(LevelDecay.DEFAULT_CURVE))
+                .setTooltip(Component.translatable("config.carianstyle.levelDecay.curve.tooltip"))
+                .setSaveConsumer(ConfigLoader.COMMON.levelDecayCurve::set)
+                .build());
+
+        balanceCategory.addEntry(entryBuilder.startIntField(
+                        Component.translatable("config.carianstyle.levelDecay.maxLevel"),
+                        ConfigLoader.COMMON.levelDecayMaxLevel.get())
+                .setDefaultValue(0)
+                .setMin(0)
+                .setMax(100000)
+                .setTooltip(Component.translatable("config.carianstyle.levelDecay.maxLevel.tooltip"))
+                .setSaveConsumer(ConfigLoader.COMMON.levelDecayMaxLevel::set)
                 .build());
 
         balanceCategory.addEntry(entryBuilder.startDoubleField(

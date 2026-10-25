@@ -115,9 +115,7 @@ public class EnchantmentDoomedDeath extends EnchantmentBase {
         }
 
         int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
-        }
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
 
         // 玩家需要刚挥剑
         if (ctx.isHolderPlayer() && !isJustSwung(ctx.getHolderAsPlayer())) {

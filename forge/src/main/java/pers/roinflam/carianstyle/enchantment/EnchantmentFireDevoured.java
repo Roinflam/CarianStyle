@@ -127,9 +127,7 @@ public class EnchantmentFireDevoured extends EnchantmentBase {
         }
 
         int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
-        }
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
 
         if (attacker.getRemainingFireTicks() <= 0) {
             return;

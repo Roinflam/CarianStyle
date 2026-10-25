@@ -93,9 +93,7 @@ public class EnchantmentAncestralSpiritHorn extends EnchantmentBase {
                 totalLevel += EnchantmentHelper.getItemEnchantmentLevel(ancestralSpiritHorn, armor);
             }
         }
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
-        }
+        totalLevel = applyLevelLimit(ancestralSpiritHorn, totalLevel, LEVEL_CAP.getInt());
         return totalLevel;
     }
 

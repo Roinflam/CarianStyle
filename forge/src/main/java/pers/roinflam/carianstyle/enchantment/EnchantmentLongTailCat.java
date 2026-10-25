@@ -102,9 +102,7 @@ public class EnchantmentLongTailCat extends EnchantmentBase {
             }
         }
 
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
-        }
+        totalLevel = applyLevelLimit(longTailCat, totalLevel, LEVEL_CAP.getInt());
 
         if (totalLevel <= 0) {
             return;

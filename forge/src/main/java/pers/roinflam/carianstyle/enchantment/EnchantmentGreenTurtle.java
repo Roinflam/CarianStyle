@@ -90,6 +90,8 @@ public class EnchantmentGreenTurtle extends EnchantmentBase {
             }
         }
 
+        totalLevel = decayLevel(greenTurtle, totalLevel);
+
         if (totalLevel <= 0) {
             return;
         }

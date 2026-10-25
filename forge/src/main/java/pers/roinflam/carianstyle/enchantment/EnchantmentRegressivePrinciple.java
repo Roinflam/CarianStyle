@@ -131,9 +131,7 @@ public class EnchantmentRegressivePrinciple extends EnchantmentBase {
         // 从护甲累加附魔等级（v-cache：走中央装备缓存）
         int totalLevel = EnchantmentEventHandler.armorTotal(player, regressivePrinciple);
 
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
-        }
+        totalLevel = applyLevelLimit(regressivePrinciple, totalLevel, LEVEL_CAP.getInt());
 
         if (totalLevel <= 0) {
             return;

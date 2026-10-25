@@ -75,7 +75,7 @@ public class EnchantmentBlasphemy extends EnchantmentBase {
         Enchantment blasphemy = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBlasphemy.class);
         if (blasphemy == null) return;
         int level = EnchantmentHelper.getItemEnchantmentLevel(blasphemy, heldItem);
-        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        level = applyLevelLimit(blasphemy, level, 10);
         if (level <= 0) return;
         killer.heal(dead.getMaxHealth() * (float) HEAL_RATIO.get());
         if (killer instanceof Player player) {

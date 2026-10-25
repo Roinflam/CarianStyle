@@ -110,9 +110,7 @@ public class EnchantmentAssassinGambit extends EnchantmentBase {
                 ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
                 if (!heldItem.isEmpty()) {
                     int level = EnchantmentHelper.getItemEnchantmentLevel(assassinGambit, heldItem);
-                    if (ConfigLoader.levelLimit) {
-                        level = Math.min(level, LEVEL_CAP.getInt());
-                    }
+                    level = applyLevelLimit(assassinGambit, level, LEVEL_CAP.getInt());
                     if (level > 0) {
                         DynamicAttributeManager.remove(attacker, DynamicAttributes.STEALTH);
                         evt.setAmount(evt.getAmount() + evt.getAmount() * level * (float) DAMAGE_PER_LEVEL.get());
@@ -128,6 +126,7 @@ public class EnchantmentAssassinGambit extends EnchantmentBase {
         ItemStack victimHeldItem = victim.getItemInHand(InteractionHand.MAIN_HAND);
         if (!victimHeldItem.isEmpty()) {
             int level = EnchantmentHelper.getItemEnchantmentLevel(assassinGambit, victimHeldItem);
+            level = decayLevel(assassinGambit, level);
             if (level > 0) {
                 DynamicAttributeManager.apply(victim,
                         DynamicAttributes.STEALTH.createInstance(level * STEALTH_TICKS_PER_LEVEL.getInt()));

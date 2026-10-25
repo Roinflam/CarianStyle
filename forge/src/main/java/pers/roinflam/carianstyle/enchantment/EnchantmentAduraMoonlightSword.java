@@ -123,9 +123,7 @@ public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
 
         // 手动应用等级限制
         int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
-        }
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
 
         // 玩家需要满蓄力，非玩家直接触发
         if (!isFullyCharged(ctx.getHolder())) {

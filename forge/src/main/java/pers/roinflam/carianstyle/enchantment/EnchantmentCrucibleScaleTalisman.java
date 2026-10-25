@@ -101,9 +101,7 @@ public class EnchantmentCrucibleScaleTalisman extends EnchantmentBase {
             }
         }
 
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
-        }
+        totalLevel = applyLevelLimit(crucibleScaleTalisman, totalLevel, LEVEL_CAP.getInt());
 
         if (totalLevel <= 0) {
             return;

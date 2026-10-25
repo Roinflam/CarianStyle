@@ -91,7 +91,7 @@ public class EnchantmentMikaelaBlade extends EnchantmentBase {
                 ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
                 if (!heldItem.isEmpty()) {
                     int level = EnchantmentHelper.getItemEnchantmentLevel(mikaelaBlade, heldItem);
-                    if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+                    level = applyLevelLimit(mikaelaBlade, level, 10);
                     if (level > 0) {
                         // ⭐ v2.3：连点会让每一下都叠一层连击（倍率不封顶），叠层要求满蓄力；
                         // 未满蓄力的一下只吃基础倍率（它是首击的代价），不加层、不刷新，也拿不到层数加成。

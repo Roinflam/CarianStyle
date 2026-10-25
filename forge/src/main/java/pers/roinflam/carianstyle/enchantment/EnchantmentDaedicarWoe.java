@@ -99,9 +99,7 @@ public class EnchantmentDaedicarWoe extends EnchantmentBase {
             }
         }
 
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
-        }
+        totalLevel = applyLevelLimit(daedicarWoe, totalLevel, LEVEL_CAP.getInt());
 
         if (totalLevel <= 0) {
             return;

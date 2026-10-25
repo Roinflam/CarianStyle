@@ -115,6 +115,7 @@ public class EnchantmentQuickstep extends EnchantmentBase {
 
         // v-cache：走中央装备缓存
         int totalLevel = EnchantmentEventHandler.armorTotal(player, quickstep);
+        totalLevel = decayLevel(quickstep, totalLevel);
 
         if (totalLevel <= 0) {
             return;

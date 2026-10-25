@@ -116,9 +116,7 @@ public class EnchantmentBlueFeatheredBranchsword extends EnchantmentBase {
 
         // 手动应用等级限制
         int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
-        }
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
 
         // ⭐ v2.1：再压一道公式自身的安全上限，保证减伤系数恒为正（详见类注释）
         effectiveLevel = Math.min(effectiveLevel, MAX_EFFECTIVE_LEVEL.getInt());

@@ -90,7 +90,7 @@ public class EnchantmentMoonOfNoxtura extends EnchantmentBase {
 
         // 检查护甲附魔（v-cache：走中央装备缓存）
         int totalLevel = EnchantmentEventHandler.armorTotal(player, moonOfNoxtura);
-        if (ConfigLoader.levelLimit) totalLevel = Math.min(totalLevel, 10);
+        totalLevel = applyLevelLimit(moonOfNoxtura, totalLevel, 10);
         if (totalLevel <= 0) return;
 
         // 2.5%概率触发

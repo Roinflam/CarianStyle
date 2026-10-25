@@ -5,6 +5,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
@@ -299,9 +300,7 @@ public final class CarianStyleConditionDisplay {
                 new StackDisplayRegistry.Info(BLACK_FLAME_SHELTER_NAME_KEY, BLACK_FLAME_SHELTER_COLOR),
                 (player, ctx) -> {
                     int total = armorSumLevelById(ctx, BLACK_FLAME_SHELTER_ID);
-                    if (ConfigLoader.levelLimit) {
-                        total = Math.min(total, ARMOR_TOTAL_LEVEL_CAP);
-                    }
+                    total = EnchantmentBase.applyLevelLimit(resolveEnchantment(BLACK_FLAME_SHELTER_ID), total, ARMOR_TOTAL_LEVEL_CAP);
                     // ⭐ 与附魔 v2.2 的无条件硬上限保持同一口径（详见 BLACK_FLAME_SHELTER_MAX_LEVEL）
                     total = Math.min(total, BLACK_FLAME_SHELTER_MAX_LEVEL);
                     if (total <= 0) {
@@ -415,9 +414,7 @@ public final class CarianStyleConditionDisplay {
                         return StackDisplayRegistry.Stacks.NONE;
                     }
                     int total = armorSumLevelById(ctx, MOON_OF_NOXTURA_ID);
-                    if (ConfigLoader.levelLimit) {
-                        total = Math.min(total, ARMOR_TOTAL_LEVEL_CAP);
-                    }
+                    total = EnchantmentBase.applyLevelLimit(resolveEnchantment(MOON_OF_NOXTURA_ID), total, ARMOR_TOTAL_LEVEL_CAP);
                     if (total <= 0) {
                         return StackDisplayRegistry.Stacks.NONE;
                     }

@@ -106,9 +106,7 @@ public class EnchantmentBadOmen extends EnchantmentBase {
 
         // 手动应用等级限制
         int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
-        }
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
 
         // 如果敌人已有凶兆效果，额外造成50%伤害
         if (victim.hasEffect(CarianStylePotion.BAD_OMEN.get())) {

@@ -107,9 +107,7 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
                 totalLevel += EnchantmentHelper.getItemEnchantmentLevel(giantFlame, armor);
             }
         }
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
-        }
+        totalLevel = applyLevelLimit(giantFlame, totalLevel, LEVEL_CAP.getInt());
         return totalLevel;
     }
 

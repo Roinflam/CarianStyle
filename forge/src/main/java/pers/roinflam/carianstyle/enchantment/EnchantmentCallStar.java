@@ -161,9 +161,7 @@ public class EnchantmentCallStar extends EnchantmentBase {
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(callStar, heldItem);
 
-        if (ConfigLoader.levelLimit) {
-            level = Math.min(level, LEVEL_CAP.getInt());
-        }
+        level = applyLevelLimit(callStar, level, LEVEL_CAP.getInt());
 
         if (level <= 0) {
             return;

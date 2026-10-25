@@ -129,9 +129,7 @@ public class EnchantmentEpilepsyFire extends EnchantmentBase {
         }
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(epilepsyFire, heldItem);
-        if (ConfigLoader.levelLimit) {
-            level = Math.min(level, LEVEL_CAP.getInt());
-        }
+        level = applyLevelLimit(epilepsyFire, level, LEVEL_CAP.getInt());
         if (level <= 0) {
             return;
         }

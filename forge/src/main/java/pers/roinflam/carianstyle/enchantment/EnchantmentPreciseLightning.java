@@ -105,7 +105,7 @@ public class EnchantmentPreciseLightning extends EnchantmentBase {
         for (ItemStack armor : victim.getArmorSlots()) {
             if (!armor.isEmpty()) totalLevel += EnchantmentHelper.getItemEnchantmentLevel(preciseLightning, armor);
         }
-        if (ConfigLoader.levelLimit) totalLevel = Math.min(totalLevel, 10);
+        totalLevel = applyLevelLimit(preciseLightning, totalLevel, 10);
         if (totalLevel <= 0) return;
 
         final int effectiveLevel = totalLevel;

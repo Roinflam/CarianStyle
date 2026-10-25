@@ -116,6 +116,7 @@ public class EnchantmentPatience extends EnchantmentBase {
         }
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(patience, heldItem);
+        level = decayLevel(patience, level);
 
         if (level <= 0) {
             return;

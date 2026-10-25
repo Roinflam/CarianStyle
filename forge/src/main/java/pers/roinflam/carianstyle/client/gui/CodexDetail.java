@@ -11,6 +11,7 @@ import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
+import pers.roinflam.carianstyle.base.enchantment.LevelDecay;
 import pers.roinflam.carianstyle.codex.EnchantmentCodex;
 import pers.roinflam.carianstyle.codex.ModNames;
 import pers.roinflam.carianstyle.codex.EnchantmentMeta;
@@ -604,6 +605,23 @@ public final class CodexDetail {
 
         if (ConfigLoader.levelLimit) {
             cursorY = bullet(g, font, Component.translatable("carianstyle.codex.field.level_limit_on"),
+                    left, cursorY, innerWidth, UiTheme.WARN);
+        }
+
+        if (LevelDecay.isEnabled()) {
+            int threshold = LevelDecay.threshold(enchantment);
+            StringBuilder samples = new StringBuilder();
+            for (int sample : new int[]{10, 25, 50, 100}) {
+                if (sample <= threshold) {
+                    continue;
+                }
+                if (samples.length() > 0) {
+                    samples.append(", ");
+                }
+                samples.append(sample).append(" → ").append(LevelDecay.apply(enchantment, sample));
+            }
+            cursorY = bullet(g, font, Component.translatable("carianstyle.codex.field.level_decay_on",
+                            threshold, samples.toString()),
                     left, cursorY, innerWidth, UiTheme.WARN);
         }
 

@@ -160,6 +160,7 @@ public class EnchantmentParry extends EnchantmentBase {
         }
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(parry, activeItem);
+        level = decayLevel(parry, level);
         if (level <= 0) {
             return;
         }

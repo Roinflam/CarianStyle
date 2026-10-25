@@ -67,9 +67,7 @@ public class EnchantmentCrucibleKnotTalisman extends EnchantmentBase {
         }
 
         int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
-        }
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
 
         if (attacker.getY() > victim.getY()) {
             float damageReduction = 1 - effectiveLevel * (float) REDUCTION_PER_LEVEL.get();

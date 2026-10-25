@@ -58,7 +58,7 @@ public class EnchantmentBloodCollection extends EnchantmentBase {
     protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
         LivingEntity attacker = ctx.getHolder();
         int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) effectiveLevel = Math.min(effectiveLevel, 10);
+        effectiveLevel = capLevel(effectiveLevel, 10);
         if (!isFullyCharged(ctx.getHolder())) return;
         float lostHealthRatio = 1 - attacker.getHealth() / attacker.getMaxHealth();
         float bonusDamage = ctx.getDamage() * lostHealthRatio * effectiveLevel * (float) BONUS_DAMAGE_PER_LEVEL.get();

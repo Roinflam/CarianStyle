@@ -121,9 +121,7 @@ public class EnchantmentDragonBreathCorruption extends EnchantmentBase {
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(dragonBreath, heldItem);
 
-        if (ConfigLoader.levelLimit) {
-            level = Math.min(level, LEVEL_CAP.getInt());
-        }
+        level = applyLevelLimit(dragonBreath, level, LEVEL_CAP.getInt());
 
         if (level <= 0) {
             return;

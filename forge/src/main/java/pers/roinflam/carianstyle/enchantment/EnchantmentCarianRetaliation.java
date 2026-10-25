@@ -173,9 +173,7 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(carianRetaliation, heldItem);
 
-        if (ConfigLoader.levelLimit) {
-            level = Math.min(level, LEVEL_CAP.getInt());
-        }
+        level = applyLevelLimit(carianRetaliation, level, LEVEL_CAP.getInt());
 
         if (level <= 0) {
             return;

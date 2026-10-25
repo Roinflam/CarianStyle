@@ -111,7 +111,7 @@ public class EnchantmentEatShit extends EnchantmentBase {
         ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) return;
         int level = EnchantmentHelper.getItemEnchantmentLevel(eatShit, heldItem);
-        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        level = applyLevelLimit(eatShit, level, 10);
         if (level <= 0) return;
         // ⭐ v2.4：连点会让每一下都挂上反胃和治疗削减，要求满蓄力
         if (!EnchantmentBase.isFullyCharged(attacker)) return;

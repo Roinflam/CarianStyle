@@ -109,9 +109,7 @@ public class EnchantmentLivingCorpse extends EnchantmentBase {
                 totalLevel += EnchantmentHelper.getItemEnchantmentLevel(livingCorpse, armor);
             }
         }
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
-        }
+        totalLevel = applyLevelLimit(livingCorpse, totalLevel, LEVEL_CAP.getInt());
         return totalLevel;
     }
 

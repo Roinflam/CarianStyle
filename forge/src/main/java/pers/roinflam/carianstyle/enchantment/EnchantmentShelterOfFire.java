@@ -97,9 +97,7 @@ public class EnchantmentShelterOfFire extends EnchantmentBase {
 
         // 手动应用等级限制
         int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
-        }
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
 
         // 计算减伤比例：2% × 等级
         float damageReduction = effectiveLevel * (float) REDUCTION_PER_LEVEL.get();
@@ -138,9 +136,7 @@ public class EnchantmentShelterOfFire extends EnchantmentBase {
 
         // 手动应用等级限制
         int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
-        }
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
 
         // 每秒恢复 0.1% × 等级 最大生命值（原本是每tick算1/20，现在1秒一次直接算总量）
         float healAmount = entity.getMaxHealth() * effectiveLevel * (float) HEAL_PER_LEVEL.get();

@@ -6,6 +6,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.config.ModConfigEvent;
 import org.apache.commons.lang3.tuple.Pair;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.LevelDecay;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import java.util.Arrays;
@@ -110,6 +111,13 @@ public final class ConfigLoader {
 
         public final ForgeConfigSpec.BooleanValue useVanillaRarityWeight;
         public final ForgeConfigSpec.BooleanValue allowVillagerBookTrade;
+
+        // ==================== 高等级衰减 ====================
+
+        public final ForgeConfigSpec.BooleanValue levelDecayEnabled;
+        public final ForgeConfigSpec.IntValue levelDecayThreshold;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> levelDecayCurve;
+        public final ForgeConfigSpec.IntValue levelDecayMaxLevel;
 
         // ==================== 怪物附魔触发配置（v2.3新增） ====================
 
@@ -292,6 +300,50 @@ public final class ConfigLoader {
                     .comment("Default: false (block)")
                     .comment("默认值：false（拦截）")
                     .define("allowVillagerBookTrade", false);
+
+            builder.pop();
+
+            // ========== 高等级衰减 ==========
+            builder.comment("")
+                    .comment("═══════════════════════════════════════════════════════════════")
+                    .comment("High Level Decay")
+                    .comment("高等级衰减：附魔等级超过阈值后，实际生效的等级按曲线打折")
+                    .comment("Only affects CarianStyle enchantments. Levels at or below the threshold are untouched,")
+                    .comment("只影响本模组的附魔。等级不超过阈值时原样生效，")
+                    .comment("and one more level never makes an enchantment weaker.")
+                    .comment("并且多一级永远不会变弱。")
+                    .comment("═══════════════════════════════════════════════════════════════")
+                    .push("levelDecay");
+
+            levelDecayEnabled = builder
+                    .comment("Enable high level decay. Default: false")
+                    .comment("是否开启高等级衰减。默认 false（关）")
+                    .define("enabled", false);
+
+            levelDecayThreshold = builder
+                    .comment("Decay starts above this level. 0 = each enchantment's own max level (1 / 3 / 5).")
+                    .comment("超过这个等级才开始衰减。0 = 用每个附魔自己的等级上限（1 / 3 / 5 级）；")
+                    .comment("a positive number applies the same threshold to every enchantment.")
+                    .comment("填正数则所有附魔统一用这个等级。")
+                    .defineInRange("threshold", 0, 0, 10000);
+
+            levelDecayCurve = builder
+                    .comment("Curve points as \"level:percent\": at that level, effective level = level x percent.")
+                    .comment("曲线点，写成「等级:百分比」，意思是到这个等级时，实际生效等级 = 等级 × 百分比。")
+                    .comment("Between points the effective level is interpolated linearly; past the last point it keeps")
+                    .comment("两点之间平滑过渡；超过最后一个点后，每多一级的增量和最后一段相同（最后一段越平缓，")
+                    .comment("growing at the slope of the last segment. Points at or below the threshold are ignored.")
+                    .comment("极端等级涨得越慢）。不超过阈值的点不起作用。")
+                    .comment("Default: 10->9, 20->15, 30->20, 50->25, 75->30, 100->33, 200->40, 1000->96")
+                    .comment("默认效果：10 级 → 9，20 → 15，30 → 20，50 → 25，75 → 30，100 → 33，200 → 40，1000 → 96")
+                    .comment("A harsher alternative: [\"10:80\", \"25:70\", \"50:60\", \"75:50\", \"100:40\"]")
+                    .comment("更狠一些的写法：[\"10:80\", \"25:70\", \"50:60\", \"75:50\", \"100:40\"]（100 级 → 40，1000 → 130）")
+                    .defineList("curve", LevelDecay.DEFAULT_CURVE, obj -> obj instanceof String);
+
+            levelDecayMaxLevel = builder
+                    .comment("Hard cap on the effective level after decay. 0 = no cap.")
+                    .comment("衰减后实际生效等级的硬上限，0 = 不封顶。指令刷出 32767 级之类时用得上。")
+                    .defineInRange("maxLevel", 0, 0, 100000);
 
             builder.pop();
 
@@ -500,6 +552,9 @@ public final class ConfigLoader {
 
         levelLimit = COMMON.levelLimit.get();
         enchantingDifficulty = COMMON.enchantingDifficulty.get();
+
+        LevelDecay.bake(COMMON.levelDecayEnabled.get(), COMMON.levelDecayThreshold.get(),
+                COMMON.levelDecayMaxLevel.get(), COMMON.levelDecayCurve.get());
 
         // v2.4新增：同步附魔获取途径平衡开关
         useVanillaRarityWeight = COMMON.useVanillaRarityWeight.get();

@@ -171,9 +171,7 @@ public class EnchantmentStampSweep extends EnchantmentBase {
 
         // 手动应用等级限制
         int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
-        }
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
 
         // 如果是玩家，执行旋转动画
         if (attacker instanceof ServerPlayer) {

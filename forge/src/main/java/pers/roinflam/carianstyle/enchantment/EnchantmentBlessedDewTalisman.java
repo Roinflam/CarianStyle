@@ -126,9 +126,7 @@ public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
         int totalLevel = EnchantmentEventHandler.armorTotal(player, blessedDewTalisman);
 
         // 应用等级上限
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
-        }
+        totalLevel = applyLevelLimit(blessedDewTalisman, totalLevel, LEVEL_CAP.getInt());
 
         // 执行治疗
         if (totalLevel > 0) {

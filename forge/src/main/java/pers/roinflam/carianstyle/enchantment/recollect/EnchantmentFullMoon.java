@@ -104,7 +104,7 @@ public class EnchantmentFullMoon extends EnchantmentBase {
         for (ItemStack armor : holder.getArmorSlots()) {
             if (!armor.isEmpty()) totalLevel += EnchantmentHelper.getItemEnchantmentLevel(fullMoon, armor);
         }
-        if (ConfigLoader.levelLimit) totalLevel = Math.min(totalLevel, 10);
+        totalLevel = applyLevelLimit(fullMoon, totalLevel, 10);
         if (totalLevel <= 0) return;
         if (!EnchantmentDataManager.isOnCooldown(FULL_MOON_COOLDOWN_KEY, uuid)) {
             evt.setCanceled(true);

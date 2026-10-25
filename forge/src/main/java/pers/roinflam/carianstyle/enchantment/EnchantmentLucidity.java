@@ -91,9 +91,7 @@ public class EnchantmentLucidity extends EnchantmentBase implements IEffectModif
         }
 
         // 应用等级限制
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, LEVEL_CAP.getInt());
-        }
+        totalLevel = applyLevelLimit(this, totalLevel, LEVEL_CAP.getInt());
 
         return totalLevel;
     }

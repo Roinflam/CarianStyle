@@ -122,7 +122,7 @@ public class EnchantmentScholarShield extends EnchantmentBase {
         }
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(scholarShield, activeItem);
-        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        level = applyLevelLimit(scholarShield, level, 10);
         if (level <= 0) return;
 
         // ⭐ v2.3：反伤期间置位重入标记，确保反伤伤害不会再次触发反伤；
@@ -165,7 +165,7 @@ public class EnchantmentScholarShield extends EnchantmentBase {
         }
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(scholarShield, activeItem);
-        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        level = applyLevelLimit(scholarShield, level, 10);
         if (level <= 0) return;
 
         evt.setAmount(evt.getAmount() - evt.getAmount() * level * (float) REDUCTION_PER_LEVEL.get());

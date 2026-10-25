@@ -182,6 +182,7 @@ public class EnchantmentGravitas extends EnchantmentBase {
         }
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(gravitas, heldItem);
+        level = decayLevel(gravitas, level);
 
         if (level <= 0) {
             return;

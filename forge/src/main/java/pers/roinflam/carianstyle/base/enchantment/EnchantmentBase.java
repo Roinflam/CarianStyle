@@ -1,5 +1,7 @@
 package pers.roinflam.carianstyle.base.enchantment;
 
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -375,6 +377,21 @@ public abstract class EnchantmentBase extends Enchantment {
         return enchantmentRarity.getMaxLevel();
     }
 
+    /**
+     * 开了高等级衰减、并且这一级会被打折时，在名字后面补上实际生效等级，例如「锋利 L（生效 25 级）」。
+     * 只按这一件物品上的等级算；护甲类附魔是几件加起来再衰减，穿齐一套时实际值以百科的说明为准。
+     */
+    @Override
+    public Component getFullname(int level) {
+        Component name = super.getFullname(level);
+        int effective = LevelDecay.apply(this, level);
+        if (effective == level) {
+            return name;
+        }
+        return name.copy().append(Component.translatable("carianstyle.level_decay.effective", effective)
+                .withStyle(ChatFormatting.DARK_GRAY));
+    }
+
     @Override
     public int getMinCost(int enchantmentLevel) {
         if (annotation != null && annotation.baseEnchantability() != -1) {
@@ -494,16 +511,59 @@ public abstract class EnchantmentBase extends Enchantment {
     }
 
     /**
-     * 应用附魔等级上限
+     * 应用高等级衰减与附魔等级上限
      *
      * @param level 原始等级
      * @return 限制后的等级
      */
     public int applyLevelLimit(int level) {
+        return applyLevelLimit(level, 10);
+    }
+
+    /**
+     * 应用高等级衰减（{@link LevelDecay}），再在 {@code levelLimit} 开启时钳到附魔自己的上限。
+     * <p>
+     * 先衰减再钳：钳制是对「实际生效等级」的硬上限，和衰减叠用时结果只会更低，不会因为先钳后衰减把 10 级再打一次折。
+     * </p>
+     *
+     * @param level 原始等级（护甲类是几件加起来的总和）
+     * @param cap   {@code levelLimit} 开启时的上限
+     * @return 实际生效等级
+     */
+    public int applyLevelLimit(int level, int cap) {
+        return applyLevelLimit(this, level, cap);
+    }
+
+    /**
+     * {@link #applyLevelLimit(int, int)} 的静态版本，给静态事件处理器用。
+     */
+    public static int applyLevelLimit(Enchantment enchantment, int level, int cap) {
+        level = LevelDecay.apply(enchantment, level);
         if (ConfigLoader.levelLimit) {
-            return Math.min(level, 10);
+            return Math.min(level, cap);
         }
         return level;
+    }
+
+    /**
+     * 只在 {@code levelLimit} 开启时钳到上限，不做衰减。
+     * <p>
+     * 给 {@code onXxx(ctx, level)} 回调里用：分发器传进来的 level 已经走过 {@link #applyLevelLimit(int)}，
+     * 衰减过一次，再衰减就打了两次折。
+     * </p>
+     */
+    public static int capLevel(int level, int cap) {
+        if (ConfigLoader.levelLimit) {
+            return Math.min(level, cap);
+        }
+        return level;
+    }
+
+    /**
+     * 只做高等级衰减，不受 {@code levelLimit} 影响。给原本就不吃等级上限的附魔用。
+     */
+    public static int decayLevel(Enchantment enchantment, int level) {
+        return LevelDecay.apply(enchantment, level);
     }
 
     /**

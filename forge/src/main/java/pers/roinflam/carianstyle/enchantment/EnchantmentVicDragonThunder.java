@@ -166,9 +166,7 @@ public class EnchantmentVicDragonThunder extends EnchantmentBase {
                 ItemStack victimHeld = victim.getItemInHand(InteractionHand.MAIN_HAND);
                 if (!victimHeld.isEmpty()) {
                     int level = EnchantmentHelper.getItemEnchantmentLevel(vicDragonThunder, victimHeld);
-                    if (ConfigLoader.levelLimit) {
-                        level = Math.min(level, LEVEL_CAP.getInt());
-                    }
+                    level = applyLevelLimit(vicDragonThunder, level, LEVEL_CAP.getInt());
                     if (level > 0) {
                         if (level * REDUCTION_PER_LEVEL.get() >= 1) {
                             evt.setCanceled(true);
@@ -194,9 +192,7 @@ public class EnchantmentVicDragonThunder extends EnchantmentBase {
         }
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(vicDragonThunder, attackerHeld);
-        if (ConfigLoader.levelLimit) {
-            level = Math.min(level, LEVEL_CAP.getInt());
-        }
+        level = applyLevelLimit(vicDragonThunder, level, LEVEL_CAP.getInt());
         if (level <= 0) {
             return;
         }

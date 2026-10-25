@@ -128,7 +128,7 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
                 ItemStack heldItem = livingVictim.getItemInHand(InteractionHand.MAIN_HAND);
                 if (!heldItem.isEmpty()) {
                     int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);
-                    if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+                    level = applyLevelLimit(darkMoon, level, 10);
                     if (level > 0) {
                         boolean hasFullMoon = hasFullMoonEnchantment(livingVictim);
                         evt.setAmount(evt.getAmount() * (1 - ratio(hasFullMoon)));
@@ -146,7 +146,7 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
         ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) return;
         int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);
-        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        level = applyLevelLimit(darkMoon, level, 10);
         if (level <= 0) return;
         if (!isFullyCharged(attacker)) return;
         boolean hasFullMoon = hasFullMoonEnchantment(attacker);
@@ -172,7 +172,7 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
         ItemStack heldItem = healer.getItemInHand(InteractionHand.MAIN_HAND);
         if (heldItem.isEmpty()) return;
         int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);
-        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        level = applyLevelLimit(darkMoon, level, 10);
         if (level <= 0) return;
         boolean hasFullMoon = hasFullMoonEnchantment(healer);
         evt.setAmount(evt.getAmount() * (1 + ratio(hasFullMoon)));
@@ -187,7 +187,7 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
         // v-cache：走中央装备缓存。本方法每玩家每 tick 都会跑（夜间），
         // 直查会每次反序列化一遍主手的附魔 ListTag。
         int level = EnchantmentEventHandler.mainHand(player, darkMoon);
-        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        level = applyLevelLimit(darkMoon, level, 10);
         if (level > 0) player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, NIGHT_VISION_TICKS.getInt()));
     }
 

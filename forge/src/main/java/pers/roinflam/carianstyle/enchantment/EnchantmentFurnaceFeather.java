@@ -98,9 +98,7 @@ public class EnchantmentFurnaceFeather extends EnchantmentBase {
 
         // 手动应用等级限制（虽然 EnchantmentBase 已经限制过了，但为了保险再限制一次）
         int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
-        }
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
 
         // 增加无敌帧
         victim.invulnerableTime = (int) (victim.invulnerableDuration +

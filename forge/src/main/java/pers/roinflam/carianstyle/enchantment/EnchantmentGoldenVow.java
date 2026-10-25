@@ -119,9 +119,7 @@ public class EnchantmentGoldenVow extends EnchantmentBase {
                 }
             }
 
-            if (ConfigLoader.levelLimit) {
-                victimLevel = Math.min(victimLevel, VICTIM_LEVEL_CAP.getInt());
-            }
+            victimLevel = applyLevelLimit(goldenVow, victimLevel, VICTIM_LEVEL_CAP.getInt());
 
             if (victimLevel > 0) {
                 int duration = (int) (DURATION_SECONDS_PER_LEVEL.get() * victimLevel * 20);
@@ -144,9 +142,7 @@ public class EnchantmentGoldenVow extends EnchantmentBase {
             }
         }
 
-        if (ConfigLoader.levelLimit) {
-            attackerLevel = Math.min(attackerLevel, ATTACKER_LEVEL_CAP.getInt());
-        }
+        attackerLevel = applyLevelLimit(goldenVow, attackerLevel, ATTACKER_LEVEL_CAP.getInt());
 
         if (attackerLevel > 0) {
             attackerLevel = Math.min(attackerLevel, ATTACKER_AMPLIFIER_CAP.getInt());

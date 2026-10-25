@@ -135,9 +135,7 @@ public class EnchantmentSkyShot extends EnchantmentBase {
         }
 
         int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, LEVEL_CAP.getInt());
-        }
+        effectiveLevel = applyLevelLimit(skyShot, effectiveLevel, LEVEL_CAP.getInt());
 
         double heightDifference = target.getY() - shooter.getY();
         if (heightDifference < HEIGHT_THRESHOLD.get()) {

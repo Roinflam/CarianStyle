@@ -85,6 +85,7 @@ public class EnchantmentCragblade extends EnchantmentBase {
         }
 
         int level = EnchantmentHelper.getItemEnchantmentLevel(cragblade, heldItem);
+        level = decayLevel(cragblade, level);
 
         if (level <= 0) {
             return;

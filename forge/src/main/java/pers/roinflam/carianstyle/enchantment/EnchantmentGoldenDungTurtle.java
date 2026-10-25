@@ -52,7 +52,7 @@ public class EnchantmentGoldenDungTurtle extends EnchantmentBase {
         Enchantment goldenDungTurtle = EnchantmentRegistry.getEnchantmentByClass(EnchantmentGoldenDungTurtle.class);
         if (goldenDungTurtle == null) return;
         int level = EnchantmentHelper.getItemEnchantmentLevel(goldenDungTurtle, heldItem);
-        if (ConfigLoader.levelLimit) level = Math.min(level, 10);
+        level = applyLevelLimit(goldenDungTurtle, level, 10);
         if (level <= 0) return;
         evt.setDroppedExperience(evt.getDroppedExperience() + (int) (evt.getDroppedExperience() * level * EXP_BONUS_PER_LEVEL.get()));
     }
