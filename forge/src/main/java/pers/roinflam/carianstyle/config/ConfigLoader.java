@@ -118,6 +118,8 @@ public final class ConfigLoader {
         public final ForgeConfigSpec.IntValue levelDecayThreshold;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> levelDecayCurve;
         public final ForgeConfigSpec.IntValue levelDecayMaxLevel;
+        public final ForgeConfigSpec.BooleanValue levelDecayByMultiple;
+        public final ForgeConfigSpec.BooleanValue levelDecayShowInName;
 
         // ==================== 怪物附魔触发配置（v2.3新增） ====================
 
@@ -327,23 +329,42 @@ public final class ConfigLoader {
                     .comment("填正数则所有附魔统一用这个等级。")
                     .defineInRange("threshold", 0, 0, 10000);
 
+            levelDecayByMultiple = builder
+                    .comment("true (default): curve points are written as multiples of the threshold, so every enchantment")
+                    .comment("true（默认）：曲线的横坐标写「阈值的几倍」，上限 1 / 3 / 5 级的附魔削弱幅度一致；")
+                    .comment("is reduced by the same proportion whatever its max level (1 / 3 / 5).")
+                    .comment("false: curve points are actual levels shared by every enchantment; enchantments with a")
+                    .comment("false：横坐标直接写实际等级，所有附魔共用；上限低的附魔会削得更少")
+                    .comment("lower max level are then reduced less (level 10 is 9x the max of a level-1 enchantment).")
+                    .comment("（同样 10 级，对上限 1 级的附魔是满级的 10 倍，对上限 5 级的只是 2 倍）。")
+                    .define("byMultiple", true);
+
             levelDecayCurve = builder
-                    .comment("Curve points as \"level:percent\": at that level, effective level = level x percent.")
-                    .comment("曲线点，写成「等级:百分比」，意思是到这个等级时，实际生效等级 = 等级 × 百分比。")
+                    .comment("Curve points as \"multiple:percent\" (or \"level:percent\" when byMultiple = false):")
+                    .comment("曲线点，写成「倍数:百分比」（byMultiple = false 时是「等级:百分比」），")
+                    .comment("once the level reaches threshold x multiple, effective level = level x percent.")
+                    .comment("意思是等级到了「阈值 × 倍数」时，实际生效等级 = 等级 × 百分比。倍数可以写小数，比如 1.5。")
                     .comment("Between points the effective level is interpolated linearly; past the last point it keeps")
                     .comment("两点之间平滑过渡；超过最后一个点后，每多一级的增量和最后一段相同（最后一段越平缓，")
                     .comment("growing at the slope of the last segment. Points at or below the threshold are ignored.")
                     .comment("极端等级涨得越慢）。不超过阈值的点不起作用。")
-                    .comment("Default: 10->9, 20->15, 30->20, 50->25, 75->30, 100->33, 200->40, 1000->96")
-                    .comment("默认效果：10 级 → 9，20 → 15，30 → 20，50 → 25，75 → 30，100 → 33，200 → 40，1000 → 96")
-                    .comment("A harsher alternative: [\"10:80\", \"25:70\", \"50:60\", \"75:50\", \"100:40\"]")
-                    .comment("更狠一些的写法：[\"10:80\", \"25:70\", \"50:60\", \"75:50\", \"100:40\"]（100 级 → 40，1000 → 130）")
+                    .comment("Default, for a max level 5 enchantment: 10->9, 20->15, 30->20, 50->25, 75->30, 100->33, 200->40")
+                    .comment("默认效果，上限 5 级的附魔：10 级 → 9，20 → 15，30 → 20，50 → 25，75 → 30，100 → 33，200 → 40；")
+                    .comment("for a max level 3 enchantment: 6->5, 12->9, 30->15, 60->20; max level 1: 2->2, 10->5, 100->12")
+                    .comment("上限 3 级：6 → 5，12 → 9，30 → 15，60 → 20；上限 1 级：2 → 2，10 → 5，100 → 12")
+                    .comment("Another option, harsher early and looser late: [\"2:80\", \"5:70\", \"10:60\", \"15:50\", \"20:40\"]")
+                    .comment("另一种写法（前段更狠、满级 10 倍以后比默认松）：[\"2:80\", \"5:70\", \"10:60\", \"15:50\", \"20:40\"]（上限 5 级的附魔 10 级 → 8，100 级 → 40）")
                     .defineList("curve", LevelDecay.DEFAULT_CURVE, obj -> obj instanceof String);
 
             levelDecayMaxLevel = builder
                     .comment("Hard cap on the effective level after decay. 0 = no cap.")
                     .comment("衰减后实际生效等级的硬上限，0 = 不封顶。指令刷出 32767 级之类时用得上。")
                     .defineInRange("maxLevel", 0, 0, 100000);
+
+            levelDecayShowInName = builder
+                    .comment("Append the effective level to enchantment names, e.g. \"(effective 25)\". Default: true")
+                    .comment("附魔名后面显示实际生效等级，例如「（生效 25 级）」。默认 true（显示）；只在衰减开着且这一级会被打折时出现")
+                    .define("showInName", true);
 
             builder.pop();
 
@@ -554,7 +575,8 @@ public final class ConfigLoader {
         enchantingDifficulty = COMMON.enchantingDifficulty.get();
 
         LevelDecay.bake(COMMON.levelDecayEnabled.get(), COMMON.levelDecayThreshold.get(),
-                COMMON.levelDecayMaxLevel.get(), COMMON.levelDecayCurve.get());
+                COMMON.levelDecayByMultiple.get(), COMMON.levelDecayMaxLevel.get(),
+                COMMON.levelDecayCurve.get(), COMMON.levelDecayShowInName.get());
 
         // v2.4新增：同步附魔获取途径平衡开关
         useVanillaRarityWeight = COMMON.useVanillaRarityWeight.get();

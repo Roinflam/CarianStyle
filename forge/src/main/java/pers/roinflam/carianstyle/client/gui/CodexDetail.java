@@ -611,10 +611,9 @@ public final class CodexDetail {
         if (LevelDecay.isEnabled()) {
             int threshold = LevelDecay.threshold(enchantment);
             StringBuilder samples = new StringBuilder();
-            for (int sample : new int[]{10, 25, 50, 100}) {
-                if (sample <= threshold) {
-                    continue;
-                }
+            // 取满级的 2 / 5 / 10 / 20 倍，上限不同的附魔都能看到同一段曲线
+            for (int multiple : new int[]{2, 5, 10, 20}) {
+                int sample = threshold * multiple;
                 if (samples.length() > 0) {
                     samples.append(", ");
                 }

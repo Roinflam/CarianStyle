@@ -178,6 +178,14 @@ public class ClothConfigScreen {
                 .setSaveConsumer(ConfigLoader.COMMON.levelDecayThreshold::set)
                 .build());
 
+        balanceCategory.addEntry(entryBuilder.startBooleanToggle(
+                        Component.translatable("config.carianstyle.levelDecay.byMultiple"),
+                        ConfigLoader.COMMON.levelDecayByMultiple.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.translatable("config.carianstyle.levelDecay.byMultiple.tooltip"))
+                .setSaveConsumer(ConfigLoader.COMMON.levelDecayByMultiple::set)
+                .build());
+
         balanceCategory.addEntry(entryBuilder.startStrList(
                         Component.translatable("config.carianstyle.levelDecay.curve"),
                         new ArrayList<>(ConfigLoader.COMMON.levelDecayCurve.get()))
@@ -194,6 +202,14 @@ public class ClothConfigScreen {
                 .setMax(100000)
                 .setTooltip(Component.translatable("config.carianstyle.levelDecay.maxLevel.tooltip"))
                 .setSaveConsumer(ConfigLoader.COMMON.levelDecayMaxLevel::set)
+                .build());
+
+        balanceCategory.addEntry(entryBuilder.startBooleanToggle(
+                        Component.translatable("config.carianstyle.levelDecay.showInName"),
+                        ConfigLoader.COMMON.levelDecayShowInName.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.translatable("config.carianstyle.levelDecay.showInName.tooltip"))
+                .setSaveConsumer(ConfigLoader.COMMON.levelDecayShowInName::set)
                 .build());
 
         balanceCategory.addEntry(entryBuilder.startDoubleField(

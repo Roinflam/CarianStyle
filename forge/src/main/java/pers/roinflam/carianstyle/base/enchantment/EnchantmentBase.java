@@ -378,12 +378,15 @@ public abstract class EnchantmentBase extends Enchantment {
     }
 
     /**
-     * 开了高等级衰减、并且这一级会被打折时，在名字后面补上实际生效等级，例如「锋利 L（生效 25 级）」。
+     * 开了高等级衰减（且 showInName 没关）、并且这一级会被打折时，在名字后面补上实际生效等级，例如「锋利 L（生效 25 级）」。
      * 只按这一件物品上的等级算；护甲类附魔是几件加起来再衰减，穿齐一套时实际值以百科的说明为准。
      */
     @Override
     public Component getFullname(int level) {
         Component name = super.getFullname(level);
+        if (!LevelDecay.showInName()) {
+            return name;
+        }
         int effective = LevelDecay.apply(this, level);
         if (effective == level) {
             return name;
