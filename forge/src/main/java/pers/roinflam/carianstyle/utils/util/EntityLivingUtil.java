@@ -168,6 +168,25 @@ public class EntityLivingUtil {
     }
 
     /**
+     * 这个实体的真伤扣血是否就是一次普通的 {@code setHealth}
+     * <p>
+     * 是的话，连续几次 {@link #damageHealthDirectly(LivingEntity, float)} 可以先按
+     * {@code clamp(max(0, 血量 - 伤害), 0, 最大生命)} 逐次算好，最后只 {@code setHealth} 一次，结果逐位相同。
+     * 这个类还没走过发现流程（没有缓存）时返回 false，调用方照旧逐次扣，扣过一次缓存就有了。
+     * </p>
+     *
+     * @param entity 目标实体
+     * @return 真伤关闭，或该类已确认用 setHealth 扣血时为 true
+     */
+    public static boolean isPlainSetHealth(@Nonnull LivingEntity entity) {
+        if (!ConfigLoader.enableTrueDamage) {
+            return true;
+        }
+        HealthFieldInfo info = HEALTH_FIELD_CACHE.get(entity.getClass());
+        return info != null && info.method == DamageMethod.SET_HEALTH;
+    }
+
+    /**
      * 使用缓存的信息应用伤害
      *
      * @param entity       目标实体

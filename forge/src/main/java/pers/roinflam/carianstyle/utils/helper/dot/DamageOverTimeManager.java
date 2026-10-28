@@ -1,7 +1,11 @@
 package pers.roinflam.carianstyle.utils.helper.dot;
 
+import it.unimi.dsi.fastutil.objects.Reference2FloatMap;
+import it.unimi.dsi.fastutil.objects.Reference2FloatOpenHashMap;
+import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -111,8 +115,33 @@ import java.util.function.BiFunction;
  * 死者的受伤统计会多记一笔 10 倍最大生命的伤害。逐 tick 的持续扣血仍然直扣血量，不变。
  * </p>
  *
+ * <h3>v1.3：同一玩家同一 tick 的扣血合并成一次 setHealth</h3>
+ * <p>
+ * <b>问题：</b>战士每挨一下就登记一条持续伤害，被围殴的玩家身上能同时挂几十上百条，以前每条每 tick 各调一次
+ * {@code setHealth}。混合端（CraftBukkit 系）的 {@code LivingEntity.setHealth} 对玩家每次都会重建一份全属性同步包，
+ * 模组服的玩家属性很多，这一下比扣血本身贵得多。叠上无视无敌帧的追加攻击，tick 越慢、两 tick 之间挨的下数越多、
+ * 登记的条目越多、下一 tick 越慢，实测一个被围殴的玩家能把单个 tick 拖到一秒以上。
+ * </p>
+ * <p>
+ * <b>做法：</b>目标是玩家、且真伤扣血就是普通 setHealth 的（{@link EntityLivingUtil#isPlainSetHealth}），
+ * 遍历时不直接扣，而是在 {@link #MERGED_HEALTH} 里按 {@code setHealth} 同样的公式逐条推「虚拟血量」，
+ * 遍历结束统一 setHealth 一次。
+ * </p>
+ * <ul>
+ *     <li>致死判断、「目标已死」判断都读虚拟血量，逐条照旧：{@code 虚拟血量 - 伤害 × 2 <= 0} 就处决；
+ *         不可致死的条目把虚拟血量扣到 0 以后，后面的条目照旧按已死移除；</li>
+ *     <li>任何处决（直接处决、自损走伤害管线）之前先把所有已推好的虚拟血量落地，死亡事件里各方读到的血量
+ *         和逐条扣时一样——战士击杀回血按击杀者「已损失生命」算，击杀者本 tick 已挨的持续伤害必须先扣上；
+ *         落地后后面的条目重新从真实血量起算，回的血不会被覆盖；</li>
+ *     <li>非玩家仍逐条扣：真伤对某些实体类改的是别的字段，{@code getHealth()} 不一定跟着变，而且只有玩家才有那份属性包的代价。</li>
+ * </ul>
+ * <p>
+ * <b>行为影响：</b>无。同一 tick 的最终血量、谁被处决、处决时刻的血量逐位不变（测试台前后对比过）；
+ * 中间值本来就不会在 tick 中途发给客户端；剩余伤害查询读的是条目，不受影响。
+ * </p>
+ *
  * @author RoinFlam
- * @version 1.2
+ * @version 1.3
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class DamageOverTimeManager {
@@ -166,6 +195,12 @@ public class DamageOverTimeManager {
      */
     @Nullable
     private static DamageSource lethalSource = null;
+
+    /**
+     * 本次遍历里合并扣血的玩家 → 虚拟血量（v1.3）
+     * <p>只在 {@link #onServerTick} 遍历期间有内容，处决前和遍历结束时由 {@link #flushMergedHealth} 落地并清空。</p>
+     */
+    private static final Reference2FloatOpenHashMap<LivingEntity> MERGED_HEALTH = new Reference2FloatOpenHashMap<>();
 
     // ==================== 公开API ====================
 
@@ -407,13 +442,34 @@ public class DamageOverTimeManager {
                 }
             }
         } finally {
-            iterating = false;
+            try {
+                flushMergedHealth();
+            } finally {
+                iterating = false;
+            }
         }
 
         // 遍历期间可能有新的效果通过 kill -> DeathEvent -> 附魔逻辑 加入 pending
         if (!PENDING.isEmpty()) {
             ACTIVE_DOTS.addAll(PENDING);
             PENDING.clear();
+        }
+    }
+
+    /**
+     * 把合并中的虚拟血量全部落地（v1.3）
+     * <p>每个玩家一次 setHealth。出异常也要清空，否则下一 tick 会拿过期的虚拟血量接着算。</p>
+     */
+    private static void flushMergedHealth() {
+        if (MERGED_HEALTH.isEmpty()) {
+            return;
+        }
+        try {
+            for (Reference2FloatMap.Entry<LivingEntity> e : MERGED_HEALTH.reference2FloatEntrySet()) {
+                e.getKey().setHealth(e.getFloatValue());
+            }
+        } finally {
+            MERGED_HEALTH.clear();
         }
     }
 
@@ -573,8 +629,12 @@ public class DamageOverTimeManager {
          * @return true=效果结束需移除
          */
         boolean tick() {
-            // 目标已死亡或被移除
-            if (!target.isAlive() || target.isRemoved()) {
+            // 本次遍历里已经合并扣过血的玩家，血量以虚拟血量为准（v1.3）
+            boolean merged = MERGED_HEALTH.containsKey(target);
+            float health = merged ? MERGED_HEALTH.getFloat(target) : target.getHealth();
+
+            // 目标已死亡或被移除（isAlive = 未移除且血量 > 0）
+            if (target.isRemoved() || !(merged ? health > 0.0F : target.isAlive())) {
                 return true;
             }
 
@@ -605,14 +665,22 @@ public class DamageOverTimeManager {
             }
 
             // 应用伤害
-            if (canKill && target.getHealth() - damage * 2 <= 0) {
+            if (canKill && health - damage * 2 <= 0) {
+                // 处决会发死亡事件，先把所有虚拟血量落地，各方读到的血量和逐条扣时一样
+                flushMergedHealth();
                 if (selfInflicted) {
                     killThroughDamagePipeline(target, source);
                 } else {
                     EntityLivingUtil.kill(target, source);
                 }
                 return true;
+            } else if (target instanceof Player && EntityLivingUtil.isPlainSetHealth(target)) {
+                // 与 damageHealthDirectly → setHealth 同一公式：max(0, 血量 - 伤害) 再夹到 [0, 最大生命]
+                MERGED_HEALTH.put(target, Mth.clamp(Math.max(0.0F, health - damage), 0.0F, target.getMaxHealth()));
             } else {
+                if (merged) {
+                    flushMergedHealth();
+                }
                 EntityLivingUtil.damageHealthDirectly(target, damage);
             }
 
