@@ -116,12 +116,12 @@ public class EnchantmentDeathBlade extends EnchantmentBase {
                     5, 1, 120);
 
     /**
-     * 死亡标记的持续秒数
-     * <p>默认 10，允许范围 1 ~ 120。</p>
+     * 死亡标记（最大生命降低）的持续秒数
+     * <p>默认 45（原作命定之死、死亡刀刃都是 45 秒），允许范围 1 ~ 120。</p>
      */
     private static final EnchantmentValues.Handle DOOM_SECONDS =
             EnchantmentValues.define(VALUE_ID, "doom_seconds",
-                    10, 1, 120);
+                    45, 1, 120);
 
     public EnchantmentDeathBlade() {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});

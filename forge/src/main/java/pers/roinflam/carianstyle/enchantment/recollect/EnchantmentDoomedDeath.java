@@ -34,7 +34,7 @@ import pers.roinflam.carianstyle.utils.util.BossUtil;
  * </p>
  * <ul>
  *     <li>持续伤害 = 2% 最大生命 + 20% 本次伤害，2 秒扣完，每下仍独立叠加；</li>
- *     <li>最大生命 -10%，持续 10 秒，不叠加（和死亡之刃共用同一个效果）；</li>
+ *     <li>最大生命 -10%，持续 45 秒（原作值），不叠加（和死亡之刃共用同一个效果）；</li>
  *     <li>目标是 BOSS（{@link BossUtil#isBoss}）时持续伤害减半、最大生命降低不变，
  *     对应原作 DLC BOSS 只对命定之死的百分比掉血有抗性。</li>
  * </ul>
@@ -92,12 +92,12 @@ public class EnchantmentDoomedDeath extends EnchantmentBase {
                     2, 1, 120);
 
     /**
-     * 死亡标记的持续秒数
-     * <p>默认 10，允许范围 1 ~ 120。</p>
+     * 死亡标记（最大生命降低）的持续秒数
+     * <p>默认 45（原作命定之死、死亡刀刃都是 45 秒），允许范围 1 ~ 120。</p>
      */
     private static final EnchantmentValues.Handle DOOM_SECONDS =
             EnchantmentValues.define(VALUE_ID, "doom_seconds",
-                    10, 1, 120);
+                    45, 1, 120);
 
     /**
      * 按本次伤害计算的持续伤害基数比例
