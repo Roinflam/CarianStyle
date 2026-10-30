@@ -2,7 +2,9 @@ package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.PickaxeItem;
@@ -12,6 +14,7 @@ import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -335,6 +338,10 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
                     continue;
                 }
 
+                if (serverLevel != null && !mayBreak(serverLevel, pos, blockState, player)) {
+                    continue;
+                }
+
                 if (!player.getAbilities().instabuild) {
                     // 生存模式破坏方块
                     block.playerWillDestroy(world, pos, blockState, player);
@@ -363,6 +370,33 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
             } finally {
                 // 无论成功与否，必须移除重入标记
                 processing.remove(encoded);
+            }
+        }
+    }
+
+    /**
+     * 连带挖的这一格先以玩家身份问一遍领地 / 保护（{@link RockBlasterProbeEvent}），被取消就不挖。
+     * 只有中心那一格走过了原版破坏流程的权限检查，相连的方块可能越过领地边界（在自己地皮边上挖到路或隔壁地皮）。
+     * 发事件那一下把拿着镐的那只手临时清空：按手上工具连带挖的监听器（本附魔、别的范围挖掘附魔）看到空手就不会再挖一片，
+     * 领地模组只看玩家和位置，照样拦得住。直接改背包格、不走 setItemInHand，不触发换装备的事件和音效。
+     */
+    private static boolean mayBreak(ServerLevel level, BlockPos pos, BlockState state, Player player) {
+        Inventory inventory = player.getInventory();
+        boolean mainHand = player.getUsedItemHand() == InteractionHand.MAIN_HAND;
+        int slot = inventory.selected;
+        ItemStack held = mainHand ? inventory.items.get(slot) : inventory.offhand.get(0);
+        if (mainHand) {
+            inventory.items.set(slot, ItemStack.EMPTY);
+        } else {
+            inventory.offhand.set(0, ItemStack.EMPTY);
+        }
+        try {
+            return !MinecraftForge.EVENT_BUS.post(new RockBlasterProbeEvent(level, pos, state, player));
+        } finally {
+            if (mainHand) {
+                inventory.items.set(slot, held);
+            } else {
+                inventory.offhand.set(0, held);
             }
         }
     }
