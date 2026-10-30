@@ -12,11 +12,13 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import pers.roinflam.carianstyle.dynamicattr.ClientSyncAttribute;
 import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttribute;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeInstance;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.network.HowlShabririSyncHelper;
 import pers.roinflam.carianstyle.network.StealthHitboxSyncHelper;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
+import javax.annotation.Nullable;
 import java.util.List;
 import java.util.UUID;
 
@@ -174,10 +176,33 @@ public class DynamicAttributes {
 
     /**
      * 注定死亡效果
-     * - 最大生命值-25%×等级
+     * - 最大生命值降低（等级 n 表示降低千分之 n+1）
+     * <p>
+     * 降低多少由施加方按自己的数值、目标是不是 BOSS 算好，再用 {@link #doomedDeath} 换成等级。
+     * 命定之死、死亡之刃共用这一个效果：同一目标同一时间只挂一份，比例大的顶掉比例小的，
+     * 比例相同只刷新时长（{@code DynamicAttributeManager.apply} 的覆盖规则），两者不会叠成双倍。
+     * 以前固定是 -25%，满血目标挨第一下会被原版压血直接削掉四分之一，现在默认 -10%（BOSS 减半）。
+     * </p>
      */
     public static final DynamicAttribute DOOMED_DEATH = new DynamicAttribute("carianstyle_doomed_death")
-            .addModifier(Attributes.MAX_HEALTH, -0.25, AttributeModifier.Operation.MULTIPLY_TOTAL);
+            .addModifier(Attributes.MAX_HEALTH, AttributeModifier.Operation.MULTIPLY_TOTAL,
+                    amplifier -> -(amplifier + 1) / 1000.0D);
+
+    /**
+     * 按「最大生命降低比例」创建一份注定死亡效果
+     *
+     * @param durationTicks 持续 tick
+     * @param reduction     降低比例（0.1 = -10%），按千分之一取整，夹在 [0.001, 0.9]
+     * @return 效果实例；比例不到千分之一时返回 null（不挂）
+     */
+    @Nullable
+    public static DynamicAttributeInstance doomedDeath(int durationTicks, double reduction) {
+        int permille = (int) Math.round(Math.min(reduction, 0.9D) * 1000.0D);
+        if (permille <= 0) {
+            return null;
+        }
+        return DOOMED_DEATH.createInstance(durationTicks, permille - 1);
+    }
 
     /**
      * 沙布里里的嚎叫效果

@@ -50,6 +50,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * <ul>
  *   <li>首次启动：按各附魔声明的默认值全量生成；</li>
  *   <li>后续启动：<b>保留服主已改的值</b>，只补进新增的键；</li>
+ *   <li>模组更新改了某项的默认值时，文件里这一项的值若仍等于文件记下的旧默认值（服主没改过），
+ *       就跟着换成新默认值——否则调平衡只对新装的服生效，老服永远停在旧数值上；
+ *       服主改过的值（与记下的旧默认值不同）照旧保留；</li>
  *   <li>被删除的附魔遗留的键会保留在文件里但不生效，方便回滚，不会静默丢失；</li>
  *   <li>越界的值在加载时 clamp 到声明的 [min, max] 并打警告，不会因为手滑写错崩服。</li>
  * </ul>
@@ -131,7 +134,8 @@ public final class EnchantmentValues {
             "!! 重要：本文件只改行为数值，不会改附魔的说明文字。",
             "!! 调整数值后请自行同步修改语言文件中的 enchantment.carianstyle.<id>.desc，",
             "!! 否则玩家看到的描述会与实际效果不符。",
-            "每个数值的允许范围见 range 字段；超出范围的值会被自动收拢到边界并记录警告。"
+            "每个数值的允许范围见 range 字段；超出范围的值会被自动收拢到边界并记录警告。",
+            "value 与 default 相同的项视为没改过：模组更新调整默认值时会自动跟着换成新值。"
     };
 
     /** 全部已声明的数值：复合键 → 句柄 */
@@ -407,6 +411,17 @@ public final class EnchantmentValues {
             }
 
             double raw = primitive.getAsDouble();
+
+            // 服主没改过（值 = 文件记下的旧默认值）、而代码里的默认值变了：跟随新默认值
+            Double recordedDefault = findRecordedDefault(existing, handle);
+            if (recordedDefault != null && sameValue(raw, recordedDefault)
+                    && !sameValue(recordedDefault, handle.defaultValue)) {
+                LogUtil.info("卡利亚式附魔 - 数值 %s 未被修改过，默认值已更新：%s → %s",
+                        handle.compoundKey, raw, handle.defaultValue);
+                handle.current = handle.defaultValue;
+                continue;
+            }
+
             double clamped = Math.min(handle.max, Math.max(handle.min, raw));
             if (clamped != raw) {
                 LogUtil.warn("卡利亚式附魔 - 数值 %s 的值 %s 超出范围 [%s, %s]，已收拢为 %s",
@@ -489,6 +504,37 @@ public final class EnchantmentValues {
             return entry.getAsJsonObject().get("value");
         }
         return entry;
+    }
+
+    /**
+     * 从已读取的 JSON 中取出某个句柄上次写文件时记下的默认值。
+     *
+     * @param root   根对象
+     * @param handle 句柄
+     * @return 记下的默认值；简写形态、没有 default 字段或不是数字时返回 null
+     */
+    @Nullable
+    private static Double findRecordedDefault(@Nonnull JsonObject root, @Nonnull Handle handle) {
+        JsonElement group = root.get(handle.enchantmentId);
+        if (group == null || !group.isJsonObject()) {
+            return null;
+        }
+        JsonElement entry = group.getAsJsonObject().get(handle.key);
+        if (entry == null || !entry.isJsonObject()) {
+            return null;
+        }
+        JsonElement recorded = entry.getAsJsonObject().get("default");
+        if (recorded == null || !recorded.isJsonPrimitive() || !recorded.getAsJsonPrimitive().isNumber()) {
+            return null;
+        }
+        return recorded.getAsDouble();
+    }
+
+    /**
+     * 两个数值是否视为相同（整数项写文件时是 int、默认值是 double，浮点项经过一次 JSON 往返）。
+     */
+    private static boolean sameValue(double a, double b) {
+        return Math.abs(a - b) <= 1.0E-9D * Math.max(1.0D, Math.max(Math.abs(a), Math.abs(b)));
     }
 
     /**
