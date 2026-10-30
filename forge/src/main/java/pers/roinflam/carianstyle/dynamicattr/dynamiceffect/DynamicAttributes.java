@@ -178,10 +178,10 @@ public class DynamicAttributes {
      * 注定死亡效果
      * - 最大生命值降低（等级 n 表示降低千分之 n+1）
      * <p>
-     * 降低多少由施加方按自己的数值、目标是不是 BOSS 算好，再用 {@link #doomedDeath} 换成等级。
+     * 降低多少由施加方按自己的数值算好，再用 {@link #doomedDeath} 换成等级。
      * 命定之死、死亡之刃共用这一个效果：同一目标同一时间只挂一份，比例大的顶掉比例小的，
      * 比例相同只刷新时长（{@code DynamicAttributeManager.apply} 的覆盖规则），两者不会叠成双倍。
-     * 以前固定是 -25%，满血目标挨第一下会被原版压血直接削掉四分之一，现在默认 -10%（BOSS 减半）。
+     * 以前固定是 -25%，满血目标挨第一下会被原版压血直接削掉四分之一，现在默认 -10%（BOSS 也一样）。
      * </p>
      */
     public static final DynamicAttribute DOOMED_DEATH = new DynamicAttribute("carianstyle_doomed_death")

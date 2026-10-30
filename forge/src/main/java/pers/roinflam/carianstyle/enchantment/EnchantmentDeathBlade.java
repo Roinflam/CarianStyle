@@ -35,7 +35,7 @@ import pers.roinflam.carianstyle.utils.util.BossUtil;
  * 旧的持续伤害是 75% 本次伤害（按护甲前的伤害算、真伤扣血），加上折半后的即时伤害合计 125%，
  * 对穿重甲的目标远超普通一刀；最大生命 -25% 又会被原版压血，满血目标挨第一下就少四分之一。现在：
  * 持续伤害 50% 本次伤害，最大生命 -10%（和命定之死共用同一个效果，不叠加）；
- * 目标是 BOSS（{@link BossUtil#isBoss}）时持续伤害和最大生命降低都减半。即时伤害折半不变。
+ * 目标是 BOSS（{@link BossUtil#isBoss}）时持续伤害减半、最大生命降低不变。即时伤害折半不变。
  * </p>
  *
  * @author RoinFlam
@@ -92,7 +92,7 @@ public class EnchantmentDeathBlade extends EnchantmentBase {
                     0.1D, 0.0D, 0.9D);
 
     /**
-     * 目标是 BOSS 时持续伤害与最大生命降低的倍率
+     * 目标是 BOSS 时持续伤害的倍率（最大生命降低不受影响）
      * <p>默认 0.5，允许范围 0.0 ~ 1.0。</p>
      */
     private static final EnchantmentValues.Handle BOSS_MULTIPLIER =
@@ -161,9 +161,9 @@ public class EnchantmentDeathBlade extends EnchantmentBase {
                 DynamicAttributes.DOOMED_DEATH_BURNING.createInstance(BURNING_SECONDS.getInt() * 20 + 5, 0));
         ClientSyncEffectHelper.onAttributeApplied(ctx.getVictim(), DynamicAttributes.DOOMED_DEATH_BURNING);
 
-        // 应用注定死亡效果（最大生命降低，BOSS 减半）
+        // 应用注定死亡效果（最大生命降低，BOSS 也一样）
         DynamicAttributeInstance doom = DynamicAttributes.doomedDeath(
-                DOOM_SECONDS.getInt() * 20 + 5, MAX_HEALTH_REDUCTION.get() * multiplier);
+                DOOM_SECONDS.getInt() * 20 + 5, MAX_HEALTH_REDUCTION.get());
         if (doom != null) {
             DynamicAttributeManager.apply(ctx.getVictim(), doom);
         }
