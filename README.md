@@ -173,11 +173,11 @@ Absolutely! Free to use in any modpack without asking permission.
 
 ### 📜 License
 
-**Custom License:**
-- ✅ Free for personal use and modification
-- ✅ Free to include in modpacks
-- ❌ No commercial use without permission
-- ⚠️ Modified redistributions must credit the original author (Roinflam)
+Licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) (Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International). Full text: [LICENSE](LICENSE).
+
+- ✅ Free to use, modify and include in modpacks
+- ❌ No commercial use
+- ⚠️ Redistributed or modified versions must credit the original author (Roinflam), state what was changed, and use the same license
 
 ### 👤 Credits
 
@@ -355,11 +355,11 @@ If you enjoy this mod, please give it a ⭐ **Star** on GitHub!
 
 ### 📜 许可证
 
-**自定义许可证：**
-- ✅ 可自由用于个人使用和修改
-- ✅ 可自由加入整合包
-- ❌ 未经许可禁止商业使用
-- ⚠️ 修改后重新发布必须注明原作者(Roinflam)
+本项目采用 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans)（知识共享 署名-非商业性使用-相同方式共享 4.0 国际）协议，全文见 [LICENSE](LICENSE)。
+
+- ✅ 可以免费使用、修改、加入整合包
+- ❌ 不得用于商业用途
+- ⚠️ 转载或发布修改版必须署原作者（Roinflam）、注明改动，并沿用同一协议
 
 ### 👤 制作人员
 
