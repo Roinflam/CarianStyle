@@ -56,6 +56,11 @@ import java.util.regex.Pattern;
  * 所以这里自己分词再贪心排版：<b>数字连同单位是一个不可分割的词</b>，
  * 中文按字断（保持中文该有的自由换行），占位符也整体不拆。
  * </p>
+ * <p>
+ * 英文描述按单词断：字母、数字、半角标点首尾相接的片段连成一个词整体换行，
+ * 否则 {@code fully} 会被切成 {@code full} / {@code y}。英文写法 {@code [Level] x 15%}
+ * 与中文的 {@code [附魔等级]×15%} 一样能代入，按句号分条，对应中文的分号。
+ * </p>
  *
  * <h3>括号与引号内不切分</h3>
  * <p>
@@ -77,25 +82,30 @@ public final class DescriptionText {
      * 描述里出现过的全部等级占位符写法。
      * <p>作者在不同附魔里用了不同的措辞，这里全部认下来。</p>
      */
-    private static final String PLACEHOLDER = "\\[(?:附魔等级|等级|效果等级|冻伤等级)\\]";
+    private static final String PLACEHOLDER =
+            "\\[(?:附魔等级|等级|效果等级|冻伤等级|Level|Effect Level|Frostbite Level)\\]";
+
+    /** 乘号：中文写 {@code ×} 不带空格，英文写 {@code  x } 两边带空格 */
+    private static final String TIMES = "\\s*[×x]\\s*";
 
     /**
      * {@code ([等级]-1)×N+M}，两个数字后面允许各带一个百分号。
      * <p>两个百分号必须成对出现；一个有一个没有说明这不是同一量纲，不评估。</p>
      */
     private static final Pattern OFFSET_FORM = Pattern.compile(
-            "\\(" + PLACEHOLDER + "-1\\)×([0-9]+(?:\\.[0-9]+)?)(%?)\\+([0-9]+(?:\\.[0-9]+)?)(%?)");
+            "\\(" + PLACEHOLDER + "\\s*-\\s*1\\)" + TIMES
+                    + "([0-9]+(?:\\.[0-9]+)?)(%?)\\s*\\+\\s*([0-9]+(?:\\.[0-9]+)?)(%?)");
 
     /** {@code [等级]×N} */
     private static final Pattern SIMPLE_FORM = Pattern.compile(
-            PLACEHOLDER + "×([0-9]+(?:\\.[0-9]+)?)");
+            PLACEHOLDER + TIMES + "([0-9]+(?:\\.[0-9]+)?)");
 
     /** 裸占位符（没跟乘法的），代入时直接换成等级数字 */
     private static final Pattern BARE = Pattern.compile(PLACEHOLDER);
 
-    /** 高亮用：数字 + 可选单位 */
+    /** 高亮用：数字 + 可选单位（英文的秒写作 {@code 10s}） */
     private static final Pattern NUMBER = Pattern.compile(
-            "[+\\-]?[0-9]+(?:\\.[0-9]+)?(?:%|秒|格|级|层|倍|点)?");
+            "[+\\-]?[0-9]+(?:\\.[0-9]+)?(?:%|秒|格|级|层|倍|点|s(?![A-Za-z]))?");
 
     /** 占位符与代入结果的高亮色（金色，与界面强调色一致） */
     private static final TextColor COLOR_LEVEL = TextColor.fromRgb(0xD9B46A);
@@ -279,25 +289,51 @@ public final class DescriptionText {
         int used = 0;
         boolean empty = true;
 
-        for (Span span : spans) {
-            int w = font.width(span.toComponent());
+        int i = 0;
+        while (i < spans.size()) {
+            // 首尾相接的拉丁片段（英文单词连同标点、数字）是一个词，整体放下或整体换行
+            int end = i + 1;
+            while (end < spans.size() && glued(spans.get(end - 1), spans.get(end))) {
+                end++;
+            }
+            int w = 0;
+            for (int k = i; k < end; k++) {
+                w += font.width(spans.get(k).toComponent());
+            }
             if (!empty && used + w > width) {
                 lines.add(new Line(current, indent, blockStart && lines.isEmpty()));
                 current = Component.empty();
                 used = 0;
+                empty = true;
             }
             // 行首不留空白类字符，否则每一行都会莫名缩进一格
-            if (empty && span.text.isBlank()) {
+            if (empty && end - i == 1 && spans.get(i).text.isBlank()) {
+                i = end;
                 continue;
             }
-            current.append(span.toComponent());
+            for (int k = i; k < end; k++) {
+                current.append(spans.get(k).toComponent());
+            }
             used += w;
             empty = false;
+            i = end;
         }
         if (!empty) {
             lines.add(new Line(current, indent, blockStart && lines.isEmpty()));
         }
         return lines;
+    }
+
+    /** 两个片段之间不能断行：前一个的末字和后一个的首字都是拉丁类字符 */
+    private static boolean glued(@Nonnull Span before, @Nonnull Span after) {
+        return !before.text.isEmpty() && !after.text.isEmpty()
+                && latinLike(before.text.charAt(before.text.length() - 1))
+                && latinLike(after.text.charAt(0));
+    }
+
+    /** 半角字母、数字、标点等（中文、全角标点不算，它们照旧逐字断） */
+    private static boolean latinLike(char c) {
+        return c < 0x2E80 && !Character.isWhitespace(c);
     }
 
     /**
@@ -370,6 +406,10 @@ public final class DescriptionText {
                 depth = Math.max(0, depth - 1);
             } else if (depth == 0 && (c == separator || c == ';')) {
                 parts.add(text.substring(start, i));
+                start = i + 1;
+            } else if (depth == 0 && c == '.' && i + 1 < text.length() && text.charAt(i + 1) == ' ') {
+                // 英文按句分条，句号留在句尾
+                parts.add(text.substring(start, i + 1));
                 start = i + 1;
             }
         }

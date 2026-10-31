@@ -294,7 +294,10 @@ public final class CodexScreen extends Screen {
         // 会压到它们身上——被盖住的槽还会抢走按钮的点击。这时改从搜索框右端让出位置，
         // 两组控件在任何宽度下都不重叠
         int filterBlock = 20 + 2 + 12;
-        int buttonsLeft = this.width - MARGIN - 132;
+        // 按钮宽度至少照中文的 62 / 66，文字更长时跟着加宽（英文「Reload Values」放不进 66）
+        int backWidth = Math.max(62, this.font.width(Component.translatable("carianstyle.codex.back")) + 12);
+        int reloadWidth = Math.max(66, this.font.width(Component.translatable("carianstyle.codex.reload")) + 12);
+        int buttonsLeft = this.width - MARGIN - reloadWidth - 4 - backWidth;
         filterCompact = buttonsLeft < contentLeft + LIST_WIDTH + 8 + filterBlock + 6;
         // 紧凑时左侧控件（搜索框 + 物品槽）整体只用到按钮左边 6px 为止，搜索框吃剩下的宽度。
         // 最窄的 320 宽下按钮从 172 开始，而左栏本来要到 206——只挪物品槽不缩搜索框的话还是会撞
@@ -312,8 +315,8 @@ public final class CodexScreen extends Screen {
         searchBox.setBordered(false);
         addRenderableWidget(searchBox);
 
-        setRect(backRect, this.width - MARGIN - 132, MARGIN + 31, 62, 18);
-        setRect(reloadRect, this.width - MARGIN - 66, MARGIN + 31, 66, 18);
+        setRect(backRect, buttonsLeft, MARGIN + 31, backWidth, 18);
+        setRect(reloadRect, this.width - MARGIN - reloadWidth, MARGIN + 31, reloadWidth, 18);
 
         // 放入物品槽紧挨搜索框右边、与它同高：两者都是「缩小左栏范围」的手段，放在一起
         setRect(filterRect, filterCompact
