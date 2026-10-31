@@ -36,7 +36,7 @@ Most effects scale with a percentage of the damage dealt or of health, so they s
 | Enchantment Codex (`K`) | Yes | No |
 | Config files | `config/carianstyle-common.toml`, plus `config/carianstyle/enchantment_values.json` for every enchantment's numbers | `config/carianstyle.cfg` |
 
-Both versions have the same set of enchantments. Everything on this page describes the 1.20.1 version; the 1.12.2 version gets fewer updates and some numbers and conditions differ.
+Both versions have the same set of enchantments.
 
 ### Enchantment types
 
@@ -319,7 +319,7 @@ Yes, no need to ask. Please credit the author; commercial use is not allowed (se
 | 附魔百科（`K` 键） | 有 | 无 |
 | 配置文件 | `config/carianstyle-common.toml`，以及各附魔数值 `config/carianstyle/enchantment_values.json` | `config/carianstyle.cfg` |
 
-两个版本的附魔种类相同。本页的效果、数值都以 1.20.1 版为准；1.12.2 版更新较少，部分数值和触发条件与 1.20.1 版不同。
+两个版本的附魔种类相同。
 
 ### 附魔分类
 
@@ -351,7 +351,7 @@ Yes, no need to ask. Please credit the author; commercial use is not allowed (se
 | **野兽健壮**（宝藏） | Ⅰ | 胸甲 | 所有增益和负面效果等级翻倍，但持续时间-60%（瞬间效果除外） |
 | **野兽活力**（宝藏） | Ⅴ | 胸甲 | 所有增益和负面效果持续时间+[附魔等级]×30% |
 | **拒绝** | Ⅲ | 护腿 | 被生物攻击时以0.5力度击退([附魔等级]-1)×0.75+5格内的所有生物（至多20个） |
-| **恩惠露滴** | Ⅴ | 胸甲 | 饱食度满时每秒回复[附魔等级]×0.2%最大生命值 |
+| **恩惠露滴** | Ⅴ | 胸甲 | 饥饿值满时每秒回复[附魔等级]×0.2%最大生命值 |
 | **狄蒂卡之祸**（宝藏、诅咒） | Ⅰ | 盔甲 | 诅咒 受到的伤害×3；受伤无敌时间-50% |
 | **硬箭** | Ⅴ | 弓 | 弓箭伤害+[附魔等级]×80%；代价：12格内有其他生物时，受到来自生物的伤害+[附魔等级]×80%，被击退效果+[附魔等级]×75% |
 | **神皮襁褓** | Ⅲ | 剑 | 满蓄力攻击每命中4次回复([附魔等级]-1)×1%+3%最大生命值 |
