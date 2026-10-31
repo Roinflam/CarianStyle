@@ -72,7 +72,7 @@ import java.util.List;
  * 仅在客户端渲染线程访问，无并发问题。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 2.0
  */
 @OnlyIn(Dist.CLIENT)

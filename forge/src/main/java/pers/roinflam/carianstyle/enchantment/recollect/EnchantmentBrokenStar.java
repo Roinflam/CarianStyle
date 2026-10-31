@@ -48,7 +48,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  *         两档严格互补、无重叠也无空档。
  *         <b>注意这与语言文件的「＞50% / ＜50%」措辞略有出入</b>——
  *         按字面写会让恰好半血时两档都不生效，留出一个死区；
- *         这里选择保留攻势的 {@code >=}，若你更想要严格照描述，
+ *         这里选择保留攻势的 {@code >=}，要严格照描述的话，
  *         把攻击者分支的 {@code >=} 改成 {@code >} 即可。</li>
  * </ol>
  *
@@ -60,7 +60,7 @@ public class EnchantmentBrokenStar extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.broken_star.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.broken_star.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -118,7 +118,7 @@ public class EnchantmentBrokenStar extends EnchantmentBase {
 
         // 攻击者视角
         if (evt.getSource().getDirectEntity() instanceof LivingEntity attacker) {
-            // ⭐ v2.2：怪物附魔触发开关（攻击者视角）
+            // v2.2：怪物附魔触发开关（攻击者视角）
             if (!EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) {
                 ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
                 if (!heldItem.isEmpty()) {
@@ -136,20 +136,20 @@ public class EnchantmentBrokenStar extends EnchantmentBase {
         if (!evt.getSource().isCreativePlayer()) {
             LivingEntity victim = evt.getEntity();
 
-            // ⭐ v2.2：怪物附魔触发开关（受击者视角）
+            // v2.2：怪物附魔触发开关（受击者视角）
             if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
 
             ItemStack heldItem = victim.getItemInHand(InteractionHand.MAIN_HAND);
             if (!heldItem.isEmpty()) {
                 int level = EnchantmentHelper.getItemEnchantmentLevel(brokenStar, heldItem);
-                // ⭐ v2.3 修复 B：补上等级上限，与攻击者分支保持一致。
+                // v2.3 修复 B：补上等级上限，与攻击者分支保持一致。
                 // 当前减伤系数不随等级变化，所以这一行暂时不影响结果，
                 // 但缺了它意味着以后一旦把减伤做成随等级递增，就会绕过 levelLimit
                 level = applyLevelLimit(brokenStar, level, 10);
-                // ⭐ v2.3 修复 C：改用严格小于，与攻击者分支的 >= 互补。
+                // v2.3 修复 C：改用严格小于，与攻击者分支的 >= 互补。
                 // 原来两边都含等号，生命值恰好半血时攻守两档会同时生效
                 if (level > 0 && victim.getHealth() < victim.getMaxHealth() * (float) HEALTH_THRESHOLD.get()) {
-                    // ⭐ v2.3 修复 A：昼夜互换。
+                    // v2.3 修复 A：昼夜互换。
                     // 原为 (!isDay ? 0.75f : 0.5f) —— 夜晚只减伤 25%、白天减伤 50%，
                     // 与语言文件「夜晚翻倍」的描述正好相反，且与攻击者分支
                     // (!isDay ? 2 : 1.5f) 的昼夜方向自相矛盾。

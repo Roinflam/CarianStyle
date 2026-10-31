@@ -62,7 +62,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 自行注册，{@code StackDisplayRegistry.register} 只是往列表里追加，注册先后不影响任何行为。
  * </p>
  *
- * <h3>⚠ 护甲类一律走「等级之和」，不是「最高等级」</h3>
+ * <h3>护甲类一律走「等级之和」，不是「最高等级」</h3>
  * <p>
  * 本批里黑焰庇护、快步、诺克斯之月三项的效果强度都是<b>四件护甲等级累加</b>算的。
  * {@link EquipmentEnchantContext#armorMaxLevel} 对它们是<b>错的口径</b>——
@@ -103,7 +103,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 比不显示更有害。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
@@ -291,7 +291,7 @@ public final class CarianStyleConditionDisplay {
         // 口径：四件护甲等级之和（levelLimit 开启时钳到 10），每级减 12.5% 物理伤害。
         // 用 armorSumLevel 而非 armorMaxLevel —— 附魔内部是逐件累加的（见类注释）。
         //
-        // ⚠ 上限口径必须与附魔完全一致：附魔 v2.2 加了无条件的 7 级硬上限
+        // 上限口径必须与附魔完全一致：附魔 v2.2 加了无条件的 7 级硬上限
         //   （8 级系数归零、9 级起变负会让挨打变回血），HUD 跟着钳到同一级。
         //   这里【不是】在遮问题 —— 问题已经在附魔侧修掉了，HUD 只是如实反映修完后的结果。
         //   上限常量直接引用附魔的 public 字段，两边不可能漂移。
@@ -301,7 +301,7 @@ public final class CarianStyleConditionDisplay {
                 (player, ctx) -> {
                     int total = armorSumLevelById(ctx, BLACK_FLAME_SHELTER_ID);
                     total = EnchantmentBase.applyLevelLimit(resolveEnchantment(BLACK_FLAME_SHELTER_ID), total, ARMOR_TOTAL_LEVEL_CAP);
-                    // ⭐ 与附魔 v2.2 的无条件硬上限保持同一口径（详见 BLACK_FLAME_SHELTER_MAX_LEVEL）
+                    // 与附魔 v2.2 的无条件硬上限保持同一口径（详见 BLACK_FLAME_SHELTER_MAX_LEVEL）
                     total = Math.min(total, BLACK_FLAME_SHELTER_MAX_LEVEL);
                     if (total <= 0) {
                         return StackDisplayRegistry.Stacks.NONE;
@@ -315,7 +315,7 @@ public final class CarianStyleConditionDisplay {
         // 附魔逻辑：攻击或受击时写入一条 60 tick 的冷却；潜行时若冷却未结束就不给隐身。
         // 这一行是本批唯一真正的「冷却项」——有明确总时长，进度条走充能方向，归零即消失。
         //
-        // ⚠ 门控用 armorMaxLevel（任一护甲带即可），因为附魔是 ARMOR 全槽位注册的，
+        // 门控用 armorMaxLevel（任一护甲带即可），因为附魔是 ARMOR 全槽位注册的，
         //    生效条件是「有」而非「几级」，与 armorSumLevel 无关。
         StackDisplayRegistry.register(
                 CONCEALING_VEIL_BATTLE,
@@ -334,7 +334,7 @@ public final class CarianStyleConditionDisplay {
                 });
 
         // ===================== 34 吃屎：治疗削减剩余 =====================
-        // ⚠ 这一行的显示条件与装备无关 —— 它表达的是「我中招了」，
+        // 这一行的显示条件与装备无关 —— 它表达的是「我中招了」，
         //    而中招者手里未必有这个附魔（多半是被别人打的）。因此不做任何装备门控。
         //
         // max 传 0（不画进度条）：debuff 的总时长是「攻击者等级 × 80」，
@@ -354,7 +354,7 @@ public final class CarianStyleConditionDisplay {
 
         // ===================== 35 快步：当前速度等级 =====================
         // 口径与附魔完全一致：
-        //   totalLevel      = 四件护甲等级之和（⚠ 附魔【没有】应用 levelLimit，故这里也不钳）
+        //   totalLevel      = 四件护甲等级之和（附魔【没有】应用 levelLimit，故这里也不钳）
         //   missingPercent  = 1 - 当前生命 / 最大生命
         //   speedLevel      = (int)(missingPercent * 100 / 5 * totalLevel)
         // 显示的是速度效果的【等级】（1 级 = 原版「迅捷 I」），不是百分比。
@@ -386,7 +386,7 @@ public final class CarianStyleConditionDisplay {
         // 这里直接查动态属性是否存在，而不是查主手装备 —— 换武器之后窗口仍然有效，
         // 按装备判断会让它提前消失，那就是在骗人。
         //
-        // ⚠ 显示的是【附魔等级】（amplifier + 1），不是剩余时间：
+        // 显示的是【附魔等级】（amplifier + 1），不是剩余时间：
         //   DynamicAttributeInstance 的 getDuration 在本包外不保证可见，
         //   为一个次要信息去扩大 API 暴露面不值得。「这一行在＝窗口开着」已经够用了。
         StackDisplayRegistry.register(

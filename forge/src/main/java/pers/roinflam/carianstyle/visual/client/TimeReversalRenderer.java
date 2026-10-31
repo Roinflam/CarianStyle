@@ -109,7 +109,7 @@ import java.util.Map;
  * 故全部预解包为 {@code C_} 常量，颜色相关堆分配恒为 0，无需 {@code SCRATCH} 缓冲。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)
@@ -143,7 +143,7 @@ public final class TimeReversalRenderer {
     /** 深褐：外环暗部、地面铺底 */
     private static final int TIME_DEEP = 0x5A4420;
 
-    // ===== 预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // ===== 预解包的固定配色（只读，切勿作为写入目标）=====
     // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
     // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
     // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
@@ -246,7 +246,7 @@ public final class TimeReversalRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
@@ -254,7 +254,7 @@ public final class TimeReversalRenderer {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
-        // ⚠ 离开世界的清理必须在取共享缓冲之前：那一帧批次本就不会开启，
+        // 离开世界的清理必须在取共享缓冲之前：那一帧批次本就不会开启，
         // 若排在判空之后，收束状态会残留到下次进入世界，与新分配的实体 id 撞号后闪出错误画面
         if (mc.level == null || mc.player == null) {
             STATE.clear();
@@ -422,7 +422,7 @@ public final class TimeReversalRenderer {
                     C_GOLD, a * (quarter ? 1f : 0.65f), a * (quarter ? 1f : 0.65f));
         }
 
-        // ⭐ 逆时针指针：本模组唯一反向走的旋转元素
+        // 逆时针指针：本模组唯一反向走的旋转元素
         float handAng = time * HAND_SPEED;
         float hx = cx + Mth.cos(handAng) * radius * HAND_LENGTH_RATIO;
         float hz = cz + Mth.sin(handAng) * radius * HAND_LENGTH_RATIO;
@@ -456,7 +456,7 @@ public final class TimeReversalRenderer {
         for (int i = 0; i < count; i++) {
             float phase = (float) i / count;
             float t = frac(time * RING_PER_SECOND + phase + seedId * 0.07f);
-            // ⭐ 向内收缩：半径随进度递减
+            // 向内收缩：半径随进度递减
             float radius = maxRadius * (1f - easeOutCubic(t));
             if (radius <= 0.15f) {
                 continue;

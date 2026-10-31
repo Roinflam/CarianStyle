@@ -57,7 +57,7 @@ public class EnchantmentLionClaw extends EnchantmentBase {
         // 基础增伤15%
         ctx.addDamage(ctx.getDamage() * (level * 0.15f));
 
-        // ⭐ v2.1：播放「三道爪痕」自绘特效。
+        // v2.1：播放「三道爪痕」自绘特效。
         // 位置取受击者、朝向取攻击者（详见类注释）
         LivingEntity attacker = ctx.getHolder();
         LivingEntity victim = ctx.getVictim();

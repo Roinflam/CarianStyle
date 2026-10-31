@@ -78,11 +78,11 @@ public class CarianStyle {
             CarianStylePotion.MOB_EFFECTS.register(modEventBus);
             LogUtil.info("卡利亚式附魔 - 药水效果注册器已挂载");
 
-            // ⭐ 注册附魔 DeferredRegister
+            // 注册附魔 DeferredRegister
             CarianStyleEnchantments.ENCHANTMENTS_REGISTER.register(modEventBus);
             LogUtil.info("卡利亚式附魔 - 附魔注册器已挂载");
 
-            // ⭐ 立即扫描并注册所有附魔（必须在构造函数中完成）
+            // 立即扫描并注册所有附魔（必须在构造函数中完成）
             LogUtil.info("卡利亚式附魔 - 正在扫描并注册附魔");
             EnchantmentRegistry.scanAndRegister("pers.roinflam.carianstyle.enchantment");
             LogUtil.info("卡利亚式附魔 - 附魔扫描注册完成");

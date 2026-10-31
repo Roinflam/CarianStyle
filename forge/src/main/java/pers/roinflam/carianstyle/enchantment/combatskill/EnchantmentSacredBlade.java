@@ -73,7 +73,7 @@ import java.util.UUID;
  *         也就是「越砍越虚」——与「神圣之力净化亡灵」的语义一致。</li>
  * </ul>
  * <p>
- * <b>⚠ 升级提示：</b>旧版本在你的存档里可能已经给玩家累积了很深的攻击力削弱
+ * <b>升级提示：</b>旧版本在你的存档里可能已经给玩家累积了很深的攻击力削弱
  * （{@code MULTIPLY_TOTAL} 的永久修正器，最深 -99%）。本次修复<b>不会自动清除历史残留</b>——
  * {@link #onPlayerRespawn} 与 {@link #onEntityJoinLevel} 会在玩家重生 / 实体加入世界时清掉它，
  * 因此<b>受影响的玩家重新登录一次即可恢复</b>（登录会触发 {@code EntityJoinLevelEvent}）。
@@ -137,7 +137,7 @@ public class EnchantmentSacredBlade extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.sacred_blade.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.sacred_blade.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -205,7 +205,7 @@ public class EnchantmentSacredBlade extends EnchantmentBase {
             float bonusDamage = ctx.getDamage() * level * (float) BONUS_DAMAGE_PER_LEVEL.get() * healthRatio;
             ctx.addDamage(bonusDamage);
 
-            // ⭐ v3.1：永久削弱每下固定叠一档、与这一下打多少无关，连点几下就能把亡灵削到底，
+            // v3.1：永久削弱每下固定叠一档、与这一下打多少无关，连点几下就能把亡灵削到底，
             // 回血和削弱一起要求满蓄力。增伤按本次伤害成比例，不拦（详见类注释「v3.1」小节）
             if (isFullyCharged(attacker)) {
                 // 治疗攻击者（上限为最大血量的10%）
@@ -213,7 +213,7 @@ public class EnchantmentSacredBlade extends EnchantmentBase {
                     attacker.getMaxHealth() * (float) LIFESTEAL_CAP_RATIO.get());
                 attacker.heal(healAmount);
 
-                // ⭐ v3.0 修复：削弱的是【被砍的亡灵】，不是持有者。
+                // v3.0 修复：削弱的是【被砍的亡灵】，不是持有者。
                 // 旧代码传的是 attacker，导致玩家每砍一刀亡灵自己就弱 5%×等级、
                 // 累积到 -99% 后砍普通骷髅都要砍半天（详见类注释「v3.0 修复」小节）。
                 applyAttackPenalty(victim, level);

@@ -45,7 +45,7 @@ import java.util.Optional;
  * <b>不改变任何正常链路的行为</b>：服务端发、客户端收，方向与声明一致。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 3
  */
 public final class VisualNetwork {

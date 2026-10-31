@@ -64,7 +64,7 @@ import java.util.regex.Pattern;
  * 否则一句完整的补充会被从中间劈开。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 2.0
  */
 @OnlyIn(Dist.CLIENT)

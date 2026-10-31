@@ -55,7 +55,7 @@ import java.util.List;
  * 与下方 {@code EntityUtil.getNearbyEntities(..., 3, ...)} 的实际 AOE 半径一致——
  * 刀光扫到哪里就打到哪里，玩家可以据此走位。<b>若将来调整了 AOE 半径，
  * 务必改用带 radius 的重载同步传入新值</b>，否则视觉会骗人。</p>
- * <p>本次改动仅新增视觉，机制完全未动：旋转动画、增伤公式、目标筛选、命中上限全部保持原样；
+ * <p>只加视觉，机制不变：旋转动画、增伤公式、目标筛选、命中上限全部保持原样；
  * 特效为纯服务端广播，不生成实体、不触发任何事件。触发条件是「冲刺攻击」，
  * 频率天然受控，不会刷屏。</p>
  *
@@ -86,7 +86,7 @@ public class EnchantmentStampSweep extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.stamp_sweep.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.stamp_sweep.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -147,7 +147,7 @@ public class EnchantmentStampSweep extends EnchantmentBase {
      */
     @Override
     protected void onDamageAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
-        // ⭐ v2.4：AOE 自己打出的伤害会再次进入这里，正在结算 AOE 时直接放行（详见类注释）
+        // v2.4：AOE 自己打出的伤害会再次进入这里，正在结算 AOE 时直接放行（详见类注释）
         if (IN_SWEEP.get()) {
             return;
         }
@@ -164,7 +164,7 @@ public class EnchantmentStampSweep extends EnchantmentBase {
             return;
         }
 
-        // ⭐ v2.4：武器不带击退附魔时，原版低蓄力命中不会打断疾跑，疾跑中连点每下都放一圈 AOE，要求满蓄力
+        // v2.4：武器不带击退附魔时，原版低蓄力命中不会打断疾跑，疾跑中连点每下都放一圈 AOE，要求满蓄力
         if (!isFullyCharged(attacker)) {
             return;
         }
@@ -178,7 +178,7 @@ public class EnchantmentStampSweep extends EnchantmentBase {
             performSpinAnimation((ServerPlayer) attacker);
         }
 
-        // ⭐ v2.3 视觉：绕自身扫过一圈的银白刀光 + 扬尘环（纯服务端广播，不影响任何机制）
+        // v2.3 视觉：绕自身扫过一圈的银白刀光 + 扬尘环（纯服务端广播，不影响任何机制）
         // 半径与下方 AOE 判定共用 SWEEP_RADIUS，保证「扫到哪里就打到哪里」
         if (attacker.level() instanceof ServerLevel serverLevel) {
             CarianStyleCombatArtEffects.spinSlash(
@@ -218,7 +218,7 @@ public class EnchantmentStampSweep extends EnchantmentBase {
         );
 
         // 对周围其他敌人造成伤害
-        // ⭐ v2.2：命中数量硬上限，防止密集怪物场景下无上限 hurt 触发事件链风暴
+        // v2.2：命中数量硬上限，防止密集怪物场景下无上限 hurt 触发事件链风暴
         int hitCount = 0;
         IN_SWEEP.set(Boolean.TRUE);
         try {

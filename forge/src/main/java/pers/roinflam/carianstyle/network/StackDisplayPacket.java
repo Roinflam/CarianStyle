@@ -49,7 +49,7 @@ import java.util.function.Supplier;
  * <b>线格式没有变化</b>，新旧端可互通。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.1
  */
 public class StackDisplayPacket {

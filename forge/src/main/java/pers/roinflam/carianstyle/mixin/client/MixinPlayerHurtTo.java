@@ -86,7 +86,7 @@ import pers.roinflam.carianstyle.init.CarianStylePotion;
  * 也正因目标恒为客户端实体，方法内不再需要 {@code isClientSide} 守卫。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.1
  */
 @Mixin(LocalPlayer.class)

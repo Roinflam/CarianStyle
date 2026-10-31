@@ -22,15 +22,15 @@ import java.util.List;
  * </p>
  * <ol>
  *     <li>实体标签 {@code carianstyle:not_bosses}：服主用数据包排除误判，命中就不算；</li>
- *     <li>实体标签 {@code forge:bosses}（Forge 自带末影龙、凋灵，灾变、暮色森林、甜蜜魔法、诡厄、以太、
- *     植物魔法等大多数 BOSS 模组都往里加）或 {@code carianstyle:bosses}（本模组自带的这份只引用
+ *     <li>实体标签 {@code forge:bosses}（Forge 自带末影龙、凋灵，
+ *     大多数 BOSS 模组也往里加）或 {@code carianstyle:bosses}（本模组自带的这份只引用
  *     {@code c:bosses}，服主可用数据包追加）；</li>
  *     <li>身上有没有<b>正在显示</b>的服务端 BOSS 血条（{@link ServerBossEvent} 类型的实例字段，含父类）。
- *     兜住没打标签、或标签放错路径的模组——例如莫琪的生物把标签放在 1.21 才认的 {@code tags/entity_type/}，
+ *     兜住没打标签、或标签放错路径的模组——例如有的模组把标签放在 1.21 才认的 {@code tags/entity_type/}，
  *     在 1.20.1 上不生效，但它的 BOSS 都挂着血条。</li>
  * </ol>
  * <p>
- * 血条要看<b>可见</b>，不能只看字段在不在：自定义 NPC 每个都带一条 BOSS 血条，默认隐藏，
+ * 血条要看<b>可见</b>，不能只看字段在不在：有的 NPC 模组每个 NPC 都带一条 BOSS 血条，默认隐藏，
  * 只有服主在 NPC 设置里打开显示（或设成战斗时显示且正在战斗）才可见，这时它确实是被当 BOSS 用的。
  * </p>
  * <p>

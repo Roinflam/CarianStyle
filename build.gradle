@@ -9,7 +9,7 @@ plugins {
     // Shadow 插件：将多个 jar 合并为一个，用于把 common 代码打包进平台 jar
     id 'com.github.johnrengelman.shadow' version '8.1.1' apply false
 
-    // 应用 Mixin 插件（GeckoLib 必需）
+    // 应用 Mixin 插件
     id 'org.spongepowered.mixin' version '0.7.+' apply false
 }
 
@@ -40,7 +40,7 @@ subprojects {
 
     // Maven 仓库配置：Gradle 从这些地址下载依赖
     repositories {
-        maven { url 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/' }  // GeckoLib（新增）
+        maven { url 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/' }  // GeckoLib
         maven { url "https://maven.theillusivec4.top/" }
         maven { url "https://maven.shedaniel.me/" }
     }

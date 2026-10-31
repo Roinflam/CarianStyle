@@ -75,7 +75,7 @@ import java.util.UUID;
  * 的那批生物，清一次即可，0.5 秒的周期复查纯属冗余保险。
  * </p>
  *
- * <h3>v2.2 新增：嘶吼层数的客户端同步（本次改动，机制零影响）</h3>
+ * <h3>v2.2 新增：嘶吼层数的客户端同步（不影响机制）</h3>
  * <p>
  * {@link #HOWL_SHABRIRI} 此前只有属性修正器与治疗削减，<b>客户端完全不知道它的存在</b>——
  * 因为 {@code DynamicAttributeManager} 的数据只在服务端产生，客户端那份 Map 恒为空。
@@ -309,7 +309,7 @@ public class DynamicAttributes {
                     StealthHitboxSyncHelper.clear(entity);
                 });
 
-        // ⭐ v2.2：嘶吼的层数同步。
+        // v2.2：嘶吼的层数同步。
         // 刻意不走 ClientSyncAttribute + ClientSyncEffectHelper 那套——
         // 那套是「一个属性对应一个固定序列号」，只能表达「有 / 没有」，
         // 而嘶吼需要表达「第几层」，故用 HowlShabririSyncHelper 的

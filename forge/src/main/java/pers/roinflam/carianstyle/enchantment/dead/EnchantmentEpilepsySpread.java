@@ -111,7 +111,7 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.epilepsy_spread.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.epilepsy_spread.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -258,7 +258,7 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
             hurter.setHealth(hurter.getMaxHealth() * (float) REVIVE_HEALTH_RATIO.get());
             hurter.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 100, 6));
 
-            // ⭐ 触发瞬间在脚底地面生成癫火狂乱演出，并绑定持有者跟随。
+            // 触发瞬间在脚底地面生成癫火狂乱演出，并绑定持有者跟随。
             // 时序关键：客户端演出的爆发主点（p≈0.42）恰好对齐下方延迟 30tick 的灼烧阶段，
             // 因此必须在这里调用，不能挪进延迟任务里（详见类注释）。
             // 纯服务端广播，不触发任何事件，不影响下方并发灼烧任务 / 上限 / 清理逻辑。
@@ -355,7 +355,7 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
                     new SynchronizationTask(66) {
                         @Override
                         public void run() {
-                            // ⭐ v3.1：持有者若已离线，kill 会因 isAlive() 为 false 空转，
+                            // v3.1：持有者若已离线，kill 会因 isAlive() 为 false 空转，
                             // 这次死亡就被白嫖掉了。此处登记待补刀标记，重登时补上（详见类注释）。
                             if (hurter.isAlive()) {
                                 EntityLivingUtil.kill(hurter, NewDamageSource.epilepsyFire(hurter.level()));

@@ -44,7 +44,7 @@ public class EnchantmentScholarShield extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.scholar_shield.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.scholar_shield.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -92,7 +92,7 @@ public class EnchantmentScholarShield extends EnchantmentBase {
             return;
         }
 
-        // ⭐ v2.3：重入保护 —— 若当前线程正在执行学者盾反伤，直接跳过，
+        // v2.3：重入保护 —— 若当前线程正在执行学者盾反伤，直接跳过，
         // 阻断双方举盾对攻时的连锁二次反伤
         if (PROCESSING_RETALIATION.get()) {
             return;
@@ -104,7 +104,7 @@ public class EnchantmentScholarShield extends EnchantmentBase {
 
         LivingEntity victim = evt.getEntity();
 
-        // ⭐ v2.2：怪物附魔触发开关（受击者视角，反伤）
+        // v2.2：怪物附魔触发开关（受击者视角，反伤）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
 
         if (!victim.isUsingItem()) {
@@ -125,7 +125,7 @@ public class EnchantmentScholarShield extends EnchantmentBase {
         level = applyLevelLimit(scholarShield, level, 10);
         if (level <= 0) return;
 
-        // ⭐ v2.3：反伤期间置位重入标记，确保反伤伤害不会再次触发反伤；
+        // v2.3：反伤期间置位重入标记，确保反伤伤害不会再次触发反伤；
         // try-finally 保证标记可靠复位，避免标记滞留导致学者盾反伤永久失效
         PROCESSING_RETALIATION.set(Boolean.TRUE);
         try {
@@ -147,7 +147,7 @@ public class EnchantmentScholarShield extends EnchantmentBase {
 
         LivingEntity victim = evt.getEntity();
 
-        // ⭐ v2.2：怪物附魔触发开关（受击者视角，减伤）
+        // v2.2：怪物附魔触发开关（受击者视角，减伤）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
 
         if (!victim.isUsingItem()) {

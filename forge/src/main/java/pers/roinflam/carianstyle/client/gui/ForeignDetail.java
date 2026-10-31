@@ -42,7 +42,7 @@ import java.util.List;
  * 界面靠键里有没有冒号来区分，见 {@code CodexEntry.getKey()}。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)

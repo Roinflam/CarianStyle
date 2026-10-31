@@ -43,7 +43,7 @@ import java.util.Map;
  * 内置探测器工厂覆盖：装备常驻（任意槽最高）、护甲常驻（护甲槽最高）、护甲叠加（护甲槽之和）、举盾触发。
  * 计时型/状态型光环（如重力场）无法仅凭客户端状态判断，需另走服务端同步，暂不在此。
  *
- * @author FlameForge
+ * @author RoinFlam
  */
 @OnlyIn(Dist.CLIENT)
 public final class AuraDisplayRegistry {

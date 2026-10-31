@@ -261,7 +261,7 @@ public class GlintbladesRender extends EntityRenderer<EntityGlintblades> {
         poseStack.mulPose(Axis.XP.rotationDegrees(rollDeg));
         // 最内层：把斜向素材的刀身轴掰正到 +X（详见类注释）
         poseStack.mulPose(Axis.ZP.rotationDegrees(-TEXTURE_TIP_ANGLE_DEG));
-        // ⚠ 必须是最后一个变换：只有排在最后才是在模型空间沿贴图法线加厚（详见类注释）
+        // 必须是最后一个变换：只有排在最后才是在模型空间沿贴图法线加厚（详见类注释）
         poseStack.scale(1f, 1f, Z_THICKNESS);
 
         // ===== 5) 渲染物品 =====

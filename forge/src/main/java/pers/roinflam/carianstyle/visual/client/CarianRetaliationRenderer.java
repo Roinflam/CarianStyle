@@ -130,7 +130,7 @@ import java.util.Set;
  * 几何也全部用标量内联，无任何临时数组。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)
@@ -182,7 +182,7 @@ public final class CarianRetaliationRenderer {
     /** 辉石深蓝：内环与剑柄侧的暗部 */
     private static final int GLINT_DEEP = 0x3A6FC0;
 
-    // ===== 预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // ===== 预解包的固定配色（只读，切勿作为写入目标）=====
     // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
     // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
     // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
@@ -304,7 +304,7 @@ public final class CarianRetaliationRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。

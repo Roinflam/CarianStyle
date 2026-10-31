@@ -166,7 +166,7 @@ import java.util.List;
  * 几何上也全部用标量内联，无任何临时数组。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 3.0
  */
 @OnlyIn(Dist.CLIENT)
@@ -212,7 +212,7 @@ public final class DarkMoonRenderer {
     /** 夜蓝：月海、月相暗面、脚下月光盘 */
     private static final int MOON_DEEP = 0x3F5C99;
 
-    // ===== 预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // ===== 预解包的固定配色（只读，切勿作为写入目标）=====
     // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
     // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
     // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
@@ -288,7 +288,7 @@ public final class DarkMoonRenderer {
      * 坐标是手调的，刻意做成大小不一、分布不对称（对称会显得像图案而非天体）。
      * </p>
      * <p>
-     * <b>⚠ 只读常量数组</b>，绘制时只按下标读取、绝不写入。
+     * <b>只读常量数组</b>，绘制时只按下标读取、绝不写入。
      * </p>
      */
     private static final float[] MOON_MARIA = {
@@ -361,7 +361,7 @@ public final class DarkMoonRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
@@ -378,7 +378,7 @@ public final class DarkMoonRenderer {
             return;
         }
 
-        // ⭐ 白天直接整个跳过——暗月只在夜晚生效，这一行省掉全部后续开销。
+        // 白天直接整个跳过——暗月只在夜晚生效，这一行省掉全部后续开销。
         // 不能用 level.isDay()：客户端的 skyDarken 从进世界起就没更新过，永远是白天
         if (DayNightUtil.isDay(mc.level)) {
             return;

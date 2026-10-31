@@ -46,7 +46,7 @@ public class EnchantmentContinuousShooting extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.continuous_shooting.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.continuous_shooting.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -103,7 +103,7 @@ public class EnchantmentContinuousShooting extends EnchantmentBase {
             return;
         }
 
-        // ⭐ v2.2：怪物附魔触发开关（射手视角）
+        // v2.2：怪物附魔触发开关（射手视角）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(shooter, false)) return;
 
         Enchantment continuousShooting = getCachedEnchantment();
@@ -131,7 +131,7 @@ public class EnchantmentContinuousShooting extends EnchantmentBase {
             return;
         }
 
-        // ⭐ v2.2：怪物附魔触发开关（持有者视角，加速拉弓）
+        // v2.2：怪物附魔触发开关（持有者视角，加速拉弓）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(entity, false)) return;
 
         ItemStack heldItem = entity.getItemInHand(entity.getUsedItemHand());

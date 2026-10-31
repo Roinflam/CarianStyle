@@ -194,7 +194,7 @@ import java.util.Map;
  * 淡出的触发时机、持续时间、状态机的其余部分一字未动。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 5
  */
 @OnlyIn(Dist.CLIENT)
@@ -225,7 +225,7 @@ public final class GravitasDistortionRenderer {
     private static final int GRAVITY_MID = 0x5A3AB0;
     private static final int GRAVITY_CORE = 0xC7B4FF;
 
-    // ===== v4：预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // ===== v4：预解包的固定配色（只读，切勿作为写入目标）=====
     // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
     // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
     // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
@@ -237,7 +237,7 @@ public final class GravitasDistortionRenderer {
     private static final float[] C_GRAVITY_CORE = VisualColor.constant(GRAVITY_CORE);
 
     /**
-     * v4：动态插值色的复用缓冲（⚠ 写入后必须立即消费，不可跨调用留存）。
+     * v4：动态插值色的复用缓冲（写入后必须立即消费，不可跨调用留存）。
      * <p>
      * 仅用于两处随时间 / 逐元素变化的颜色：{@link #drawSqueezeRings} 的逐环收缩渐变、
      * {@link #drawInwardDust} 的逐粒汇聚渐变。二者顺序调用、互不嵌套，
@@ -376,7 +376,7 @@ public final class GravitasDistortionRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
@@ -405,7 +405,7 @@ public final class GravitasDistortionRenderer {
 
         float partial = VisualBatch.partialTick();
         float time = (System.currentTimeMillis() - START_MILLIS) / 1000f;
-        // ⭐ v5：本帧帧号。VisualBatch 在同一阶段的 HIGHEST 优先级里自增，
+        // v5：本帧帧号。VisualBatch 在同一阶段的 HIGHEST 优先级里自增，
         // 而本渲染器是默认的 NORMAL 优先级，故这里读到的必然是本帧的值
         int frameId = VisualBatch.frameId();
 
@@ -433,7 +433,7 @@ public final class GravitasDistortionRenderer {
         }
         for (Map.Entry<Integer, FieldAnimState> e : FIELD_STATE.entrySet()) {
             FieldAnimState st = e.getValue();
-            // ⭐ v5：「本帧没出现」等价于「lastSeenFrame 不是当前帧号」，
+            // v5：「本帧没出现」等价于「lastSeenFrame 不是当前帧号」，
             // 一次 int 比较取代了原先的 HashSet 查找 + Integer 装箱
             if (st.fadeStart < 0f && st.lastSeenFrame != frameId) {
                 st.fadeStart = time;
@@ -472,7 +472,7 @@ public final class GravitasDistortionRenderer {
                     continue;
                 }
 
-                // ⭐ v3：个人压制视觉尺寸与实体相当，按实体中心距离取细节系数即可
+                // v3：个人压制视觉尺寸与实体相当，按实体中心距离取细节系数即可
                 // （与其它渲染器一致）。12 格内恒为 1.0，视觉与优化前一致
                 float detail = VisualLod.detail(distSqr);
                 VisualLod.countInstance();
@@ -538,7 +538,7 @@ public final class GravitasDistortionRenderer {
                 continue; // 太远：本帧不渲染，但保留状态，淡出计时继续
             }
 
-            // ⭐ v3：力场圈的细节系数必须按「到圆环边界的距离」取，不能按到圈心的距离。
+            // v3：力场圈的细节系数必须按「到圆环边界的距离」取，不能按到圈心的距离。
             // 力场半径可能大于 VisualLod.FULL_DETAIL_RANGE(12)，若按圈心距离算，
             // 玩家站在圈内侧边缘时（到圈心 ≈ 半径）会被判定为"远"并大幅削减，
             // 但那圈线其实就在脚边、削减清晰可见。改用到边界的近似距离后，
@@ -779,7 +779,7 @@ public final class GravitasDistortionRenderer {
 
         // 边界压制柱栅栏：均布的立体短柱，高度随时间起伏明灭，替代纯平面刻度线，
         // 给范围圈补上真正的立体轮廓。
-        // ⭐ v3：均布角度按步长抽取，绝不能截断——否则整圈栅栏只剩一段圆弧上有柱子
+        // v3：均布角度按步长抽取，绝不能截断——否则整圈栅栏只剩一段圆弧上有柱子
         float rot = time * FIELD_PYLON_ROT_SPEED + seedId * 0.2f;
         int drawnPylons = VisualLod.scale(FIELD_PYLON_COUNT, detail);
         int pylonStep = Math.max(1, FIELD_PYLON_COUNT / drawnPylons);

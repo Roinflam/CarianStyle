@@ -98,7 +98,7 @@ import java.util.List;
  *         截断前 N 个会让法阵明显「缺一块」。</li>
  * </ul>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 2.0
  */
 @OnlyIn(Dist.CLIENT)
@@ -132,7 +132,7 @@ public final class GlintbladesEffectRenderer {
     /** 辉石深蓝：法阵内环与拖尾末端的暗部 */
     private static final int GLINT_DEEP = 0x3A6FC0;
 
-    // ===== 预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // ===== 预解包的固定配色（只读，切勿作为写入目标）=====
     // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
     // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，会永久污染该配色。
     private static final float[] C_CORE = VisualColor.constant(GLINT_CORE);
@@ -140,7 +140,7 @@ public final class GlintbladesEffectRenderer {
     private static final float[] C_DEEP = VisualColor.constant(GLINT_DEEP);
 
     /**
-     * 动态插值色的复用缓冲（⚠ 写入后必须立即消费，不可跨调用留存）。
+     * 动态插值色的复用缓冲（写入后必须立即消费，不可跨调用留存）。
      * <p>本渲染器不存在「两个动态色同时存活」的场景——每处都是
      * 「算一个色 → 立刻画完 → 不再用」，故一个缓冲即可。
      * 若将来新增两端异色的渐变线段，必须再加一个独立缓冲。</p>
@@ -207,7 +207,7 @@ public final class GlintbladesEffectRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
@@ -261,7 +261,7 @@ public final class GlintbladesEffectRenderer {
                 continue;
             }
 
-            // ⭐ 细节系数按「到剑体边界的距离」取，不能按到中心的距离（详见类注释）
+            // 细节系数按「到剑体边界的距离」取，不能按到中心的距离（详见类注释）
             double visualRadius = size * TIP_FACTOR;
             double edge = Math.max(0.0, Math.sqrt(distSqr) - visualRadius);
             float detail = VisualLod.detail(edge * edge);

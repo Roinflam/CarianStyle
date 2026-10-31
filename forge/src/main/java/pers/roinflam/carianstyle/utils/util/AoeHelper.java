@@ -44,7 +44,7 @@ import java.util.function.Predicate;
  * 一开始就带上防护，而不是等崩服后再回头补。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 public final class AoeHelper {

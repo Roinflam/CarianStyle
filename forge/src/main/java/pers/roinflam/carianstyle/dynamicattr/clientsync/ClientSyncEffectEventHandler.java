@@ -116,7 +116,7 @@ public class ClientSyncEffectEventHandler {
             return;
         }
 
-        // ⭐ v1.1：先清掉该实体在全部序列号下的同步条目（MobEffect 类唯一的清理入口）
+        // v1.1：先清掉该实体在全部序列号下的同步条目（MobEffect 类唯一的清理入口）
         ClientSyncEffectManager.removeAllForEntity(event.getEntity());
 
         // 清除该实体的所有动态属性（会触发移除回调，顺带清掉火焰 / 隐身的同步条目）

@@ -98,7 +98,7 @@ public class EnchantmentVicDragonThunder extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.vic_dragon_thunder.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.vic_dragon_thunder.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -197,7 +197,7 @@ public class EnchantmentVicDragonThunder extends EnchantmentBase {
             return;
         }
 
-        // ⭐ v3.2：连点会让每一下都掷一次落雷（雷暴天每下必出），要求满蓄力
+        // v3.2：连点会让每一下都掷一次落雷（雷暴天每下必出），要求满蓄力
         if (!EnchantmentBase.isFullyCharged(attacker)) {
             return;
         }
@@ -220,11 +220,11 @@ public class EnchantmentVicDragonThunder extends EnchantmentBase {
 
         Level world = victim.level();
         if (world instanceof ServerLevel serverLevel) {
-            // ⭐ v3.1：视觉 + 雷声一次调用，两级节流在门面类内部各自生效。
+            // v3.1：视觉 + 雷声一次调用，两级节流在门面类内部各自生效。
             // 本附魔是「按实体节流」真正生效的那一处——雷暴天 100% 概率 + 高攻速时，
             // 同一目标一两 tick 内会连发好几次，节流后表现为一道持续劈着的雷。
             //
-            // ⚠ 节流只作用于视听：下方 victim.hurt 在节流之外，
+            // 节流只作用于视听：下方 victim.hurt 在节流之外，
             // 被拦掉的那次仍然会照常结算伤害（详见类注释）。
             CarianStyleEffects.redLightningStrike(serverLevel, victim);
         }

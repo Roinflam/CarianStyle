@@ -75,10 +75,10 @@ import java.util.Map;
  * 而 {@code getRarity()} 是 public 非 final 方法，原版所有读取点都走它。
  * </p>
  * <p>
- * <b>⚠ 已知副作用：</b>铁砧的附魔书合成花费也读 {@code getRarity()}
+ * <b>已知副作用：</b>铁砧的附魔书合成花费也读 {@code getRarity()}
  * （COMMON=1、UNCOMMON=2、RARE=4、VERY_RARE=8 倍率），
  * 因此 RARE / VERY_RARE 档的模组附魔在铁砧上会变贵。
- * 这与「稀有附魔更贵」的原版设计一致，但确实是本次改动带来的数值变化。
+ * 这与「稀有附魔更贵」的原版设计一致，但确实是这项映射带来的数值变化。
  * </p>
  *
  * <p>

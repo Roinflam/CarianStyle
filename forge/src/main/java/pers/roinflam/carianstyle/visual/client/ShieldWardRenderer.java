@@ -88,7 +88,7 @@ import java.util.Map;
  * 直接省掉一整遍描边。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 6.0
  */
 @OnlyIn(Dist.CLIENT)
@@ -328,13 +328,13 @@ public final class ShieldWardRenderer {
     /** 准星线半宽（格） */
     private static final float DEBUG_MARKER_HALF = 0.012f;
 
-    // ===== 预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // ===== 预解包的固定配色（只读，切勿作为写入目标）=====
     private static final float[] C_MANA_CORE = VisualColor.constant(MANA_CORE);
     private static final float[] C_MANA_MAIN = VisualColor.constant(MANA_MAIN);
     private static final float[] C_GOLD_CORE = VisualColor.constant(GOLD_CORE);
     private static final float[] C_GOLD_MAIN = VisualColor.constant(GOLD_MAIN);
 
-    // ===== 每帧复用的暂存区（⚠ 可写）=====
+    // ===== 每帧复用的暂存区（可写）=====
     // 绘制只在渲染线程发生，读完即用完，不存在跨帧持有，复用即可避免每帧分配。
     /** 金蓝插值后的高光色 */
     private static final float[] MIX_CORE = new float[3];
@@ -395,7 +395,7 @@ public final class ShieldWardRenderer {
     public static void renderOnItem(LivingEntity entity, ItemStack stack,
                                     ItemDisplayContext displayContext, boolean leftHand,
                                     PoseStack poseStack, MultiBufferSource buffer) {
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉盾墙时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉盾墙时整段跳过。
         // 放在最前面——本方法由 Mixin 在每个持盾实体的每帧渲染中调进来，
         // 后面紧跟着两次 getItemEnchantmentLevel（NBT 解析），不该白付。
         if (!VisualToggle.isEnabled(VisualEffectType.SHIELD_WARD)) {
@@ -462,7 +462,7 @@ public final class ShieldWardRenderer {
         poseStack.pushPose();
         try {
             // 与原版 ItemRenderer.render 的前两步完全一致（BEWLR 路径同样走这两步）。
-            // ⚠ translate(-0.5,-0.5,-0.5) 是把模型「居中到原点」
+            // translate(-0.5,-0.5,-0.5) 是把模型「居中到原点」
             model.applyTransform(displayContext, poseStack, leftHand);
             poseStack.translate(-0.5f, -0.5f, -0.5f);
             // 挪到物品自身的几何中心：烘焙出来的坐标都是相对这里的

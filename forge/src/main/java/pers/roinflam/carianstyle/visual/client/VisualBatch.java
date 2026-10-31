@@ -75,7 +75,7 @@ import javax.annotation.Nullable;
  * 取一次细节系数即可。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.1
  */
 @OnlyIn(Dist.CLIENT)

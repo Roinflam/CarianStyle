@@ -24,7 +24,7 @@ import java.util.List;
  * 血刃、挥石魔法、黄金律法、对空射击、硬箭。
  * </p>
  *
- * <h3>⚠ 本文件最重要的一条规则：自身特效一律贴地</h3>
+ * <h3>本文件最重要的一条规则：自身特效一律贴地</h3>
  * <p>
  * v1.0 的血刃与黄金律法都<b>挡视野</b>，这不是调参能救的，是设计错了：
  * </p>
@@ -104,7 +104,7 @@ import java.util.List;
  * <b>尺寸决定占多大地方，粗细决定看不看得见</b>，要收的是前者。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  *
  * <h3>v2.2：黄金律法改为原著的环形符印；硬箭尺寸随伤害缩放</h3>
  * <ul>
@@ -210,7 +210,7 @@ public final class CombatArtBurstRenderer {
     private static final int HARD_GOLD = 0xF0BC48;
     private static final int HARD_DARK = 0x5A564E;
 
-    // ===== 预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // ===== 预解包的固定配色（只读，切勿作为写入目标）=====
     // C_ 前缀是本模组约定：类加载时解包一次、此后永久复用的常量颜色数组。
     // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，会永久污染该配色。
     private static final float[] C_FLASH = VisualColor.constant(FLASH_WHITE);
@@ -425,7 +425,7 @@ public final class CombatArtBurstRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
@@ -480,7 +480,7 @@ public final class CombatArtBurstRenderer {
             float ryFoot = (float) dy;
             float rz = (float) dz;
 
-            // ⭐ 起手爆闪的高度按「自身 / 目标」分流：
+            // 起手爆闪的高度按「自身 / 目标」分流：
             // 自身演出贴地闪，否则等于在第一人称视野里开了一盏灯
             boolean selfAnchored = isSelfAnchored(fx.type);
             float flashY = selfAnchored ? FLASH_SELF_HEIGHT : CHEST_HEIGHT;
@@ -645,7 +645,7 @@ public final class CombatArtBurstRenderer {
         // ===== 血刃新月：本演出的主体，一枚朝前飞出去的弹体 =====
         float waveP = clamp01((p - 0.06f) / BLOOD_CRESCENT_RATIO);
         if (waveP > 0f) {
-            // ⭐ 关键：曲率半径恒定，向前平移的是弧的【圆心】而不是半径。
+            // 关键：曲率半径恒定，向前平移的是弧的【圆心】而不是半径。
             // 若改成「圆心固定在玩家、半径逐渐变大」，画出来就是一圈从脚下扩散的
             // 冲击波 —— 那是《鲜血斩击》的语汇，不是《血刃》的
             float travel = radius * BLOOD_CRESCENT_TRAVEL * easeOutCubic(waveP);
@@ -861,7 +861,7 @@ public final class CombatArtBurstRenderer {
             if (a > 0.01f) {
                 long sd = seedFor((int) (baseAngle * 1000f), 7);
                 float spin = rngFloat(sd) * TAU;
-                // ⚠ 只有两层朴素的灰，没有任何光晕或魔力包裹。
+                // 只有两层朴素的灰，没有任何光晕或魔力包裹。
                 // 给它加一点光效，它就变成「石属性法术弹」了，梗当场消失
                 billboardSquare(b, m, px, py, pz, STONE_ROCK_SIZE,
                         spin + swing * 2.6f, C_STONE_DARK, a);
@@ -1001,7 +1001,7 @@ public final class CombatArtBurstRenderer {
      *         也是它与上面三者最直接的区别。</li>
      * </ul>
      * <p>
-     * <b>⚠ 仍然全部贴地。</b>免疫恰恰发生在被围殴的时候，那个时机挡视野尤其致命。
+     * <b>仍然全部贴地。</b>免疫恰恰发生在被围殴的时候，那个时机挡视野尤其致命。
      * </p>
      * <p><b>削减：</b>环分段数缩放；辐条按步长抽取（均布角度，截断会只剩一侧）；
      * 光尘整层可跳过。双环与法环小环不削——它们是全部辨识度所在。</p>
@@ -1163,7 +1163,7 @@ public final class CombatArtBurstRenderer {
             billboardDiamond(b, m, cx, headY, cz, radius * 0.2f, C_SKY_WHITE, 0.95f * fade);
         }
 
-        // ===== 空爆环：⭐ 画在目标躯干高度，不落地 =====
+        // ===== 空爆环：画在目标躯干高度，不落地 =====
         float burstP = clamp01((p - 0.2f) / SKY_BURST_RATIO);
         if (burstP > 0f && burstP < 1f) {
             float rr = radius * SKY_BURST_RADIUS_RATIO * easeOutCubic(burstP);
@@ -1508,7 +1508,7 @@ public final class CombatArtBurstRenderer {
         float r = col[0], g = col[1], bl = col[2];
         float rInner = Math.max(0f, radius - halfWidth);
         float rOuter = radius + halfWidth;
-        // ⭐ 递推复用三角值：相邻两段共用一个端点，本段末端就是下一段起点。
+        // 递推复用三角值：相邻两段共用一个端点，本段末端就是下一段起点。
         // 原实现每段算 4 次 Math.cos/sin，现在每段只算 2 次 Mth.cos/sin。
         // ring() 是本文件调用最密的基元（单个演出里能被调七八次、每次 24~36 段），
         // 这一处的省量比任何一个演出的顶点削减都大
@@ -1562,7 +1562,7 @@ public final class CombatArtBurstRenderer {
         float r = col[0], g = col[1], bl = col[2];
         int drawn = Math.max(1, Math.round(segments * sweep));
         float segAngle = span * sweep / drawn;
-        // ⭐ 同 ring()：递推复用三角值，每段省下一半 Mth.cos/sin
+        // 同 ring()：递推复用三角值，每段省下一半 Mth.cos/sin
         float cos0 = Mth.cos(startAngle);
         float sin0 = Mth.sin(startAngle);
         float invDrawn = 1f / drawn;
@@ -1570,7 +1570,7 @@ public final class CombatArtBurstRenderer {
             float a1 = startAngle + segAngle * (i + 1);
             float u0 = i * invDrawn;
             float u1 = (i + 1) * invDrawn;
-            // ⭐ u^1.5 = u × √u。原来每段调一次 Math.pow —— 那是本文件最贵的一个浮点调用，
+            // u^1.5 = u × √u。原来每段调一次 Math.pow —— 那是本文件最贵的一个浮点调用，
             // 而它算的只是个亮度梯度。改成乘一次开方后完全等价，开销降一个量级
             float alpha0 = alpha * u0 * (float) Math.sqrt(u0);
             float alpha1 = alpha * u1 * (float) Math.sqrt(u1);

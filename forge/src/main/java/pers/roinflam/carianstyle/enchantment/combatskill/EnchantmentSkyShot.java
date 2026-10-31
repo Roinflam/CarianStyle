@@ -48,7 +48,7 @@ public class EnchantmentSkyShot extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.sky_shot.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.sky_shot.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -114,7 +114,7 @@ public class EnchantmentSkyShot extends EnchantmentBase {
 
         LivingEntity shooter = (LivingEntity) arrow.getOwner();
 
-        // ⭐ v2.2：怪物附魔触发开关（射手视角）
+        // v2.2：怪物附魔触发开关（射手视角）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(shooter, false)) return;
 
         LivingEntity target = (LivingEntity) entityHit.getEntity();
@@ -148,7 +148,7 @@ public class EnchantmentSkyShot extends EnchantmentBase {
 
         arrow.setBaseDamage(baseDamage + bonusDamage1 + bonusDamage2);
 
-        // ⭐ v2.3：对空射击特效。
+        // v2.3：对空射击特效。
         // 必须放在高度差判定之后 —— 这个演出的全部语义就是「在空中把它打下来」。
         // 传入的是 target 本身（它此刻在空中），空爆环会画在它所处的高度而非地面
         if (shooter.level() instanceof ServerLevel serverLevel) {

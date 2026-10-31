@@ -95,7 +95,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 比不显示更有害。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)

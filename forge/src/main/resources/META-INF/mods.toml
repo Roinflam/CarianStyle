@@ -29,9 +29,9 @@ versionRange="[${minecraft_version}]"
 ordering="NONE"
 side="BOTH"
 
-# ==================== 本次补充：Cloth Config 加载顺序 ====================
+# ==================== Cloth Config 加载顺序 ====================
 # build.gradle 里 Cloth Config 是 modApi + include，会以 jar-in-jar 内嵌进本模组，
-# 因此【不存在缺失风险】，玩家不装也能正常玩——这一点此前我判断错了，特此更正。
+# 因此【不存在缺失风险】，玩家不装也能正常玩。
 #
 # 但仍然需要这条声明，原因是【加载顺序】：Forge 依据依赖关系排序模组的构造阶段，
 # 未声明时本模组有可能先于 Cloth Config 完成构造，而 CarianStyle 的构造函数里

@@ -29,9 +29,9 @@ import java.util.List;
  *       一次攻击触发数千次 LivingHurtEvent 事件链，导致看门狗超时崩服。</li>
  * </ul>
  *
- * <p>崩溃场景示例：若玩家手持 100 级 fire_devoured 武器 + SlashBlade 残影 areaAttack
- * 同时命中 50 个 NPC，原版逻辑会触发 50 × 300 ≈ 15,000 次 hurt 调用，
- * 每次 hurt 再走一整条 LivingHurtEvent → l2library → l2damagetracker → l2hostility 事件链，
+ * <p>崩溃场景示例：若玩家手持 100 级 fire_devoured 武器，用范围攻击
+ * 同时命中 50 个生物，原版逻辑会触发 50 × 300 ≈ 15,000 次 hurt 调用，
+ * 每次 hurt 再走一整条 LivingHurtEvent 事件链（装了别的伤害处理模组还会更长），
  * 单个 tick 耗时轻松突破 60 秒，触发 Spigot Watchdog 崩服。</p>
  *
  * <h3>v2.2：要求满蓄力</h3>
@@ -55,7 +55,7 @@ public class EnchantmentFireDevoured extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.fire_devoured.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.fire_devoured.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -121,7 +121,7 @@ public class EnchantmentFireDevoured extends EnchantmentBase {
             return;
         }
 
-        // ⭐ v2.2：每次命中最多 16 次 hurt 加点燃，连点等于成倍放大事件风暴，要求满蓄力
+        // v2.2：每次命中最多 16 次 hurt 加点燃，连点等于成倍放大事件风暴，要求满蓄力
         if (!isFullyCharged(attacker)) {
             return;
         }
@@ -133,7 +133,7 @@ public class EnchantmentFireDevoured extends EnchantmentBase {
             return;
         }
 
-        // ⭐ v2.1：搜索半径硬上限，防止等级直接当半径导致扫描范围爆炸
+        // v2.1：搜索半径硬上限，防止等级直接当半径导致扫描范围爆炸
         // 例如 100 级原本 = 半径 100 方块（200³ = 800 万方块体积），硬封顶 8 方块
         int searchRadius = Math.min(effectiveLevel, MAX_SEARCH_RADIUS.getInt());
 
@@ -149,7 +149,7 @@ public class EnchantmentFireDevoured extends EnchantmentBase {
         // 伤害倍率保留原有线性等级加成（游戏设计不变）
         float damage = ctx.getDamage() * effectiveLevel * (float) DAMAGE_PER_LEVEL.get();
 
-        // ⭐ v2.1：单次触发最大命中目标数硬上限，防止事件链风暴
+        // v2.1：单次触发最大命中目标数硬上限，防止事件链风暴
         int hitCount = 0;
         for (LivingEntity entity : nearbyEntities) {
             if (hitCount >= MAX_TARGETS.getInt()) {

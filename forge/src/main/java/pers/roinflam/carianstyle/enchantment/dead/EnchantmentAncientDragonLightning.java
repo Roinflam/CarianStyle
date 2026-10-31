@@ -132,7 +132,7 @@ public class EnchantmentAncientDragonLightning extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.ancient_dragon_lightning.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.ancient_dragon_lightning.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -258,7 +258,7 @@ public class EnchantmentAncientDragonLightning extends EnchantmentBase {
             return;
         }
 
-        // ⭐ v3.1：命中目标数硬上限。
+        // v3.1：命中目标数硬上限。
         // 必须在 randomList 之前截断——分配基数要用截断后的数量，
         // 否则 level*100 的落雷总量会被摊给不存在的目标（详见类注释）。
         // 复制成新列表而非用 subList 视图，避免持有原大列表的引用。
@@ -290,7 +290,7 @@ public class EnchantmentAncientDragonLightning extends EnchantmentBase {
                         return;
                     }
 
-                    // ⭐ v3.1：存活检查提前到发包之前。
+                    // v3.1：存活检查提前到发包之前。
                     // 原实现先发一轮红闪 + 两个音效再检查，导致目标死亡 / 卸载后
                     // 仍会往尸体或空气里多劈一道雷、多发三个包（详见类注释）。
                     if (!entityLivingBase.isAlive()) {
@@ -300,7 +300,7 @@ public class EnchantmentAncientDragonLightning extends EnchantmentBase {
 
                     Level world = entityLivingBase.level();
                     if (world instanceof ServerLevel serverLevel) {
-                        // ⭐ v3.2：视觉 + 雷声一次调用，两级节流在门面类内部各自生效。
+                        // v3.2：视觉 + 雷声一次调用，两级节流在门面类内部各自生效。
                         // 视觉按目标实体节流（对本附魔近乎 no-op，刻意为之——
                         // 每个目标身上那道雷是打击反馈，不该被砍）；
                         // 雷声按 64 格网格全局节流，把 100 目标场景下的音效包量

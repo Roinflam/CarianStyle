@@ -39,7 +39,7 @@ import javax.annotation.Nonnull;
  * 与原版隐身药水一致（原版隐身的实体着火时火焰照样可见）。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)

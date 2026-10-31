@@ -16,7 +16,7 @@ import javax.annotation.Nullable;
 /**
  * 自定义伤害来源
  * <p>
- * ⚠️ 1.20.1重要变更：伤害系统完全重构
+ * 1.20.1重要变更：伤害系统完全重构
  * <p>
  * 新系统工作流程：
  * 1. 在 data/{modid}/damage_type/*.json 中定义伤害类型

@@ -35,7 +35,7 @@ import java.util.Map;
  * {@code getStacks(Player)} 重载（自行构建一次性快照），因此形如
  * {@code entry.provider().getStacks(player)} 的既有调用点同样不受影响。
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 2
  */
 public final class StackDisplayRegistry {

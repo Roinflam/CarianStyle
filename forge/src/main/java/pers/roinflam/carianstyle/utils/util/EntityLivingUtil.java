@@ -241,7 +241,7 @@ public class EntityLivingUtil {
             float actualHealth = entity.getHealth();
 
             if (Math.abs(actualHealth - targetHealth) < 0.01f) {
-                LogUtil.info("✓ [真伤系统] " + entityName + " 使用 SET_HEALTH 方式");
+                LogUtil.info("[真伤系统] " + entityName + " 使用 SET_HEALTH 方式");
                 return new HealthFieldInfo();
             }
 
@@ -258,7 +258,7 @@ public class EntityLivingUtil {
         HealthFieldInfo customFieldInfo = bruteForceFindHealthField(entity, currentHealth);
 
         if (customFieldInfo != null && customFieldInfo.method == DamageMethod.CUSTOM_FIELD) {
-            LogUtil.info("✓ [真伤系统] " + entityName + " 使用 CUSTOM_FIELD 方式");
+            LogUtil.info("[真伤系统] " + entityName + " 使用 CUSTOM_FIELD 方式");
             return customFieldInfo;
         }
 

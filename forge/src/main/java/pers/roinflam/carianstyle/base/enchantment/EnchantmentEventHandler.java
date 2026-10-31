@@ -298,7 +298,7 @@ public class EnchantmentEventHandler {
      * 装备只扫一遍。
      * </p>
      *
-     * <h3>⚠ 与直接调 EnchantmentHelper 的两点行为差异</h3>
+     * <h3>与直接调 EnchantmentHelper 的两点行为差异</h3>
      * <p>
      * 快照是由 {@code scanPlayerEnchantments} 构建的，它做了两件直接调用不会做的事：
      * </p>
@@ -525,7 +525,7 @@ public class EnchantmentEventHandler {
                                    boolean isAttacker,
                                    @Nonnull EquipmentSlot[] slots) {
 
-        // ⭐ v3.2：怪物 + 通用关 → 整个 holder 跳过
+        // v3.2：怪物 + 通用关 → 整个 holder 跳过
         // 这是性能收益最大的拦截点，跳过整个装备槽位的 NBT 扫描
         boolean holderIsPlayer = holder instanceof Player;
         if (!holderIsPlayer && !ConfigLoader.allowMobTriggerEnchantments) {
@@ -548,7 +548,7 @@ public class EnchantmentEventHandler {
                 // v3.1：跳过被禁用的附魔
                 if (base.isDisabled()) continue;
 
-                // ⭐ v3.2：怪物 + 死亡类关 + 是 DEAD 分类 → 跳过
+                // v3.2：怪物 + 死亡类关 + 是 DEAD 分类 → 跳过
                 // 覆盖 EnchantmentEpilepsySpread（通过 onDamageAsVictimLowest 触发的濒死类）
                 if (filterDeathEnchantmentsInLoop && isDeadCategoryEnchantment(base)) {
                     continue;
@@ -757,7 +757,7 @@ public class EnchantmentEventHandler {
         if (event.getEntity().level().isClientSide) return;
         LivingEntity victim = event.getEntity();
 
-        // ⭐ v3.2：怪物死亡触发拦截
+        // v3.2：怪物死亡触发拦截
         // 死亡是濒死类的典型场景，所以传 isDeathTrigger=true
         if (shouldBlockMobTrigger(victim, true)) {
             return;
@@ -792,7 +792,7 @@ public class EnchantmentEventHandler {
         if (event.getEntity().level().isClientSide) return;
         LivingEntity healer = event.getEntity();
 
-        // ⭐ v3.2：治疗事件不属于死亡/濒死类，传 false
+        // v3.2：治疗事件不属于死亡/濒死类，传 false
         if (shouldBlockMobTrigger(healer, false)) {
             return;
         }

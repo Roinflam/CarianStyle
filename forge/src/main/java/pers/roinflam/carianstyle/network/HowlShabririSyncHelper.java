@@ -35,7 +35,7 @@ import javax.annotation.Nonnull;
  * 而嘶吼叠层的频率受攻击速度限制，量级完全可以接受。
  * </p>
  *
- * <h3>⚠ 关于「6 档」而不是 5 档</h3>
+ * <h3>关于「6 档」而不是 5 档</h3>
  * <p>
  * 语言文件里嘶吼写的是「至多 5 层」，但 {@code EnchantmentHowlShabriri} 的实际逻辑是：
  * </p>
@@ -48,9 +48,9 @@ import javax.annotation.Nonnull;
  * {@code baseValue × (amplifier + 1)}，即 amplifier 5 对应 -90% 护甲 = <b>第 6 层</b>。
  * </p>
  * <p>
- * <b>这是附魔本身的一处 off-by-one，本次不动它</b>（改数值会实打实改变平衡）。
+ * <b>这是附魔本身的一处 off-by-one，这里先不动它</b>（改数值会实打实改变平衡）。
  * 本类如实按 6 档同步，渲染器也按 6 档显示——玩家看到的层数与真实生效的减甲一致，
- * 只是与描述文本差一层。若你决定把附魔改成真正的 5 层封顶
+ * 只是与描述文本差一层。以后要把附魔改成真正的 5 层封顶
  * （把 {@code Math.min(currentAmplifier + 1, 5)} 改成 {@code 4}），
  * 只需把 {@link #HOWL_MAX_AMPLIFIER} 同步改为 4，本类与渲染器都无需其它改动。
  * </p>
@@ -89,7 +89,7 @@ import javax.annotation.Nonnull;
  * 此时 {@code getAmplifier} 必定返回新值，可以放心查。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 public final class HowlShabririSyncHelper {
@@ -109,7 +109,7 @@ public final class HowlShabririSyncHelper {
      * 嘶吼 amplifier 的最大值。
      * <p>与 {@code EnchantmentHowlShabriri} 里
      * {@code Math.min(currentAmplifier + 1, 5)} 的封顶值保持一致；
-     * 改动那边务必同步改这里（详见类注释的「⚠ 关于 6 档」小节）。</p>
+     * 改动那边务必同步改这里（详见类注释的「关于 6 档」小节）。</p>
      */
     public static final int HOWL_MAX_AMPLIFIER = 5;
 

@@ -60,7 +60,7 @@ import java.util.List;
  * 也不需要改动 {@code EnchantmentDaedicarWoe} 一行代码。
  * </p>
  *
- * <h3>⚠ 装备槽口径</h3>
+ * <h3>装备槽口径</h3>
  * <p>
  * {@link #hasWoe} 目前只扫描<b>4 件护甲槽</b>——与 {@link CalamityRenderer} 同一判断依据。
  * 若该附魔实际不是护甲附魔，把 {@code getArmorSlots()} 换成遍历
@@ -108,7 +108,7 @@ import java.util.List;
  * 故全部预解包为 {@code C_} 常量，颜色相关堆分配恒为 0，无需复用缓冲。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)
@@ -140,7 +140,7 @@ public final class DaedicarWoeRenderer {
     /** 深紫：缝合线与脚下圈的暗部 */
     private static final int WOE_DEEP = 0x2E2242;
 
-    // ===== 预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // ===== 预解包的固定配色（只读，切勿作为写入目标）=====
     // C_ 前缀是本模组约定：类加载时解包一次、此后永久复用的常量颜色数组。
     private static final float[] C_PALE = VisualColor.constant(WOE_PALE);
     private static final float[] C_THREAD = VisualColor.constant(WOE_THREAD);
@@ -208,7 +208,7 @@ public final class DaedicarWoeRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
@@ -294,7 +294,7 @@ public final class DaedicarWoeRenderer {
      * 用 {@link ItemStack#isEnchanted()} 做廉价前置过滤——该方法只检查 NBT 标签是否存在、
      * 不做任何反序列化，能砍掉裸装与未附魔护甲的解析开销。
      * </p>
-     * <p><b>⚠ 若该附魔实际不是护甲附魔</b>，改用 {@code EquipmentSlot.values()} 遍历即可
+     * <p><b>若该附魔实际不是护甲附魔</b>，改用 {@code EquipmentSlot.values()} 遍历即可
      * （详见类注释）。</p>
      *
      * @param entity 待判定实体

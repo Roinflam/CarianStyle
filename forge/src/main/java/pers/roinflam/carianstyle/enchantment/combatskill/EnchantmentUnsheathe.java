@@ -40,7 +40,7 @@ import java.util.UUID;
  * 任何视觉反馈，玩家只能靠伤害数字判断是否触发过。
  * </p>
  * <p>
- * <b>本次改动仅新增视觉，机制完全未动：</b>触发概率、伤害倍率、攻速惩罚、计数累积与重置
+ * <b>只加视觉，机制不变：</b>触发概率、伤害倍率、攻速惩罚、计数累积与重置
  * 全部保持原样；特效为纯服务端广播，不生成实体、不触发任何事件，对伤害结算零影响。
  * 特效只在<b>实际触发居合斩</b>的分支内播放，未触发的普通攻击不会有任何视觉，
  * 因此不会刷屏——这也正是居合适合作为首批战技特效的原因。
@@ -61,7 +61,7 @@ public class EnchantmentUnsheathe extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.unsheathe.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.unsheathe.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -144,7 +144,7 @@ public class EnchantmentUnsheathe extends EnchantmentBase {
                 }
             }.start();
 
-            // ⭐ v2.1 视觉：拔刀斩的银白弧形刀光（纯服务端广播，不影响任何机制）
+            // v2.1 视觉：拔刀斩的银白弧形刀光（纯服务端广播，不影响任何机制）
             if (player.level() instanceof ServerLevel serverLevel) {
                 CarianStyleCombatArtEffects.iaiSlash(serverLevel, player);
             }

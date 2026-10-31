@@ -52,7 +52,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 public class EnchantmentConcealingVeil extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.concealing_veil.desc。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.concealing_veil.desc。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "concealing_veil";

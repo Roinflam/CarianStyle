@@ -75,7 +75,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class EnchantmentGravitas extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.gravitas.desc。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.gravitas.desc。
     //
     // 注意 FIELD_RADIUS 用的是 defineShared 而非 define：它同时被客户端的
     // GravitasDistortionRenderer 用来画地面范围圈，必须由服务端下发，
@@ -168,7 +168,7 @@ public class EnchantmentGravitas extends EnchantmentBase {
         LivingEntity victim = evt.getEntity();
         LivingEntity attacker = (LivingEntity) evt.getSource().getEntity();
 
-        // ⭐ v2.2：怪物附魔触发开关（攻击者视角）
+        // v2.2：怪物附魔触发开关（攻击者视角）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
 
         ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);

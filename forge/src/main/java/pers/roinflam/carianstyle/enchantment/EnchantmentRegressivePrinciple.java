@@ -56,7 +56,7 @@ public class EnchantmentRegressivePrinciple extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.regressive_principle.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.regressive_principle.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -137,7 +137,7 @@ public class EnchantmentRegressivePrinciple extends EnchantmentBase {
             return;
         }
 
-        // ⭐ v2.1：搜索半径硬上限，防止等级×3直接当半径
+        // v2.1：搜索半径硬上限，防止等级×3直接当半径
         // 原：totalLevel * 3（100级 = 300格，扫过整个区块区域）
         int searchRadius = Math.min(totalLevel * 3, MAX_SEARCH_RADIUS.getInt());
 
@@ -148,7 +148,7 @@ public class EnchantmentRegressivePrinciple extends EnchantmentBase {
                 entity -> !entity.getActiveEffects().isEmpty()
         );
 
-        // ⭐ v2.1：命中数量硬上限，防止对上千个实体执行 removeAllEffects
+        // v2.1：命中数量硬上限，防止对上千个实体执行 removeAllEffects
         int hitCount = 0;
         for (LivingEntity target : targets) {
             if (hitCount >= MAX_TARGETS.getInt()) {

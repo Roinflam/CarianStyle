@@ -66,7 +66,7 @@ public class EnchantmentExclude extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.exclude.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.exclude.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -166,7 +166,7 @@ public class EnchantmentExclude extends EnchantmentBase {
         double range = BASE_RANGE.get() + (totalLevel - 1) * RANGE_PER_LEVEL.get();
         double searchRadius = Math.min(range, MAX_SEARCH_RADIUS.get());
 
-        // ⭐ 受击触发范围击退时播放一发排斥冲击波（双环猛烈外推、约 520ms）。
+        // 受击触发范围击退时播放一发排斥冲击波（双环猛烈外推、约 520ms）。
         // 传实体重载 → 内部取脚底坐标，冲击环贴地（详见类注释）。
         // 纯服务端发包，不生成实体、不触发任何事件，不影响下方击退逻辑。
         if (victim.level() instanceof ServerLevel serverLevel) {

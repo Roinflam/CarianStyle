@@ -115,7 +115,7 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.scarlet_lonia.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.scarlet_lonia.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -277,7 +277,7 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
         hurter.setHealth(1);
         hurter.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 30, 6));
 
-        // ⭐ 触发瞬间在脚底地面生成猩红立体花，并绑定持有者跟随。
+        // 触发瞬间在脚底地面生成猩红立体花，并绑定持有者跟随。
         // 时序关键：客户端演出的盛放主点（p≈0.42）恰好对齐下方延迟 30tick 的第二阶段爆发，
         // 因此必须在这里调用，不能挪进延迟任务里（详见类注释）。
         // 纯服务端广播，不触发任何事件，不影响下方双阶段 AOE / 上限 / 击退 / 清理逻辑。
@@ -354,7 +354,7 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
 
                 EnchantmentDataManager.removeData("scarlet_lonia_active", hurter.getUUID());
 
-                // ⭐ v3.1：持有者若已离线，kill 会因 isAlive() 为 false 空转，
+                // v3.1：持有者若已离线，kill 会因 isAlive() 为 false 空转，
                 // 这次死亡就被白嫖掉了。此处登记待补刀标记，重登时补上（详见类注释）。
                 if (hurter.isAlive()) {
                     EntityLivingUtil.kill(hurter, NewDamageSource.scarletRot(hurter.level()));

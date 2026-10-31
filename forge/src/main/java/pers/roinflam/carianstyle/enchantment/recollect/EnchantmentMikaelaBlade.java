@@ -35,7 +35,7 @@ public class EnchantmentMikaelaBlade extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.mikaela_blade.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.mikaela_blade.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -86,14 +86,14 @@ public class EnchantmentMikaelaBlade extends EnchantmentBase {
 
         // 攻击者视角
         if (evt.getSource().getDirectEntity() instanceof LivingEntity attacker) {
-            // ⭐ v2.2：怪物附魔触发开关（攻击者视角）
+            // v2.2：怪物附魔触发开关（攻击者视角）
             if (!EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) {
                 ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
                 if (!heldItem.isEmpty()) {
                     int level = EnchantmentHelper.getItemEnchantmentLevel(mikaelaBlade, heldItem);
                     level = applyLevelLimit(mikaelaBlade, level, 10);
                     if (level > 0) {
-                        // ⭐ v2.3：连点会让每一下都叠一层连击（倍率不封顶），叠层要求满蓄力；
+                        // v2.3：连点会让每一下都叠一层连击（倍率不封顶），叠层要求满蓄力；
                         // 未满蓄力的一下只吃基础倍率（它是首击的代价），不加层、不刷新，也拿不到层数加成。
                         // 不能整段跳过：那样低层数时连点的伤害（×1.0）反而比满蓄力（×0.4 起）更高。
                         // 下面的受击者分支照常执行
@@ -114,7 +114,7 @@ public class EnchantmentMikaelaBlade extends EnchantmentBase {
         // 受击者视角（被打断连击的额外伤害）
         LivingEntity victim = evt.getEntity();
 
-        // ⭐ v2.2：怪物附魔触发开关（受击者视角）
+        // v2.2：怪物附魔触发开关（受击者视角）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
 
         int victimCombo = EnchantmentDataManager.getCounter(COMBO_COUNT_KEY, victim.getUUID());

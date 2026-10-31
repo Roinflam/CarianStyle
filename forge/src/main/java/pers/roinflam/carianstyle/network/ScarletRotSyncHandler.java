@@ -42,7 +42,7 @@ import javax.annotation.Nonnull;
  * （腐败女神等反复刷新）也不会产生重复网络包。所有逻辑仅在服务端执行（客户端事件由
  * {@code isClientSide} 守卫跳过）。
  *
- * @author FlameForge
+ * @author RoinFlam
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public final class ScarletRotSyncHandler {

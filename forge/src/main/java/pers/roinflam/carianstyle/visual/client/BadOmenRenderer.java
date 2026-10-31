@@ -124,7 +124,7 @@ import java.util.List;
  *         「边缘染金」渐变、浸染盘随时间的色相脉动）。</li>
  * </ol>
  * <p>
- * <b>为什么 {@link #C_OOZE_HEAD} 值得单列一条：</b>它是本次优化里唯一「靠观察发现的常量」。
+ * <b>为什么 {@link #C_OOZE_HEAD} 值得单列一条：</b>它是这轮优化里唯一「靠观察发现的常量」。
  * {@link #drawOoze} 每滴都调 {@code mix(black, rust, 0.45f)}，
  * 三个参数全是编译期常量、结果恒定不变，却被放在了循环体里——
  * 这类「看起来动态、其实恒定」的表达式是最容易漏掉的分配点。
@@ -142,7 +142,7 @@ import java.util.List;
  * 输出的每个颜色分量与 v2 数值相等。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 3
  */
 @OnlyIn(Dist.CLIENT)
@@ -177,7 +177,7 @@ public final class BadOmenRenderer {
     /** 污浊头端的固定混色比例（黑 → 锈），见 {@link #C_OOZE_HEAD} */
     private static final float OOZE_HEAD_MIX = 0.45f;
 
-    // ===== v3：预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // ===== v3：预解包的固定配色（只读，切勿作为写入目标）=====
     // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
     // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
     // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
@@ -189,7 +189,7 @@ public final class BadOmenRenderer {
     private static final float[] C_OMEN_SICK_GOLD = VisualColor.constant(OMEN_SICK_GOLD);
 
     /**
-     * v3：污浊头端色（{@code mix(墨黑, 血锈, 0.45)} 的<b>预算结果</b>，⚠ 只读）。
+     * v3：污浊头端色（{@code mix(墨黑, 血锈, 0.45)} 的<b>预算结果</b>，只读）。
      * <p>
      * 旧实现在 {@link #drawOoze} 的循环里对每滴污浊都算一次
      * {@code mix(black, rust, 0.45f)}——三个参数全是编译期常量、结果恒定不变，
@@ -208,7 +208,7 @@ public final class BadOmenRenderer {
     }
 
     /**
-     * v3：动态插值色的复用缓冲（⚠ 写入后必须立即消费，不可跨调用留存）。
+     * v3：动态插值色的复用缓冲（写入后必须立即消费，不可跨调用留存）。
      * <p>
      * 仅用于两处<b>真正随时间 / 逐元素变化</b>的颜色：
      * {@link #drawCurseRing} 的逐段「边缘染金」渐变、{@link #drawBlightPool} 的色相脉动。
@@ -285,7 +285,7 @@ public final class BadOmenRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
@@ -332,7 +332,7 @@ public final class BadOmenRenderer {
                 continue;
             }
 
-            // ⭐ v2：本实体的细节系数（距离 × 同屏拥挤度）。12 格内恒为 1.0，视觉与优化前一致
+            // v2：本实体的细节系数（距离 × 同屏拥挤度）。12 格内恒为 1.0，视觉与优化前一致
             float detail = VisualLod.detail(distSqr);
             // 登记实例，供下一帧估算拥挤度。本渲染器接入 VisualLod 的首要意义就在这一行——
             // 只要还有渲染器不登记，全局 crowdFactor 就会被系统性高估

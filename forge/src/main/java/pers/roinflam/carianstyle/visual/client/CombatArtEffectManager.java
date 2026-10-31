@@ -83,7 +83,7 @@ import java.util.List;
  * <p>
  * <b>只对 {@link #shouldMerge} 列出的类型生效。</b>居合、回旋、水鸟这些刻意要
  * 「多道错相叠加」的类型<b>绝不能合并</b>——水鸟乱舞的连斩感完全依赖多个实例同时存在，
- * 合并了就只剩一道刀光。这是本次改动唯一需要小心的地方。
+ * 合并了就只剩一道刀光。这是合并唯一需要小心的地方。
  * </p>
  *
  * <h4>上限同步提到 {@value #MAX_ACTIVE}</h4>
@@ -97,7 +97,7 @@ import java.util.List;
  * 而不是无限放宽总量——总量放宽只会让远处一堆看不清的刀光继续吃掉填充率。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  *
  * <h3>v1.4（同批）：移除四个演出的时长与合并登记</h3>
  * <p>
@@ -145,7 +145,7 @@ public final class CombatArtEffectManager {
     /**
      * 格挡窗口的时长（毫秒）。
      * <p>
-     * <b>⚠ 这个值不是「看着合适」挑出来的，而是被机制锁死的。</b>
+     * <b>这个值不是「看着合适」挑出来的，而是被机制锁死的。</b>
      * {@code EnchantmentParry.onLivingAttack} 里写的是
      * {@code EnchantmentDataManager.setData(PARRY_LEVEL_KEY, uuid, level, 10)}，
      * 即反击加成的有效期为 <b>10 tick = 500ms</b>。
@@ -219,7 +219,7 @@ public final class CombatArtEffectManager {
      */
     public static void spawn(int type, double x, double y, double z, float radius, float yaw) {
         long now = System.currentTimeMillis();
-        // ⭐ v1.4：高频类型的同位置合并。命中即返回，不再新建
+        // v1.4：高频类型的同位置合并。命中即返回，不再新建
         if (shouldMerge(type) && tryMerge(type, x, y, z, now)) {
             return;
         }
@@ -233,7 +233,7 @@ public final class CombatArtEffectManager {
     /**
      * 该类型是否参与同位置合并。
      * <p>
-     * <b>⚠ 只列出「每次攻击都可能触发」的类型。</b>刻意要多道错相叠加的类型
+     * <b>只列出「每次攻击都可能触发」的类型。</b>刻意要多道错相叠加的类型
      * （尤其是水鸟乱舞——它的连斩感完全依赖多个实例同时存在）绝不能出现在这里，
      * 否则会被合并成一道，整个演出就废了。
      * </p>
@@ -297,7 +297,7 @@ public final class CombatArtEffectManager {
      * 即角 a 对应 {@code atan2(dz, dx)}。代入朝向向量：
      * {@code a = atan2(cos(yaw), -sin(yaw)) = yaw + 90°}。
      * </p>
-     * <p>校验：yaw=0 → a=90°，代入得点在 +Z 方向 ✓；yaw=90° → a=180°，点在 -X 方向 ✓。</p>
+     * <p>校验：yaw=0 → a=90°，代入得点在 +Z 方向；yaw=90° → a=180°，点在 -X 方向，两处都对得上。</p>
      *
      * @param yawDegrees Minecraft 朝向（度）
      * @return 极坐标基准角（弧度），指向持有者正前方

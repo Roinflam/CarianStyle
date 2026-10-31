@@ -75,7 +75,7 @@ import pers.roinflam.carianstyle.network.StealthHitboxSyncHelper;
  * 放在 {@code client} 数组中，Mohist 等混合端的服务端根本不会尝试加载本 Mixin。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.1
  */
 @Mixin(EntityRenderDispatcher.class)

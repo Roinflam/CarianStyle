@@ -53,7 +53,7 @@ import java.util.regex.Pattern;
  * 百科不该因为玩家没装某个特定模组就整页空着。
  * </p>
  *
- * <h3>⚠ 为什么补充描述不写成 {@code enchantment.minecraft.*.desc}</h3>
+ * <h3>为什么补充描述不写成 {@code enchantment.minecraft.*.desc}</h3>
  * <p>
  * 那是<b>全局约定的键</b>。写进去之后，Enchantment Descriptions 之类按同一约定
  * 读取的模组会把本模组的文本显示在物品提示框里，按资源加载顺序覆盖掉人家写的版本——
@@ -67,7 +67,7 @@ import java.util.regex.Pattern;
  * 界面上也会标注这一条是补充的，不会冒充成附魔自带的说明。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 public final class ForeignMeta implements CodexEntry {
@@ -402,7 +402,7 @@ public final class ForeignMeta implements CodexEntry {
             return Component.translatable("carianstyle.codex.foreign.vanilla");
         }
         // 优先显示模组的正式名称，拿不到再退回命名空间——
-        // 「Apotheosis」比「apotheosis」好读，但后者至少不会显示成空白
+        // 正式名称比命名空间好读，但后者至少不会显示成空白
         return ModList.get().getModContainerById(namespace)
                 .map(c -> Component.literal(c.getModInfo().getDisplayName()))
                 .orElseGet(() -> Component.literal(namespace));

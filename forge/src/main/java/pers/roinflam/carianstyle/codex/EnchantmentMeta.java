@@ -38,7 +38,7 @@ import java.util.Locale;
  * 也能得到正确答案。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 public final class EnchantmentMeta implements CodexEntry {

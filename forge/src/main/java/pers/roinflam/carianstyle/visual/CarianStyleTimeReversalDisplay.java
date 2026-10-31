@@ -67,13 +67,13 @@ import pers.roinflam.carianstyle.utils.Reference;
  * 两处注册的先后顺序不影响任何行为，serialId 不冲突即可。
  * </p>
  * <p>
- * <b>如果你更希望统一管理</b>，把 {@link #register()} 里那段
+ * <b>以后要统一管理的话</b>，把 {@link #register()} 里那段
  * {@code StackDisplayRegistry.register(...)} 原样剪进
  * {@code CarianStyleStackDisplays.init()}、再把序列号常量搬过去，然后删掉本文件即可，
  * 其余代码一行都不用动。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.1
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
@@ -89,7 +89,7 @@ public final class CarianStyleTimeReversalDisplay {
     /**
      * 逆转期间累积伤害的数据键（值类型 {@code Float}）。
      * <p>
-     * <b>⚠ 必须与 {@code EnchantmentTimeReversal.REVERSAL_DAMAGE_KEY} 逐字一致</b>，
+     * <b>必须与 {@code EnchantmentTimeReversal.REVERSAL_DAMAGE_KEY} 逐字一致</b>，
      * 改动那边务必同步改这里，否则 HUD 会静默地永远读不到值（不会报错，只是永远不显示）。
      * </p>
      * <p>

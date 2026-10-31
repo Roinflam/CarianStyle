@@ -103,7 +103,7 @@ import java.util.List;
  * 不是「我在回血」这个信息本身。
  * </p>
  * <p>
- * <b>⚠ 改这个值必须同步改 {@code AoeEffectRenderer.MOON_BLESSING_SECONDS}</b>
+ * <b>改这个值必须同步改 {@code AoeEffectRenderer.MOON_BLESSING_SECONDS}</b>
  * （那边是秒，即本值 ÷ 1000）。渲染器用它把归一化的 progress 换算回绝对秒数，
  * 从而让动画速度与总时长脱钩——两处不一致会导致月轮转速、回春环频率整体偏快或偏慢。
  * </p>
@@ -126,7 +126,7 @@ import java.util.List;
  * v6.4 那个「两处常量必须手工同步」的隐患随之消失。
  * </p>
  *
- * <h3>v6.6 性能：红色闪电的三重节流（本次新增）</h3>
+ * <h3>v6.6 性能：红色闪电的三重节流</h3>
  * <p>
  * <b>问题：</b>红闪是全模组唯一能把 {@link #MAX_ACTIVE} 跑满的类型，而且它的爆发时机
  * <b>恰好是客户端最卡的那一瞬</b>——古龙雷击在持有者濒死时对 {@code MAX_TARGETS}(100)
@@ -370,7 +370,7 @@ public final class AoeEffectManager {
     public static void spawn(int type, double x, double y, double z, float radius,
                              int entityId, int durationMs) {
         long now = System.currentTimeMillis();
-        // ⭐ v6.6：红闪三重节流（合并半径 / 专用上限 / 新建限速），命中任一条即不新建
+        // v6.6：红闪三重节流（合并半径 / 专用上限 / 新建限速），命中任一条即不新建
         if (type == AoeEffectPacket.TYPE_RED_LIGHTNING && tryAbsorbRedLightning(x, y, z, now)) {
             return;
         }
@@ -548,7 +548,7 @@ public final class AoeEffectManager {
                 // 回退值取 10000 而非 20000：万一时长丢失，宁可短一点也不要
                 // 在玩家满血之后还挂着月光（那正是 v6.4 被反馈的问题）。
                 //
-                // ⚠ 渲染器不再需要同步任何时长常量——它直接用
+                // 渲染器不再需要同步任何时长常量——它直接用
                 // 「已播放毫秒 / 总毫秒」算绝对秒数，动画速度天然与总时长无关。
                 return 10000L;
             case AoeEffectPacket.TYPE_SACRED_PURGE:
@@ -690,7 +690,7 @@ public final class AoeEffectManager {
         if (ACTIVE.isEmpty()) {
             return;
         }
-        // ⭐ v6.1：先解绑死亡 / 卸载的绑定实体，再做到期清理
+        // v6.1：先解绑死亡 / 卸载的绑定实体，再做到期清理
         detachDeadBindings(level);
         long now = System.currentTimeMillis();
         ACTIVE.removeIf(fx -> now - fx.birthMs >= fx.durationMs);

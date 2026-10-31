@@ -50,7 +50,7 @@ import java.util.*;
  * 但本附魔的实际逻辑在 {@link #onBreak} 里明确要求
  * {@code tool.getItem() instanceof PickaxeItem}，也就是<b>只有镐子才会生效</b>。
  * 于是玩家用附魔台附斧头 / 锹 / 锄时，岩石爆破照样会出现在候选池里并被刷出来，
- * 附上去之后却毫无效果——这正是玩家反馈的「工具附魔串了、刷出来一堆没用的」。
+ * 附上去之后却毫无效果，在玩家看来就是「工具附魔串了、刷出来一堆没用的」。
  * </p>
  * <p>
  * <b>修复：</b>改用 {@code CarianStyleEnchantments} 中定义的自定义类型
@@ -80,7 +80,7 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.rock_blaster.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.rock_blaster.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */

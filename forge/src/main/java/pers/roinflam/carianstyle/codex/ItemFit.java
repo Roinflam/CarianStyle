@@ -23,7 +23,7 @@ import java.util.Set;
  * <p>
  * {@code ItemProbe} 回答的是「这个附魔能附在哪几类东西上」，拿一组原版代表物品去测，
  * 物品本身是干净的。这里回答的是玩家手里<b>那一件</b>：它可能已经带着附魔
- * （会冲突、会重复），可能是模组物品（TACZ 的枪全靠 NBT 区分型号，
+ * （会冲突、会重复），可能是模组物品（有的模组枪械全靠 NBT 区分型号，
  * {@code canApplyAtEnchantingTable} 可能看 NBT），也可能是一本附魔书。
  * 所以必须拿玩家那一份 {@link ItemStack} 原样去问，而不是只看它是什么 {@code Item}。
  * </p>
@@ -86,7 +86,7 @@ import java.util.Set;
  * 所以这里不能加重活（I/O、大量分配、遍历注册表之类）。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 public final class ItemFit {
@@ -307,7 +307,7 @@ public final class ItemFit {
                 return false;
             }
             // 附魔台给出的等级有上限：只要有一个等级的最低需求够得着，就有机会抽到。
-            // 本模组的附魔难度配置会把需求整体放大（整合包里是 2 倍），
+            // 本模组的附魔难度配置会把需求整体放大（比如设成 2 倍时），
             // 不查这一条的话，重力、催眠烟雾这类会被标成「附魔台」，玩家白刷
             for (int level = enchantment.getMinLevel(); level <= enchantment.getMaxLevel(); level++) {
                 if (enchantment.getMinCost(level) <= context.tableReach) {

@@ -92,7 +92,7 @@ public class EnchantmentStarlight extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.starlight.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.starlight.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -188,7 +188,7 @@ public class EnchantmentStarlight extends EnchantmentBase {
         Enchantment starlight = EnchantmentRegistry.getEnchantmentByClass(EnchantmentStarlight.class);
         if (starlight == null) return;
 
-        // ⭐ v2.2：先查缓存再决定要不要解析 NBT。
+        // v2.2：先查缓存再决定要不要解析 NBT。
         // computeIfAbsent 只在玩家首次 tick 时创建条目，之后是一次 Map 查询。
         ArmorScanCache cache = SCAN_CACHE.computeIfAbsent(entity.getUUID(), uuid -> new ArmorScanCache());
         if (!cache.isEquipped(entity, starlight)) return;

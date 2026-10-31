@@ -133,7 +133,7 @@ import java.util.List;
  * 不是「肉眼看不出」而是「数值相等」。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 8
  */
 @OnlyIn(Dist.CLIENT)
@@ -169,7 +169,7 @@ public final class FrostbiteMistRenderer {
     private static final int ICE_BLUE = 0x8FD4FF;
     private static final int ICE_DEEP = 0x2E5C82;
 
-    // ===== v8：预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // ===== v8：预解包的固定配色（只读，切勿作为写入目标）=====
     // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
     // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
     // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
@@ -182,7 +182,7 @@ public final class FrostbiteMistRenderer {
     private static final float[] C_ICE_BLUE = VisualColor.constant(ICE_BLUE);
 
     /**
-     * v8：动态插值色的复用缓冲（⚠ 写入后必须立即消费，不可跨调用留存）。
+     * v8：动态插值色的复用缓冲（写入后必须立即消费，不可跨调用留存）。
      * <p>
      * 用于霜地圆盘、冰雾雾团、冷蒸汽这三处随时间 / 逐元素变化的颜色。
      * 三者不会同时活跃（{@link #drawFrostedGround} / {@link #drawFrostFog} /
@@ -252,7 +252,7 @@ public final class FrostbiteMistRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
@@ -309,7 +309,7 @@ public final class FrostbiteMistRenderer {
                 continue;
             }
 
-            // ⭐ v7：本实体的细节系数（距离 × 同屏拥挤度）。12 格内恒为 1.0，视觉与优化前一致
+            // v7：本实体的细节系数（距离 × 同屏拥挤度）。12 格内恒为 1.0，视觉与优化前一致
             float detail = VisualLod.detail(distSqr);
             // 登记实例，供下一帧估算拥挤度（不影响本帧绘制）
             VisualLod.countInstance();
@@ -421,7 +421,7 @@ public final class FrostbiteMistRenderer {
         float rot = time * ICE_STAR_ROT_SPEED + seedId * 0.3f;
         float innerR = width * ICE_STAR_RADIUS_FACTOR * 0.95f;
 
-        // ⭐ v7：均布裂纹按步长抽取，保持与八角星尖角的对称关系
+        // v7：均布裂纹按步长抽取，保持与八角星尖角的对称关系
         int drawnCracks = VisualLod.scale(CRACK_COUNT, detail);
         int step = Math.max(1, CRACK_COUNT / drawnCracks);
 

@@ -156,7 +156,7 @@ import java.util.List;
  *         且只在渲染线程访问），复用安全。</li>
  * </ol>
  * <p>
- * <b>⚠ 复用缓冲的约束：</b>这三个缓冲<b>只能在 {@link #emitShard} 内部使用</b>，
+ * <b>复用缓冲的约束：</b>这三个缓冲<b>只能在 {@link #emitShard} 内部使用</b>，
  * 且必须「写满 → 立刻画完 → 不再引用」。若将来新增其它需要世界坐标缓冲的元素，请另开一组。
  * </p>
  * <p>
@@ -164,7 +164,7 @@ import java.util.List;
  * 输出的每个顶点坐标与 v3 完全相同。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 4
  */
 @OnlyIn(Dist.CLIENT)
@@ -209,7 +209,7 @@ public final class IncisionRenderer {
     /** 近黑红：雾团外缘、地面涟漪的深色端 */
     private static final int INCISION_DARK = 0x2A0408;
 
-    // ===== v3：预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // ===== v3：预解包的固定配色（只读，切勿作为写入目标）=====
     // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
     // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
     // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
@@ -221,7 +221,7 @@ public final class IncisionRenderer {
     private static final float[] C_INCISION_DARK = VisualColor.constant(INCISION_DARK);
 
     /**
-     * v3：动态插值色的复用缓冲 A（⚠ 写入后必须立即消费，不可跨调用留存）。
+     * v3：动态插值色的复用缓冲 A（写入后必须立即消费，不可跨调用留存）。
      * <p>
      * 用于：刀痕的滚动双缓冲之一、血刃碎片色、涟漪色、雾团色。这几处不会同时活跃
      * （四个 draw 方法顺序调用、互不嵌套），故可共用。
@@ -231,7 +231,7 @@ public final class IncisionRenderer {
     private static final float[] SCRATCH_A = new float[VisualColor.RGB];
 
     /**
-     * v3：动态插值色的复用缓冲 B（⚠ 同上）。
+     * v3：动态插值色的复用缓冲 B（同上）。
      * <p>
      * <b>专供 {@link #drawGash} 与 {@link #SCRATCH_A} 配对使用</b>——
      * {@link #emitBillboardQuad} 需要同时持有带状四边形两端的颜色，一个缓冲不够
@@ -241,7 +241,7 @@ public final class IncisionRenderer {
     private static final float[] SCRATCH_B = new float[VisualColor.RGB];
 
     /**
-     * v4：血刃碎片世界坐标的复用缓冲 X（⚠ 仅供 {@link #emitShard} 内部使用）。
+     * v4：血刃碎片世界坐标的复用缓冲 X（仅供 {@link #emitShard} 内部使用）。
      * <p>
      * 旧实现每片碎片 {@code new float[4]} 三次 + 局部轮廓点数组五个，
      * 满配 20 片即 <b>160 个临时数组 / 实体 / 帧</b>——比 v3 清掉的颜色分配高出近三倍
@@ -252,16 +252,16 @@ public final class IncisionRenderer {
      * 故提为静态定长缓冲复用，分配归零。
      * </p>
      * <p>
-     * <b>⚠ 约束：</b>只能在 {@link #emitShard} 内部使用，且必须
+     * <b>约束：</b>只能在 {@link #emitShard} 内部使用，且必须
      * 「写满 → 立刻画完 → 不再引用」。
      * </p>
      */
     private static final float[] SHARD_WX = new float[SHARD_POINTS];
 
-    /** v4：血刃碎片世界坐标的复用缓冲 Y（⚠ 同上，与 {@link #SHARD_WX} 配对）。 */
+    /** v4：血刃碎片世界坐标的复用缓冲 Y（同上，与 {@link #SHARD_WX} 配对）。 */
     private static final float[] SHARD_WY = new float[SHARD_POINTS];
 
-    /** v4：血刃碎片世界坐标的复用缓冲 Z（⚠ 同上，与 {@link #SHARD_WX} 配对）。 */
+    /** v4：血刃碎片世界坐标的复用缓冲 Z（同上，与 {@link #SHARD_WX} 配对）。 */
     private static final float[] SHARD_WZ = new float[SHARD_POINTS];
 
     // ===== 腹部横向刀痕（核心标志）=====
@@ -335,7 +335,7 @@ public final class IncisionRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
@@ -392,7 +392,7 @@ public final class IncisionRenderer {
                 continue;
             }
 
-            // ⭐ v2：本实体的细节系数（距离 × 同屏拥挤度）。12 格内恒为 1.0，视觉与优化前一致
+            // v2：本实体的细节系数（距离 × 同屏拥挤度）。12 格内恒为 1.0，视觉与优化前一致
             float detail = VisualLod.detail(distSqr);
             // 登记实例，供下一帧估算拥挤度（不影响本帧绘制）
             VisualLod.countInstance();
@@ -495,7 +495,7 @@ public final class IncisionRenderer {
 
         int segments = VisualLod.scaleSegments(GASH_SEGMENTS, GASH_SEGMENTS_MIN, detail);
 
-        // ⭐ v3 滚动双缓冲：prevCol 持有上一段末端色，curCol 持有本段末端色。
+        // v3 滚动双缓冲：prevCol 持有上一段末端色，curCol 持有本段末端色。
         // 循环外先算出 u=0（左端点）的颜色，作为第一段的起点色。
         float[] prevCol = SCRATCH_A;
         float[] curCol = SCRATCH_B;
@@ -535,7 +535,7 @@ public final class IncisionRenderer {
      * {@link #C_INCISION_BLOOD}，结果写入调用方提供的缓冲。
      * <p>v3：由「返回新数组」改为「写入缓冲」，消除刀痕循环里每段两次的堆分配。</p>
      *
-     * @param dst 目标缓冲（⚠ 不可传入 {@code C_} 常量数组）
+     * @param dst 目标缓冲（不可传入 {@code C_} 常量数组）
      * @param u   沿长度的归一化位置（0~1）
      */
     private static void gashColorInto(float[] dst, float u) {
@@ -708,7 +708,7 @@ public final class IncisionRenderer {
                                   float upX, float upY, float upZ) {
         final float longAxis = size * 3f;
 
-        // ⭐ v4：菱形的 4 个局部顶点内联为标量。
+        // v4：菱形的 4 个局部顶点内联为标量。
         // 数值与原 local 字面量逐位相同：
         //   {0, +longAxis}, {+size, 0}, {0, -longAxis}, {-size, 0}
         // 上下为长轴尖端、左右为短轴，即细长菱形（血刃）的轮廓
@@ -720,7 +720,7 @@ public final class IncisionRenderer {
         final float cosR = (float) Math.cos(rot);
         final float sinR = (float) Math.sin(rot);
 
-        // ⭐ v4：世界坐标写入静态复用缓冲，不再每片 new float[4] 三次
+        // v4：世界坐标写入静态复用缓冲，不再每片 new float[4] 三次
         final float[] wx = SHARD_WX;
         final float[] wy = SHARD_WY;
         final float[] wz = SHARD_WZ;

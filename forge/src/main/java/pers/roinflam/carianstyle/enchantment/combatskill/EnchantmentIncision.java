@@ -55,7 +55,7 @@ public class EnchantmentIncision extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.incision.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.incision.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -70,7 +70,7 @@ public class EnchantmentIncision extends EnchantmentBase {
                     0.75D, 0.0D, 1.0D);
 
     /**
-     * 触发时消耗的最大生命占比。⚠ 必须小于 trigger_health_ratio，否则会当场自杀
+     * 触发时消耗的最大生命占比。必须小于 trigger_health_ratio，否则会当场自杀
      * <p>默认 0.5，允许范围 0.0 ~ 0.95。</p>
      */
     private static final EnchantmentValues.Handle SELF_COST_RATIO =
@@ -175,7 +175,7 @@ public class EnchantmentIncision extends EnchantmentBase {
             return;
         }
 
-        // ⭐ v2.2：怪物附魔触发开关（击杀者视角，击杀续命非濒死触发）
+        // v2.2：怪物附魔触发开关（击杀者视角，击杀续命非濒死触发）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(killer, false)) return;
 
         ItemStack heldItem = killer.getItemInHand(InteractionHand.MAIN_HAND);

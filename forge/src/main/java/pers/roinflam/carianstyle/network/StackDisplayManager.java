@@ -71,7 +71,7 @@ import java.util.UUID;
  *         数值是<b>平滑趋近</b>目标而非瞬跳，轮询间隔的变化被这层平滑进一步吸收。</li>
  * </ul>
  * <p>
- * <b>如果你觉得手感变钝了，改回 3 即可</b>——本项是全部性能改动里唯一带观感取舍的一项，
+ * <b>手感变钝的话改回 3 即可</b>——本项是这批性能改动里唯一带观感取舍的一项，
  * 且回退成本是<b>一个常量</b>，不涉及任何逻辑。
  * </p>
  * <p>
@@ -86,7 +86,7 @@ import java.util.UUID;
  *         装备快照只是<b>门控</b>用的，跳过会直接导致叠层数字卡住不动。</li>
  * </ul>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 3
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID)

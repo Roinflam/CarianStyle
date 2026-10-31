@@ -70,7 +70,7 @@ import javax.annotation.Nullable;
  * <h4>已知的连带影响：黑焰刀刃</h4>
  * <p>
  * 序列号 2（白焰）是<b>黑焰仪式和黑焰刀刃共用</b>的，而黑焰刀刃是把火挂在<b>被打的人</b>身上。
- * 因此本次改动的连带结果是：<b>你被别人的黑焰刀刃打中时，第一人称也看不到自己在烧</b>，
+ * 因此这样做的连带结果是：<b>你被别人的黑焰刀刃打中时，第一人称也看不到自己在烧</b>，
  * 只能靠第三人称或别人的视角看到。
  * </p>
  * <p>
@@ -115,7 +115,7 @@ import javax.annotation.Nullable;
  * 远处能省下两三层，聊胜于无，<b>不要指望它带来可观测的帧率变化</b>。
  * </p>
  *
- * <h4>⚠ 时序坑：不能直接在这里调 countInstance</h4>
+ * <h4>时序坑：不能直接在这里调 countInstance</h4>
  * <p>
  * 本渲染器挂的是 {@link RenderLivingEvent.Post}，而在 {@code LevelRenderer.renderLevel}
  * 的流程里，<b>实体渲染发生在 {@code AFTER_TRANSLUCENT_BLOCKS} 之前</b>：
@@ -167,7 +167,7 @@ import javax.annotation.Nullable;
  * 而调用方远不止原版的世界渲染循环：
  * </p>
  * <ul>
- *     <li><b>残影 / 分身类粒子</b>——不少模组的 Boss（如某些整合包里会放 AfterImage 残影的怪）
+ *     <li><b>残影 / 分身类粒子</b>——不少模组的 Boss
  *         会在<b>粒子渲染阶段</b>把同一个实体<b>再渲染一遍</b>做残影，
  *         并塞进一个自己包装的 {@link MultiBufferSource}（通常是为了改 alpha）。
  *         那种包装往往<b>忽略传入的 RenderType</b>、返回它自己那条管线的
@@ -326,7 +326,7 @@ public class ClientSyncFlameRenderer {
      * <p>
      * <b>不能在绘制时直接 {@code countInstance()}</b>——实体渲染早于
      * {@code VisualBatch.onBatchBegin}，那次计数会被 {@code beginFrame} 当场清零
-     * （详见类注释「⚠ 时序坑」）。故先攒在这里，由 {@link #onRenderLevelStage} 补报。
+     * （详见类注释「时序坑」）。故先攒在这里，由 {@link #onRenderLevelStage} 补报。
      * </p>
      * <p>仅客户端渲染线程访问，无并发问题。</p>
      */
@@ -414,7 +414,7 @@ public class ClientSyncFlameRenderer {
                     Reference.MOD_ID + ":block/crimson_flame_layer_1"),
 
             // 毁灭火焰（白色）- 序列号2
-            // ⭐ v4：第三人称专属。黑焰仪式在满足条件时会持续刷新这团火，
+            // v4：第三人称专属。黑焰仪式在满足条件时会持续刷新这团火，
             //    贴在镜头前会长时间挡住视野（详见类注释「v4」一节）。
             new FlameConfig(2,
                     Reference.MOD_ID + ":block/white_flame_layer_0",
@@ -490,7 +490,7 @@ public class ClientSyncFlameRenderer {
      * <p>
      * v2：新增距离裁剪与 {@link VisualLod} 细节系数；实例登记改为攒进
      * {@link #pendingInstances}、由 {@link #onRenderLevelStage} 补报
-     * （原因详见类注释的「⚠ 时序坑」小节）。
+     * （原因详见类注释的「时序坑」小节）。
      * </p>
      * <p>
      * v3：新增两道准入检查，确保只在<b>主世界实体渲染流程</b>里画火焰——
@@ -505,12 +505,12 @@ public class ClientSyncFlameRenderer {
         if (renderDisabled || !ClientVisualConfig.enabled || !ClientVisualConfig.flamesEnabled) {
             return;
         }
-        // ⭐ v3 检查一：必须处于主实体渲染的阶段窗口内。
+        // v3 检查一：必须处于主实体渲染的阶段窗口内。
         // 粒子阶段的残影重渲染、GUI 里的实体预览都落在窗口之外
         if (!inMainEntityPass) {
             return;
         }
-        // ⭐ v4：不再要求事件传来的就是主缓冲本身，而是统一画进主缓冲。
+        // v4：不再要求事件传来的就是主缓冲本身，而是统一画进主缓冲。
         // Oculus 会在 EntityRenderDispatcher 里把实体渲染用的缓冲包一层（不开光影也包），
         // v3 的身份比对因此永远不通过，装了 Oculus 的客户端完全看不到自定义火焰。
         // 已经确认处于主实体渲染窗口内，直接写主缓冲：顶点格式由我们请求的 RenderType 决定，
@@ -532,7 +532,7 @@ public class ClientSyncFlameRenderer {
         // 检查每种火焰效果
         for (FlameConfig config : FLAME_CONFIGS) {
             if (ClientSyncEffectManager.shouldRenderEffect(config.serialNumber, entityId)) {
-                // ⭐ v2：距离裁剪 + 细节系数。相机不可用时按满细节处理（不裁剪），
+                // v2：距离裁剪 + 细节系数。相机不可用时按满细节处理（不裁剪），
                 // 保证任何异常情况下火焰都不会凭空消失——宁可多画也不能漏画
                 float detail = 1f;
                 Minecraft mc = Minecraft.getInstance();
@@ -552,7 +552,7 @@ public class ClientSyncFlameRenderer {
                     detail = VisualLod.detail(distSqr);
                 }
 
-                // ⭐ v2：攒着，不能在这里直接 countInstance（会被 beginFrame 清零）
+                // v2：攒着，不能在这里直接 countInstance（会被 beginFrame 清零）
                 pendingInstances++;
 
                 renderFlameGuarded(
@@ -699,7 +699,7 @@ public class ClientSyncFlameRenderer {
         // 检查每种火焰效果
         for (FlameConfig config : FLAME_CONFIGS) {
             if (ClientSyncEffectManager.shouldRenderEffect(config.serialNumber, playerId)) {
-                // ⭐ v4：第三人称专属的火焰在这里止步。
+                // v4：第三人称专属的火焰在这里止步。
                 // 用 break 而不是 continue —— 第三人称那边同样是「命中第一个就 break」，
                 // 若这里改用 continue 往下找，会出现「第三人称烧白焰、第一人称烧黄焰」
                 // 这种两个视角不一致的情况。跳过就是彻底不画，不找替补。
@@ -794,7 +794,7 @@ public class ClientSyncFlameRenderer {
         float height = startHeight;
         int stage = 0;
 
-        // ⭐ v2：按细节系数放大分层步长（层数变少、总高度不变），
+        // v2：按细节系数放大分层步长（层数变少、总高度不变），
         // 横向收缩与纵深推进同比换算，保证削减后轮廓与全细节时近似。
         // 三者在循环外算一次即可——放在循环里会让每层多一次 Math.pow
         float step = FLAME_LAYER_STEP / Math.max(FLAME_STEP_DETAIL_FLOOR, detail);

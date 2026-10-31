@@ -10,7 +10,7 @@ import pers.roinflam.carianstyle.utils.Reference;
 /**
  * 叠层 HUD 覆盖层注册（客户端，MOD 总线）。
  *
- * @author FlameForge
+ * @author RoinFlam
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)

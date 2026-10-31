@@ -62,7 +62,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 每秒就是 20 次范围查询 + 600 次附魔 NBT 解析。
  * </p>
  * <p>
- * <b>本次优化的两点：</b>
+ * <b>优化有两点：</b>
  * <ol>
  *     <li><b>结果缓存</b>（{@link #hasAeoniaHolderNearby}）——按实体 UUID 缓存判定结果，
  *         有效期 {@value #AEONIA_CACHE_TTL_TICKS} tick。由于 {@link #applyEffectTick}

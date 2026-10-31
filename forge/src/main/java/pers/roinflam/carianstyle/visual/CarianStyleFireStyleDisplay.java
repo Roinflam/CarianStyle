@@ -120,7 +120,7 @@ import pers.roinflam.carianstyle.utils.Reference;
  * 比原先的 {@code Class<?>} 更不容易误用。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.1
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)

@@ -53,7 +53,7 @@ import javax.annotation.Nullable;
  *     <li><b>轮廓追踪</b>——轮廓格与外部相邻的那条边收集起来，共线的合并成长段。</li>
  * </ol>
  *
- * <h2>⚠ BEWLR 截取</h2>
+ * <h2>BEWLR 截取</h2>
  * <p>
  * {@code getQuads()} 对 BEWLR 模型返回空表——几何在 {@code ModelPart} 里，不是 {@code BakedQuad}。
  * 但 {@code renderByItem} 是公开入口：传一个只记录不绘制的 {@link CaptureBuffer}，
@@ -66,7 +66,7 @@ import javax.annotation.Nullable;
  * 这条恰好绕开了「某个模组的 BEWLR 有没有照抄那句 scale」这个从外部无法判断的问题。
  * </p>
  * <p>
- * <b>⚠ 假画布不能对所有渲染类型返回同一个实例。</b>附魔物品渲染时会走
+ * <b>假画布不能对所有渲染类型返回同一个实例。</b>附魔物品渲染时会走
  * {@code VertexMultiConsumer.create(附魔光效缓冲, 本体缓冲)}，
  * 而该方法一旦发现两个参数是同一个对象就直接抛
  * {@code IllegalArgumentException: Duplicate delegates}。
@@ -83,7 +83,7 @@ import javax.annotation.Nullable;
  * 因此整段用 try/catch 包住，任何异常都退回包围盒，绝不让特效弄崩渲染。
  * </p>
  *
- * <h2>⚠ 为什么侧壁不能按面积光栅化</h2>
+ * <h2>为什么侧壁不能按面积光栅化</h2>
  * <p>
  * {@code builtin/generated}（2D 精灵物品）的正面是<b>一整块铺满的矩形</b>——
  * 轮廓不在几何里而在贴图 alpha 里。真正描出轮廓的是
@@ -94,7 +94,7 @@ import javax.annotation.Nullable;
  * 按面积扫会一格都扫不到。所以侧壁必须沿边做 DDA 逐格标记。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)
@@ -125,7 +125,7 @@ public final class ShieldWardShape {
      * 栅格<b>有效区</b>的边长：形状被映射到中间的 {@code INNER × INNER} 格，
      * 四周各留一格空白。
      *
-     * <h4>⚠ 这一格空白是必须的，不是余量</h4>
+     * <h4>这一格空白是必须的，不是余量</h4>
      * <p>
      * 灌水必须从<b>确定在外部</b>的格子起步。若形状紧贴栅格边界，
      * 外面就没有任何合法起灌点；而实心形状（例如原版盾的挡板）内部没有墙，
@@ -339,14 +339,14 @@ public final class ShieldWardShape {
             baked = bake(model, stack, displayContext);
             if (baked == null && DEBUG) {
                 LOGGER.info("[CarianStyle/WardShape] " + stack.getDescriptionId()
-                        + " ⚠ 烘焙返回空 → 用兜底方盒（原版盾尺寸）"
+                        + " 烘焙返回空 → 用兜底方盒（原版盾尺寸）"
                         + " 路径=" + (model.isCustomRenderer() ? "截取BEWLR" : "读模型quad"));
             }
         } catch (Throwable t) {
             // 截取 BEWLR 等于在跑别人的代码，任何意外都不能让特效弄崩渲染
             if (DEBUG) {
                 LOGGER.info("[CarianStyle/WardShape] " + stack.getDescriptionId()
-                        + " ⚠ 烘焙抛异常 → 用兜底方盒（原版盾尺寸）: " + t);
+                        + " 烘焙抛异常 → 用兜底方盒（原版盾尺寸）: " + t);
                 LOGGER.error("[CarianStyle/WardShape] 烘焙异常堆栈", t);
             }
             baked = degenerate();
@@ -640,7 +640,7 @@ public final class ShieldWardShape {
     /**
      * 从普通 JSON 模型收集三角形。
      *
-     * <h4>⚠ 坐标<b>原样收下</b>，绝不能自己减 0.5</h4>
+     * <h4>坐标<b>原样收下</b>，绝不能自己减 0.5</h4>
      * <p>
      * 原版 {@code ItemRenderer.render} 的顺序是：先套用手持变换，
      * 再 {@code translate(-0.5, -0.5, -0.5)}，<b>然后</b>把 {@code getQuads}
@@ -686,7 +686,7 @@ public final class ShieldWardShape {
                 float[] pz = new float[4];
                 for (int v = 0; v < 4; v++) {
                     int o = v * stride;
-                    // ⚠ 原样收下，不要减 0.5：那半格由渲染器的 translate 负责，见方法注释
+                    // 原样收下，不要减 0.5：那半格由渲染器的 translate 负责，见方法注释
                     px[v] = Float.intBitsToFloat(data[o]);
                     py[v] = Float.intBitsToFloat(data[o + 1]);
                     pz[v] = Float.intBitsToFloat(data[o + 2]);
@@ -844,7 +844,7 @@ public final class ShieldWardShape {
      * 它们改为记录成「哪两格之间不通」，见 {@link #blockWall}。
      * </p>
      *
-     * <h4>⚠ 墙是格与格之间的<b>缝</b>，不是格本身</h4>
+     * <h4>墙是格与格之间的<b>缝</b>，不是格本身</h4>
      * <p>
      * v6.1 之前把墙标记成格子，于是墙格自己也算进了轮廓。这会带来一格的系统偏差，
      * 而且<b>左右不对称</b>：左侧的墙算下来落在实心格上（无害），

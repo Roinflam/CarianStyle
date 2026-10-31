@@ -117,10 +117,10 @@ public class EnchantmentRegistry {
 
             LogUtil.debug("卡利亚式附魔 - 正在注册：%s", annotation.id());
 
-            // ⭐ 解析 EnchantmentCategory
+            // 解析 EnchantmentCategory
             EnchantmentCategory category = resolveEnchantmentCategory(annotation);
 
-            // ⭐ 使用正确的 EnchantmentCategory 创建附魔实例
+            // 使用正确的 EnchantmentCategory 创建附魔实例
             Enchantment enchantment = createEnchantmentInstance(enchantmentClass, annotation, category);
 
             // 通过 DeferredRegister 注册到游戏

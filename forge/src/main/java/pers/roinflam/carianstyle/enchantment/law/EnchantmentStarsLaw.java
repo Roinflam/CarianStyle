@@ -23,7 +23,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 /**
  * 星律附魔
  * <p>
- * ⚠️ 注意：此类使用了FROSTBITE（冻伤）效果，需要先在 DynamicAttributes 中定义该效果
+ * 注意：此类使用了FROSTBITE（冻伤）效果，需要先在 DynamicAttributes 中定义该效果
  * <p>
  * 夜晚效果：
  * - 受到的恢复效果提高50%
@@ -53,7 +53,7 @@ public class EnchantmentStarsLaw extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.stars_law.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.stars_law.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */

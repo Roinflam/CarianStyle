@@ -44,7 +44,7 @@ import java.util.Locale;
  * 也就不会出现「画的位置和点的位置对不上」这种经典 GUI bug。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)

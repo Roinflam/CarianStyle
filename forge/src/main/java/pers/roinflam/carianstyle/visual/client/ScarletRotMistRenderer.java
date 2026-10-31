@@ -88,7 +88,7 @@ import java.util.List;
  * {@code ringFrac} 仍按<b>原始总数</b>计算，保证保留孢子的半径与方位不变、且始终铺满整个感染范围。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -219,7 +219,7 @@ public final class ScarletRotMistRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
@@ -281,7 +281,7 @@ public final class ScarletRotMistRenderer {
                 continue;
             }
 
-            // ⭐ v3：本实体的细节系数（距离 × 同屏拥挤度）。12 格内恒为 1.0，视觉与优化前一致
+            // v3：本实体的细节系数（距离 × 同屏拥挤度）。12 格内恒为 1.0，视觉与优化前一致
             float detail = VisualLod.detail(distSqr);
             // 登记实例，供下一帧估算拥挤度（不影响本帧绘制）
             VisualLod.countInstance();
@@ -541,7 +541,7 @@ public final class ScarletRotMistRenderer {
         }
 
         // —— 2) 环境升腾孢子（地面各处稳定位置错相升起）——
-        // ⭐ v3：按步长抽取，绝不能截断——下标决定半径，截断会让光环塌成中心一撮（详见类注释）
+        // v3：按步长抽取，绝不能截断——下标决定半径，截断会让光环塌成中心一撮（详见类注释）
         int drawnSpores = VisualLod.scale(AEONIA_FIELD_SPORES, detail);
         int sporeStep = Math.max(1, AEONIA_FIELD_SPORES / drawnSpores);
         int sporeSegments = VisualLod.scaleSegments(SPORE_SEGMENTS, SPORE_SEGMENTS_MIN, detail);

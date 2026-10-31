@@ -26,7 +26,7 @@ import javax.annotation.Nonnull;
  * </p>
  * <p>
  * 两个订阅都是注解式自注册，<b>不需要在模组主类里加任何代码</b>——
- * 这样本次新增的功能可以整包加入 / 整包删除，不会在 {@code CarianStyle.java}
+ * 这样这块功能可以整包加入 / 整包删除，不会在 {@code CarianStyle.java}
  * 里留下需要一并回滚的接线。
  * </p>
  *
@@ -37,7 +37,7 @@ import javax.annotation.Nonnull;
  * 冲突时玩家可在原版按键设置里改，本模组不做任何强制。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)

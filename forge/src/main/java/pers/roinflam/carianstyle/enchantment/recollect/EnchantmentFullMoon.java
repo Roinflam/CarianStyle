@@ -53,8 +53,8 @@ import java.util.UUID;
  * 因此 10 秒版与 20 秒版的<b>动画速度完全一致</b>，只是持续段长短不同。
  * </p>
  * <p>
- * <b>⚠ 顺序要求：</b>{@code hasDarkMoon} 与 {@code duration} 的计算<b>必须</b>
- * 排在 {@code moonBlessing(...)} 调用之前——这是本次改动唯一调整的代码顺序。
+ * <b>顺序要求：</b>{@code hasDarkMoon} 与 {@code duration} 的计算<b>必须</b>
+ * 排在 {@code moonBlessing(...)} 调用之前——这是接入特效时唯一调整的代码顺序。
  * 若将来有人把特效调用挪到前面，特效时长会退回默认值，
  * 又会出现「特效比回血长」的老毛病。
  * </p>
@@ -111,7 +111,7 @@ public class EnchantmentFullMoon extends EnchantmentBase {
             holder.setHealth(holder.getMaxHealth() * 0.0075f);
             EnchantmentDataManager.setCooldown(FULL_MOON_STATE_KEY, uuid, 400);
 
-            // ⭐ v2.5：先算出实际回血时长，才能把它随特效包发给客户端。
+            // v2.5：先算出实际回血时长，才能把它随特效包发给客户端。
             // 这两行原本在特效调用之后，现已提前——顺序不可再颠倒（详见类注释）。
             // 修复：使用主手检查DarkMoon
             boolean hasDarkMoon = false;
@@ -122,7 +122,7 @@ public class EnchantmentFullMoon extends EnchantmentBase {
             }
             int duration = hasDarkMoon ? HEAL_DURATION_TICKS_DARK_MOON : HEAL_DURATION_TICKS;
 
-            // ⭐ v2.4/2.5：月华复活特效（跟随持有者，时长 = 实际回血时长）。
+            // v2.4/2.5：月华复活特效（跟随持有者，时长 = 实际回血时长）。
             // 放在此处是因为复活已确认触发（冷却检查已通过），不会出现「放了特效却没复活」。
             // 纯视觉，不产生任何机制影响。
             if (holder.level() instanceof ServerLevel serverLevel) {

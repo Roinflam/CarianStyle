@@ -270,20 +270,20 @@ public class MobEffectSleep extends IconBase {
      */
     @Override
     public void applyEffectTick(@Nonnull LivingEntity entityLivingBaseIn, int amplifier) {
-        // ⭐ v1.1 客户端守卫：目标清除与失明施加只在逻辑服务端执行一次，
+        // v1.1 客户端守卫：目标清除与失明施加只在逻辑服务端执行一次，
         // 结果由原版效果同步机制下发给客户端，画面表现完全不变。
         if (entityLivingBaseIn.level().isClientSide) {
             return;
         }
 
-        // ⭐ v1.2：仅在 AI 真的重新锁定了目标时才调用 setTarget。
+        // v1.2：仅在 AI 真的重新锁定了目标时才调用 setTarget。
         // Forge 会在 setTarget 内无条件触发一次全局 LivingChangeTargetEvent，
         // 而 target 绝大多数 tick 本就是 null（上一 tick 刚清过），空判可省掉这次空转分发。
         if (entityLivingBaseIn instanceof Mob mob && mob.getTarget() != null) {
             mob.setTarget(null);
         }
 
-        // ⭐ v1.2：按需补充失明，而非每 tick 覆盖。
+        // v1.2：按需补充失明，而非每 tick 覆盖。
         // 首次施加时 getEffect 返回 null，立刻补上，因此不存在「刚睡着还能看见」的空窗；
         // 之后每 20 tick 才补一次，效果同步包降为原来的 1/20。
         // 若目标身上已有其它来源的、更长的失明，这里也不会再把它压短（原实现会）。

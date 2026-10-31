@@ -258,7 +258,7 @@ public class MobEffectIncision extends IconBase {
      */
     @Override
     public void applyEffectTick(@Nonnull LivingEntity entityLivingBaseIn, int amplifier) {
-        // ⭐ v3.1 客户端守卫：扣血与速度衰减只在逻辑服务端执行一次。
+        // v3.1 客户端守卫：扣血与速度衰减只在逻辑服务端执行一次。
         // 缺少此判断会导致客户端自行走死亡逻辑 -> getServer() 为 null -> 崩溃。
         if (entityLivingBaseIn.level().isClientSide) {
             return;
@@ -273,7 +273,7 @@ public class MobEffectIncision extends IconBase {
             // 既是性能灾难也会让机制行为跑偏；持续掉血语义上是「自我消耗」而非「受到攻击」。
             entityLivingBaseIn.setHealth(entityLivingBaseIn.getHealth() - damage);
         } else {
-            // ⭐ v3.1 致死路径：改走原版伤害管线，不再用 EntityLivingUtil.kill 强制处决。
+            // v3.1 致死路径：改走原版伤害管线，不再用 EntityLivingUtil.kill 强制处决。
             // 原实现会绕过 hurt()，导致不死图腾与各类免死机制全部失效。
             entityLivingBaseIn.hurt(
                     NewDamageSource.hemorrhage(entityLivingBaseIn.level()),
@@ -283,7 +283,7 @@ public class MobEffectIncision extends IconBase {
         }
 
         // ========== 速度衰减 ==========
-        // ⭐ v3.2 降频：每 SPEED_DECAY_INTERVAL_TICKS tick 才衰减一次。
+        // v3.2 降频：每 SPEED_DECAY_INTERVAL_TICKS tick 才衰减一次。
         // 用世界游戏刻取模而非各实体独立计数，无需额外状态；不同实体的衰减时机同相，
         // 但衰减是纯数值变化、无视觉节奏可言，同相不会产生任何观感问题。
         if (entityLivingBaseIn.level().getGameTime() % SPEED_DECAY_INTERVAL_TICKS != 0) {

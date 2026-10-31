@@ -43,7 +43,7 @@ import net.minecraftforge.api.distmarker.OnlyIn;
  * 极难定位。让每个渲染器持有自己命名的缓冲，作用域一眼可见，也便于评审。
  * </p>
  *
- * <h3>⚠ 使用约束（违反会导致颜色错乱）</h3>
+ * <h3>使用约束（违反会导致颜色错乱）</h3>
  * <ul>
  *     <li><b>{@link #constant(int)} 产出的数组必须当成只读</b>。Java 没有不可变数组，
  *         若不慎把常量数组当作 {@code dst} 传给 {@code *Into} 方法，
@@ -54,12 +54,12 @@ import net.minecraftforge.api.distmarker.OnlyIn;
  *     <li><b>两个动态颜色同时存活时，必须用两个不同的缓冲</b>。这是最容易踩的一处——
  *         例如渐变线段需要同时持有起点色与终点色：
  *         <pre>
- * // ❌ 错误：两次写同一个缓冲，colPrev 会被 col 覆盖，整条线变成纯色
+ * // 错误：两次写同一个缓冲，colPrev 会被 col 覆盖，整条线变成纯色
  * mixInto(SCRATCH, petal, mist, uPrev);  float[] colPrev = SCRATCH;
  * mixInto(SCRATCH, petal, mist, u);      float[] col     = SCRATCH;
  * lineGradient(..., colPrev, a1, col, a2);
  *
- * // ✅ 正确：各用各的缓冲
+ * // 正确：各用各的缓冲
  * mixInto(SCRATCH_A, petal, mist, uPrev);
  * mixInto(SCRATCH_B, petal, mist, u);
  * lineGradient(..., SCRATCH_A, a1, SCRATCH_B, a2);
@@ -80,7 +80,7 @@ import net.minecraftforge.api.distmarker.OnlyIn;
  * 仅在客户端渲染线程访问，无并发问题。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)

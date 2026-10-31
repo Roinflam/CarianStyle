@@ -22,7 +22,7 @@ import javax.annotation.Nonnull;
  * - 造成伤害时增加15%×(等级+1)
  * </p>
  */
-@Mod.EventBusSubscriber  // ⭐ 添加这个注解！
+@Mod.EventBusSubscriber
 public class MobEffectGoldenVow extends IconBase {
 
     public MobEffectGoldenVow(boolean isBadEffectIn, int liquidColorIn) {
@@ -35,7 +35,7 @@ public class MobEffectGoldenVow extends IconBase {
      * @param evt 受伤事件
      */
     @SubscribeEvent
-    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {  // ⭐ 改为static方法
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;
         }

@@ -35,7 +35,7 @@ import java.util.List;
  *     <li>结果存 volatile 列表，渲染线程直接读。</li>
  * </ul>
  *
- * @author FlameForge
+ * @author RoinFlam
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -99,7 +99,7 @@ public final class AuraScanner {
             active = Collections.emptyList();
             StackHudManager.clear();
 
-            // ⭐ 修复 1：清空效果同步缓存（序列号 -> 实体网络 ID 集合）。
+            // 修复 1：清空效果同步缓存（序列号 -> 实体网络 ID 集合）。
             // 该缓存原先没有任何清理入口，退出世界后旧世界的实体 ID 会原样留着；
             // 而实体网络 ID 是按世界分配、且会从小数字重新开始复用的。
             // 于是重进世界 / 换服后，凡是撞上旧 ID 的实体都会凭空挂上腐败雾、
@@ -110,7 +110,7 @@ public final class AuraScanner {
             // 新世界从未触发过的序列号不会发包，因此拦不住这种残留。
             ClientSyncEffectManager.clearClientCache();
 
-            // ⭐ 修复 2：清空每帧共享实体查询缓存。
+            // 修复 2：清空每帧共享实体查询缓存。
             // 该缓存持有上一帧查到的 LivingEntity / 辉剑列表，实体又反向持有其 Level，
             // 不清就会让整个旧客户端世界（区块、方块实体等）在主菜单期间无法回收。
             SharedEntityQuery.clear();
@@ -170,7 +170,7 @@ public final class AuraScanner {
      *     <li>手持类光环（当前仅圣域 holy_ground，ANY_MAX 且要求举盾）→ 由
      *         {@link #isBlockingWithEnchantedHand} 覆盖。</li>
      * </ul>
-     * <b>⚠ 耦合警告：</b>若将来新增「不要求举盾的手持/任意槽光环」，必须在此扩展过滤条件，
+     * <b>耦合警告：</b>若将来新增「不要求举盾的手持/任意槽光环」，必须在此扩展过滤条件，
      * 否则该光环会被错误略过、永不显示。
      *
      * @param entity 待检测实体

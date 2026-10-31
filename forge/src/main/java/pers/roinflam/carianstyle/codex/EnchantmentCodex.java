@@ -48,7 +48,7 @@ import java.util.Map;
  * 防止极端情况下的重复构建；构建完成后的集合是只读的，无需加锁。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 public final class EnchantmentCodex {

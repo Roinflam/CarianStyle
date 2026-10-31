@@ -57,7 +57,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li>越界的值在加载时 clamp 到声明的 [min, max] 并打警告，不会因为手滑写错崩服。</li>
  * </ul>
  *
- * <h3>⚠ 关于物品描述</h3>
+ * <h3>关于物品描述</h3>
  * <p>
  * 本系统只改<b>行为数值</b>，不会自动改附魔的说明文字。
  * 语言文件里的 {@code enchantment.carianstyle.xxx.desc} 是静态文本，
@@ -80,7 +80,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * double divisor = EnchantmentValues.getDouble(ID, "speed_divisor");
  * </pre>
  *
- * <h3>⚠ 共享数值：为什么需要 {@link #defineShared}</h3>
+ * <h3>共享数值：为什么需要 {@link #defineShared}</h3>
  * <p>
  * 本配置文件是<b>各端各一份</b>的：多人游戏时客户端读的是玩家自己电脑上的
  * {@code config/carianstyle/enchantment_values.json}，不是服务器那份。
@@ -115,7 +115,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 见 {@link Handle}。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)

@@ -42,7 +42,7 @@ import java.util.UUID;
  * （{@link CarianStyleCombatArtEffects#prayerStrike}——自天而降的金色圣光柱 + 落地金环 +
  * 地面十字圣徽 + 升腾金光丝）。此前蓄力完成的那一击只有 {@code PLAYER_LEVELUP} 音效，
  * 没有任何画面，玩家难以确认「这一下是不是蓄满了的」。</p>
- * <p>本次改动仅新增视觉，机制完全未动：蓄力冷却、触发判定、伤害加成、生命上限累积、
+ * <p>只加视觉，机制不变：蓄力冷却、触发判定、伤害加成、生命上限累积、
  * 治疗与音效全部保持原样；特效为纯服务端广播，不生成实体、不触发任何事件。
  * 蓄力周期为 160tick（8 秒）、判定窗口 80tick，触发频率天然受控，不会刷屏。</p>
  *
@@ -63,7 +63,7 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.prayerful_strike.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.prayerful_strike.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -78,7 +78,7 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
                     160, 1, 12000);
 
     /**
-     * 未就绪状态的时长（tick）。⚠ 应小于 charging_cooldown，二者共同决定可用节奏
+     * 未就绪状态的时长（tick）。应小于 charging_cooldown，二者共同决定可用节奏
      * <p>默认 80，允许范围 1 ~ 12000。</p>
      */
     private static final EnchantmentValues.Handle NOT_READY_COOLDOWN =
@@ -162,7 +162,7 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
         }
 
         // 攻击者视角
-        // ⭐ v2.2：怪物附魔触发开关（攻击者视角）
+        // v2.2：怪物附魔触发开关（攻击者视角）
         if (!EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) {
             ItemStack attackerHeld = attacker.getItemInHand(InteractionHand.MAIN_HAND);
             if (!attackerHeld.isEmpty()) {
@@ -174,7 +174,7 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
         }
 
         // 受击者视角
-        // ⭐ v2.2：怪物附魔触发开关（受击者视角）
+        // v2.2：怪物附魔触发开关（受击者视角）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
 
         ItemStack victimHeld = victim.getItemInHand(InteractionHand.MAIN_HAND);
@@ -228,7 +228,7 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
         attacker.playSound(SoundEvents.PLAYER_LEVELUP, 1, 0);
         victim.playSound(SoundEvents.PLAYER_LEVELUP, 1, 0);
 
-        // ⭐ v2.3 视觉：蓄力完成那一击的金色圣光柱（纯服务端广播，不影响任何机制）
+        // v2.3 视觉：蓄力完成那一击的金色圣光柱（纯服务端广播，不影响任何机制）
         // 落在攻击者脚下——这一击的语义是「祈祷得到回应」，光应该降在祈祷者身上而非目标身上
         if (attacker.level() instanceof ServerLevel serverLevel) {
             CarianStyleCombatArtEffects.prayerStrike(serverLevel, attacker);

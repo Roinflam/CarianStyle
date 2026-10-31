@@ -53,7 +53,7 @@ public class EnchantmentVowedRevenge extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.vowed_revenge.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.vowed_revenge.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -100,7 +100,7 @@ public class EnchantmentVowedRevenge extends EnchantmentBase {
             return;
         }
 
-        // ⭐ v2.1：搜索半径硬上限，防止等级直接当半径
+        // v2.1：搜索半径硬上限，防止等级直接当半径
         // 原：level * 2（100级 = 200格）
         int searchRadius = Math.min(level * 2, MAX_SEARCH_RADIUS.getInt());
 
@@ -112,7 +112,7 @@ public class EnchantmentVowedRevenge extends EnchantmentBase {
                 entityLivingBase -> !entityLivingBase.equals(attacker)
         );
 
-        // ⭐ v2.1：计数目标数硬上限，防止 entities.size() 过大导致伤害倍率失控
+        // v2.1：计数目标数硬上限，防止 entities.size() 过大导致伤害倍率失控
         int countedTargets = Math.min(entities.size(), MAX_COUNTED_TARGETS);
 
         // 每个周围敌人增加 2.5% × 等级 的伤害（使用封顶后的数量）

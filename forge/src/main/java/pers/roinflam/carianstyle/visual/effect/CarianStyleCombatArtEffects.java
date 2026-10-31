@@ -44,7 +44,7 @@ import pers.roinflam.carianstyle.network.VisualNetwork;
  * 世界视觉再画一遍只是重复。
  * </p>
  *
- * <h4>⚠ 调用时机比前几批更需要小心</h4>
+ * <h4>调用时机比前几批更需要小心</h4>
  * <p>
  * 前十个战技全是「概率触发」或「特定动作触发」，调用点天然唯一；
  * 而这批大多是<b>条件判定</b>，必须<b>只在条件命中的那一个分支里调</b>：
@@ -59,7 +59,7 @@ import pers.roinflam.carianstyle.network.VisualNetwork;
  * 条件没命中却发包，视觉就在骗人——那比没有视觉更糟。
  * </p>
  *
- * <h4>⚠ 三个「打在别人身上」的演出</h4>
+ * <h4>三个「打在别人身上」的演出</h4>
  * <p>
  * {@link #waveStone}、{@link #skyShot}、{@link #hardArrow} 都提供了
  * {@code (level, attacker, victim)} 形式的重载：<b>位置取受击者、朝向取攻击者</b>。
@@ -67,7 +67,7 @@ import pers.roinflam.carianstyle.network.VisualNetwork;
  * 而崩开的方向必须由攻击者决定。
  * </p>
  *
- * <h4>⚠ 自身锚定的演出必须贴地</h4>
+ * <h4>自身锚定的演出必须贴地</h4>
  * <p>
  * {@link #bloodBlade} 与 {@link #goldenLaw} 画在<b>持有者自己</b>身上。
  * 第一人称相机就在胸口高度、朝正前方，<b>任何锚在自己身上又立到胸口的几何体都会糊住准星</b>。
@@ -75,7 +75,7 @@ import pers.roinflam.carianstyle.network.VisualNetwork;
  * 若以后再加自身锚定的演出，必须遵守同一条约束。
  * </p>
  *
- * <h4>⚠ 高频触发的客户端节流</h4>
+ * <h4>高频触发的客户端节流</h4>
  * <p>
  * 血刃、复仇誓言、黄金律法、献斗剑、碎星、挥石魔法都是<b>每次攻击就可能触发</b>的。
  * {@code CombatArtEffectManager} 已为这六个类型加了<b>同位置合并</b>
@@ -87,7 +87,7 @@ import pers.roinflam.carianstyle.network.VisualNetwork;
  * （可照抄 {@code CarianStyleEffects.shouldEmitRedLightning} 的写法）。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.7
  */
 public final class CarianStyleCombatArtEffects {
@@ -506,7 +506,7 @@ public final class CarianStyleCombatArtEffects {
     /**
      * 盾牌冲击：朝正前方推出的竖直扇面冲击墙 + 地面落点扇形 + 推力线。
      * <p>
-     * <b>⚠ 关于「看起来没效果」：</b>附魔本身靠 {@code attacker.knockback()} 击退，
+     * <b>关于「看起来没效果」：</b>附魔本身靠 {@code attacker.knockback()} 击退，
      * 而<b>铁傀儡的击退抗性是 1.0</b>（凋灵骷髅、远古守卫者等同理），
      * 对它们施加的击退会被完全吸收——这是原版机制，不是附魔或特效的问题。
      * </p>
@@ -548,7 +548,7 @@ public final class CarianStyleCombatArtEffects {
      * 最容易导致误判血线送命，这个反馈补的正是那个缺口。
      * </p>
      * <p>
-     * <b>⚠ 全部图元压在 0.65 格以下。</b>第一人称相机就在胸口高度、朝正前方，
+     * <b>全部图元压在 0.65 格以下。</b>第一人称相机就在胸口高度、朝正前方，
      * 任何锚在自己身上又立到胸口的东西都会糊住准星。主体因此铺在地面上，
      * 靠面积和鲜红配色换可见度，而不是靠高度。
      * </p>
@@ -628,7 +628,7 @@ public final class CarianStyleCombatArtEffects {
      * （免疫不超过 15% 最大生命的伤害；每 5 秒免疫一次伤害）。
      * </p>
      * <p>
-     * <b>⚠ 只在免疫真正生效的那一刻调用</b>——即取消伤害的那一行旁边。
+     * <b>只在免疫真正生效的那一刻调用</b>——即取消伤害的那一行旁边。
      * 常驻的增伤 / 减伤没有触发点，也不该有视觉，否则会变成一个每帧都在闪的噪音源。
      * </p>
      * <p>
@@ -636,7 +636,7 @@ public final class CarianStyleCombatArtEffects {
      * 神圣净化（三维十字）、黄金树祝福（根须 + 落叶）在形状上彻底分开。
      * </p>
      * <p>
-     * <b>⚠ 碑是放倒铺在地上的，不是立起来的。</b>立起来的版本正好挡住第一人称视野正中，
+     * <b>碑是放倒铺在地上的，不是立起来的。</b>立起来的版本正好挡住第一人称视野正中，
      * 而免疫恰恰发生在被围殴的时候，那个时机挡视野尤其致命。矩形这个形状语言完整保留。
      * </p>
      *
@@ -687,7 +687,7 @@ public final class CarianStyleCombatArtEffects {
      * 对应 {@code EnchantmentSkyShot}：射击高于自身至少 5 格的目标时额外加伤。
      * </p>
      * <p>
-     * <b>⚠ 只在高度差判定通过时调用</b>——不满足 5 格高差的普通命中不该有这个演出。
+     * <b>只在高度差判定通过时调用</b>——不满足 5 格高差的普通命中不该有这个演出。
      * </p>
      * <p>
      * <b>爆环画在目标所在高度而非地面</b>，这是它与其余全部演出的关键区别：

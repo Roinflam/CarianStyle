@@ -25,7 +25,7 @@ import java.util.Map;
  * 实现分类没有丢弃，它移到了详情页里作为一行信息展示。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 public enum CodexTheme {

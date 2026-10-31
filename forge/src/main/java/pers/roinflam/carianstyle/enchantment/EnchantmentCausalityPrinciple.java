@@ -57,12 +57,12 @@ import java.util.List;
  * 这正是手写版本最容易漏掉的地方。
  * </p>
  *
- * <h3>崩溃链路（对应看门狗线程转储第 133 行）</h3>
+ * <h3>崩溃链路</h3>
  * <ol>
  *   <li>玩家受击 → LivingDamageEvent → 本附魔第 5 次累积触发 AOE 反击</li>
  *   <li>AOE 对周围实体 hurt → 每个被击中实体再走完整「受击 → 伤害」事件链</li>
  *   <li>若被击中实体也穿因果律护甲 → 继续累积计数 → 再次触发 AOE，呈指数级放大</li>
- *   <li>叠加 ReflectTrait 反弹 + celestial_core 每次攻击 addModifier，
+ *   <li>再叠加其它模组的反伤与「每次攻击都 addModifier」的机制，
  *       单 tick 内伤害事件爆炸式增长，最终卡死在 AttributeInstance 的 HashSet.add</li>
  * </ol>
  *
@@ -81,7 +81,7 @@ public class EnchantmentCausalityPrinciple extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.causality_principle.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.causality_principle.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -149,7 +149,7 @@ public class EnchantmentCausalityPrinciple extends EnchantmentBase {
      * <p>
      * AOE 反击对周围实体造成的二次伤害会再次进入 {@link #onLivingDamage}，
      * 此守卫在方法入口处直接拦截，防止因果律自身递归触发，
-     * 进而避免与 ReflectTrait / celestial_core 形成伤害事件级联导致服务端崩溃。
+     * 进而避免与其它模组的反伤、加属性机制形成伤害事件级联导致服务端崩溃。
      * </p>
      * <p>
      * <b>每个附魔必须持有自己独立的一份</b>，不同附魔之间互不影响
@@ -228,7 +228,7 @@ public class EnchantmentCausalityPrinciple extends EnchantmentBase {
 
             int searchRadius = Math.min(effectiveLevel * 3, MAX_SEARCH_RADIUS.getInt());
 
-            // ⭐ AOE 触发时播放一发因果律金紫六芒星法阵（约 1100ms）。
+            // AOE 触发时播放一发因果律金紫六芒星法阵（约 1100ms）。
             // 特效半径取实际作用半径 searchRadius，保证「看到多大就打多大」。
             // 纯服务端发包，不生成实体、不触发任何事件，
             // 不影响下方伤害逻辑与两层崩服防护。

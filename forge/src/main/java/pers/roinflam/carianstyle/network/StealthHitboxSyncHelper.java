@@ -68,7 +68,7 @@ import javax.annotation.Nonnull;
  * 碰撞箱屏蔽与之对齐：只对玩家生效，不会出现「怪物看得见却没有碰撞箱」的错位。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 public final class StealthHitboxSyncHelper {

@@ -18,7 +18,7 @@ public class ReflectionCache {
     // ===== 字段缓存 =====
     private static Field noJumpDelayField = null;
     private static Field useItemRemainingField = null;
-    private static EntityDataAccessor<Float> dataHealthId = null;  // ⭐ 新增
+    private static EntityDataAccessor<Float> dataHealthId = null;
 
     // ===== 方法缓存 =====
     private static Method updatingUsingItemMethod = null;
@@ -28,7 +28,7 @@ public class ReflectionCache {
     private static boolean noJumpDelayAvailable = false;
     private static boolean useItemRemainingAvailable = false;
     private static boolean updatingUsingItemAvailable = false;
-    private static boolean dataHealthIdAvailable = false;  // ⭐ 新增
+    private static boolean dataHealthIdAvailable = false;
 
     static {
         initialize();
@@ -51,9 +51,9 @@ public class ReflectionCache {
             noJumpDelayField = ObfuscationReflectionHelper.findField(LivingEntity.class, "f_20954_");
             noJumpDelayField.setAccessible(true);
             noJumpDelayAvailable = true;
-            LogUtil.info("✓ 成功获取 noJumpDelay 字段");
+            LogUtil.info("成功获取 noJumpDelay 字段");
         } catch (Exception e) {
-            LogUtil.error("✗ 无法获取 noJumpDelay 字段", e);
+            LogUtil.error("无法获取 noJumpDelay 字段", e);
             noJumpDelayAvailable = false;
         }
 
@@ -63,22 +63,22 @@ public class ReflectionCache {
             useItemRemainingField = ObfuscationReflectionHelper.findField(LivingEntity.class, "f_20936_");
             useItemRemainingField.setAccessible(true);
             useItemRemainingAvailable = true;
-            LogUtil.info("✓ 成功获取 useItemRemaining 字段");
+            LogUtil.info("成功获取 useItemRemaining 字段");
         } catch (Exception e) {
-            LogUtil.error("✗ 无法获取 useItemRemaining 字段", e);
+            LogUtil.error("无法获取 useItemRemaining 字段", e);
             useItemRemainingAvailable = false;
         }
 
-        // ⭐ 获取 DATA_HEALTH_ID 字段
+        // 获取 DATA_HEALTH_ID 字段
         // MCP名: DATA_HEALTH_ID, SRG名: f_20961_
         try {
             Field healthField = ObfuscationReflectionHelper.findField(LivingEntity.class, "f_20961_");
             healthField.setAccessible(true);
             dataHealthId = (EntityDataAccessor<Float>) healthField.get(null);
             dataHealthIdAvailable = true;
-            LogUtil.info("✓ 成功获取 DATA_HEALTH_ID 字段");
+            LogUtil.info("成功获取 DATA_HEALTH_ID 字段");
         } catch (Exception e) {
-            LogUtil.error("✗ 无法获取 DATA_HEALTH_ID 字段", e);
+            LogUtil.error("无法获取 DATA_HEALTH_ID 字段", e);
             dataHealthIdAvailable = false;
         }
 
@@ -91,9 +91,9 @@ public class ReflectionCache {
             );
             updatingUsingItemMethod.setAccessible(true);
             updatingUsingItemAvailable = true;
-            LogUtil.info("✓ 成功获取 updatingUsingItem 方法");
+            LogUtil.info("成功获取 updatingUsingItem 方法");
         } catch (Exception e) {
-            LogUtil.error("✗ 无法获取 updatingUsingItem 方法", e);
+            LogUtil.error("无法获取 updatingUsingItem 方法", e);
             updatingUsingItemAvailable = false;
         }
 

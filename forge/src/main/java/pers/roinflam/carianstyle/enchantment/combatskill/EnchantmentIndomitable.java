@@ -56,7 +56,7 @@ public class EnchantmentIndomitable extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.indomitable.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.indomitable.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -86,7 +86,7 @@ public class EnchantmentIndomitable extends EnchantmentBase {
 
         LivingEntity holder = evt.getEntity();
 
-        // ⭐ v2.1：怪物附魔触发开关（受击者视角，低血量伤害免疫）
+        // v2.1：怪物附魔触发开关（受击者视角，低血量伤害免疫）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
 
         Enchantment indomitable = EnchantmentRegistry.getEnchantmentByClass(EnchantmentIndomitable.class);
@@ -111,7 +111,7 @@ public class EnchantmentIndomitable extends EnchantmentBase {
         if (RandomUtil.percentageChance(immuneChance)) {
             evt.setCanceled(true);
 
-            // ⭐ v2.2：免疫真正生效，播放「不屈壁障」自绘特效。
+            // v2.2：免疫真正生效，播放「不屈壁障」自绘特效。
             // 位置与朝向都取持有者——这是「我把这一下弹回去了」的自身反馈
             if (holder.level() instanceof ServerLevel serverLevel) {
                 CarianStyleCombatArtEffects.indomitable(serverLevel, holder);

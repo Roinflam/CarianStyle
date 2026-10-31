@@ -23,7 +23,7 @@ import javax.annotation.Nonnull;
  * - 不对绝对伤害生效
  * </p>
  */
-@Mod.EventBusSubscriber  // ⭐ 添加这个注解！
+@Mod.EventBusSubscriber
 public class MobEffectProtectionOfTheErdtree extends IconBase {
 
     public MobEffectProtectionOfTheErdtree(boolean isBadEffectIn, int liquidColorIn) {
@@ -36,7 +36,7 @@ public class MobEffectProtectionOfTheErdtree extends IconBase {
      * @param evt 伤害事件
      */
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {  // ⭐ 改为static方法
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;
         }

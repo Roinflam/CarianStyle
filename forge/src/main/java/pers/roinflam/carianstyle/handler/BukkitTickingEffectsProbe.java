@@ -15,7 +15,7 @@ import java.lang.reflect.Modifier;
 /**
  * 探测「CraftBukkit 系服务端（Mohist 及其衍生版）此刻正在给这个实体 tick 药水效果」。
  * <p>
- * <b>2026-09-23 修复：药水 tick 期间新加的效果被 IEffectModifier 附魔改写两次。</b>
+ * <b>修复：药水 tick 期间新加的效果被 IEffectModifier 附魔改写两次。</b>
  * </p>
  * <p>
  * <b>问题：</b>Mohist 的 {@code LivingEntity}：
@@ -39,8 +39,8 @@ import java.lang.reflect.Modifier;
  * {@code LivingEntity.addEffect(Cause)} 重放入队的效果，说明药水 tick 期间确有效果入队，重放确实经过本钩子。
  * tick 循环里（非重放）经过 {@code m_147207_} 的调用链更常见
  * （典型链是 {@code MobEffectInstance.m_19552_}（tick）→ {@code m_19550_}（applyEffect）
- * → 各效果的 {@code applyEffectTick m_6742_} → {@code m_7292_} → {@code m_147207_}，常见的是 传世之刃 {@code HitDamageEffect}、
- * Goety {@code AuraEffect}；目标是自己还是周围实体，栈上看不出）。
+ * → 各效果的 {@code applyEffectTick m_6742_} → {@code m_7292_} → {@code m_147207_}，常见的是各模组在效果 tick 里再给实体加效果，
+ * 目标是自己还是周围实体，栈上看不出）。
  * 这里只用它说明重放路径确实存在，不涉及调用次数。
  * </p>
  * <p>
@@ -53,7 +53,7 @@ import java.lang.reflect.Modifier;
  * 要么往 Mohist 独有的重放循环里注入（那段代码原版 Forge 没有，{@code defaultRequire = 1} 下单机会直接崩），
  * 要么按对象身份记住「入队的是本模组新建的副本」、重放时认出来跳过（得多维护一张线程安全的弱引用身份表）。
  * 现在的做法不需要额外状态，还有个好处：重放那次与「非 tick 期间直接调用」走同一条路径、传入同一个未改实例，其它模组挂在 addEffect
- * 头部的钩子（整合包里 Cataclysm / Goety / Biomancy / EndingLib 都有）、Forge 的 Applicable/Added 事件、Bukkit 事件
+ * 头部的钩子（不少模组都有）、Forge 的 Applicable/Added 事件、Bukkit 事件
  * 看到的都与平时直接调用时相同（旧逻辑下重放时事件里是改过两次的实例）。
  * </p>
  * <p>

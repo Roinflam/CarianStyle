@@ -38,7 +38,7 @@ import javax.annotation.Nonnull;
  * 玩家重进世界后本就需要重新触发。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public final class IncisionSyncHandler {

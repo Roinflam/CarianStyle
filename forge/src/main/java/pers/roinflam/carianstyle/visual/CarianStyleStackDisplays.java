@@ -114,7 +114,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>
  * 读取器仅在服务端轮询时调用，均为廉价查询。
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 3
  */
 public final class CarianStyleStackDisplays {
@@ -212,7 +212,7 @@ public final class CarianStyleStackDisplays {
     private static final int CAUSALITY_PRINCIPLE_MAX = 5;
 
     // ===== v2 新增：死亡附魔冷却总时长（tick，作充能进度条满值）=====
-    // 说明：以下时长均来自对各死亡附魔实现里 setCooldown(..., 时长) 的核对；如你后续调整了某个附魔的
+    // 说明：以下时长均来自对各死亡附魔实现里 setCooldown(..., 时长) 的核对；以后调整了某个附魔的
     // 冷却时长，只需改对应常量即可（仅影响充能条填充比例，HUD 显示的剩余秒数恒取自真实剩余 tick、不受影响）。
     /**
      * 满月冷却进度条满值（tick）。

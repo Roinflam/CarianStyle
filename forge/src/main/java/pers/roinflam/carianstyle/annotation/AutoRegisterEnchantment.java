@@ -29,7 +29,7 @@ public @interface AutoRegisterEnchantment {
 
     /**
      * 附魔所属的类别（自定义分类）
-     * ⚠️ 注意：这是模组自定义的EnchantmentCategory，不是原版的
+     * 注意：这是模组自定义的EnchantmentCategory，不是原版的
      */
     pers.roinflam.carianstyle.annotation.EnchantmentCategory category();
 
@@ -45,7 +45,7 @@ public @interface AutoRegisterEnchantment {
      * 默认值为 BREAKABLE，适用于大多数可损坏物品
      * </p>
      * <p>
-     * ⚠️ 如果需要使用自定义类型（如SHIELD、ARMS、PICKAXE等），
+     * 如果需要使用自定义类型（如SHIELD、ARMS、PICKAXE等），
      * 请使用 customType() 参数，不要使用此参数
      * </p>
      */
@@ -66,7 +66,7 @@ public @interface AutoRegisterEnchantment {
      * </ul>
      * </p>
      * <p>
-     * ⚠️ 注意：customType 和 type 只能二选一使用
+     * 注意：customType 和 type 只能二选一使用
      * <ul>
      *   <li>如果 customType 不为空，则使用自定义类型，忽略 type 参数</li>
      *   <li>如果 customType 为空，则使用 type 参数指定的原版类型</li>

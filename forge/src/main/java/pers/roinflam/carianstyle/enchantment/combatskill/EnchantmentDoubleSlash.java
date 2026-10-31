@@ -92,7 +92,7 @@ public class EnchantmentDoubleSlash extends EnchantmentBase {
         float extraDamage = ctx.getDamage() * level * 0.2f;
         victim.hurt(victim.damageSources().magic(), extraDamage);
 
-        // ⭐ v2.1：播放「两道交叉刀光」自绘特效。
+        // v2.1：播放「两道交叉刀光」自绘特效。
         // 位置取受击者、朝向取攻击者（与狮子斩同理）
         if (player.level() instanceof ServerLevel serverLevel) {
             CarianStyleCombatArtEffects.doubleSlash(serverLevel, player, victim);

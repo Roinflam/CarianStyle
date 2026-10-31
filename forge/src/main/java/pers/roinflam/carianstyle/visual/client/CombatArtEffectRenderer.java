@@ -131,7 +131,7 @@ import java.util.List;
  * 现内联为标量，顶点输出与顺序逐字不变（做法与 {@code AoeEffectRenderer} v7 同源）。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 2.0
  */
 @OnlyIn(Dist.CLIENT)
@@ -216,7 +216,7 @@ public final class CombatArtEffectRenderer {
     /** 圣光深色：外缘与圣徽暗部 */
     private static final int PRAYER_DEEP = 0xC9962F;
 
-    // ===== v2：预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // ===== v2：预解包的固定配色（只读，切勿作为写入目标）=====
     // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
     // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
     // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
@@ -292,7 +292,7 @@ public final class CombatArtEffectRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
@@ -331,11 +331,11 @@ public final class CombatArtEffectRenderer {
                 continue;
             }
 
-            // ⭐ v2：按「到演出视觉边界的距离」取细节系数。
+            // v2：按「到演出视觉边界的距离」取细节系数。
             // 居合 / 回旋的半径远小于 FULL_DETAIL_RANGE，等价于按中心距离；
             // 祈祷的视觉体量是 14 格高的竖直光柱，必须单独换算（详见类注释）
             float detail = detailFor(fx.type, distSqr, fx.radius);
-            // ⭐ v2：登记同屏实例。本渲染器此前不登记，会让全局 crowdFactor 被低估
+            // v2：登记同屏实例。本渲染器此前不登记，会让全局 crowdFactor 被低估
             VisualLod.countInstance();
 
             float rx = (float) dx;
@@ -676,7 +676,7 @@ public final class CombatArtEffectRenderer {
         // v2：整层可跳过（极细的竖线，远处几乎不可见）
         float threadPhase = clamp01((p - 0.2f) / 0.8f);
         if (threadPhase > 0f && fade > 0f && VisualLod.keepLayer(detail, PRAYER_THREAD_KEEP_THRESHOLD)) {
-            // ⭐ v2：角度主项是 baseAngle + TAU × i / 8 均布的，必须按步长抽取而非截断，
+            // v2：角度主项是 baseAngle + TAU × i / 8 均布的，必须按步长抽取而非截断，
             // 否则光丝只朝一侧升、破坏「圣光自四周升腾」的语义。
             // 角度基准仍用原始 PRAYER_THREAD_COUNT，保证保留光丝的方位与全细节时一致
             int drawnThreads = VisualLod.scale(PRAYER_THREAD_COUNT, detail);

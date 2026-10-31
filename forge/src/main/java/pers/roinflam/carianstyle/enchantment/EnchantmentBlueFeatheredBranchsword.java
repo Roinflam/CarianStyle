@@ -54,7 +54,7 @@ public class EnchantmentBlueFeatheredBranchsword extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.blue_feathered_branchsword.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.blue_feathered_branchsword.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -118,7 +118,7 @@ public class EnchantmentBlueFeatheredBranchsword extends EnchantmentBase {
         int effectiveLevel = level;
         effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
 
-        // ⭐ v2.1：再压一道公式自身的安全上限，保证减伤系数恒为正（详见类注释）
+        // v2.1：再压一道公式自身的安全上限，保证减伤系数恒为正（详见类注释）
         effectiveLevel = Math.min(effectiveLevel, MAX_EFFECTIVE_LEVEL.getInt());
 
         // 血量 <= 20%时触发

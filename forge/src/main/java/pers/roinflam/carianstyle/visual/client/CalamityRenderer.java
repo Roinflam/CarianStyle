@@ -78,7 +78,7 @@ import java.util.List;
  * 也不需要改动 {@code EnchantmentCalamity} 一行代码。
  * </p>
  *
- * <h3>⚠ 装备槽口径</h3>
+ * <h3>装备槽口径</h3>
  * <p>
  * {@link #hasCalamity} 目前只扫描<b>4 件护甲槽</b>——灾祸是诅咒类附魔，
  * 按本模组既有惯例（以及原版诅咒的做法）应当是护甲附魔。
@@ -118,7 +118,7 @@ import java.util.List;
  * 故全部预解包为 {@code C_} 常量，颜色相关堆分配恒为 0，无需复用缓冲。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 2.0
  */
 @OnlyIn(Dist.CLIENT)
@@ -156,7 +156,7 @@ public final class CalamityRenderer {
     /** 充血红：只用在眼眶血丝上，是「充血之眼」的那点意思，不喧宾夺主 */
     private static final int CALAMITY_BLOOD = 0x9E1A18;
 
-    // ===== 预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // ===== 预解包的固定配色（只读，切勿作为写入目标）=====
     // C_ 前缀是本模组约定：类加载时解包一次、此后永久复用的常量颜色数组。
     // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
     // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
@@ -308,7 +308,7 @@ public final class CalamityRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
@@ -394,7 +394,7 @@ public final class CalamityRenderer {
      * 循环内绝大部分的 {@code getItemEnchantmentLevel} 调用。
      * </p>
      * <p>
-     * <b>⚠ 若灾祸实际不是护甲附魔</b>，把 {@code getArmorSlots()} 换成遍历
+     * <b>若灾祸实际不是护甲附魔</b>，把 {@code getArmorSlots()} 换成遍历
      * {@code EquipmentSlot.values()} 即可，其余代码无需改动（详见类注释）。
      * </p>
      *

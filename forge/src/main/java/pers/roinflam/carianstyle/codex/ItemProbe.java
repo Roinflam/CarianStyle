@@ -40,7 +40,7 @@ import java.util.List;
  * 结果固化进 {@link EnchantmentMeta}。不在任何 tick 或 render 路径上。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 public final class ItemProbe {

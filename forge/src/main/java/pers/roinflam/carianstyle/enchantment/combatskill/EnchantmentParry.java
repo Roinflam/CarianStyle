@@ -48,7 +48,7 @@ import java.util.UUID;
  * </p>
  * <p>
  * <b>修复：</b>把注解改为 {@code customType = "SHIELD"}，与构造函数对齐。
- * 本次改动<b>不改变任何当前运行时行为</b>，只是消除两边不一致的隐患。
+ * 这样改<b>不改变任何当前运行时行为</b>，只是消除两边不一致的隐患。
  * </p>
  *
  * <h3>v2.4：成功架住时播放「格挡窗口」自绘特效</h3>
@@ -60,7 +60,7 @@ import java.util.UUID;
  * 数据写进去的那一刻，就是窗口开始的那一刻。
  * </p>
  * <p>
- * <b>⚠ 时长与 10 tick 严格绑定。</b>客户端那边
+ * <b>时长与 10 tick 严格绑定。</b>客户端那边
  * {@code CombatArtEffectManager.PARRY_WINDOW_DURATION_MS} 取 500ms，
  * 正好等于这里 {@code setData(..., 10)} 的 10 tick。
  * 准星收缩到零的瞬间就是加成失效的瞬间——<b>改了这里的 10，必须同步改那个常量</b>，
@@ -87,7 +87,7 @@ public class EnchantmentParry extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.parry.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.parry.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -140,7 +140,7 @@ public class EnchantmentParry extends EnchantmentBase {
 
         LivingEntity holder = evt.getEntity();
 
-        // ⭐ v2.2：怪物附魔触发开关（受击者视角，进入招架状态）
+        // v2.2：怪物附魔触发开关（受击者视角，进入招架状态）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
 
         UUID uuid = holder.getUUID();
@@ -180,7 +180,7 @@ public class EnchantmentParry extends EnchantmentBase {
 
         EnchantmentDataManager.setData(PARRY_LEVEL_KEY, uuid, level, WINDOW_TICKS.getInt());
 
-        // ⭐ v2.4：架住成功，播放「格挡窗口」自绘特效。
+        // v2.4：架住成功，播放「格挡窗口」自绘特效。
         // 时长与上面那个 10 tick 严格对齐，准星收缩到零即窗口关闭（详见类注释）
         if (holder.level() instanceof ServerLevel serverLevel) {
             CarianStyleCombatArtEffects.parryWindow(serverLevel, holder);
@@ -199,7 +199,7 @@ public class EnchantmentParry extends EnchantmentBase {
 
         LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
 
-        // ⭐ v2.2：怪物附魔触发开关（攻击者视角，招架增伤）
+        // v2.2：怪物附魔触发开关（攻击者视角，招架增伤）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
 
         UUID uuid = attacker.getUUID();

@@ -57,7 +57,7 @@ import java.util.function.Supplier;
  * 范围是本端代码定义的语义边界，不该由对端决定。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 public class EnchantmentValuesPacket {

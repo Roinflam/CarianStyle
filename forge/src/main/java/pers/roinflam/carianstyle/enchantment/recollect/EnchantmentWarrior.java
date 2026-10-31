@@ -88,7 +88,7 @@ public class EnchantmentWarrior extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.warrior.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.warrior.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -166,7 +166,7 @@ public class EnchantmentWarrior extends EnchantmentBase {
         if (evt.getEntity().level().isClientSide) return;
         if (!(evt.getSource().getDirectEntity() instanceof LivingEntity attacker)) return;
 
-        // ⭐ v3.1：怪物附魔触发开关（攻击者视角，非死亡触发）
+        // v3.1：怪物附魔触发开关（攻击者视角，非死亡触发）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
 
         ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
@@ -196,7 +196,7 @@ public class EnchantmentWarrior extends EnchantmentBase {
 
         LivingEntity victim = evt.getEntity();
 
-        // ⭐ v3.1：怪物附魔触发开关（受击者视角，非死亡触发）
+        // v3.1：怪物附魔触发开关（受击者视角，非死亡触发）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
 
         ItemStack heldItem = victim.getItemInHand(InteractionHand.MAIN_HAND);
@@ -215,7 +215,7 @@ public class EnchantmentWarrior extends EnchantmentBase {
         // 剩余50%分60tick持续扣血
         float damagePerTick = evt.getAmount() / DOT_DURATION.getInt();
 
-        // ⭐ v3.2：改用带来源标签的重载，使 HUD 能查到「本附魔造成的」剩余流血。
+        // v3.2：改用带来源标签的重载，使 HUD 能查到「本附魔造成的」剩余流血。
         // 行为与不带标签的重载完全一致，只是多记一个字符串引用
         DamageOverTimeManager.applyLinear(
                 victim,
@@ -237,7 +237,7 @@ public class EnchantmentWarrior extends EnchantmentBase {
         if (evt.getEntity().level().isClientSide) return;
         if (!(evt.getSource().getDirectEntity() instanceof LivingEntity killer)) return;
 
-        // ⭐ v3.1：怪物附魔触发开关（击杀者视角，击杀奖励不属于濒死触发）
+        // v3.1：怪物附魔触发开关（击杀者视角，击杀奖励不属于濒死触发）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(killer, false)) return;
 
         ItemStack heldItem = killer.getItemInHand(InteractionHand.MAIN_HAND);

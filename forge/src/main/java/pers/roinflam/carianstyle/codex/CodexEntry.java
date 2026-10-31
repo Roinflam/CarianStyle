@@ -22,7 +22,7 @@ import javax.annotation.Nullable;
  * 而各自的详情面板仍然可以按自己的信息量去写，互不迁就。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 public interface CodexEntry {

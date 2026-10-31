@@ -39,7 +39,7 @@ import pers.roinflam.carianstyle.visual.client.ShieldWardRenderer;
  * 护鞘自动跟随，一个不落。
  * </p>
  *
- * <h3>⚠ 为什么注入点是 popPose 而不是 TAIL（v1.0 的 bug 就在这里）</h3>
+ * <h3>为什么注入点是 popPose 而不是 TAIL（v1.0 的 bug 就在这里）</h3>
  * <p>
  * <b>v1.0 注入 {@code TAIL}，导致第三人称的护鞘完全歪掉。</b>
  * 记下来的原因是错的，原话是「TAIL 处 PoseStack 仍在手臂空间，
@@ -96,7 +96,7 @@ import pers.roinflam.carianstyle.visual.client.ShieldWardRenderer;
  * {@code @Inject} 是这种场景唯一合适的选择，兼容性最好。
  * </p>
  *
- * <h3>⚠ 目标方法签名</h3>
+ * <h3>目标方法签名</h3>
  * <p>
  * {@code method} 里写的是完整描述符而非裸方法名，这样一旦签名对不上会在<b>加载期立刻报错</b>
  * （配置里 {@code defaultRequire = 1}），而不是安静地不生效——后者要难查得多。
@@ -113,7 +113,7 @@ import pers.roinflam.carianstyle.visual.client.ShieldWardRenderer;
  * {@code method} 字符串与下方处理方法的形参——两处必须一致。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.1
  */
 @Mixin(ItemInHandLayer.class)

@@ -83,7 +83,7 @@ public class MobEffectBlessingOfTheErdtree extends IconBase {
      */
     @Override
     public void applyEffectTick(@Nonnull LivingEntity entityLivingBaseIn, int amplifier) {
-        // ⭐ v1.1 客户端守卫：治疗只在逻辑服务端结算一次，
+        // v1.1 客户端守卫：治疗只在逻辑服务端结算一次，
         // 血量经原版同步机制下发给客户端，避免两侧治疗量不一致导致血条闪跳。
         if (entityLivingBaseIn.level().isClientSide) {
             return;

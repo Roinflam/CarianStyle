@@ -3,7 +3,7 @@ plugins {
     id 'com.github.johnrengelman.shadow'
 }
 
-// ========== 添加这个仓库配置块 ==========
+// ========== 额外的 Maven 仓库 ==========
 repositories {
     maven { url 'https://maven.blamejared.com' }
 }
@@ -12,7 +12,6 @@ repositories {
 loom {
     forge {
         // 指定 Mixin 配置文件路径，文件名从 gradle.properties 读取
-        // GeckoLib 需要 Mixin 支持
         mixinConfig "${rootProject.mod_id}.mixins.json"
     }
 }

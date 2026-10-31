@@ -186,7 +186,7 @@ import java.util.List;
  * <b>在零分配之外又顺带省掉一半的插值计算</b>。
  * </p>
  *
- * <h4>⚠ 传给 drawPetal 的 deep / mid / tip 必须是只读常量</h4>
+ * <h4>传给 drawPetal 的 deep / mid / tip 必须是只读常量</h4>
  * <p>
  * {@link #drawPetalLayer} 会把三个配色数组一路传进 {@link #drawPetal}，
  * 而后者<b>在整个脊线循环期间反复读取它们</b>。因此这三个参数只能传
@@ -406,7 +406,7 @@ public final class AoeEffectRenderer {
     /** 圣光深色：净化环外缘与地面圣徽暗部 */
     private static final int SACRED_DEEP = 0xC08A28;
 
-    // ===== v7：预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // ===== v7：预解包的固定配色（只读，切勿作为写入目标）=====
     // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
     // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
     // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
@@ -458,7 +458,7 @@ public final class AoeEffectRenderer {
     private static final float[] C_SACRED_DEEP = VisualColor.constant(SACRED_DEEP);
 
     /**
-     * v7：花瓣脊线滚动双缓冲之一（⚠ 写入后必须立即消费，不可跨调用留存）。
+     * v7：花瓣脊线滚动双缓冲之一（写入后必须立即消费，不可跨调用留存）。
      * <p>
      * <b>必须与 {@link #PETAL_COL_B} 配对使用。</b>{@link #drawPetal} 的每一段四边形
      * 需要<b>同时</b>持有根侧与尖侧两个不同的颜色，一个缓冲不够——
@@ -469,20 +469,20 @@ public final class AoeEffectRenderer {
     private static final float[] PETAL_COL_A = new float[VisualColor.RGB];
 
     /**
-     * v7：花瓣脊线滚动双缓冲之二（⚠ 同上，专供 {@link #drawPetal} 与 {@link #PETAL_COL_A} 配对）。
+     * v7：花瓣脊线滚动双缓冲之二（同上，专供 {@link #drawPetal} 与 {@link #PETAL_COL_A} 配对）。
      */
     private static final float[] PETAL_COL_B = new float[VisualColor.RGB];
 
     /**
      * 花瓣脊线的<b>全细节</b>细分段数，同时也是 {@link #PETAL_HOR} / {@link #PETAL_VER}
      * 两个复用缓冲的定长依据。
-     * <p><b>⚠ 若要调大此值，必须同步意识到那两个缓冲会跟着变长</b>；
+     * <p><b>若要调大此值，必须同步意识到那两个缓冲会跟着变长</b>；
      * {@link #drawPetal} 内有防御性钳制，超出时会静默降到本值而不是越界崩溃。</p>
      */
     private static final int PETAL_SEGMENTS = 8;
 
     /**
-     * v7：花瓣脊线的水平位移复用缓冲（⚠ 仅供 {@link #drawPetal} 内部使用）。
+     * v7：花瓣脊线的水平位移复用缓冲（仅供 {@link #drawPetal} 内部使用）。
      * <p>
      * 旧实现在每片花瓣里 {@code new double[seg + 1]} 两次。单朵花 32 瓣即
      * <b>64 个临时数组 / 帧</b>——数量虽比颜色数组少一个数量级，但每个都更大（9 个 double = 72 字节），
@@ -494,12 +494,12 @@ public final class AoeEffectRenderer {
     private static final double[] PETAL_HOR = new double[PETAL_SEGMENTS + 1];
 
     /**
-     * v7：花瓣脊线的竖直位移复用缓冲（⚠ 同上，与 {@link #PETAL_HOR} 配对）。
+     * v7：花瓣脊线的竖直位移复用缓冲（同上，与 {@link #PETAL_HOR} 配对）。
      */
     private static final double[] PETAL_VER = new double[PETAL_SEGMENTS + 1];
 
     /**
-     * v7：一次性混色的复用缓冲（⚠ 写入后必须立即消费，不可跨调用留存）。
+     * v7：一次性混色的复用缓冲（写入后必须立即消费，不可跨调用留存）。
      * <p>
      * 用于花心白热球、猩红炸裂核、癫火蓄能核与冲击强闪这类
      * 「算一个色 → 立刻画完 → 不再用」的场景，任一时刻只有一个动态色存活，故一个缓冲即可。
@@ -625,7 +625,7 @@ public final class AoeEffectRenderer {
      * 坐标是手调的，刻意做成大小不一、分布不对称（对称会显得像图案而非天体）。
      * </p>
      * <p>
-     * <b>⚠ 只读常量数组</b>，绘制时只按下标读取、绝不写入。
+     * <b>只读常量数组</b>，绘制时只按下标读取、绝不写入。
      * </p>
      */
     private static final float[] MOON_MARIA = {
@@ -653,7 +653,7 @@ public final class AoeEffectRenderer {
     private static final double SACRED_MOTE_HALF = 0.03;
 
     /**
-     * v7：闪电主干节点坐标的复用缓冲 X（⚠ 仅供 {@link #drawRedLightning} 内部使用）。
+     * v7：闪电主干节点坐标的复用缓冲 X（仅供 {@link #drawRedLightning} 内部使用）。
      * <p>
      * 旧实现每道闪电 {@code new double[segs + 1]} 三次。而红闪恰恰是<b>最容易跑满
      * {@code AoeEffectManager.MAX_ACTIVE}(40) 的类型</b>——古龙雷击对分散目标降雷时，
@@ -670,10 +670,10 @@ public final class AoeEffectRenderer {
      */
     private static final double[] LIGHTNING_NX = new double[LIGHTNING_SEGMENTS + 1];
 
-    /** v7：闪电主干节点坐标的复用缓冲 Y（⚠ 同上）。 */
+    /** v7：闪电主干节点坐标的复用缓冲 Y（同上）。 */
     private static final double[] LIGHTNING_NY = new double[LIGHTNING_SEGMENTS + 1];
 
-    /** v7：闪电主干节点坐标的复用缓冲 Z（⚠ 同上）。 */
+    /** v7：闪电主干节点坐标的复用缓冲 Z（同上）。 */
     private static final double[] LIGHTNING_NZ = new double[LIGHTNING_SEGMENTS + 1];
 
     private AoeEffectRenderer() {
@@ -694,7 +694,7 @@ public final class AoeEffectRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
@@ -772,10 +772,10 @@ public final class AoeEffectRenderer {
             double ry = fxY - cam.y + Y_OFFSET;
             double rz = fxZ - cam.z;
 
-            // ⭐ v6：按「到演出视觉边界的距离」取细节系数（不能按到中心的距离，详见类注释）。
+            // v6：按「到演出视觉边界的距离」取细节系数（不能按到中心的距离，详见类注释）。
             // 演出范围内 detail 恒为 1.0，与优化前逐像素一致
             float detail = detailFor(fx.type, distSqr, fx.radius);
-            // ⭐ v6：登记同屏实例。本渲染器此前完全不登记，导致全局 crowdFactor 被系统性低估，
+            // v6：登记同屏实例。本渲染器此前完全不登记，导致全局 crowdFactor 被系统性低估，
             // 已接入 LOD 的黄金树祝福 / 腐败女神在团战时削减不足
             VisualLod.countInstance();
 
@@ -826,7 +826,7 @@ public final class AoeEffectRenderer {
                 // 闪电的主要视觉体量是 28 格高的竖直电柱，而非落地冲击环
                 return Math.max(radius, LIGHTNING_HEIGHT * LIGHTNING_VISUAL_RADIUS_FACTOR);
             case AoeEffectPacket.TYPE_MOON_BLESSING:
-                // ⭐ v9：月轮悬浮在 3.4 格高处、月华柱贯穿其下，主体视觉在头顶上方而非脚下平面
+                // v9：月轮悬浮在 3.4 格高处、月华柱贯穿其下，主体视觉在头顶上方而非脚下平面
                 return Math.max(radius, MOON_DISC_HEIGHT * MOON_VISUAL_RADIUS_FACTOR);
             default:
                 return radius;
@@ -1059,7 +1059,7 @@ public final class AoeEffectRenderer {
     private static void drawMoonBlessing(BufferBuilder b, Matrix4f m,
                                          double cx, double cy, double cz, double radius,
                                          float p, float totalSeconds, float detail) {
-        // ⭐ v11：绝对播放秒数。totalSeconds 来自服务端指定的实际回血时长，
+        // v11：绝对播放秒数。totalSeconds 来自服务端指定的实际回血时长，
         // 因此 10 秒版与 20 秒版的动画速度完全一致（详见方法注释）
         float age = p * totalSeconds;
 
@@ -1130,13 +1130,13 @@ public final class AoeEffectRenderer {
         if (discRadius > 0.05) {
             float discAlpha = fade * appear;
 
-            // ⭐ v11 核心：球面着色。月相由光源方向决定，此处取近正照 = 满月
+            // v11 核心：球面着色。月相由光源方向决定，此处取近正照 = 满月
             bbSphere(b, m, cx, discY, cz, discRadius, discRings, discSegs,
                     rgX, rgY, rgZ, upX, upY, upZ, core,
                     MOON_LIGHT_U, MOON_LIGHT_V, MOON_LIGHT_W,
                     MOON_AMBIENT, 0.92f * discAlpha);
 
-            // ⭐ 月海：球面上几块稍暗的斑块。「像月亮」最关键的一笔——
+            // 月海：球面上几块稍暗的斑块。「像月亮」最关键的一笔——
             // 纯亮球读起来是「光球」，有了不规则暗斑才认得出是天体。
             // 月海用同一套光照着色，因此暗面那侧的月海会自然融进阴影里
             int mariaCount = MOON_MARIA.length / 3;
@@ -1188,7 +1188,7 @@ public final class AoeEffectRenderer {
             float phase = (float) i / ringCount;
             // 绝对时间驱动：MOON_RING_PER_SECOND 圈/秒，与总时长无关
             float t = frac(age * MOON_RING_PER_SECOND + phase);
-            // ⭐ 收拢：半径从外向内递减（本模组其余环全是向外扩散，反向即读作「汇聚」）
+            // 收拢：半径从外向内递减（本模组其余环全是向外扩散，反向即读作「汇聚」）
             double rr = radius * (1.0 - easeOutCubic(t));
             if (rr <= 0.25) {
                 continue;
@@ -1778,7 +1778,7 @@ public final class AoeEffectRenderer {
      * 花心白热球仅 48 顶点，不削。
      * </p>
      * <p>
-     * <b>v7 ⚠：</b>传给 {@link #drawPetalLayer} 的三个配色数组必须是只读常量。
+     * <b>v7 注意：</b>传给 {@link #drawPetalLayer} 的三个配色数组必须是只读常量。
      * {@link #drawPetal} 会在整个脊线循环期间反复读取它们，若传入可写缓冲，
      * 循环跑到一半配色就会被改掉（详见类注释）。
      * 花心球的动态混色写入 {@link #SCRATCH}——此时全部花瓣已绘制完毕，时序上不重叠。
@@ -1790,7 +1790,7 @@ public final class AoeEffectRenderer {
         if (flowerAlpha <= 0.01f || riseH <= 0.01f) {
             return;
         }
-        // ⚠ 只读常量，drawPetal 会跨整个循环反复读取，绝不可传入可写缓冲
+        // 只读常量，drawPetal 会跨整个循环反复读取，绝不可传入可写缓冲
         final float[] deep = C_SCARLET_DEEP;
         final float[] red = C_SCARLET;
         final float[] hot = C_SCARLET_HOT;
@@ -1819,7 +1819,7 @@ public final class AoeEffectRenderer {
 
     /**
      * 绘制一层花瓣：{@code petals} 片均布，方位以 {@code baseRot} 为起点。
-     * <p><b>⚠ {@code deep} / {@code mid} / {@code tip} 必须是只读常量数组</b>，
+     * <p><b>{@code deep} / {@code mid} / {@code tip} 必须是只读常量数组</b>，
      * 它们会被一路传进 {@link #drawPetal} 并在其脊线循环中反复读取。</p>
      *
      * @param seg 每瓣的脊线细分段数（v6 起由调用方按细节系数传入）
@@ -1860,13 +1860,13 @@ public final class AoeEffectRenderer {
         double cosA = Math.cos(azimuth), sinA = Math.sin(azimuth);
         double wx = -sinA, wz = cosA;
 
-        // ⭐ v7 防御性钳制：脊线缓冲按 PETAL_SEGMENTS 定长分配，
+        // v7 防御性钳制：脊线缓冲按 PETAL_SEGMENTS 定长分配，
         // 若将来有人把细分数调大而忘了同步缓冲长度，这里静默降级而非数组越界崩溃
         if (seg > PETAL_SEGMENTS) {
             seg = PETAL_SEGMENTS;
         }
 
-        // ⭐ v7：脊线位移改用静态复用缓冲。旧实现每片花瓣 new 两个 double 数组，
+        // v7：脊线位移改用静态复用缓冲。旧实现每片花瓣 new 两个 double 数组，
         // 单朵花 32 瓣即 64 个临时数组 / 帧。drawPetal 不可重入，故复用安全。
         final double[] hor = PETAL_HOR;
         final double[] ver = PETAL_VER;
@@ -1881,7 +1881,7 @@ public final class AoeEffectRenderer {
             v += Math.cos(ang) * ds;
         }
 
-        // ⭐ v7 滚动双缓冲：colPrev 持有本段根侧（u0）的颜色，colCur 持有本段尖侧（u1）的颜色。
+        // v7 滚动双缓冲：colPrev 持有本段根侧（u0）的颜色，colCur 持有本段尖侧（u1）的颜色。
         // 循环外先算出 u=0 的颜色作为第一段的起点色；每段末尾交换引用，
         // 本段的尖侧色即成为下一段的根侧色，省掉一半插值。
         float[] colPrev = PETAL_COL_A;
@@ -1982,7 +1982,7 @@ public final class AoeEffectRenderer {
      * 插值口径与旧的 {@code mix} 完全一致（归一化域线性插值 + clamp01），输出逐位相同。
      * </p>
      *
-     * @param dst  目标缓冲（⚠ 不可传入 {@code C_} 常量数组）
+     * @param dst  目标缓冲（不可传入 {@code C_} 常量数组）
      * @param u    沿脊线的归一化位置（0 = 根部，1 = 尖端）
      * @param deep 根部色（只读）
      * @param mid  中部色（只读）
@@ -2187,10 +2187,10 @@ public final class AoeEffectRenderer {
         final float[] deep = C_LIGHTNING_DEEP;
 
         // ===== 主电柱节点：自落地点向上蜿蜒（底部两段保持接地不偏移，使落点精确居中）=====
-        // ⭐ v6：节点始终按原段数完整生成——rng 推进次数、分叉锚点范围均不受细节系数影响，
+        // v6：节点始终按原段数完整生成——rng 推进次数、分叉锚点范围均不受细节系数影响，
         // 保证同一道闪电在任何距离下骨架完全一致（详见类注释）
         final int segs = LIGHTNING_SEGMENTS;
-        // ⭐ v7：节点坐标改用静态复用缓冲。旧实现每道闪电 new 三个 double 数组，
+        // v7：节点坐标改用静态复用缓冲。旧实现每道闪电 new 三个 double 数组，
         // 而红闪是最容易跑满同屏上限（40 道）的类型，且爆发时机恰是客户端最卡的一瞬。
         // 节点数恒为 segs + 1，缓冲尺寸精确匹配；drawRedLightning 不可重入，复用安全。
         final double[] nx = LIGHTNING_NX;
@@ -2213,7 +2213,7 @@ public final class AoeEffectRenderer {
             nz[i] = cz + walkZ;
         }
 
-        // ⭐ v6：绘制时按步长跳着连线（节点本身不变，只是折线更粗糙）
+        // v6：绘制时按步长跳着连线（节点本身不变，只是折线更粗糙）
         int drawnSegs = VisualLod.scaleSegments(segs, LIGHTNING_SEGMENTS_MIN, detail);
         int segStep = Math.max(1, segs / drawnSegs);
 
@@ -2241,7 +2241,7 @@ public final class AoeEffectRenderer {
         }
 
         // ===== 分叉：在中上部若干节点分出蜿蜒短支（逐段变细、淡出、收尖）=====
-        // ⭐ v6：截断尾部而非按步长抽取——分叉方向是随机的（非均布），
+        // v6：截断尾部而非按步长抽取——分叉方向是随机的（非均布），
         // 截断保留的那几条形状与全细节时逐点一致
         int drawnBranches = VisualLod.scale(LIGHTNING_BRANCHES, detail);
         int branchSegs = VisualLod.scaleSegments(

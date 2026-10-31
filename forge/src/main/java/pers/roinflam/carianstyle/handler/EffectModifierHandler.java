@@ -24,16 +24,16 @@ import java.util.WeakHashMap;
  * 具体的等级获取和修改逻辑都在各个附魔类中
  * </p>
  * <p>
- * <b>2026-09-23 性能优化：同一 tick 内按实体缓存「装备上有哪些 IEffectModifier 附魔」。</b>
+ * <b>性能优化：同一 tick 内按实体缓存「装备上有哪些 IEffectModifier 附魔」。</b>
  * </p>
  * <p>
  * <b>问题：</b>本处理器由 {@code MixinEffectModifier} 挂在 {@code LivingEntity.addEffect(MobEffectInstance, Entity)}
  * 的方法头，全服每一次 addEffect 都要把护甲 + 主副手逐件跑一遍 {@code EnchantmentHelper.getEnchantments}
  * （把物品 NBT 里的附魔列表逐条反序列化、解析 ResourceLocation、查注册表）。
  * 很多饰品每 tick 都给佩戴者续 buff，同一个玩家同一 tick 会连续进来好几次，装备根本没变，
- * 扫描结果每次都一样。例：无尽贪婪 {@code CuriosTools$1.curioTick} 每次饰品 tick 对佩戴者连调两次 addEffect
- * （核对过 Re-Avaritia 1.3.9.7 的实现）。性能分析里本处理器的耗时大部分落在旧实现的 {@code addModifiersFromItem}
- * （即逐件 getEnchantments）里，且大多数调用栈经过 Curios 的饰品 tick。
+ * 扫描结果每次都一样，有的饰品每次饰品 tick 会对佩戴者连调两次 addEffect。
+ * 性能分析里本处理器的耗时大部分落在旧实现的 {@code addModifiersFromItem}
+ * （即逐件 getEnchantments）里，且大多数调用栈经过饰品的 tick。
  * </p>
  * <p>
  * <b>做法与等价性：</b>缓存的只是「附魔集合」这一步，它只取决于扫描到的那几个 {@link ItemStack} 对象本身。
@@ -122,7 +122,7 @@ public class EffectModifierHandler {
      * </p>
      * <p>
      * Mohist 系服务端正在 tick 该实体的药水效果时原样返回：那次调用只入队，
-     * 重放时会再进来一次并在那时改写，保证每个效果只被改一次（2026-09-23，见 {@link BukkitTickingEffectsProbe}）。
+     * 重放时会再进来一次并在那时改写，保证每个效果只被改一次（见 {@link BukkitTickingEffectsProbe}）。
      * </p>
      *
      * @param entity 接受药水效果的实体
@@ -217,7 +217,7 @@ public class EffectModifierHandler {
      * 按原实现的顺序取出要扫描的物品对象：先 {@code getArmorSlots()}，再 {@code getHandSlots()}。
      * <p>
      * 故意不改用 {@code getItemBySlot}：模组实体可以各自覆写这两个 Iterable
-     * （比如 CustomNPCs 的 {@code EntityNPCInterface.getArmorSlots}），逐槽取值不一定与之相同，
+     * （比如一些 NPC 模组的实体），逐槽取值不一定与之相同，
      * 且槽位顺序会影响 HashSet 的迭代顺序（见类注释）。玩家/普通生物都是 4 + 2 = 6 件，数组一次分配到位。
      * </p>
      */

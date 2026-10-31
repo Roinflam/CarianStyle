@@ -33,7 +33,7 @@ import pers.roinflam.carianstyle.visual.client.ShieldWardRenderer;
  * 而不是贴在盾上。所以第一人称同样只能走 Mixin。
  * </p>
  *
- * <h3>⚠ 为什么注入点是 popPose 而不是 TAIL</h3>
+ * <h3>为什么注入点是 popPose 而不是 TAIL</h3>
  * <p>
  * 这是本补丁最容易踩错的一点。目标方法的结构是：
  * </p>
@@ -78,7 +78,7 @@ import pers.roinflam.carianstyle.visual.client.ShieldWardRenderer;
  * 不影响其它模组对同一方法的注入。{@code @Inject} 是这种场景唯一合适的选择。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @Mixin(ItemInHandRenderer.class)

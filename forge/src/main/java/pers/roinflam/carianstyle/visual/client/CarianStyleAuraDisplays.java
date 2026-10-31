@@ -35,7 +35,7 @@ import net.minecraftforge.api.distmarker.OnlyIn;
  *     <li>艾奥尼亚 aeonia：经核对其为“给自身叠腐败/攻击回血”的自身效果，<b>没有范围 AOE</b>，故不作为光环。</li>
  * </ul>
  *
- * @author FlameForge
+ * @author RoinFlam
  */
 @OnlyIn(Dist.CLIENT)
 public final class CarianStyleAuraDisplays {

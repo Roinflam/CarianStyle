@@ -80,7 +80,7 @@ import java.util.Map;
  * 仅在服务端主线程构造与读取，无并发问题。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.1
  */
 public final class EquipmentEnchantContext {

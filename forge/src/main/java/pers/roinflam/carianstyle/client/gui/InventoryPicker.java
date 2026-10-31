@@ -39,7 +39,7 @@ import java.util.List;
  * 玩家也许就是想确认「为什么这件什么都附不上」。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)

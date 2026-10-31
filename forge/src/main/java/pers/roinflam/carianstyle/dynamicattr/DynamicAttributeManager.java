@@ -29,7 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *   避免对没有动态属性的实体（服务器上数千个）执行 getUUID() 和 Map.get()。
  * </p>
  *
- * <h3>性能优化 v2.2（本次新增，效果数值与持续时间完全不变）</h3>
+ * <h3>性能优化 v2.2（效果数值与持续时间不变）</h3>
  * <p>
  * <b>问题：重复 apply 同等级效果会整体重建实例。</b>
  * 本模组有大量附魔在<b>高频反复调用</b> {@link #apply}，且每次传入的等级都相同：
@@ -118,7 +118,7 @@ public class DynamicAttributeManager {
         }
 
         if (existing != null) {
-            // ⭐ v2.2 核心：等级相同 → 修正器数值必然一致，拆了重装毫无意义。
+            // v2.2 核心：等级相同 → 修正器数值必然一致，拆了重装毫无意义。
             // 只刷新持续时间即可，跳过「移除修正器 / 注销处理器 / onRemoved / onApplied」全套开销。
             // 时长取 max(旧, 新)，与优化前的结果完全相同（推导见类注释）
             if (instance.getAmplifier() == existing.getAmplifier()) {

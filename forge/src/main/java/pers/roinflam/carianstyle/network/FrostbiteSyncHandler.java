@@ -31,7 +31,7 @@ import javax.annotation.Nonnull;
  * 即便本同步链路因故失效也能退回到「玩家自己」的可见水平，不会全黑。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public final class FrostbiteSyncHandler {

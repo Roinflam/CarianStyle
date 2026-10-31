@@ -61,7 +61,7 @@ import java.util.List;
  * 只是这条契约少了一层保护——本类本身不参与渲染，加不加都不影响画面。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)

@@ -59,7 +59,7 @@ public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.adura_moonlight_sword.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.adura_moonlight_sword.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -135,7 +135,7 @@ public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
             pers.roinflam.carianstyle.utils.util.DamageSourceUtil.setMagicDamage(ctx.getDamageSource());
         }
 
-        // ⭐ v2.1：搜索半径硬上限，防止等级直接当半径
+        // v2.1：搜索半径硬上限，防止等级直接当半径
         // 原：effectiveLevel（100级 = 100格）
         int searchRadius = Math.min(effectiveLevel, MAX_SEARCH_RADIUS.getInt());
 
@@ -159,7 +159,7 @@ public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
         int stackIncrease = isNight ? 2 : 1;
         int initialLevel = isNight ? 1 : 0;
 
-        // ⭐ v2.1：命中数量硬上限，防止密集怪物场景下事件风暴
+        // v2.1：命中数量硬上限，防止密集怪物场景下事件风暴
         int hitCount = 0;
         for (LivingEntity entity : nearbyEntities) {
             if (hitCount >= MAX_TARGETS.getInt()) {

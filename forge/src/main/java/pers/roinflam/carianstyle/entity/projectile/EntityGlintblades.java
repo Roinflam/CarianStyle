@@ -678,7 +678,7 @@ public class EntityGlintblades extends ThrowableProjectile {
         }
 
         Entity hitEntity = result.getEntity();
-        // 多部位生物（末影龙、灾变的下界合金巨兽等）被撞到的是部位实体，它不是 LivingEntity，
+        // 多部位生物（末影龙、一些模组的 BOSS 等）被撞到的是部位实体，它不是 LivingEntity，
         // 伤害要转给本体，否则这一剑什么也不做
         if (hitEntity instanceof net.minecraftforge.entity.PartEntity<?> part && part.getParent() != null) {
             hitEntity = part.getParent();
@@ -717,13 +717,13 @@ public class EntityGlintblades extends ThrowableProjectile {
     public void tick() {
         super.tick();
 
-        // ⭐ v4.0：悬浮期跟随释放者。刻意放在 isClientSide 判断之外——
+        // v4.0：悬浮期跟随释放者。刻意放在 isClientSide 判断之外——
         // 双端用同一个公式各算各的，结果一致，故跟随平滑度不受 updateInterval 影响。
         if (!isShooted()) {
             followAnchor();
         }
 
-        // ⭐ v4.1：双端刷新最后已知瞄准点。目标失效后本值定格为死亡地点，剑继续飞过去。
+        // v4.1：双端刷新最后已知瞄准点。目标失效后本值定格为死亡地点，剑继续飞过去。
         refreshAimPoint();
 
         if (!this.level().isClientSide) {

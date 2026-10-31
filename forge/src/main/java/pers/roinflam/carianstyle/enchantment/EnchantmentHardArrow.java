@@ -61,7 +61,7 @@ public class EnchantmentHardArrow extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.hard_arrow.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.hard_arrow.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -107,7 +107,7 @@ public class EnchantmentHardArrow extends EnchantmentBase {
         if (!(evt.getProjectile() instanceof AbstractArrow arrow)) return;
         if (!(arrow.getOwner() instanceof LivingEntity attacker)) return;
 
-        // ⭐ v2.2：怪物附魔触发开关（射手视角）
+        // v2.2：怪物附魔触发开关（射手视角）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
 
         ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
@@ -120,13 +120,13 @@ public class EnchantmentHardArrow extends EnchantmentBase {
         arrow.setBaseDamage(arrow.getBaseDamage()
                 + arrow.getBaseDamage() * level * ARROW_DAMAGE_PER_LEVEL.get());
 
-        // ⭐ v2.3：冲击特效。
+        // v2.3：冲击特效。
         // 本方法对「射中方块」与「射中实体」一视同仁地加伤，但特效需要一个命中实体
         // 作为锚点（冲击环以它为原点沿箭道后退），故只在实体命中时播。
         // 射中方块时不播是刻意的：那种情况下加伤没有意义，画出来只会是噪音
         if (evt.getRayTraceResult() instanceof EntityHitResult entityHit
                 && attacker.level() instanceof ServerLevel serverLevel) {
-            // ⭐ v2.4：演出尺寸随伤害缩放，故把伤害估值一并传过去。
+            // v2.4：演出尺寸随伤害缩放，故把伤害估值一并传过去。
             //
             // 这里必须自己估算，不能直接用 getBaseDamage() —— 原版箭矢的实际伤害是
             //     Mth.ceil(clamp(速度模长 × baseDamage))
@@ -157,7 +157,7 @@ public class EnchantmentHardArrow extends EnchantmentBase {
         if (evt.getEntity().level().isClientSide) return;
         LivingEntity victim = evt.getEntity();
 
-        // ⭐ v2.2：怪物附魔触发开关（受击者视角，被击退强化）
+        // v2.2：怪物附魔触发开关（受击者视角，被击退强化）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
 
         ItemStack heldItem = victim.getItemInHand(InteractionHand.MAIN_HAND);

@@ -28,7 +28,7 @@ import javax.annotation.Nonnull;
  * 暗褐底 + 金色强调。所有颜色集中在本类，改主题只改这里。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)

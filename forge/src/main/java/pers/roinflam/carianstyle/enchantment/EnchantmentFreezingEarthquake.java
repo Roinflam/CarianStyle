@@ -75,7 +75,7 @@ public class EnchantmentFreezingEarthquake extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.freezing_earthquake.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.freezing_earthquake.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -188,7 +188,7 @@ public class EnchantmentFreezingEarthquake extends EnchantmentBase {
         int range = BASE_RANGE.getInt() + (totalLevel - 1) * RANGE_PER_LEVEL.getInt();
         int searchRadius = Math.min(range, MAX_SEARCH_RADIUS.getInt());
 
-        // ⭐ 唯一的一发特效广播（早期曾误写成两发，导致冰爆重叠播放，详见类注释）。
+        // 唯一的一发特效广播（早期曾误写成两发，导致冰爆重叠播放，详见类注释）。
         // 特效半径取实际作用半径 searchRadius，保证「看到多大就打多大」；
         // 广播范围由 CarianStyleEffects.BROADCAST_RANGE(64 格) 统一决定。
         // 纯服务端发包，不生成实体、不触发任何事件，不影响下方范围冻结逻辑。

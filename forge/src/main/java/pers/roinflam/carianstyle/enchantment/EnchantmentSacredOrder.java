@@ -44,7 +44,7 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.sacred_order.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.sacred_order.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -108,7 +108,7 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
 
         LivingEntity killer = (LivingEntity) evt.getSource().getEntity();
 
-        // ⭐ v2.1：怪物附魔触发开关（击杀者视角，击杀加吸收盾非濒死）
+        // v2.1：怪物附魔触发开关（击杀者视角，击杀加吸收盾非濒死）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(killer, false)) return;
 
         Enchantment sacredOrder = EnchantmentRegistry.getEnchantmentByClass(EnchantmentSacredOrder.class);
@@ -149,7 +149,7 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
         }
 
         // 受击者视角（吸收盾减伤+反弹）
-        // ⭐ v2.1：怪物附魔触发开关（受击者视角）
+        // v2.1：怪物附魔触发开关（受击者视角）
         if (!EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) {
             if (victim.getAbsorptionAmount() > 0) {
                 int victimLevel = 0;
@@ -174,7 +174,7 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
         if (damageSource.getEntity() instanceof LivingEntity) {
             LivingEntity attacker = (LivingEntity) damageSource.getEntity();
 
-            // ⭐ v2.1：怪物附魔触发开关（攻击者视角）
+            // v2.1：怪物附魔触发开关（攻击者视角）
             if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
 
             if (attacker.getAbsorptionAmount() > 0) {
@@ -213,7 +213,7 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
             return;
         }
 
-        // ⭐ v2.1：状态恢复也加开关检查，避免新生怪物获得吸收盾
+        // v2.1：状态恢复也加开关检查，避免新生怪物获得吸收盾
         if (EnchantmentEventHandler.shouldBlockMobTrigger(entity, false)) return;
 
         Enchantment sacredOrder = EnchantmentRegistry.getEnchantmentByClass(EnchantmentSacredOrder.class);
@@ -241,7 +241,7 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
 
         LivingEntity entity = evt.getEntity();
 
-        // ⭐ v2.1：怪物附魔触发开关（受治疗者视角，"无法被治疗"也属于附魔触发）
+        // v2.1：怪物附魔触发开关（受治疗者视角，"无法被治疗"也属于附魔触发）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(entity, false)) return;
 
         Enchantment sacredOrder = EnchantmentRegistry.getEnchantmentByClass(EnchantmentSacredOrder.class);

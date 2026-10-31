@@ -38,7 +38,7 @@ import java.util.List;
  * 收敛成了「传进来的 {@code categoryName} 不同」，仅此而已。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)

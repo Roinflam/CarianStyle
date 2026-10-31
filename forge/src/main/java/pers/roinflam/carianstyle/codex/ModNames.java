@@ -24,7 +24,7 @@ import java.util.Map;
  * 命名空间反复求名。缓存一次就够——模组列表在运行期不会变。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 public final class ModNames {
@@ -91,8 +91,8 @@ public final class ModNames {
         if (byOrder != 0) {
             return byOrder;
         }
-        // 按显示名而不是命名空间排：玩家看到的是「Apotheosis」，
-        // 按 apotheosis 排和按 Apotheosis 排在有中文名的模组上会得出不同结果
+        // 按显示名而不是命名空间排：玩家看到的是显示名，
+        // 按命名空间排和按显示名排在有中文名的模组上会得出不同结果
         return displayName(a).compareToIgnoreCase(displayName(b));
     }
 }

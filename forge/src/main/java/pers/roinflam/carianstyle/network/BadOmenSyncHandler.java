@@ -26,7 +26,7 @@ import javax.annotation.Nonnull;
  * 这个视觉在实战中一次都不会出现，附魔的核心节奏就完全没有反馈。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public final class BadOmenSyncHandler {

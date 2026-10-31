@@ -47,7 +47,7 @@ import java.util.List;
  * 这是纯展示信息，缺了不影响任何玩法，没有理由为它冒崩溃的风险。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 public final class EnchantmentSlots {

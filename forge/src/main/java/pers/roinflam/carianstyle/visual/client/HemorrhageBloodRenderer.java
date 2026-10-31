@@ -126,7 +126,7 @@ import java.util.List;
  * 顶点格式与着色器现由 {@link VisualBatch} 统一设置。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  */
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
@@ -159,7 +159,7 @@ public final class HemorrhageBloodRenderer {
     private static final int BLOOD_MID = 0x8A0F18;
     private static final int BLOOD_DARK = 0x3A0508;
 
-    // ===== v6：预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // ===== v6：预解包的固定配色（只读，切勿作为写入目标）=====
     // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
     // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
     // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
@@ -175,7 +175,7 @@ public final class HemorrhageBloodRenderer {
     private static final float[] C_BLOOD_DARK = VisualColor.constant(BLOOD_DARK);
 
     /**
-     * v6：动态插值色的复用缓冲（⚠ 写入后必须立即消费，不可跨调用留存）。
+     * v6：动态插值色的复用缓冲（写入后必须立即消费，不可跨调用留存）。
      * <p>
      * 仅用于血滴（{@link #drawDroplets}）与血雾（{@link #drawBloodMist}）——
      * 这两处的颜色随飞行进度 / 脉冲相位实时变化，无法预解包。两者都是
@@ -243,7 +243,7 @@ public final class HemorrhageBloodRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。

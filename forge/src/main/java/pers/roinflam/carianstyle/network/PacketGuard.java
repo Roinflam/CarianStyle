@@ -33,7 +33,7 @@ import javax.annotation.Nonnull;
  * 问题被静默吞掉，日后排查时毫无线索。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 public final class PacketGuard {

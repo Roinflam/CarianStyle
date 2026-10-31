@@ -80,7 +80,7 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
  * 删掉它只省一行，却把一个配置项的语义从这个类里抹掉了。
  * </p>
  *
- * <h4>⚠ 本次<b>没有</b>动治疗削减那一侧</h4>
+ * <h4>本次<b>没有</b>动治疗削减那一侧</h4>
  * <p>
  * 治疗削减是 {@code 1 - totalLevel * 0.25f}，每级 25%——<b>4 级就归零</b>。
  * 但它不会符号翻转：{@code LivingEntity.heal} 里是 {@code if (pHealAmount <= 0) return;}，
@@ -111,7 +111,7 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.black_flame_shelter.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.black_flame_shelter.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -178,7 +178,7 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
             }
         }
         totalLevel = applyLevelLimit(blackFlameShelter, totalLevel, LEVEL_CAP.getInt());
-        // ⭐ v2.2：无条件硬上限，防止减伤系数归零（8级）乃至变负（9级+）。
+        // v2.2：无条件硬上限，防止减伤系数归零（8级）乃至变负（9级+）。
         // 与上面的 levelLimit 是两回事：那个是可关闭的平衡开关，这个是正确性约束。
         // 详见 MAX_EFFECTIVE_LEVEL 与类注释。
         totalLevel = Math.min(totalLevel, MAX_EFFECTIVE_LEVEL);
@@ -200,7 +200,7 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
 
         LivingEntity holder = evt.getEntity();
 
-        // ⭐ v2.1：怪物附魔触发开关（受击者视角，物理减伤）
+        // v2.1：怪物附魔触发开关（受击者视角，物理减伤）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
 
         int totalLevel = getTotalLevel(holder);
@@ -219,7 +219,7 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
 
         LivingEntity holder = evt.getEntity();
 
-        // ⭐ v2.1：怪物附魔触发开关（受治疗者视角，治疗削减）
+        // v2.1：怪物附魔触发开关（受治疗者视角，治疗削减）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
 
         int totalLevel = getTotalLevel(holder);

@@ -68,7 +68,7 @@ public class EnchantmentCarianPhalanx extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.carian_phalanx.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.carian_phalanx.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -131,7 +131,7 @@ public class EnchantmentCarianPhalanx extends EnchantmentBase {
      * <pre>
      * θ = 58°   → 偏离视线 122°   完全在背后，第一人称一点都看不到
      * θ = 90°   → 偏离视线  90°   正侧方，仍在视野外
-     * θ = 125°  → 偏离视线  55°   ★ 恰好压在余光边缘
+     * θ = 125°  → 偏离视线  55°   恰好压在余光边缘
      * θ = 135°  → 偏离视线  45°   明确可见，开始占视野
      * </pre>
      * <p>
@@ -167,7 +167,7 @@ public class EnchantmentCarianPhalanx extends EnchantmentBase {
         if (!(damageSource.getDirectEntity() instanceof AbstractArrow)) return;
         if (!(damageSource.getEntity() instanceof LivingEntity attacker)) return;
 
-        // ⭐ v2.2：怪物附魔触发开关（攻击者视角，箭矢命中追加魔法剑阵）
+        // v2.2：怪物附魔触发开关（攻击者视角，箭矢命中追加魔法剑阵）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
 
         LivingEntity victim = evt.getEntity();

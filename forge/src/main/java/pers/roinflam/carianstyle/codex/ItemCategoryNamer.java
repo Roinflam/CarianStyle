@@ -37,7 +37,7 @@ import java.util.Map;
  * 归类拼接没有这个问题：认识的部分照常说清，不认识的组合也能如实列出来。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 public final class ItemCategoryNamer {

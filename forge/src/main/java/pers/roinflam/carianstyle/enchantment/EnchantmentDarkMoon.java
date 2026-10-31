@@ -41,7 +41,7 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.dark_moon.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.dark_moon.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -123,7 +123,7 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
 
         // 受击者视角（减伤）
         if (victim instanceof Mob livingVictim) {
-            // ⭐ v2.2：怪物附魔触发开关（受击者视角）
+            // v2.2：怪物附魔触发开关（受击者视角）
             if (!EnchantmentEventHandler.shouldBlockMobTrigger(livingVictim, false)) {
                 ItemStack heldItem = livingVictim.getItemInHand(InteractionHand.MAIN_HAND);
                 if (!heldItem.isEmpty()) {
@@ -140,7 +140,7 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
         // 攻击者视角（增伤+吸血）
         if (!(evt.getSource().getDirectEntity() instanceof LivingEntity attacker)) return;
 
-        // ⭐ v2.2：怪物附魔触发开关（攻击者视角）
+        // v2.2：怪物附魔触发开关（攻击者视角）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
 
         ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
@@ -164,7 +164,7 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
         if (evt.getEntity().level().isClientSide || evt.getEntity().level().isDay()) return;
         LivingEntity healer = evt.getEntity();
 
-        // ⭐ v2.2：怪物附魔触发开关（受治疗者视角）
+        // v2.2：怪物附魔触发开关（受治疗者视角）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(healer, false)) return;
 
         Enchantment darkMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDarkMoon.class);

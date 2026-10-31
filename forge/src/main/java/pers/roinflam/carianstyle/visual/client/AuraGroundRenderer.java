@@ -202,7 +202,7 @@ import java.util.Map;
  *         调用点只有边框彗星一处，且同样是「写入 → 立刻读走」。</li>
  * </ol>
  * <p>
- * <b>⚠ 复用缓冲的约束：</b>{@link #SCRATCH} 与 {@link #PERIMETER_XZ} 都必须
+ * <b>复用缓冲的约束：</b>{@link #SCRATCH} 与 {@link #PERIMETER_XZ} 都必须
  * 「写入 → 立即消费 → 不跨调用留存」。本渲染器不存在「两个动态值同时存活」的场景
  * （{@link #addBand} / {@link #addLine} 等基元接收的都是已拆开的 r/g/b 标量，
  * 而非数组引用），故各一个缓冲即可。若将来新增需要同时持有两组颜色的元素，
@@ -269,7 +269,7 @@ import java.util.Map;
  * （填充完立刻遍历绘制，绝不跨帧留存引用），这个约束由本类自己保证，不外泄。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 6
  */
 @OnlyIn(Dist.CLIENT)
@@ -401,7 +401,7 @@ public final class AuraGroundRenderer {
     private static final float HALF_PI = (float) (Math.PI / 2.0);
 
     /**
-     * v5：颜色解包的复用缓冲（⚠ 写入后必须立即消费，不可跨调用留存）。
+     * v5：颜色解包的复用缓冲（写入后必须立即消费，不可跨调用留存）。
      * <p>
      * <b>为什么本渲染器不能用 {@code C_} 常量：</b>其它渲染器的主题色都是编译期常量、
      * 可以在类加载时预解包一次；而本渲染器的颜色来自
@@ -417,7 +417,7 @@ public final class AuraGroundRenderer {
     private static final float[] SCRATCH = new float[VisualColor.RGB];
 
     /**
-     * v5：方形周边坐标的复用缓冲（⚠ 同上，仅供 {@link #perimeterPoint} 使用）。
+     * v5：方形周边坐标的复用缓冲（同上，仅供 {@link #perimeterPoint} 使用）。
      * <p>索引 0 为相对中心的 dx，索引 1 为 dz。调用点只有 {@link #drawSquare} 的边框彗星一处。</p>
      */
     private static final double[] PERIMETER_XZ = new double[2];
@@ -489,7 +489,7 @@ public final class AuraGroundRenderer {
      * 稳态下一个对象都不分配（详见类注释「第二处：Prepared 由 record 改为对象池」）。
      * </p>
      * <p>
-     * <b>⚠ 槽位会被下一帧复写</b>，因此其内容<b>只能在同一次 {@link #onRenderLevel}
+     * <b>槽位会被下一帧复写</b>，因此其内容<b>只能在同一次 {@link #onRenderLevel}
      * 调用内使用</b>——填充完立刻遍历绘制，绝不跨帧留存引用。这个约束由本类自己保证、不外泄。
      * </p>
      */
@@ -575,7 +575,7 @@ public final class AuraGroundRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
@@ -583,7 +583,7 @@ public final class AuraGroundRenderer {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
-        // ⚠ 必须在取共享缓冲之前处理「离开世界」：离开世界那一帧共享批次本就不会开启，
+        // 必须在取共享缓冲之前处理「离开世界」：离开世界那一帧共享批次本就不会开启，
         // 若把清空逻辑排在下面的判空之后，淡出状态会残留到下次进入世界，
         // 与新的实体网络 id 撞号后会闪出一两帧错误光环。
         if (mc.level == null) {
@@ -603,7 +603,7 @@ public final class AuraGroundRenderer {
         List<AuraScanner.ActiveAura> auras = AuraScanner.getActiveAuras();
         // v3：墙钟驱动的 tick 时间轴（不再受服务端 TPS 影响，也不会回绕）
         float now = currentTime();
-        // ⭐ v6：本帧帧号。VisualBatch 在同一阶段的 HIGHEST 优先级里自增，
+        // v6：本帧帧号。VisualBatch 在同一阶段的 HIGHEST 优先级里自增，
         // 而本渲染器是默认的 NORMAL 优先级，故这里读到的必然是本帧的值
         int frameId = VisualBatch.frameId();
 
@@ -631,7 +631,7 @@ public final class AuraGroundRenderer {
         // ===== 2) 标记本帧未出现的光环开始淡出 =====
         for (Map.Entry<Long, AuraState> e : STATE.entrySet()) {
             AuraState st = e.getValue();
-            // ⭐ v6：「本帧没出现」等价于「lastSeenFrame 不是当前帧号」，
+            // v6：「本帧没出现」等价于「lastSeenFrame 不是当前帧号」，
             // 一次 int 比较取代了原先的 HashSet 查找 + Long 装箱
             if (st.fadeStart < 0f && st.lastSeenFrame != frameId) {
                 st.fadeStart = now;
@@ -708,7 +708,7 @@ public final class AuraGroundRenderer {
 
             double radius = st.nominalRadius * radiusFactor;
 
-            // ⭐ v4：细节系数必须按「到圆环边界的距离」取，不能按到中心的距离。
+            // v4：细节系数必须按「到圆环边界的距离」取，不能按到中心的距离。
             // 圣域半径 16 格 > VisualLod.FULL_DETAIL_RANGE(12)，若按中心距离算，
             // 玩家站在圈内侧边缘时（到圈心 ≈ 16）会被判定为"远"并大幅削减，
             // 但那圈发光边界其实就在脚边、削减清晰可见。
@@ -716,7 +716,7 @@ public final class AuraGroundRenderer {
             // 开方成本可忽略（同屏光环数量通常是个位数）。
             double edgeDist = Math.max(0.0, Math.sqrt(distSqr) - radius);
             float detail = VisualLod.detail(edgeDist * edgeDist);
-            // ⭐ v4：补上此前缺失的实例登记。不登记会让全局 crowdFactor 被系统性低估，
+            // v4：补上此前缺失的实例登记。不登记会让全局 crowdFactor 被系统性低估，
             // 导致已接入 LOD 的实体类渲染器在团战时削减不足
             VisualLod.countInstance();
 
@@ -1565,7 +1565,7 @@ public final class AuraGroundRenderer {
         }
         int drawn = VisualLod.scale(count, detail);
         int step = Math.max(1, count / drawn);
-        // ⭐ 步长必须为奇数，否则长短交替会被抽成"全长"或"全短"
+        // 步长必须为奇数，否则长短交替会被抽成"全长"或"全短"
         if ((step & 1) == 0) {
             step++;
         }

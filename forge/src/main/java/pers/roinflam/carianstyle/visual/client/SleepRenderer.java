@@ -156,7 +156,7 @@ import java.util.List;
  *         且只在渲染线程访问），复用安全。</li>
  * </ol>
  * <p>
- * <b>⚠ 复用缓冲的约束：</b>这三个缓冲<b>只能在 {@link #emitPetal} 内部使用</b>，
+ * <b>复用缓冲的约束：</b>这三个缓冲<b>只能在 {@link #emitPetal} 内部使用</b>，
  * 且必须「写满 → 立刻画完 → 不再引用」。{@link #spark} 只有 4 个角点、直接内联成标量，
  * 不需要缓冲。
  * </p>
@@ -165,7 +165,7 @@ import java.util.List;
  * 输出的每个顶点坐标与 v3 完全相同。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 4
  */
 @OnlyIn(Dist.CLIENT)
@@ -205,7 +205,7 @@ public final class SleepRenderer {
     /** 沉眠暗蓝灰：雾盘外缘与螺旋末端的暗部 */
     private static final int SLEEP_DEEP = 0x6E7695;
 
-    // ===== v3：预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // ===== v3：预解包的固定配色（只读，切勿作为写入目标）=====
     // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
     // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
     // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
@@ -215,7 +215,7 @@ public final class SleepRenderer {
     private static final float[] C_SLEEP_MIST = VisualColor.constant(SLEEP_MIST);
 
     /**
-     * v3：动态插值色的复用缓冲 A（⚠ 写入后必须立即消费，不可跨调用留存）。
+     * v3：动态插值色的复用缓冲 A（写入后必须立即消费，不可跨调用留存）。
      * <p>
      * 用于：螺旋的滚动双缓冲之一、花瓣颜色、雾盘颜色。这三处不会同时活跃
      * （{@link #drawSlumberMist} / {@link #drawPetals} / {@link #drawHypnoticSpiral}
@@ -226,7 +226,7 @@ public final class SleepRenderer {
     private static final float[] SCRATCH_A = new float[VisualColor.RGB];
 
     /**
-     * v3：动态插值色的复用缓冲 B（⚠ 同上）。
+     * v3：动态插值色的复用缓冲 B（同上）。
      * <p>
      * <b>专供 {@link #drawHypnoticSpiral} 与 {@link #SCRATCH_A} 配对使用</b>——
      * {@link #lineGradient} 需要同时持有线段两端的颜色，一个缓冲不够
@@ -236,7 +236,7 @@ public final class SleepRenderer {
     private static final float[] SCRATCH_B = new float[VisualColor.RGB];
 
     /**
-     * v4：花瓣世界坐标的复用缓冲 X（⚠ 仅供 {@link #emitPetal} 内部使用）。
+     * v4：花瓣世界坐标的复用缓冲 X（仅供 {@link #emitPetal} 内部使用）。
      * <p>
      * 旧实现每片花瓣 {@code new float[6]} 三次 + 局部轮廓点数组七个，
      * 10 片即 <b>100 个临时数组 / 实体 / 帧</b>——与 v3 清掉的颜色分配几乎等量，
@@ -247,16 +247,16 @@ public final class SleepRenderer {
      * 故提为静态定长缓冲复用，分配归零。
      * </p>
      * <p>
-     * <b>⚠ 约束：</b>只能在 {@link #emitPetal} 内部使用，且必须
+     * <b>约束：</b>只能在 {@link #emitPetal} 内部使用，且必须
      * 「写满 → 立刻画完 → 不再引用」。
      * </p>
      */
     private static final float[] PETAL_WX = new float[PETAL_POINTS];
 
-    /** v4：花瓣世界坐标的复用缓冲 Y（⚠ 同上，与 {@link #PETAL_WX} 配对）。 */
+    /** v4：花瓣世界坐标的复用缓冲 Y（同上，与 {@link #PETAL_WX} 配对）。 */
     private static final float[] PETAL_WY = new float[PETAL_POINTS];
 
-    /** v4：花瓣世界坐标的复用缓冲 Z（⚠ 同上，与 {@link #PETAL_WX} 配对）。 */
+    /** v4：花瓣世界坐标的复用缓冲 Z（同上，与 {@link #PETAL_WX} 配对）。 */
     private static final float[] PETAL_WZ = new float[PETAL_POINTS];
 
     // ===== 头顶催眠螺旋 =====
@@ -310,7 +310,7 @@ public final class SleepRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
@@ -364,7 +364,7 @@ public final class SleepRenderer {
                 continue;
             }
 
-            // ⭐ v2：本实体的细节系数（距离 × 同屏拥挤度）。12 格内恒为 1.0，视觉与优化前一致
+            // v2：本实体的细节系数（距离 × 同屏拥挤度）。12 格内恒为 1.0，视觉与优化前一致
             float detail = VisualLod.detail(distSqr);
             // 登记实例，供下一帧估算拥挤度。本渲染器接入 VisualLod 的首要意义就在这一行——
             // 只要还有渲染器不登记，全局 crowdFactor 就会被系统性高估
@@ -442,7 +442,7 @@ public final class SleepRenderer {
         float prevX = cx;
         float prevZ = cz;
 
-        // ⭐ v3 滚动双缓冲：prevCol 持有上一段末端色，curCol 持有本段末端色。
+        // v3 滚动双缓冲：prevCol 持有上一段末端色，curCol 持有本段末端色。
         // 每段只做一次插值，段末把两个引用对调——本段末端色即成为下一段的起点色。
         float[] prevCol = SCRATCH_A;
         float[] curCol = SCRATCH_B;
@@ -617,7 +617,7 @@ public final class SleepRenderer {
                                   float r, float g, float bl, float alpha,
                                   float rightX, float rightY, float rightZ,
                                   float upX, float upY, float upZ) {
-        // ⭐ v4：圆润椭圆花瓣的 6 个局部轮廓点内联为标量。
+        // v4：圆润椭圆花瓣的 6 个局部轮廓点内联为标量。
         // 数值与原 local 字面量逐位相同：
         //   {0, +1.05}, {+0.85, +0.50}, {+0.85, -0.50},
         //   {0, -1.05}, {-0.85, -0.50}, {-0.85, +0.50}   （均 × size）
@@ -632,7 +632,7 @@ public final class SleepRenderer {
         final float cosR = (float) Math.cos(rot);
         final float sinR = (float) Math.sin(rot);
 
-        // ⭐ v4：世界坐标写入静态复用缓冲，不再每片 new float[6] 三次
+        // v4：世界坐标写入静态复用缓冲，不再每片 new float[6] 三次
         final float[] wx = PETAL_WX;
         final float[] wy = PETAL_WY;
         final float[] wz = PETAL_WZ;

@@ -54,7 +54,7 @@ public class EnchantmentLungeUp extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.lunge_up.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.lunge_up.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -94,7 +94,7 @@ public class EnchantmentLungeUp extends EnchantmentBase {
             return;
         }
 
-        // ⭐ v2.3：武器不带击退附魔时，原版低蓄力命中不会打断疾跑，疾跑中连点能把一群怪挨个挑飞，要求满蓄力
+        // v2.3：武器不带击退附魔时，原版低蓄力命中不会打断疾跑，疾跑中连点能把一群怪挨个挑飞，要求满蓄力
         if (!isFullyCharged(attacker)) {
             return;
         }
@@ -102,7 +102,7 @@ public class EnchantmentLungeUp extends EnchantmentBase {
         // 停止疾跑
         attacker.setSprinting(false);
 
-        // ⭐ v2.2：播放「上挑弧 + 地面急停尘环」自绘特效。
+        // v2.2：播放「上挑弧 + 地面急停尘环」自绘特效。
         // 位置取受击者、朝向取攻击者；在急停这一刻就播，理由见类注释
         if (attacker.level() instanceof ServerLevel serverLevel) {
             CarianStyleCombatArtEffects.lungeUp(serverLevel, attacker, victim);

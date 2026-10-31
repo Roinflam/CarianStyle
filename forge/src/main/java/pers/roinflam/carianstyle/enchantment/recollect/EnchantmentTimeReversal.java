@@ -52,7 +52,7 @@ import java.util.UUID;
  * 也不知道已经攒了多少伤害、更不知道还剩几秒。
  * </p>
  * <p>
- * 本次接入两条<b>纯读取</b>的反馈链路，均不改动任何机制逻辑：
+ * 这里接入两条<b>纯读取</b>的反馈链路，均不改动任何机制逻辑：
  * </p>
  * <ol>
  *     <li><b>世界视觉</b>——{@link #TIME_REVERSAL_SERIAL} 通过
@@ -91,7 +91,7 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.time_reversal.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.time_reversal.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -205,7 +205,7 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
 
         LivingEntity holder = evt.getEntity();
 
-        // ⭐ v2.1：怪物附魔触发开关 —— 时间逆转属于濒死无敌类，怪物身上不触发
+        // v2.1：怪物附魔触发开关 —— 时间逆转属于濒死无敌类，怪物身上不触发
         // 若此处被拦截，REVERSAL_STATE_KEY 不会被设置，
         // onLivingAttack 中的反弹判断也自然失效，无需在 onLivingAttack 中重复拦截
         if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, true)) {
@@ -235,7 +235,7 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
         EnchantmentDataManager.setData(REVERSAL_STATE_KEY, uuid, true);
         EnchantmentDataManager.setData(REVERSAL_DAMAGE_KEY, uuid, 0f);
 
-        // ⭐ v2.3：登记逆转状态，供客户端绘制世界视觉。
+        // v2.3：登记逆转状态，供客户端绘制世界视觉。
         // 放在这里而非任务里，是为了让视觉与无敌<b>同帧开始</b>——
         // 玩家看到光圈亮起的那一刻就是他真正免疫的那一刻，不存在误导窗口
         ClientSyncEffectManager.addEntity(holder, TIME_REVERSAL_SERIAL);
@@ -254,7 +254,7 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
                 EnchantmentDataManager.removeData(REVERSAL_STATE_KEY, uuid);
                 EnchantmentDataManager.removeData(REVERSAL_DAMAGE_KEY, uuid);
 
-                // ⭐ v2.3：与治疗结算同帧注销视觉。
+                // v2.3：与治疗结算同帧注销视觉。
                 // 不加 isAlive 守卫：实体若已被移除，removeEntity 内部按维度查表，
                 // 对不在集合中的条目是零开销空操作；而漏掉这次注销会让
                 // 残留条目一直等到 5 秒后的定期重同步才被剪掉
@@ -309,7 +309,7 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
 
         // 反弹伤害
         if (evt.getSource().getEntity() instanceof LivingEntity) {
-            // ⭐ v2.2：重入保护 —— 若本次受击由另一个逆转实体的反弹造成，跳过本次反弹，
+            // v2.2：重入保护 —— 若本次受击由另一个逆转实体的反弹造成，跳过本次反弹，
             // 阻断双方逆转状态下的连锁反弹。免疫（取消伤害）与累积已在上方执行，正常效果保留
             if (PROCESSING_REFLECT.get()) {
                 return;

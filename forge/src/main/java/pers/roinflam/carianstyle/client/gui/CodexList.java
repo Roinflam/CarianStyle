@@ -28,7 +28,7 @@ import java.util.List;
  * {@link #setEntries} 时算好并缓存，不在渲染路径里做字符串匹配。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)

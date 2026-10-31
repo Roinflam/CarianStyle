@@ -31,7 +31,7 @@ import java.util.function.BiFunction;
  * 原问题：
  * 注定死亡、死亡之刃、黑焰刃、癫火、战士、沙布里里嚎叫、空癫火等附魔，
  * 每次攻击命中都创建1-2个 SynchronizationTask(delay, 1)，持续60-100tick。
- * 50人服务器战斗高峰时，每秒产生数百个周期任务对象，同时存活数千个。
+ * 人多的服务器战斗高峰时，每秒产生数百个周期任务对象，同时存活数千个。
  * 每个匿名内部类实例约200+字节（捕获外部变量引用+类元数据），
  * 加上 ConcurrentHashMap/ConcurrentLinkedQueue 操作的 Node 对象。
  * </p>
@@ -293,7 +293,7 @@ public class DamageOverTimeManager {
     /**
      * 注册一个递增/自定义伤害的持续效果，并打上来源标签（v1.1 新增）
      * <p>
-     * <b>⚠ 注意：</b>{@link #getRemainingDamage} 对缩放型条目只能按<b>基础速率</b>估算
+     * <b>注意：</b>{@link #getRemainingDamage} 对缩放型条目只能按<b>基础速率</b>估算
      * （{@code baseDamagePerTick × 剩余 tick}），无法预测缩放函数未来的返回值。
      * 若需要精确的剩余量，请改用 {@link #applyLinear} 的标签重载。
      * </p>

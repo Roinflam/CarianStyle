@@ -106,7 +106,7 @@ public class MobEffectHemorrhage extends IconBase {
      */
     @Override
     public void applyEffectTick(@Nonnull LivingEntity entityLivingBaseIn, int amplifier) {
-        // ⭐ v3.1 客户端守卫：扣血与致死判定只在逻辑服务端执行一次。
+        // v3.1 客户端守卫：扣血与致死判定只在逻辑服务端执行一次。
         // 缺少此判断会导致客户端自行走死亡逻辑 -> getServer() 为 null -> 崩溃。
         if (entityLivingBaseIn.level().isClientSide) {
             return;
@@ -120,7 +120,7 @@ public class MobEffectHemorrhage extends IconBase {
             // 既是性能灾难也会让机制行为跑偏；持续失血语义上不是「受到攻击」。
             entityLivingBaseIn.setHealth(entityLivingBaseIn.getHealth() - damage);
         } else {
-            // ⭐ v3.1 致死路径：改走原版伤害管线，不再用 EntityLivingUtil.kill 强制处决。
+            // v3.1 致死路径：改走原版伤害管线，不再用 EntityLivingUtil.kill 强制处决。
             // 原实现会绕过 hurt()，导致不死图腾与各类免死机制全部失效。
             entityLivingBaseIn.hurt(
                     NewDamageSource.hemorrhage(entityLivingBaseIn.level()),

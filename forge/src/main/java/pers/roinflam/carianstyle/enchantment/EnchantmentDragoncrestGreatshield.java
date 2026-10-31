@@ -43,7 +43,7 @@ public class EnchantmentDragoncrestGreatshield extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.dragoncrest_greatshield.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.dragoncrest_greatshield.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -94,7 +94,7 @@ public class EnchantmentDragoncrestGreatshield extends EnchantmentBase {
 
         LivingEntity victim = evt.getEntity();
 
-        // ⭐ v2.1：怪物附魔触发开关（受击者视角，物理叠层护盾）
+        // v2.1：怪物附魔触发开关（受击者视角，物理叠层护盾）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
 
         Enchantment dragoncrest = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDragoncrestGreatshield.class);

@@ -45,7 +45,7 @@ import java.util.Map;
  * 这两处改动是配套的。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.1
  */
 public final class StackHudManager {

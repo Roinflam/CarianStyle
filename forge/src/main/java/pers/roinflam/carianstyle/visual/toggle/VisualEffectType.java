@@ -35,7 +35,7 @@ import java.util.Locale;
  * 界面上对后者标注提示，让玩家知道关掉的代价。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 public enum VisualEffectType {

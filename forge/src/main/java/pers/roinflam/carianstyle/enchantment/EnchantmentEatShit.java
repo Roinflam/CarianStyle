@@ -57,7 +57,7 @@ public class EnchantmentEatShit extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.eat_shit.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.eat_shit.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -102,7 +102,7 @@ public class EnchantmentEatShit extends EnchantmentBase {
         if (evt.getEntity().level().isClientSide) return;
         if (!(evt.getSource().getDirectEntity() instanceof LivingEntity attacker)) return;
 
-        // ⭐ v2.2：怪物附魔触发开关（攻击者视角）
+        // v2.2：怪物附魔触发开关（攻击者视角）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
 
         LivingEntity victim = evt.getEntity();
@@ -113,7 +113,7 @@ public class EnchantmentEatShit extends EnchantmentBase {
         int level = EnchantmentHelper.getItemEnchantmentLevel(eatShit, heldItem);
         level = applyLevelLimit(eatShit, level, 10);
         if (level <= 0) return;
-        // ⭐ v2.4：连点会让每一下都挂上反胃和治疗削减，要求满蓄力
+        // v2.4：连点会让每一下都挂上反胃和治疗削减，要求满蓄力
         if (!EnchantmentBase.isFullyCharged(attacker)) return;
         int victimDuration = level * VICTIM_TICKS_PER_LEVEL.getInt();
         victim.addEffect(new MobEffectInstance(MobEffects.CONFUSION, victimDuration));
@@ -125,7 +125,7 @@ public class EnchantmentEatShit extends EnchantmentBase {
     public static void onLivingHeal(@NotNull LivingHealEvent evt) {
         if (evt.getEntity().level().isClientSide) return;
 
-        // ⭐ v2.2：怪物附魔触发开关（受治疗者视角，被附加的debuff效果）
+        // v2.2：怪物附魔触发开关（受治疗者视角，被附加的debuff效果）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(evt.getEntity(), false)) return;
 
         if (EnchantmentDataManager.isOnCooldown(DEBUFF_KEY, evt.getEntity().getUUID())) {

@@ -40,7 +40,7 @@ public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.blessed_dew_talisman.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.blessed_dew_talisman.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -99,18 +99,18 @@ public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
 
         Player player = evt.player;
 
-        // ⭐ 优化1: 使用计数器控制执行频率,每20tick(1秒)执行一次
+        // 优化1: 使用计数器控制执行频率,每20tick(1秒)执行一次
         int tickCounter = EnchantmentDataManager.incrementCounter(COUNTER_ID, player.getUUID());
         if (tickCounter % HEAL_INTERVAL.getInt() != 0) {
             return;
         }
 
-        // ⭐ 优化2: 提前检查是否满血,满血直接跳过
+        // 优化2: 提前检查是否满血,满血直接跳过
         if (player.getHealth() >= player.getMaxHealth()) {
             return;
         }
 
-        // ⭐ 优化3: 提前检查饱食度,不满时直接跳过
+        // 优化3: 提前检查饱食度,不满时直接跳过
         // 1.20.1: getFoodStats().needFood() → getFoodData().needsFood()
         if (player.getFoodData().needsFood()) {
             return;
@@ -130,7 +130,7 @@ public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
 
         // 执行治疗
         if (totalLevel > 0) {
-            // ⭐ 优化4: 因为改为每秒执行一次,所以不再除以20
+            // 优化4: 因为改为每秒执行一次,所以不再除以20
             // 原公式: 最大血量 * 等级 * 0.002 / 20 每tick
             // 新公式: 最大血量 * 等级 * 0.002 每秒
             float healAmount = player.getMaxHealth() * totalLevel * (float) HEAL_PER_LEVEL.get();

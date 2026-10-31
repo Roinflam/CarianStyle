@@ -136,7 +136,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <b>裸坐标重载保留不动</b>，供确实需要「同一处连续劈」的场景（如固定坐标的仪式类演出）使用。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 3.2
  */
 public final class CarianStyleEffects {
@@ -691,7 +691,7 @@ public final class CarianStyleEffects {
      * 用于 {@code EnchantmentFullMoon} 的濒死复活：阻止死亡、残血保命、随后持续回血。
      * </p>
      *
-     * <h4>⚠ 必须传入实际回血时长</h4>
+     * <h4>必须传入实际回血时长</h4>
      * <p>
      * 满月的回血持续时间<b>取决于持有者有没有装备暗月</b>（200 tick 或 400 tick），
      * 而客户端无从得知这一点。早期版本让客户端取最长的 20 秒写死，

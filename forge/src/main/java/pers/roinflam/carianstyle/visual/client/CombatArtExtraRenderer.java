@@ -114,7 +114,7 @@ import java.util.List;
  * <b>起手爆闪永不削减。</b>它只有 36 顶点，却是「能不能被看见」的最后保险。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 2.0
  */
 @OnlyIn(Dist.CLIENT)
@@ -202,7 +202,7 @@ public final class CombatArtExtraRenderer {
     /** 深灰：扇面外缘与推力线 */
     private static final int BASH_DEEP = 0x5A564E;
 
-    // ===== 预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // ===== 预解包的固定配色（只读，切勿作为写入目标）=====
     // C_ 前缀是本模组约定：类加载时解包一次、此后永久复用的常量颜色数组。
     private static final float[] C_FLASH = VisualColor.constant(FLASH_WHITE);
     private static final float[] C_STEEL_WHITE = VisualColor.constant(STEEL_WHITE);
@@ -356,7 +356,7 @@ public final class CombatArtExtraRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
@@ -409,7 +409,7 @@ public final class CombatArtExtraRenderer {
             float ryFoot = (float) dy;
             float rz = (float) dz;
 
-            // ⭐ v2.0：统一的起手爆闪。放在各演出之前画，
+            // v2.0：统一的起手爆闪。放在各演出之前画，
             // 保证哪怕主体图形被模型挡住，玩家余光也能捕捉到「这里发生了什么」
             drawImpactFlash(builder, matrix, rx, ryFoot, rz, fx.radius, p);
 
@@ -667,7 +667,7 @@ public final class CombatArtExtraRenderer {
             float u2 = eu * lenMul + offU * k;
             float v2 = ev * lenMul + offV * k;
 
-            // ⭐ v2.0：残影层。最宽最暗，淡出最慢——「刚才这儿被划了一道」
+            // v2.0：残影层。最宽最暗，淡出最慢——「刚才这儿被划了一道」
             if (drawGhost) {
                 planeStroke(b, m, ccx, ccy, ccz, ux, uy, uz, wx, wy, wz,
                         u1, v1, u2, v2, CLAW_HALF * 1.9f, CLAW_SEGMENTS, sweep,
@@ -1004,7 +1004,7 @@ public final class CombatArtExtraRenderer {
      * 画成整圈会让玩家以为身后的人也被推开了。
      * </p>
      * <p>
-     * <b>⚠ 关于铁傀儡：</b>铁傀儡的击退抗性是 1.0，
+     * <b>关于铁傀儡：</b>铁傀儡的击退抗性是 1.0，
      * {@code attacker.knockback()} 对它完全无效——所以拿铁傀儡测时
      * 「怪没被推开」是原版机制的正常结果，与本特效无关。
      * 特效本身仍会正常播放。
@@ -1035,7 +1035,7 @@ public final class CombatArtExtraRenderer {
             return;
         }
 
-        // ===== ⭐ 竖直扇面冲击墙：v2.0 的主体，也是可见性的关键 =====
+        // ===== 竖直扇面冲击墙：v2.0 的主体，也是可见性的关键 =====
         // 双层：外层灰、内层白，让墙有厚度而不是一张纸
         float wallBottom = cyFoot + BASH_WALL_BOTTOM;
         float wallTop = cyFoot + BASH_WALL_TOP;

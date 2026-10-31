@@ -59,7 +59,7 @@ public class EnchantmentCorpsePiler extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.corpse_piler.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.corpse_piler.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -108,7 +108,7 @@ public class EnchantmentCorpsePiler extends EnchantmentBase {
     protected void onDamageAsAttackerHighest(@NotNull EnchantmentContext ctx, int level) {
         LivingEntity attacker = ctx.getHolder();
 
-        // ⭐ v2.3：回血按最大生命算、与这一下打多少无关，连点每下都回，要求满蓄力（增伤一并跳过）
+        // v2.3：回血按最大生命算、与这一下打多少无关，连点每下都回，要求满蓄力（增伤一并跳过）
         if (!isFullyCharged(attacker)) {
             return;
         }
@@ -141,7 +141,7 @@ public class EnchantmentCorpsePiler extends EnchantmentBase {
         if (evt.getSource().getDirectEntity() instanceof LivingEntity) {
             LivingEntity killer = (LivingEntity) evt.getSource().getDirectEntity();
 
-            // ⭐ v2.2：怪物附魔触发开关（击杀者视角）
+            // v2.2：怪物附魔触发开关（击杀者视角）
             if (!EnchantmentEventHandler.shouldBlockMobTrigger(killer, false)) {
                 ItemStack heldItem = killer.getItemInHand(InteractionHand.MAIN_HAND);
                 if (!heldItem.isEmpty()) {

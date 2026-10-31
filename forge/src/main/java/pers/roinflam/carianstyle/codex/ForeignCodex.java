@@ -44,7 +44,7 @@ import java.util.Set;
  * 而换来的是完全准确的冲突关系——手写规则表在装了未知模组时必然出错。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 public final class ForeignCodex {

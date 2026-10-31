@@ -188,7 +188,7 @@ import java.util.Map;
  * 合并成一个字段会让「新行在第二列淡入」变成从屏幕左边滑到第二列的长距离飞行。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 3
  */
 @OnlyIn(Dist.CLIENT)
@@ -469,7 +469,7 @@ public final class StackHudOverlay implements IGuiOverlay {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉叠层 HUD 时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉叠层 HUD 时整段跳过。
         // 紧跟在 hideGui 判断之后是刻意的——两者语义一致（都是「这一帧不画 HUD」），
         // 排在一起便于日后一眼看全所有「不画」的条件。
         // 与 hideGui 一样，这里 return 之前不推进动画状态机：重新打开时各行从当前值继续，
@@ -491,7 +491,7 @@ public final class StackHudOverlay implements IGuiOverlay {
             a.present = false;
         }
 
-        // ⭐ v3：先数一遍「元数据齐全、真的会画出来」的行数，再据此解算布局。
+        // v3：先数一遍「元数据齐全、真的会画出来」的行数，再据此解算布局。
         // 必须先数：缩放系数取决于总行数，而行位又取决于缩放系数，
         // 一边遍历一边定位是算不出来的。列表最多几十项，多走一趟的成本可以忽略。
         int total = 0;
@@ -537,7 +537,7 @@ public final class StackHudOverlay implements IGuiOverlay {
             } else {
                 targetRatio = max > 0 ? Math.min(1f, (float) count / max) : 0f;
             }
-            // ⭐ v3：先分列再定行。列内行号 = index % rowsPerCol，列号 = index / rowsPerCol
+            // v3：先分列再定行。列内行号 = index % rowsPerCol，列号 = index / rowsPerCol
             int column = index / layout.rowsPerCol();
             int rowInColumn = index % layout.rowsPerCol();
             float targetX = ANCHOR_X + column * columnWidth;
@@ -566,7 +566,7 @@ public final class StackHudOverlay implements IGuiOverlay {
             index++;
         }
 
-        // ⭐ v3：整体缩放。压一层 scale 之后所有 fill / fillGradient / drawString 自动跟着缩，
+        // v3：整体缩放。压一层 scale 之后所有 fill / fillGradient / drawString 自动跟着缩，
         // 无需逐元素改坐标（详见类注释「为什么缩放要包住整个渲染」）。
         graphics.pose().pushPose();
         graphics.pose().translate(anchorX - ANCHOR_X * layout.scale(),
@@ -607,7 +607,7 @@ public final class StackHudOverlay implements IGuiOverlay {
                 a.presentLastFrame = a.present;
             }
 
-            // ⭐ v3：折叠提示。放在最后一列最后一行之下，明确告诉玩家还有几项没显示 ——
+            // v3：折叠提示。放在最后一列最后一行之下，明确告诉玩家还有几项没显示 ——
             // 无声吞掉才是最坏的结果。
             if (layout.hidden() > 0) {
                 int column = Math.max(0, (layout.visible() - 1) / layout.rowsPerCol());
@@ -759,7 +759,7 @@ public final class StackHudOverlay implements IGuiOverlay {
         // 其余叠层项显示 "×层数"。徽标行以 Stacks(1,0,false) 注册，表达布尔激活态而非可累加层数，
         // 故不显示 "×1"（详见 isBadgeRow）；连击数等其它非冷却项不受影响，仍为 "×层数"。
         //
-        // ⭐ v2：三类文本全部取自预建的 Component 缓存，不再每帧拼字符串（详见类注释）
+        // v2：三类文本全部取自预建的 Component 缓存，不再每帧拼字符串（详见类注释）
         Component countText;
         if (a.cooldown) {
             countText = cooldownLabel(a.lastCount);

@@ -83,7 +83,7 @@ public class EnchantmentWaterfowlFlurry extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.waterfowl_flurry.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.waterfowl_flurry.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -154,7 +154,7 @@ public class EnchantmentWaterfowlFlurry extends EnchantmentBase {
         // 标记为水鸟乱舞伤害
         EnchantmentDataManager.setData(DAMAGE_TYPE_MARKER, attacker.getUUID(), true, MARKER_DURATION.getInt());
 
-        // ⭐ v2.1：首段刀光。放在这里而非任务里，是为了与本段伤害同帧——
+        // v2.1：首段刀光。放在这里而非任务里，是为了与本段伤害同帧——
         // 本方法运行时这一下伤害已经在结算中，刀光晚一帧出现就会与打击感脱节
         spawnSlash(attacker, 0);
 
@@ -169,7 +169,7 @@ public class EnchantmentWaterfowlFlurry extends EnchantmentBase {
                     return;
                 }
 
-                // ⭐ v2.1：后续各段的刀光。刻意放在上面的存活判断之后、hurt 之前——
+                // v2.1：后续各段的刀光。刻意放在上面的存活判断之后、hurt 之前——
                 // 目标已死时不再补刀光，避免「对着空气继续劈」
                 spawnSlash(attacker, time);
 

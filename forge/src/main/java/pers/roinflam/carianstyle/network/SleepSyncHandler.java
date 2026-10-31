@@ -35,7 +35,7 @@ import javax.annotation.Nonnull;
  * 现在打它有伤害加成」。这进一步说明本同步链路是睡眠视觉的唯一有效路径。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public final class SleepSyncHandler {

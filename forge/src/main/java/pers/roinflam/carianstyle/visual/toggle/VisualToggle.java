@@ -49,7 +49,7 @@ import java.util.Arrays;
  * 整体替换而非逐元素修改，保证读取方要么看到旧的完整状态、要么看到新的完整状态。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)

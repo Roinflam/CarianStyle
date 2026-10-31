@@ -44,7 +44,7 @@ public class EnchantmentRepeatingThrust extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // ⚠ 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.repeating_thrust.desc，
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.repeating_thrust.desc，
     //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -95,7 +95,7 @@ public class EnchantmentRepeatingThrust extends EnchantmentBase {
 
         boolean isSameTarget = victimUUID.toString().equals(storedTargetUUID);
 
-        // ⭐ v2.3：叠层与这一下打多少无关，连点能先攒层再一刀兑现，加层和增伤要求满蓄力。
+        // v2.3：叠层与这一下打多少无关，连点能先攒层再一刀兑现，加层和增伤要求满蓄力。
         // 换目标清层不受蓄力限制：否则满蓄力打首领、轻点打小怪，首领身上的层数一直保得住
         if (!isFullyCharged(attacker)) {
             if (!isSameTarget) {

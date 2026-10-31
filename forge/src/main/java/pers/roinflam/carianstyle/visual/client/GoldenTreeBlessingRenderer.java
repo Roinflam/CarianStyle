@@ -166,7 +166,7 @@ import java.util.List;
  *         且只在渲染线程访问），复用安全。</li>
  * </ol>
  * <p>
- * <b>⚠ 复用缓冲的约束：</b>{@link #LEAF_WX} 等三个缓冲<b>只能在
+ * <b>复用缓冲的约束：</b>{@link #LEAF_WX} 等三个缓冲<b>只能在
  * {@link #emitLeafMote} 内部使用</b>，且必须「写满 → 立刻画完 → 不再引用」。
  * 若将来新增其它需要世界坐标缓冲的元素，请另开一组，不要复用这三个——
  * 上升金叶与飘落金叶虽然都用它，但二者是顺序调用、互不嵌套，不会互相踩。
@@ -176,7 +176,7 @@ import java.util.List;
  * 只是把「先建数组再读」改成「直接算标量」，输出的每个顶点坐标与 v9 完全相同。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 10
  */
 @OnlyIn(Dist.CLIENT)
@@ -222,7 +222,7 @@ public final class GoldenTreeBlessingRenderer {
     /** 庇护护盾专用冷白色，与主体金色区分 */
     private static final int HOLY_SHIELD = 0xF2F7FF;
 
-    // ===== v9：预解包的固定配色（⚠ 只读，切勿作为写入目标）=====
+    // ===== v9：预解包的固定配色（只读，切勿作为写入目标）=====
     // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
     // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
     // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
@@ -237,7 +237,7 @@ public final class GoldenTreeBlessingRenderer {
     private static final float[] C_HOLY_SHIELD = VisualColor.constant(HOLY_SHIELD);
 
     /**
-     * v9：动态插值色的复用缓冲（⚠ 写入后必须立即消费，不可跨调用留存）。
+     * v9：动态插值色的复用缓冲（写入后必须立即消费，不可跨调用留存）。
      * <p>
      * 用于全部随 {@code activeCount} / 时间变化的主题色：脚下光晕主色、根须主色、
      * 胸口光辉主色、上升金叶逐片色、飘落金叶逐片色。这些不会同时活跃
@@ -254,7 +254,7 @@ public final class GoldenTreeBlessingRenderer {
     private static final float[] SCRATCH = new float[VisualColor.RGB];
 
     /**
-     * v10：金叶世界坐标的复用缓冲 X（⚠ 仅供 {@link #emitLeafMote} 内部使用）。
+     * v10：金叶世界坐标的复用缓冲 X（仅供 {@link #emitLeafMote} 内部使用）。
      * <p>
      * 旧实现每片金叶 {@code new float[6]} 三次 + 局部轮廓点数组七个，
      * 三重祝福满配时合计约 350 个临时数组 / 实体 / 帧——
@@ -265,17 +265,17 @@ public final class GoldenTreeBlessingRenderer {
      * 故提为静态定长缓冲复用，分配归零。
      * </p>
      * <p>
-     * <b>⚠ 约束：</b>只能在 {@link #emitLeafMote} 内部使用，且必须
+     * <b>约束：</b>只能在 {@link #emitLeafMote} 内部使用，且必须
      * 「写满 → 立刻画完 → 不再引用」。上升金叶与飘落金叶都会用它，但二者顺序调用、
      * 互不嵌套，不会互相踩。
      * </p>
      */
     private static final float[] LEAF_WX = new float[LEAF_POINTS];
 
-    /** v10：金叶世界坐标的复用缓冲 Y（⚠ 同上，与 {@link #LEAF_WX} 配对）。 */
+    /** v10：金叶世界坐标的复用缓冲 Y（同上，与 {@link #LEAF_WX} 配对）。 */
     private static final float[] LEAF_WY = new float[LEAF_POINTS];
 
-    /** v10：金叶世界坐标的复用缓冲 Z（⚠ 同上，与 {@link #LEAF_WX} 配对）。 */
+    /** v10：金叶世界坐标的复用缓冲 Z（同上，与 {@link #LEAF_WX} 配对）。 */
     private static final float[] LEAF_WZ = new float[LEAF_POINTS];
 
     // ===== 脚下金色光晕 =====
@@ -362,7 +362,7 @@ public final class GoldenTreeBlessingRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
@@ -419,7 +419,7 @@ public final class GoldenTreeBlessingRenderer {
                 continue;
             }
 
-            // ⭐ v8：本实体的细节系数（距离 × 同屏拥挤度）。12 格内恒为 1.0，视觉与优化前一致
+            // v8：本实体的细节系数（距离 × 同屏拥挤度）。12 格内恒为 1.0，视觉与优化前一致
             float detail = VisualLod.detail(distSqr);
             // 登记实例，供下一帧估算拥挤度（不影响本帧绘制）
             VisualLod.countInstance();
@@ -546,7 +546,7 @@ public final class GoldenTreeBlessingRenderer {
         // v9：无分配插值。SCRATCH 在下方整个循环期间保持有效（循环内只读不写）
         VisualColor.lerpInto(SCRATCH, HOLY_GOLD, HOLY_WHITE, purityFactor(activeCount));
 
-        // ⭐ v8：均布角度必须按步长抽取，不能截断前 N 条（详见类注释）
+        // v8：均布角度必须按步长抽取，不能截断前 N 条（详见类注释）
         int drawnCount = VisualLod.scale(mainCount, detail);
         int step = Math.max(1, mainCount / drawnCount);
         // 折线段数缩放：段数越少根须越硬直，故设下限
@@ -614,7 +614,7 @@ public final class GoldenTreeBlessingRenderer {
         float alpha = clamp01(RUNE_BASE_ALPHA + (activeCount - 1) * RUNE_STACK_ALPHA_STEP);
         float hw = Math.max(0.022f, width * 0.01f);
 
-        // ⭐ v8：均布刻度按步长抽取，保证仍铺满整圈
+        // v8：均布刻度按步长抽取，保证仍铺满整圈
         int drawnCount = VisualLod.scale(RUNE_TICK_COUNT, detail);
         int step = Math.max(1, RUNE_TICK_COUNT / drawnCount);
 
@@ -1066,7 +1066,7 @@ public final class GoldenTreeBlessingRenderer {
                                      float r, float g, float bl, float alpha,
                                      float rightX, float rightY, float rightZ,
                                      float upX, float upY, float upZ) {
-        // ⭐ v10：叶形的 6 个局部轮廓点内联为标量。
+        // v10：叶形的 6 个局部轮廓点内联为标量。
         // 数值与原 localPts 字面量逐位相同：
         //   {0, +1.30}, {+0.55, +0.35}, {+0.40, -0.70},
         //   {0, -1.10}, {-0.40, -0.70}, {-0.55, +0.35}   （均 × size）
@@ -1081,7 +1081,7 @@ public final class GoldenTreeBlessingRenderer {
         final float cosR = (float) Math.cos(rot);
         final float sinR = (float) Math.sin(rot);
 
-        // ⭐ v10：世界坐标写入静态复用缓冲，不再每片 new float[6] 三次
+        // v10：世界坐标写入静态复用缓冲，不再每片 new float[6] 三次
         final float[] wx = LEAF_WX;
         final float[] wy = LEAF_WY;
         final float[] wz = LEAF_WZ;

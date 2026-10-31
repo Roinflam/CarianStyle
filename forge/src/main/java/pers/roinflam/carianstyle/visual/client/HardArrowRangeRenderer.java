@@ -109,16 +109,16 @@ import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
  * <h3>口径核对结果</h3>
  * <p>已按 {@code EnchantmentHardArrow} 源码逐条核对：</p>
  * <ul>
- *     <li><b>范围 12 格</b>——与 {@link #RANGE} 一致 ✓</li>
- *     <li><b>注册名 {@code hard_arrow}</b>——取自 {@code @AutoRegisterEnchantment} ✓</li>
+ *     <li><b>范围 12 格</b>——与 {@link #RANGE} 一致</li>
+ *     <li><b>注册名 {@code hard_arrow}</b>——取自 {@code @AutoRegisterEnchantment}</li>
  *     <li><b>只认主手</b>——两个代价入口（{@code onLivingKnockBack} 与
  *         {@code onHurtAsVictimHighest}）都只读 {@code MAIN_HAND}，
  *         注册的 {@code slots} 也只有 {@code MAINHAND}。
  *         故 {@link #currentLevel} 同样只查主手：把弓换到副手代价根本不触发，
- *         此时还画着圈就是在提示一个不存在的风险 ✓</li>
+ *         此时还画着圈就是在提示一个不存在的风险</li>
  * </ul>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 3.1
  */
 @OnlyIn(Dist.CLIENT)
@@ -228,7 +228,7 @@ public final class HardArrowRangeRenderer {
      */
     private static final int COLOR_REFERENCE = 0x5FD8E8;
 
-    /** ⚠ C_ 前缀：类加载时解包一次的常量配色，只读，切勿作为写入目标 */
+    /** C_ 前缀：类加载时解包一次的常量配色，只读，切勿作为写入目标 */
     private static final float[] C_REFERENCE = VisualColor.constant(COLOR_REFERENCE);
 
     /**
@@ -356,14 +356,14 @@ public final class HardArrowRangeRenderer {
             return;
         }
 
-        // ⭐ 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
+        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
         // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
         // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
         // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
         if (!VisualToggle.isEnabled(VisualEffectType.HARD_ARROW_RANGE)) {
             return;
         }
-        // ⚠ 判据是过渡值而不是 levelCached：收弓之后还要把收起动画播完
+        // 判据是过渡值而不是 levelCached：收弓之后还要把收起动画播完
         if (transitionCur <= 0f && transitionPrev <= 0f) {
             return;
         }
@@ -473,7 +473,7 @@ public final class HardArrowRangeRenderer {
         float sector = TAU / DASH_COUNT;
         float dashSpan = sector * DASH_FILL;
 
-        // ⭐ 每段虚线内部递推复用三角值：一段虚线的 DASH_SEGMENTS 个细分是连续的，
+        // 每段虚线内部递推复用三角值：一段虚线的 DASH_SEGMENTS 个细分是连续的，
         // 本细分的末端就是下一细分的起点。虚线之间有间隔，故每段起点仍需重算。
         // 这样 cos/sin 调用由 DASH_COUNT×DASH_SEGMENTS×2 降到
         // DASH_COUNT×(DASH_SEGMENTS+1)。本渲染器是<b>常驻</b>的，

@@ -53,7 +53,7 @@ import net.minecraftforge.api.distmarker.OnlyIn;
  *         排序反而会打乱我们刻意安排的「填充 → 流纹 → 轮廓」层次。</li>
  * </ul>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)

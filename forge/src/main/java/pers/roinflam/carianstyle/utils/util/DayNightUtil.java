@@ -18,7 +18,7 @@ import javax.annotation.Nonnull;
  * 服务端仍然直接用原版字段。只读世界时间与雨雷强度，不改任何原版状态。
  * </p>
  *
- * @author FlameForge
+ * @author RoinFlam
  * @version 1.0
  */
 public final class DayNightUtil {
