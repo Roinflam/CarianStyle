@@ -52,7 +52,7 @@ public final class EnchantmentMeta implements CodexEntry {
     /** 附魔实现类 */
     private final Class<?> ownerClass;
 
-    /** 模组内部实现分类（回忆 / 战技 / 律法 / 死亡 / 通用），仅在详情页作为信息展示 */
+    /** 模组内部实现分类（追忆 / 战技 / 律法 / 死亡 / 通用），仅在详情页作为信息展示 */
     private final CodexGroup group;
 
     /** 题材主题（群星 / 癫火 / 蒙格温王朝……），列表按它分组 */
@@ -98,7 +98,7 @@ public final class EnchantmentMeta implements CodexEntry {
      * 是否与自己所属实现分类的<b>全部</b>其它成员互斥。
      * <p>
      * {@code EnchantmentBase.checkCompatibility} 里有一条「同类别互斥（GENERAL 除外）」，
-     * 于是 25 个战技之间两两互斥、14 个回忆之间两两互斥。
+     * 于是 25 个战技之间两两互斥、14 个追忆之间两两互斥。
      * 若把它们逐个列出来，战技的冲突栏会排满 24 个徽章，读者反而抓不到重点。
      * 这个标记让界面能折叠成一句「与全部战技互斥」。
      * </p>
@@ -427,7 +427,7 @@ public final class EnchantmentMeta implements CodexEntry {
         NORMAL("carianstyle.codex.group.normal", 0xFF7FB2E5),
         /** 战技 */
         COMBAT_SKILL("carianstyle.codex.group.combat_skill", 0xFFE5B35C),
-        /** 回忆 */
+        /** 追忆 */
         RECOLLECT("carianstyle.codex.group.recollect", 0xFFC08CE5),
         /** 律法 */
         LAW("carianstyle.codex.group.law", 0xFF7FE5A8),

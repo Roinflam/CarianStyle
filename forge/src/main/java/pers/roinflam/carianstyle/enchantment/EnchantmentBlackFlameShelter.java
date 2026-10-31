@@ -126,7 +126,7 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
                     10, 1, 100);
 
     /**
-     * 每级对近战伤害的减免比例
+     * 每级对物理伤害的减免比例（魔法伤害和无视护甲的伤害不减；键名沿用旧的 melee，改了老配置就对不上）
      * <p>默认 0.125，允许范围 0.0 ~ 0.5。</p>
      */
     private static final EnchantmentValues.Handle MELEE_REDUCTION_PER_LEVEL =
@@ -134,7 +134,7 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
                     0.125D, 0.0D, 0.5D);
 
     /**
-     * 每级对弹射物伤害的减免比例
+     * 每级的治疗削减比例（代价；键名沿用旧的 projectile，改了老配置就对不上）
      * <p>默认 0.25，允许范围 0.0 ~ 0.5。</p>
      */
     private static final EnchantmentValues.Handle PROJECTILE_REDUCTION_PER_LEVEL =

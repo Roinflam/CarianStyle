@@ -185,7 +185,7 @@ public final class EnchantmentCodex {
         //
         //   1. 整类互斥。EnchantmentBase.checkCompatibility 里有一条
         //      「同类别互斥（GENERAL 除外）」——25 个战技之间两两互斥、
-        //      14 个回忆之间两两互斥，这些一条注解都没写。
+        //      14 个追忆之间两两互斥，这些一条注解都没写。
         //      结果「卡利亚式奉还」在百科里显示「冲突 2」，实际是 26。
         //   2. 各附魔自己覆写的 checkCompatibility，比如重力与原版「击退」互斥。
         //
