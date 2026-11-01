@@ -131,6 +131,27 @@ public final class ConfigLoader {
     @Config.LangKey("config.carianstyle.levelLimit")
     public static boolean levelLimit = false;
 
+    @Config.Name("Allow Mob Trigger Enchantments | 允许怪物触发附魔")
+    @Config.Comment({
+            "Whether non-player entities (mobs wearing or holding enchanted gear) trigger this mod's enchantments.",
+            "非玩家生物（穿戴或手持附魔装备的怪物）是否触发本模组的附魔。",
+            "Default | 默认值: true"
+    })
+    @Config.LangKey("config.carianstyle.allowMobTriggerEnchantments")
+    public static boolean allowMobTriggerEnchantments = true;
+
+    @Config.Name("Allow Mob Trigger Death Enchantments | 允许怪物触发死亡类附魔")
+    @Config.Comment({
+            "Whether non-player entities trigger death / near-death enchantments",
+            "(Ancient Dragon Lightning, Epilepsy Spread, Greatblade Phalanx, Scarlet Lonia, Full Moon, Living Corpse, Time Reversal).",
+            "Only takes effect when mobs are allowed to trigger enchantments at all.",
+            "非玩家生物是否触发死亡 / 濒死类附魔（古龙雷击、发狂扩散、巨剑阵、猩红艾奥尼亚、满月、死诞者、普拉顿桑克斯的回溯）。",
+            "只在允许怪物触发附魔时生效。",
+            "Default | 默认值: false"
+    })
+    @Config.LangKey("config.carianstyle.allowMobTriggerDeathEnchantments")
+    public static boolean allowMobTriggerDeathEnchantments = false;
+
     @Config.Name("Enchanting Difficulty Multiplier | 附魔难度倍率")
     @Config.Comment({
             "Set the difficulty multiplier for enchantments.",

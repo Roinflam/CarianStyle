@@ -280,6 +280,10 @@ config.carianstyle.isTreasureUncommonEnchantment.tooltip=Convert all UNCOMMON en
 # Game Balance Configuration
 config.carianstyle.levelLimit=Enchantment Level Limit
 config.carianstyle.levelLimit.tooltip=Set limits for certain enchantments to prevent being overpowered
+config.carianstyle.allowMobTriggerEnchantments=Allow Mob Trigger Enchantments
+config.carianstyle.allowMobTriggerEnchantments.tooltip=Whether mobs wearing or holding enchanted gear trigger this mod's enchantments
+config.carianstyle.allowMobTriggerDeathEnchantments=Allow Mob Trigger Death Enchantments
+config.carianstyle.allowMobTriggerDeathEnchantments.tooltip=Whether mobs trigger death / near-death enchantments such as Full Moon and Time Reversal
 
 config.carianstyle.enchantingDifficulty=Enchanting Difficulty Multiplier
 config.carianstyle.enchantingDifficulty.tooltip=Set enchanting difficulty (1.0 = default)

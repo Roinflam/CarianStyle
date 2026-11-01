@@ -13,11 +13,12 @@ public class NewDamageSource {
     /**
      * 癫火伤害
      * <p>
-     * 特性：无视护甲；绝对伤害（不吃抗性提升和保护类附魔），
+     * 特性：魔法伤害（女巫抗性、魔法减伤类附魔按魔法算），无视护甲；绝对伤害（不吃抗性提升和保护类附魔），
      * 否则抗性提升 V 会把致死那一下减成 0，自损和对敌的癫火都烧不死人
      * </p>
      */
     public static final DamageSource EPILEPSY_FIRE = new DamageSource("unendurableFrenzy")
+            .setMagicDamage()
             .setDamageBypassesArmor()
             .setDamageIsAbsolute();
 
@@ -45,10 +46,11 @@ public class NewDamageSource {
     /**
      * 波石魔法伤害
      * <p>
-     * 特性：普通伤害
+     * 特性：魔法伤害
      * </p>
      */
-    public static final DamageSource WAVE_STONE_MAGIC = new DamageSource("wave_stone_magic");
+    public static final DamageSource WAVE_STONE_MAGIC = new DamageSource("wave_stone_magic")
+            .setMagicDamage();
 
     /**
      * 出血伤害

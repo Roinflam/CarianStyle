@@ -4,6 +4,7 @@ import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.IEntityOwnable;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
@@ -226,6 +227,60 @@ public abstract class EnchantmentBase extends Enchantment {
             return true;
         }
         return EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) holder) > 0.9F;
+    }
+
+    /**
+     * 非玩家持有者要不要拦下这次附魔触发
+     * <p>
+     * 玩家永不拦截；怪物看两个配置：{@code allowMobTriggerEnchantments}（默认开）关了全拦，
+     * {@code allowMobTriggerDeathEnchantments}（默认关）关着时拦死亡 / 濒死类
+     * （古龙雷击、发狂扩散、巨剑阵、猩红艾奥尼亚、满月、死诞者、普拉顿桑克斯的回溯）。
+     * 中央分发器已经处理；自己订阅事件的附魔要自己调用。
+     * </p>
+     *
+     * @param holder         持有者
+     * @param isDeathTrigger 是不是死亡 / 濒死触发
+     * @return true 表示拦下（不触发）
+     */
+    public static boolean shouldBlockMobTrigger(@Nonnull EntityLivingBase holder, boolean isDeathTrigger) {
+        if (holder instanceof EntityPlayer) {
+            return false;
+        }
+        if (!ConfigLoader.allowMobTriggerEnchantments) {
+            return true;
+        }
+        return isDeathTrigger && !ConfigLoader.allowMobTriggerDeathEnchantments;
+    }
+
+    private static boolean isDeadCategoryEnchantment(@Nonnull EnchantmentBase enchantment) {
+        AutoRegisterEnchantment ann = enchantment.getClass().getAnnotation(AutoRegisterEnchantment.class);
+        return ann != null && ann.category() == pers.roinflam.carianstyle.annotation.EnchantmentCategory.DEAD;
+    }
+
+    /**
+     * 范围伤害 / 范围减益要不要放过这个实体：自己、同类、队友、自己养的宠物
+     * <p>
+     * 「同类」指和持有者同一种实体：玩家持有时不波及别的玩家，怪物持有时不波及同种怪物（僵尸不烧僵尸）。
+     * 队友按原版 {@code isOnSameTeam}（同一记分板队伍）判断；宠物 / 坐骑只放过持有者自己的。
+     * 被直接命中的目标不走这里（它是这一下的受击者，该吃什么由各附魔自己决定）。
+     * </p>
+     *
+     * @param attacker 持有者
+     * @param other    范围内的实体
+     * @return 要放过时为 true
+     */
+    public static boolean isSameKindOrAlly(@Nullable EntityLivingBase attacker, @Nonnull EntityLivingBase other) {
+        if (attacker == null) {
+            return false;
+        }
+        if (other == attacker || other.getClass() == attacker.getClass()
+                || (other instanceof EntityPlayer && attacker instanceof EntityPlayer)) {
+            return true;
+        }
+        if (attacker.isOnSameTeam(other)) {
+            return true;
+        }
+        return other instanceof IEntityOwnable && attacker.getUniqueID().equals(((IEntityOwnable) other).getOwnerId());
     }
 
     /**
@@ -505,6 +560,11 @@ public abstract class EnchantmentBase extends Enchantment {
 
         EntityLivingBase victim = event.getEntityLiving();
 
+        // 死亡是濒死类的典型场景
+        if (shouldBlockMobTrigger(victim, true)) {
+            return;
+        }
+
         for (ItemStack stack : victim.getEquipmentAndArmor()) {
             if (stack.isEmpty()) {
                 continue;
@@ -639,21 +699,17 @@ public abstract class EnchantmentBase extends Enchantment {
             @Nonnull EventPriority priority,
             boolean isAttacker
     ) {
-        if (isAttacker) {
-            ItemStack mainHand = holder.getHeldItemMainhand();
-            ItemStack offHand = holder.getHeldItemOffhand();
+        // 怪物 + 通用开关关闭：整个持有者跳过
+        if (!(holder instanceof EntityPlayer) && !ConfigLoader.allowMobTriggerEnchantments) {
+            return;
+        }
 
-            if (!mainHand.isEmpty()) {
-                processItemEnchantments(mainHand, holder, victim, source, event, priority, true);
-            }
-            if (!offHand.isEmpty()) {
-                processItemEnchantments(offHand, holder, victim, source, event, priority, true);
-            }
-        } else {
-            for (ItemStack stack : holder.getEquipmentAndArmor()) {
-                if (!stack.isEmpty()) {
-                    processItemEnchantments(stack, holder, victim, source, event, priority, false);
-                }
+        // 攻击方和受击方都扫全身 6 个槽位：穿在身上的「攻击时」附魔（如隐秘薄纱的出手重置）也要收到回调，
+        // 武器类附魔自己只认主手
+        for (EntityEquipmentSlot slot : EntityEquipmentSlot.values()) {
+            ItemStack stack = holder.getItemStackFromSlot(slot);
+            if (!stack.isEmpty()) {
+                processItemEnchantments(stack, holder, victim, source, event, priority, isAttacker);
             }
         }
     }
@@ -673,6 +729,11 @@ public abstract class EnchantmentBase extends Enchantment {
             }
 
             EnchantmentBase baseEnchantment = (EnchantmentBase) enchantment;
+            // 怪物 + 死亡类开关关闭：跳过死亡分类的附魔（发狂扩散走受击回调）
+            if (!(holder instanceof EntityPlayer) && !ConfigLoader.allowMobTriggerDeathEnchantments
+                    && isDeadCategoryEnchantment(baseEnchantment)) {
+                continue;
+            }
             int level = EnchantmentHelper.getEnchantmentLevel(enchantment, stack);
             level = baseEnchantment.applyLevelLimit(level);
 

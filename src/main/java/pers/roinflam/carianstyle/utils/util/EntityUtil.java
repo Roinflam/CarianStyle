@@ -40,7 +40,7 @@ public class EntityUtil {
             @Nonnull Class<? extends T> clazz,
             @Nonnull Entity entity,
             double range) {
-        return getNearbyEntities(clazz, entity, range, range, range, null);
+        return getNearbyEntitiesCircular(clazz, entity, range, null);
     }
 
     /**
@@ -58,7 +58,53 @@ public class EntityUtil {
             @Nonnull Entity entity,
             double range,
             @Nullable Predicate<? super T> predicate) {
-        return getNearbyEntities(clazz, entity, range, range, range, predicate);
+        return getNearbyEntitiesCircular(clazz, entity, range, predicate);
+    }
+
+    /**
+     * 以实体精确坐标为圆心、水平圆 + 垂直 ±半径取周围实体，按实体中心点判定
+     * <p>
+     * 以前是以脚下方块坐标为中心的立方体 + 碰撞箱相交，对角线方向能够到约 1.41 倍半径，
+     * 中心取整还会往一侧偏。带宽高的重载仍是立方体。
+     * </p>
+     *
+     * @param clazz     实体类型
+     * @param entity    中心实体
+     * @param radius    半径
+     * @param predicate 附加过滤
+     * @param <T>       实体类型
+     * @return 范围内的实体
+     */
+    @Nonnull
+    public static <T extends Entity> List<T> getNearbyEntitiesCircular(
+            @Nonnull Class<? extends T> clazz,
+            @Nonnull Entity entity,
+            double radius,
+            @Nullable Predicate<? super T> predicate) {
+        if (entity.world.isRemote) {
+            return Collections.emptyList();
+        }
+
+        final double centerX = entity.posX;
+        final double centerY = entity.posY;
+        final double centerZ = entity.posZ;
+        final double radiusSqr = radius * radius;
+
+        AxisAlignedBB box = new AxisAlignedBB(
+                centerX - radius, centerY - radius, centerZ - radius,
+                centerX + radius, centerY + radius, centerZ + radius
+        );
+        return entity.world.getEntitiesWithinAABB(clazz, box, candidate -> {
+            double dx = candidate.posX - centerX;
+            double dz = candidate.posZ - centerZ;
+            if (dx * dx + dz * dz > radiusSqr) {
+                return false;
+            }
+            if (Math.abs(candidate.posY - centerY) > radius) {
+                return false;
+            }
+            return predicate == null || predicate.apply(candidate);
+        });
     }
 
     /**
