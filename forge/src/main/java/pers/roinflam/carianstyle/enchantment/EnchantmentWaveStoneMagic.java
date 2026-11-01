@@ -67,10 +67,10 @@ public class EnchantmentWaveStoneMagic extends EnchantmentBase {
     }
 
     /**
-     * 修复：改用 High 优先级，在 Normal 之后执行
+     * 挂在 Low：月光剑、黑暗弃子在 Normal 把伤害转成魔法，要排在它们之后才看得到
      */
     @Override
-    protected void onHurtAsAttackerHigh(@NotNull EnchantmentContext ctx, int level) {
+    protected void onHurtAsAttackerLow(@NotNull EnchantmentContext ctx, int level) {
         if (ctx.getDamageSource() == null || !DamageSourceUtil.isMagicDamage(ctx.getDamageSource())) {
             return;
         }

@@ -11,6 +11,7 @@ import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
@@ -140,8 +141,14 @@ import java.util.function.BiFunction;
  * 中间值本来就不会在 tick 中途发给客户端；剩余伤害查询读的是条目，不受影响。
  * </p>
  *
+ * <h3>v1.4：普拉顿桑克斯的回溯期间不扣血</h3>
+ * <p>
+ * 这里的扣血不走 {@code hurt()}，回溯的无敌拦不到，持有者会在无敌期间被烧死。
+ * 回溯期间条目照常走时间，只是这一 tick 不扣血、不处决，自损和对敌的都一样，也不计入回溯的储存伤害。
+ * </p>
+ *
  * @author RoinFlam
- * @version 1.3
+ * @version 1.4
  */
 @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class DamageOverTimeManager {
@@ -651,6 +658,11 @@ public class DamageOverTimeManager {
 
             remainingTicks--;
             elapsedDamageTicks++;
+
+            // 回溯期间不扣血（v1.4），时间照走
+            if (EnchantmentTimeReversal.isReversing(target)) {
+                return false;
+            }
 
             // 计算伤害
             float damage;

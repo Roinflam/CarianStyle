@@ -37,7 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <ul>
  *     <li>{@code EnchantmentConcealingVeil} —— 潜行时<b>每 tick</b> 施加 STEALTH（时长 2 tick）</li>
  *     <li>{@code EnchantmentStarsLaw} —— 夜间<b>每 tick</b> 施加 SPEED_BOOST（时长 2 tick）</li>
- *     <li>{@code EnchantmentQuickstep} —— 每 4 tick 施加 SPEED_BOOST</li>
+ *     <li>{@code EnchantmentQuickstep} —— 每 4 tick 施加 QUICKSTEP_SPEED</li>
  *     <li>{@code EnchantmentCragblade} / {@code EnchantmentDragoncrestGreatshield} /
  *         {@code EnchantmentMillicentProsthesis} —— 每次攻击 / 受击施加</li>
  * </ul>

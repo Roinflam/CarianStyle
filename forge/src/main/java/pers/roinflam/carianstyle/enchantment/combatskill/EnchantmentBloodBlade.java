@@ -16,6 +16,7 @@ import pers.roinflam.carianstyle.enchantment.EnchantmentScarletCorruption;
 import pers.roinflam.carianstyle.enchantment.EnchantmentVicDragonThunder;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 /**
@@ -123,11 +124,11 @@ public class EnchantmentBloodBlade extends EnchantmentBase {
                 victim.getMaxHealth()
         );
 
-        // 消耗自身15%最大生命值
-        attacker.setHealth(attacker.getHealth() - attacker.getMaxHealth() * (float) SELF_DAMAGE_RATIO.get());
+        // 消耗自身15%最大生命值，血量不够付时正常死亡（不死图腾挡得住）
+        EntityLivingUtil.payHealthCost(attacker, attacker.getMaxHealth() * (float) SELF_DAMAGE_RATIO.get());
 
         // v2.1：血刃打击反馈。
-        // 位置刻意放在 setHealth 之后 —— 只有代价真正付出去了才播，
+        // 位置刻意放在扣血之后 —— 只有代价真正付出去了才播，
         // 上面任何一个 return 都不该看到特效
         if (attacker.level() instanceof ServerLevel serverLevel) {
             CarianStyleCombatArtEffects.bloodBlade(serverLevel, attacker);

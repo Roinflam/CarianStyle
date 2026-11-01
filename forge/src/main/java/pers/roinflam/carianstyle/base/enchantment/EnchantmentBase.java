@@ -549,6 +549,25 @@ public abstract class EnchantmentBase extends Enchantment {
     }
 
     /**
+     * 持有者全身这个附魔的最高等级（已应用衰减和等级上限）。
+     * <p>
+     * 给分发器按件回调、而效果只结算一次的附魔用：第一件触发后就进冷却，
+     * 回调里的 level 只是扫到的第一件（靴子优先）的等级，不一定是最高的。
+     * </p>
+     *
+     * @param holder 持有者
+     * @return 最高等级；没有则为 0
+     */
+    protected int highestLevel(@Nonnull LivingEntity holder) {
+        int highest = 0;
+        for (EquipmentSlot slot : EquipmentSlot.values()) {
+            highest = Math.max(highest,
+                    applyLevelLimit(EnchantmentHelper.getItemEnchantmentLevel(this, holder.getItemBySlot(slot))));
+        }
+        return highest;
+    }
+
+    /**
      * 只在 {@code levelLimit} 开启时钳到上限，不做衰减。
      * <p>
      * 给 {@code onXxx(ctx, level)} 回调里用：分发器传进来的 level 已经走过 {@link #applyLevelLimit(int)}，

@@ -121,18 +121,16 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
         Enchantment darkMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDarkMoon.class);
         if (darkMoon == null) return;
 
-        // 受击者视角（减伤）
-        if (victim instanceof Mob livingVictim) {
-            // v2.2：怪物附魔触发开关（受击者视角）
-            if (!EnchantmentEventHandler.shouldBlockMobTrigger(livingVictim, false)) {
-                ItemStack heldItem = livingVictim.getItemInHand(InteractionHand.MAIN_HAND);
-                if (!heldItem.isEmpty()) {
-                    int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);
-                    level = applyLevelLimit(darkMoon, level, 10);
-                    if (level > 0) {
-                        boolean hasFullMoon = hasFullMoonEnchantment(livingVictim);
-                        evt.setAmount(evt.getAmount() * (1 - ratio(hasFullMoon)));
-                    }
+        // 受击者视角（减伤），玩家和怪物都生效
+        // v2.2：怪物附魔触发开关（受击者视角）
+        if (!EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) {
+            ItemStack heldItem = victim.getItemInHand(InteractionHand.MAIN_HAND);
+            if (!heldItem.isEmpty()) {
+                int level = EnchantmentHelper.getItemEnchantmentLevel(darkMoon, heldItem);
+                level = applyLevelLimit(darkMoon, level, 10);
+                if (level > 0) {
+                    boolean hasFullMoon = hasFullMoonEnchantment(victim);
+                    evt.setAmount(evt.getAmount() * (1 - ratio(hasFullMoon)));
                 }
             }
         }

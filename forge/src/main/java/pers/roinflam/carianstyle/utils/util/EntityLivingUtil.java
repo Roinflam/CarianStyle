@@ -2,10 +2,13 @@ package pers.roinflam.carianstyle.utils.util;
 
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
+import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.ReflectionCache;
 
 import javax.annotation.Nonnull;
@@ -22,6 +25,18 @@ import java.util.concurrent.ConcurrentHashMap;
  * Provides jump control, item use acceleration, true damage, etc.
  */
 public class EntityLivingUtil {
+
+    /**
+     * 代价致死一击的伤害倍率（× 最大生命）。
+     * <p>与出血 / 切腹的致死路径取同一个值：足以压过吸收与百分比减伤，又不会在后续乘算里溢出。</p>
+     */
+    private static final float LETHAL_DAMAGE_MULTIPLIER = 10.0f;
+
+    /**
+     * 血量探测的比较容差（绝对值上限）。
+     * <p>只用来吸收浮点误差，探测量必须明显大于它，否则「没变化」也会被判成「对上了」。</p>
+     */
+    private static final float HEALTH_PROBE_TOLERANCE = 0.01f;
 
     // ========== 真伤系统的缓存 ==========
 
@@ -97,6 +112,11 @@ public class EntityLivingUtil {
 
     /**
      * 强制杀死实体
+     * <p>
+     * 血量真的归零才调 {@code die()}。模组怪可能覆写 {@code setHealth} 或把血量存在别处，
+     * 扣血没生效时直接 {@code die()} 会留下「dead=true 但血量大于 0」的半死实体：不走死亡流程，
+     * 也打不死、清不掉。这种情况走一次原版 {@code /kill} 的伤害兜底，还活着就算了，不强行标记死亡。
+     * </p>
      *
      * @param livingEntity 要杀死的实体
      * @param damageSource 伤害源
@@ -104,7 +124,37 @@ public class EntityLivingUtil {
     public static void kill(@Nullable LivingEntity livingEntity, @Nonnull DamageSource damageSource) {
         if (livingEntity != null && livingEntity.isAlive()) {
             damageHealthDirectly(livingEntity, livingEntity.getHealth());
-            livingEntity.die(damageSource);
+            if (livingEntity.getHealth() <= 0.0F) {
+                livingEntity.die(damageSource);
+            } else {
+                livingEntity.hurt(livingEntity.damageSources().genericKill(), Float.MAX_VALUE);
+            }
+        }
+    }
+
+    /**
+     * 支付生命值代价（血刃、切腹这类主动技的自损）
+     * <p>
+     * 血量够付就直接扣，不走伤害管线；不够付时不能把血量写成 0 就算完——那样不触发死亡，
+     * 实体停在 0 血、事件和图腾都没走到。这里和出血的致死路径一样走 {@code hurt()}，
+     * 正常触发死亡事件，不死图腾和免死类附魔都拦得住。
+     * </p>
+     * <p>
+     * 普拉顿桑克斯的回溯期间不扣：回溯无敌，而且这一击的 10 倍最大生命会被算进储存伤害。
+     * </p>
+     *
+     * @param entity 付代价的实体
+     * @param cost   代价（生命值）
+     */
+    public static void payHealthCost(@Nonnull LivingEntity entity, float cost) {
+        if (EnchantmentTimeReversal.isReversing(entity)) {
+            return;
+        }
+        float remaining = entity.getHealth() - cost;
+        if (remaining > 0.0F) {
+            entity.setHealth(remaining);
+        } else {
+            entity.hurt(NewDamageSource.hemorrhage(entity.level()), entity.getMaxHealth() * LETHAL_DAMAGE_MULTIPLIER);
         }
     }
 
@@ -113,7 +163,7 @@ public class EntityLivingUtil {
     /**
      * 真伤扣血 - 三步优化策略
      *
-     * 步骤1：优先尝试setHealth，检查是否生效
+     * 步骤1：用半血探测setHealth是否生效（探完恢复）
      * 步骤2：如果setHealth无效，暴力查找SynchedEntityData中真实血量字段
      * 步骤3：所有方法失败则降级回setHealth
      *
@@ -146,23 +196,28 @@ public class EntityLivingUtil {
             return;
         }
 
-        // 无缓存，开始发现流程
-        HealthFieldInfo discoveredInfo = discoverHealthHandlingMethod(entity, currentHealth, targetHealth);
+        // 无缓存，开始发现流程（探测完血量已恢复，下面再按真实目标血量扣）
+        HealthFieldInfo discoveredInfo = discoverHealthHandlingMethod(entity, currentHealth);
         HEALTH_FIELD_CACHE.put(entity.getClass(), discoveredInfo);
         applyDamageWithCachedInfo(entity, targetHealth, discoveredInfo);
     }
 
     /**
      * 真伤扣血（带DamageSource，血量归零时触发die）
+     * <p>
+     * 只有这一次把活实体扣到 0 才 {@code die()}：{@code die()} 开头就发 {@code LivingDeathEvent}，
+     * 对已经死了的实体再调一次，事件会重发一遍。
+     * </p>
      *
      * @param entity 目标实体
      * @param damage 伤害值
      * @param source 伤害源
      */
     public static void damageHealthDirectly(@Nonnull LivingEntity entity, float damage, @Nonnull DamageSource source) {
+        boolean wasAlive = entity.isAlive();
         damageHealthDirectly(entity, damage);
 
-        if (entity.getHealth() <= 0.0F && !entity.isDeadOrDying()) {
+        if (wasAlive && entity.getHealth() <= 0.0F) {
             entity.die(source);
         }
     }
@@ -222,14 +277,20 @@ public class EntityLivingUtil {
 
     /**
      * 三步测试：发现实体的血量处理方式
+     * <p>
+     * 探测用当前血量的一半，试完恢复，不用本次真实伤害：
+     * </p>
+     * <ul>
+     *     <li>每 tick 伤害可能小于比较容差，这时 {@code setHealth} 是空操作的实体也会被判成有效；</li>
+     *     <li>命定之死先降最大生命，血量会高于上限，{@code setHealth} 被压到上限，
+     *         比较时要按压过之后的值算，不然明明生效了却被判成无效。</li>
+     * </ul>
      *
      * @param entity        实体
      * @param currentHealth 当前血量
-     * @param targetHealth  目标血量
      * @return 血量处理信息
      */
-    private static HealthFieldInfo discoverHealthHandlingMethod(
-            LivingEntity entity, float currentHealth, float targetHealth) {
+    private static HealthFieldInfo discoverHealthHandlingMethod(LivingEntity entity, float currentHealth) {
 
         String entityName = entity.getClass().getSimpleName();
 
@@ -237,16 +298,20 @@ public class EntityLivingUtil {
         LogUtil.debug("[真伤系统] 步骤1：测试 " + entityName + " 的 setHealth 方法");
 
         try {
-            entity.setHealth(targetHealth);
-            float actualHealth = entity.getHealth();
+            float probeHealth = currentHealth * 0.5f;
+            float expectedHealth = Mth.clamp(probeHealth, 0.0F, entity.getMaxHealth());
+            float tolerance = probeTolerance(currentHealth);
 
-            if (Math.abs(actualHealth - targetHealth) < 0.01f) {
+            entity.setHealth(probeHealth);
+            float actualHealth = entity.getHealth();
+            entity.setHealth(currentHealth);
+
+            if (Math.abs(actualHealth - expectedHealth) < tolerance
+                    && Math.abs(actualHealth - currentHealth) >= tolerance) {
                 LogUtil.info("[真伤系统] " + entityName + " 使用 SET_HEALTH 方式");
                 return new HealthFieldInfo();
             }
 
-            // setHealth无效，恢复血量
-            entity.setHealth(currentHealth);
             LogUtil.debug("[真伤系统] " + entityName + " 的 setHealth 无效，进入步骤2");
         } catch (Exception e) {
             LogUtil.error("[真伤系统] " + entityName + " 测试 setHealth 时出错", e);
@@ -268,11 +333,26 @@ public class EntityLivingUtil {
     }
 
     /**
+     * 比较血量时的容差。血量极低时跟着缩小，保证它始终明显小于探测量（当前血量的一半）。
+     *
+     * @param currentHealth 当前血量
+     * @return 容差
+     */
+    private static float probeTolerance(float currentHealth) {
+        return Math.min(HEALTH_PROBE_TOLERANCE, currentHealth * 0.1f);
+    }
+
+    /**
      * 暴力查找实体真正的血量字段
      *
      * 反射拿到SynchedEntityData内部的itemsById映射，
      * 遍历所有Float/Double类型字段，匹配当前血量值，
      * 再通过临时赋值验证getHealth()是否同步，确认后缓存该accessor
+     * <p>
+     * 数值恰好等于血量的字段不止血量一个（模组怪身上常有护盾、阶段阈值之类的同步字段），
+     * 所以试探量必须明显大于容差：写入后 {@code getHealth()} 要跟着变，恢复后要变回去，两头都对才算。
+     * 判错的后果很重——结果按实体类缓存，之后这类怪的真伤全写到错误字段上，再也烧不死。
+     * </p>
      *
      * @param entity        实体
      * @param currentHealth 当前血量
@@ -292,6 +372,8 @@ public class EntityLivingUtil {
             Map<Integer, SynchedEntityData.DataItem<?>> itemsById =
                     (Map<Integer, SynchedEntityData.DataItem<?>>) itemsByIdField.get(entityData);
 
+            float tolerance = probeTolerance(currentHealth);
+
             for (SynchedEntityData.DataItem<?> item : itemsById.values()) {
                 Object value = item.getValue();
 
@@ -303,8 +385,8 @@ public class EntityLivingUtil {
                 float fieldValue = value instanceof Float ? (Float) value : ((Double) value).floatValue();
 
                 // 值匹配当前血量
-                if (Math.abs(fieldValue - currentHealth) < 0.01f) {
-                    float testValue = currentHealth - 0.001f;
+                if (Math.abs(fieldValue - currentHealth) < tolerance) {
+                    float testValue = currentHealth * 0.5f;
                     Object originalValue = value;
                     boolean isFloat = value instanceof Float;
 
@@ -317,13 +399,14 @@ public class EntityLivingUtil {
                             dataItem.setValue((double) testValue);
                         }
 
-                        float newHealthValue = entity.getHealth();
-                        boolean matched = Math.abs(newHealthValue - testValue) < 0.01f;
+                        boolean followed = Math.abs(entity.getHealth() - testValue) < tolerance;
 
                         // 恢复原值
                         dataItem.setValue(originalValue);
 
-                        if (matched) {
+                        boolean restored = Math.abs(entity.getHealth() - currentHealth) < tolerance;
+
+                        if (followed && restored) {
                             return new HealthFieldInfo(DamageMethod.CUSTOM_FIELD, item.getAccessor(), isFloat);
                         }
                     } catch (Exception e) {

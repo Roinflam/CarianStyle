@@ -37,7 +37,8 @@ import java.util.*;
  * 镐子附魔，BFS 连通范围挖掘
  * 挖掘方块时：
  * - 从破坏点向外 BFS 扩散，仅破坏与之六面相邻连通的同类型方块
- * - 范围半径 = 1 + 等级/2（受配置上限限制）
+ * - 范围半径 = 等级（受配置上限限制）
+ * - 耐久只剩 1 点时拒绝挖掘，连带挖给中心那一格留够耐久，镐不会被挖坏
  * </p>
  *
  * <h3>v3.2 修复：附魔类型由 DIGGER 收窄为 PICKAXE</h3>
@@ -288,7 +289,14 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
             return;
         }
 
-        int radius = Math.min(1 + level / 2, ConfigLoader.rockBlasterMaxRange);
+        // 中心那一格的耐久由原版在事件之后扣，只剩 1 点时放行就会把镐挖坏
+        boolean isDamageable = tool.isDamageableItem() && !player.getAbilities().instabuild;
+        if (isDamageable && tool.getDamageValue() >= tool.getMaxDamage() - 1) {
+            evt.setCanceled(true);
+            return;
+        }
+
+        int radius = Math.min(level, ConfigLoader.rockBlasterMaxRange);
 
         Level world = player.level();
 
@@ -309,9 +317,6 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
             return;
         }
 
-        // 提前判断工具是否可损耗，避免循环内重复调用
-        boolean isDamageable = tool.isDamageableItem();
-
         // 提前获取时运等级，避免循环内重复查找附魔
         int fortuneLevel = EnchantmentHelper.getItemEnchantmentLevel(Enchantments.BLOCK_FORTUNE, tool);
 
@@ -320,8 +325,8 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
 
         for (BlockPos pos : targets) {
 
-            // 工具耐久不足时立即终止整个范围挖掘
-            if (isDamageable && tool.getDamageValue() >= tool.getMaxDamage() - 1) {
+            // 耐久不足时立即终止整个范围挖掘，留 2 点：1 点给中心那一格，1 点保住工具
+            if (isDamageable && tool.getDamageValue() >= tool.getMaxDamage() - 2) {
                 return;
             }
 

@@ -22,7 +22,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * 快步附魔
  * <p>
  * 血量越低速度越快
- * 速度等级 = (损失血量百分比) / 5 × 附魔总等级
+ * 速度等级 = (损失血量百分比) / 5 × 附魔总等级，随当前血量实时升降
  * </p>
  * <p>
  * 性能优化记录：
@@ -124,11 +124,16 @@ public class EnchantmentQuickstep extends EnchantmentBase {
         float missingHealthPercent = 1 - player.getHealth() / player.getMaxHealth();
         int speedLevel = (int) (missingHealthPercent * 100 / SPEED_DIVISOR.get() * totalLevel);
 
+        // apply 遇到等级更低的新实例只会给旧的续时，回血后速度就降不下来，这里先摘掉旧的
+        if (DynamicAttributeManager.getAmplifier(player, DynamicAttributes.QUICKSTEP_SPEED) > speedLevel - 1) {
+            DynamicAttributeManager.remove(player, DynamicAttributes.QUICKSTEP_SPEED);
+        }
+
         // 优化：速度等级为0时不创建实例
         if (speedLevel > 0) {
             // 优化：duration给6tick覆盖4tick间隔，确保效果无缝
             DynamicAttributeManager.apply(player,
-                    DynamicAttributes.SPEED_BOOST.createInstance(SPEED_DURATION_TICKS.getInt(), speedLevel - 1));
+                    DynamicAttributes.QUICKSTEP_SPEED.createInstance(SPEED_DURATION_TICKS.getInt(), speedLevel - 1));
         }
     }
 

@@ -21,6 +21,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * <p>
  * 胸甲附魔，延长药水效果持续时间
  * 获得药水效果时：持续时间增加 30% × 等级
+ * 无限时长的效果不处理：时长 -1 按比例延长会变成 -2，效果当场消失
  * </p>
  *
  * @author RoinFlam
@@ -92,8 +93,8 @@ public class EnchantmentBeastVitality extends EnchantmentBase implements IEffect
 
         MobEffect effect = effectInstance.getEffect();
 
-        // 只对非瞬时、可见的效果生效
-        if (effect.isInstantenous() || !effectInstance.isVisible()) {
+        // 只对非瞬时、可见、有时限的效果生效
+        if (effect.isInstantenous() || !effectInstance.isVisible() || effectInstance.isInfiniteDuration()) {
             return null;
         }
 

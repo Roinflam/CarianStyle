@@ -24,7 +24,9 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 死诞者附魔
@@ -36,9 +38,16 @@ import java.util.UUID;
  * v2.1新增: onLivingDeath 入口接入怪物附魔触发开关，
  * 怪物身上的"濒死复活+流血"效果可由配置 allowMobTriggerDeathEnchantments 控制
  * </p>
+ * <p>
+ * v2.2 修复：流血期间不管被什么打死，都算这条命的终点——清掉流血标记、不再复活。
+ * 以前只有流血自己耗死才清标记：被别的伤害打死时标记留着，重生后又开始流血；
+ * 在死亡界面停超过冷却时间，流血致死还会再触发一次复活，一直循环。
+ * 流血任务同一实体只留一份（{@link #RUNNING_BLEEDS}）：切维度也会发 EntityJoinLevelEvent，
+ * 以前会再开一份，两份一起扣血。
+ * </p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "living_corpse",
@@ -87,6 +96,12 @@ public class EnchantmentLivingCorpse extends EnchantmentBase {
     private static final String BLEEDING_STATE_KEY = "living_corpse_bleeding";
     private static final int RECOLLECT_ENCHANTABILITY = 35;
 
+    /**
+     * 正在跑的流血任务，实体 UUID → 任务。
+     * <p>玩家切维度实体对象不变，留着原任务；怪物切维度、玩家重新登录是新对象，原任务作废，换新的接上。</p>
+     */
+    private static final Map<UUID, BleedTask> RUNNING_BLEEDS = new ConcurrentHashMap<>();
+
     public EnchantmentLivingCorpse() {
         super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
@@ -134,6 +149,12 @@ public class EnchantmentLivingCorpse extends EnchantmentBase {
 
         UUID uuid = holder.getUUID();
 
+        // 流血期间死亡（耗死或被打死）就是真的死了：清标记，不再复活
+        if (Boolean.TRUE.equals(EnchantmentDataManager.getData(BLEEDING_STATE_KEY, uuid))) {
+            EnchantmentDataManager.removeData(BLEEDING_STATE_KEY, uuid);
+            return;
+        }
+
         int totalLevel = getTotalLevel(holder);
         if (totalLevel <= 0) {
             return;
@@ -154,31 +175,8 @@ public class EnchantmentLivingCorpse extends EnchantmentBase {
         EnchantmentDataManager.setCooldown(REVIVE_COOLDOWN_KEY, uuid, REVIVE_COOLDOWN.getInt());
         EnchantmentDataManager.setData(BLEEDING_STATE_KEY, uuid, true);
 
-        DamageSource originalSource = evt.getSource();
-
         // 启动持续失血任务
-        new SynchronizationTask(1, 1) {
-            private int tick = 0;
-
-            @Override
-            public void run() {
-                if (!holder.isAlive()) {
-                    this.cancel();
-                    return;
-                }
-
-                float baseDamage = holder.getMaxHealth() * (float) DRAIN_RATIO_PER_SECOND.get() / 20;
-                float damage = baseDamage * 5 + baseDamage * ++tick / 75;
-
-                if (holder.getHealth() - damage * 2 > 0) {
-                    EntityLivingUtil.damageHealthDirectly(holder, damage);
-                } else {
-                    EntityLivingUtil.kill(holder, originalSource);
-                    EnchantmentDataManager.removeData(BLEEDING_STATE_KEY, uuid);
-                    this.cancel();
-                }
-            }
-        }.start();
+        startBleeding(holder, new BleedTask(holder, evt.getSource(), 5, 75));
     }
 
     /**
@@ -208,29 +206,72 @@ public class EnchantmentLivingCorpse extends EnchantmentBase {
             return;
         }
 
+        // 切维度时实体对象没变，原任务接着跑就行，再开一份会双倍扣血
+        BleedTask running = RUNNING_BLEEDS.get(uuid);
+        if (running != null && running.holder == holder) {
+            return;
+        }
+
         // 恢复失血任务
-        new SynchronizationTask(1, 1) {
-            private int tick = 0;
+        startBleeding(holder, new BleedTask(holder, holder.damageSources().fellOutOfWorld(), 6, 30));
+    }
 
-            @Override
-            public void run() {
-                if (!holder.isAlive()) {
-                    this.cancel();
-                    return;
-                }
+    /**
+     * 启动流血任务，顶掉这个实体之前的那一份
+     *
+     * @param holder 流血的实体
+     * @param task   新任务
+     */
+    private static void startBleeding(@NotNull LivingEntity holder, @NotNull BleedTask task) {
+        BleedTask previous = RUNNING_BLEEDS.put(holder.getUUID(), task);
+        if (previous != null) {
+            previous.cancel();
+        }
+        task.start();
+    }
 
-                float baseDamage = holder.getMaxHealth() * (float) DRAIN_RATIO_PER_SECOND.get() / 20;
-                float damage = baseDamage * 6 + baseDamage * ++tick / 30;
+    /**
+     * 持续失血任务：每 tick 扣血，扣到快没了就处决。标记没了（已经死过一次）就结束。
+     */
+    private static final class BleedTask extends SynchronizationTask {
+        private final LivingEntity holder;
+        private final DamageSource lethalSource;
+        private final int baseMultiplier;
+        private final int rampDivisor;
+        private int tick = 0;
 
-                if (holder.getHealth() - damage * 2 > 0) {
-                    EntityLivingUtil.damageHealthDirectly(holder, damage);
-                } else {
-                    EntityLivingUtil.kill(holder, holder.damageSources().fellOutOfWorld());
-                    EnchantmentDataManager.removeData(BLEEDING_STATE_KEY, uuid);
-                    this.cancel();
-                }
+        BleedTask(LivingEntity holder, DamageSource lethalSource, int baseMultiplier, int rampDivisor) {
+            super(1, 1);
+            this.holder = holder;
+            this.lethalSource = lethalSource;
+            this.baseMultiplier = baseMultiplier;
+            this.rampDivisor = rampDivisor;
+        }
+
+        @Override
+        public void run() {
+            UUID uuid = holder.getUUID();
+            if (!holder.isAlive() || !Boolean.TRUE.equals(EnchantmentDataManager.getData(BLEEDING_STATE_KEY, uuid))) {
+                finish(uuid);
+                return;
             }
-        }.start();
+
+            float baseDamage = holder.getMaxHealth() * (float) DRAIN_RATIO_PER_SECOND.get() / 20;
+            float damage = baseDamage * baseMultiplier + baseDamage * ++tick / rampDivisor;
+
+            if (holder.getHealth() - damage * 2 > 0) {
+                EntityLivingUtil.damageHealthDirectly(holder, damage);
+            } else {
+                EntityLivingUtil.kill(holder, lethalSource);
+                EnchantmentDataManager.removeData(BLEEDING_STATE_KEY, uuid);
+                finish(uuid);
+            }
+        }
+
+        private void finish(UUID uuid) {
+            RUNNING_BLEEDS.remove(uuid, this);
+            this.cancel();
+        }
     }
 
     @Override

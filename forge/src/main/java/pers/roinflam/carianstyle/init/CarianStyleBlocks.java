@@ -74,7 +74,7 @@ public class CarianStyleBlocks {
                     BlockBehaviour.Properties.of()
                             .mapColor(MapColor.NONE)
                             .noCollission()
-                            .lightLevel(state -> 15)
+                            .lightLevel(state -> state.getValue(HideLight.LEVEL))
                             .air()
                             .noLootTable()
             )

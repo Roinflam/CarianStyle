@@ -14,6 +14,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
+import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
@@ -265,21 +266,24 @@ public class MobEffectIncision extends IconBase {
         }
 
         // ========== 扣血 ==========
-        float damage = entityLivingBaseIn.getMaxHealth() * 0.125f / 20;
+        // 回溯无敌期间不掉血：直扣血量拦不到，致死那一击的 10 倍最大生命还会被算进储存伤害
+        if (!EnchantmentTimeReversal.isReversing(entityLivingBaseIn)) {
+            float damage = entityLivingBaseIn.getMaxHealth() * 0.125f / 20;
 
-        if (entityLivingBaseIn.getHealth() - damage * 2 > 0) {
-            // 常规掉血：直扣血量，不走伤害管线。
-            // 每秒 20 次走 hurt() 会让全部受击类附魔各触发 20 次，
-            // 既是性能灾难也会让机制行为跑偏；持续掉血语义上是「自我消耗」而非「受到攻击」。
-            entityLivingBaseIn.setHealth(entityLivingBaseIn.getHealth() - damage);
-        } else {
-            // v3.1 致死路径：改走原版伤害管线，不再用 EntityLivingUtil.kill 强制处决。
-            // 原实现会绕过 hurt()，导致不死图腾与各类免死机制全部失效。
-            entityLivingBaseIn.hurt(
-                    NewDamageSource.hemorrhage(entityLivingBaseIn.level()),
-                    entityLivingBaseIn.getMaxHealth() * LETHAL_DAMAGE_MULTIPLIER
-            );
-            return;
+            if (entityLivingBaseIn.getHealth() - damage * 2 > 0) {
+                // 常规掉血：直扣血量，不走伤害管线。
+                // 每秒 20 次走 hurt() 会让全部受击类附魔各触发 20 次，
+                // 既是性能灾难也会让机制行为跑偏；持续掉血语义上是「自我消耗」而非「受到攻击」。
+                entityLivingBaseIn.setHealth(entityLivingBaseIn.getHealth() - damage);
+            } else {
+                // v3.1 致死路径：改走原版伤害管线，不再用 EntityLivingUtil.kill 强制处决。
+                // 原实现会绕过 hurt()，导致不死图腾与各类免死机制全部失效。
+                entityLivingBaseIn.hurt(
+                        NewDamageSource.hemorrhage(entityLivingBaseIn.level()),
+                        entityLivingBaseIn.getMaxHealth() * LETHAL_DAMAGE_MULTIPLIER
+                );
+                return;
+            }
         }
 
         // ========== 速度衰减 ==========

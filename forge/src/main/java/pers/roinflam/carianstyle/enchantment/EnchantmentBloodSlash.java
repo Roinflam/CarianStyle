@@ -18,6 +18,7 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.source.NewDamageSource;
@@ -89,7 +90,9 @@ public class EnchantmentBloodSlash extends EnchantmentBase {
                 victim.getHealth() * effectiveLevel * (float) BONUS_DAMAGE_PER_LEVEL.get(),
                 victim.getMaxHealth());
         ctx.addDamage(bonusDamage);
-        if (!(attacker instanceof Player) || !((Player) attacker).isCreative()) {
+        // 回溯无敌期间不付代价
+        if ((!(attacker instanceof Player) || !((Player) attacker).isCreative())
+                && !EnchantmentTimeReversal.isReversing(attacker)) {
             if (attacker.getHealth() > attacker.getMaxHealth() * SELF_DAMAGE_RATIO.get()) {
                 EntityLivingUtil.damageHealthDirectly(attacker,
                     attacker.getMaxHealth() * (float) SELF_DAMAGE_RATIO.get());

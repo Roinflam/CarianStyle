@@ -12,6 +12,8 @@ import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
+import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -28,9 +30,12 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * 神圣秩序附魔
  * <p>v2.1：onLivingDeath（击杀者）+ onLivingDamage（双向）+ onLivingHeal（受治疗者）入口
  * 接入怪物附魔触发开关。EntityJoinLevel是恢复初始吸收盾，属于状态恢复而非"触发"，无需检查。</p>
+ * <p>v2.2：持盾减伤挪到 LivingHurtEvent。LivingDamageEvent 发出时原版已经扣完吸收盾了，
+ * 盾够厚时事件里的伤害是 0，盾被打穿时盾量又是 0，这个减伤基本不生效。
+ * 初始吸收盾改成每条命只给一次，以前没盾时切维度、重新登录就能反复刷满。</p>
  *
  * @author RoinFlam
- * @version 2.1
+ * @version 2.2
  */
 @AutoRegisterEnchantment(
         id = "sacred_order",
@@ -90,6 +95,13 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
             EnchantmentValues.define(VALUE_ID, "vs_shielded_multiplier",
                     1.5D, 0.0D, 10.0D);
 
+    /**
+     * 这条命已经领过初始吸收盾的标记，存在实体持久数据里。
+     * <p>玩家死亡重生是新实体、标记不带过去（不放进 PERSISTED_NBT_TAG），重生后能再领一次；
+     * 切维度、重新登录时标记还在。</p>
+     */
+    private static final String INITIAL_SHIELD_GIVEN_KEY = "carianstyle_sacred_order_shield_given";
+
     public EnchantmentSacredOrder() {
         super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
                 EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
@@ -134,6 +146,39 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
         }
     }
 
+    /**
+     * 持盾时受到的伤害降低。要在护甲、吸收盾结算之前改，所以挂在 LivingHurtEvent。
+     */
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
+            return;
+        }
+
+        LivingEntity victim = evt.getEntity();
+        if (victim.getAbsorptionAmount() <= 0
+                || evt.getSource().is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)
+                || EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) {
+            return;
+        }
+
+        Enchantment sacredOrder = EnchantmentRegistry.getEnchantmentByClass(EnchantmentSacredOrder.class);
+        if (sacredOrder == null) {
+            return;
+        }
+
+        int victimLevel = 0;
+        for (ItemStack armor : victim.getArmorSlots()) {
+            if (!armor.isEmpty()) {
+                victimLevel += EnchantmentHelper.getItemEnchantmentLevel(sacredOrder, armor);
+            }
+        }
+
+        if (victimLevel > 0) {
+            evt.setAmount(evt.getAmount() * (float) SHIELDED_DAMAGE_MULTIPLIER.get());
+        }
+    }
+
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
         if (evt.getEntity().level().isClientSide) {
@@ -148,7 +193,7 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
             return;
         }
 
-        // 受击者视角（吸收盾减伤+反弹）
+        // 受击者视角（吸收盾反弹；减伤在 onLivingHurt）
         // v2.1：怪物附魔触发开关（受击者视角）
         if (!EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) {
             if (victim.getAbsorptionAmount() > 0) {
@@ -159,13 +204,9 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
                     }
                 }
 
-                if (victimLevel > 0) {
-                    evt.setAmount(evt.getAmount() * (float) SHIELDED_DAMAGE_MULTIPLIER.get());
-
-                    if (damageSource.getEntity() instanceof LivingEntity) {
-                        LivingEntity attacker = (LivingEntity) damageSource.getEntity();
-                        attacker.hurt(attacker.damageSources().magic(), victim.getAbsorptionAmount() * (float) REFLECT_RATIO.get());
-                    }
+                if (victimLevel > 0 && damageSource.getEntity() instanceof LivingEntity) {
+                    LivingEntity attacker = (LivingEntity) damageSource.getEntity();
+                    attacker.hurt(attacker.damageSources().magic(), victim.getAbsorptionAmount() * (float) REFLECT_RATIO.get());
                 }
             }
         }
@@ -193,7 +234,7 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
     }
 
     /**
-     * 实体进入世界时获得初始吸收盾。
+     * 每条命第一次进入世界时获得初始吸收盾。
      * 此事件属于状态恢复（玩家重连等），未接入怪物附魔开关。
      * 但若有"启用开关时怪物已经获得过盾"的情况，无法回收，这是设计权衡。
      */
@@ -228,8 +269,19 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
             }
         }
 
-        if (totalLevel > 0) {
+        if (totalLevel > 0 && !entity.getPersistentData().getBoolean(INITIAL_SHIELD_GIVEN_KEY)) {
+            entity.getPersistentData().putBoolean(INITIAL_SHIELD_GIVEN_KEY, true);
             entity.setAbsorptionAmount(entity.getMaxHealth());
+        }
+    }
+
+    /**
+     * 从末地回主世界也会换一个玩家实体，这条命没结束，领盾标记要带过去。
+     */
+    @SubscribeEvent
+    public static void onPlayerClone(@NotNull PlayerEvent.Clone evt) {
+        if (!evt.isWasDeath() && evt.getOriginal().getPersistentData().getBoolean(INITIAL_SHIELD_GIVEN_KEY)) {
+            evt.getEntity().getPersistentData().putBoolean(INITIAL_SHIELD_GIVEN_KEY, true);
         }
     }
 

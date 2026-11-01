@@ -76,7 +76,7 @@ public class EnchantmentStarsLaw extends EnchantmentBase {
                     10, 1, 127);
 
     /**
-     * 提供的速度效果等级
+     * 提供的速度效果等级（1 级 = 移速 +1%，0 表示不加速）
      * <p>默认 25，允许范围 0 ~ 127。</p>
      */
     private static final EnchantmentValues.Handle SPEED_BOOST_LEVEL =
@@ -194,9 +194,12 @@ public class EnchantmentStarsLaw extends EnchantmentBase {
             return;
         }
 
-        // 添加速度提升效果
-        DynamicAttributeManager.apply(ctx.getHolder(),
-                DynamicAttributes.SPEED_BOOST.createInstance(2, SPEED_BOOST_LEVEL.getInt()));
+        // 添加速度提升效果（createInstance 收的是 amplifier，等级要减 1）
+        int speedLevel = SPEED_BOOST_LEVEL.getInt();
+        if (speedLevel > 0) {
+            DynamicAttributeManager.apply(ctx.getHolder(),
+                    DynamicAttributes.SPEED_BOOST.createInstance(2, speedLevel - 1));
+        }
     }
 
     @Override

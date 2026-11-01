@@ -23,13 +23,15 @@ import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 时间逆转附魔
  * <p>
  * 死亡时触发：取消死亡，进入逆转状态100tick
- * 逆转状态：免疫伤害并反弹，累积伤害值
+ * 逆转状态：免疫伤害（含持续灼烧等直接扣血）并反弹，累积伤害值
  * 逆转结束：治疗累积伤害×25%
  * 冷却6000tick
  * </p>
@@ -76,8 +78,16 @@ import java.util.UUID;
  * 全量重同步会把它剪掉；实体死亡则由 {@code ClientSyncEffectEventHandler} 主动清理。
  * </p>
  *
+ * <h3>v2.4 修复：逆转期间挡住直接扣血的持续伤害</h3>
+ * <p>
+ * 逆转靠 {@link #onLivingAttack} 取消伤害，而持续灼烧（{@code DamageOverTimeManager}）、出血、切腹、
+ * 发狂扩散的灼烧都是直接扣血，不走这个事件，持有者会在「无敌」里被烧死。
+ * 这些地方现在都先问 {@link #isReversing}：逆转期间不扣血，持续时间照走，也不计入储存伤害——
+ * 储存的是挨的打，持续掉血没有攻击者可反弹。
+ * </p>
+ *
  * @author RoinFlam
- * @version 2.3
+ * @version 2.4
  */
 @AutoRegisterEnchantment(
         id = "time_reversal",
@@ -165,8 +175,33 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
      */
     private static final ThreadLocal<Boolean> PROCESSING_REFLECT = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
+    /**
+     * 正在逆转的实体。只是 {@link #isReversing} 的快速门槛：持续伤害每条每 tick 都要问一次，
+     * 绝大多数时候这里是空的，不用每次拼字符串键去查数据管理器。是否逆转仍以 {@link #REVERSAL_STATE_KEY} 为准。
+     */
+    private static final Set<UUID> REVERSING = ConcurrentHashMap.newKeySet();
+
     public EnchantmentTimeReversal() {
         super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
+    }
+
+    /**
+     * 实体是否正处于逆转状态
+     *
+     * @param entity 实体
+     * @return 逆转中返回 true
+     */
+    public static boolean isReversing(@NotNull LivingEntity entity) {
+        UUID uuid = entity.getUUID();
+        if (!REVERSING.contains(uuid)) {
+            return false;
+        }
+        if (Boolean.TRUE.equals(EnchantmentDataManager.getData(REVERSAL_STATE_KEY, uuid))) {
+            return true;
+        }
+        // 结束任务没跑到（比如中途关服）时状态已过期，顺手清掉
+        REVERSING.remove(uuid);
+        return false;
     }
 
     /**
@@ -234,6 +269,7 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
         EnchantmentDataManager.setCooldown(REVERSAL_COOLDOWN_KEY, uuid, REVERSAL_COOLDOWN.getInt());
         EnchantmentDataManager.setData(REVERSAL_STATE_KEY, uuid, true);
         EnchantmentDataManager.setData(REVERSAL_DAMAGE_KEY, uuid, 0f);
+        REVERSING.add(uuid);
 
         // v2.3：登记逆转状态，供客户端绘制世界视觉。
         // 放在这里而非任务里，是为了让视觉与无敌<b>同帧开始</b>——
@@ -253,6 +289,7 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
                 }
                 EnchantmentDataManager.removeData(REVERSAL_STATE_KEY, uuid);
                 EnchantmentDataManager.removeData(REVERSAL_DAMAGE_KEY, uuid);
+                REVERSING.remove(uuid);
 
                 // v2.3：与治疗结算同帧注销视觉。
                 // 不加 isAlive 守卫：实体若已被移除，removeEntity 内部按维度查表，

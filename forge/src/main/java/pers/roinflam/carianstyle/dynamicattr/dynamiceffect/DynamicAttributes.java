@@ -135,6 +135,17 @@ public class DynamicAttributes {
     public static final DynamicAttribute SPEED_BOOST = new DynamicAttribute("carianstyle_speed_boost")
             .addModifier(Attributes.MOVEMENT_SPEED, 0.01, AttributeModifier.Operation.MULTIPLY_TOTAL);
 
+    /**
+     * 碎步的速度提升
+     * - 移动速度+1%×等级
+     * <p>
+     * 和 {@link #SPEED_BOOST} 分开：碎步的等级要跟着血量往下降，得把旧等级摘掉，
+     * 共用一个属性会把群星律法的那份一起摘掉。
+     * </p>
+     */
+    public static final DynamicAttribute QUICKSTEP_SPEED = new DynamicAttribute("carianstyle_quickstep_speed")
+            .addModifier(Attributes.MOVEMENT_SPEED, 0.01, AttributeModifier.Operation.MULTIPLY_TOTAL);
+
     // ========== 防御效果 ==========
 
     /**
@@ -155,9 +166,10 @@ public class DynamicAttributes {
     /**
      * 岩石剑效果
      * - 攻击力+10%×等级
-     * - 击退抗性+10%×等级
+     * - 击退抗性+0.1×等级（加法：玩家默认是 0，按比例乘等于没有）
      * - 护甲+10%×等级
      * - 韧性+10%×等级
+     * - 无法跳跃（跳跃在客户端发起，序列号 20 同步给客户端，由 ClientSyncCragbladeJumpLock 处理）
      * - 无法跳跃
      * <p>
      * v2.1：跳跃压制由原来的 per-entity {@code LivingTickEvent} 处理器
@@ -166,7 +178,7 @@ public class DynamicAttributes {
      */
     public static final DynamicAttribute CRAGBLADE = new DynamicAttribute("carianstyle_cragblade")
             .addModifier(Attributes.ATTACK_DAMAGE, 0.1, AttributeModifier.Operation.MULTIPLY_TOTAL)
-            .addModifier(Attributes.KNOCKBACK_RESISTANCE, 0.1, AttributeModifier.Operation.MULTIPLY_TOTAL)
+            .addModifier(Attributes.KNOCKBACK_RESISTANCE, 0.1, AttributeModifier.Operation.ADDITION)
             .addModifier(Attributes.ARMOR, 0.1, AttributeModifier.Operation.MULTIPLY_TOTAL)
             .addModifier(Attributes.ARMOR_TOUGHNESS, 0.1, AttributeModifier.Operation.MULTIPLY_TOTAL)
             .onTick(context -> EntityLivingUtil.setJumped(context.getEntity()))
@@ -284,6 +296,9 @@ public class DynamicAttributes {
         // 注册隐身效果与序列号的映射
         ClientSyncAttribute.register(STEALTH, 4);
 
+        // 岩石剑：客户端要知道自己跳不了
+        ClientSyncAttribute.register(CRAGBLADE, 20);
+
         // 为火焰属性添加生命周期回调
         DOOMED_DEATH_BURNING
                 .onApplied(ClientSyncEffectHelper::onAttributeApplied)
@@ -294,6 +309,10 @@ public class DynamicAttributes {
                 .onRemoved(ClientSyncEffectHelper::onAttributeRemoved);
 
         EPILEPSY_FIRE_BURNING
+                .onApplied(ClientSyncEffectHelper::onAttributeApplied)
+                .onRemoved(ClientSyncEffectHelper::onAttributeRemoved);
+
+        CRAGBLADE
                 .onApplied(ClientSyncEffectHelper::onAttributeApplied)
                 .onRemoved(ClientSyncEffectHelper::onAttributeRemoved);
 

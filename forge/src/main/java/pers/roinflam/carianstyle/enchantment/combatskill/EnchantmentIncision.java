@@ -27,6 +27,7 @@ import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 /**
  * 切割附魔
@@ -146,9 +147,11 @@ public class EnchantmentIncision extends EnchantmentBase {
 
         if (!attacker.hasEffect(CarianStylePotion.INCISION.get())) {
             if (attacker.getHealth() >= attacker.getMaxHealth() * (float) TRIGGER_HEALTH_RATIO.get()) {
-                attacker.setHealth(attacker.getHealth() - attacker.getMaxHealth() * (float) SELF_COST_RATIO.get());
-                attacker.addEffect(new MobEffectInstance(
-                CarianStylePotion.INCISION.get(), SELF_EFFECT_DURATION.getInt(), 0));
+                EntityLivingUtil.payHealthCost(attacker, attacker.getMaxHealth() * (float) SELF_COST_RATIO.get());
+                if (attacker.isAlive()) {
+                    attacker.addEffect(new MobEffectInstance(
+                    CarianStylePotion.INCISION.get(), SELF_EFFECT_DURATION.getInt(), 0));
+                }
             }
         } else {
             float healAmount = Math.min(ctx.getDamage() * (float) HEAL_RATIO.get(),

@@ -6,6 +6,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
+import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
 
@@ -109,6 +110,11 @@ public class MobEffectHemorrhage extends IconBase {
         // v3.1 客户端守卫：扣血与致死判定只在逻辑服务端执行一次。
         // 缺少此判断会导致客户端自行走死亡逻辑 -> getServer() 为 null -> 崩溃。
         if (entityLivingBaseIn.level().isClientSide) {
+            return;
+        }
+
+        // 回溯无敌期间不掉血：直扣血量拦不到，致死那一击的 10 倍最大生命还会被算进储存伤害
+        if (EnchantmentTimeReversal.isReversing(entityLivingBaseIn)) {
             return;
         }
 

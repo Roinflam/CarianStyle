@@ -249,17 +249,18 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
     /**
      * 死亡触发：取消死亡 → 拉取无敌 1.5 秒 → 第二阶段 AOE 伤害 → 自身死亡。
      *
-     * @param ctx   附魔上下文
-     * @param level 附魔等级
+     * @param ctx        附魔上下文
+     * @param pieceLevel 这一件的等级（实际按全身最高等级算）
      */
     @Override
-    protected void onDeath(@NotNull EnchantmentContext ctx, int level) {
+    protected void onDeath(@NotNull EnchantmentContext ctx, int pieceLevel) {
         // 夏玻利利 / 癫火反噬致死的那一击也挂着「无视无敌」，但它以前是直接处决、照样会触发本附魔，这里保持不变
         if (ctx.canHarmInCreative() && !DamageOverTimeManager.isSelfLethalBlow(ctx.getDamageSource())) {
             return;
         }
 
         LivingEntity hurter = ctx.getHolder();
+        int level = highestLevel(hurter);
 
         if (EnchantmentDataManager.isOnCooldown("scarlet_lonia_cooldown", hurter.getUUID())) {
             Boolean isActive = EnchantmentDataManager.getData("scarlet_lonia_active", hurter.getUUID());

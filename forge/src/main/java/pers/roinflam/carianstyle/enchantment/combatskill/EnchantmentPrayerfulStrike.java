@@ -225,7 +225,7 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
         evt.setAmount(evt.getAmount() + bonusDamage);
         applyMaxHealthBonus(attacker, bonusDamage);
         attacker.heal(bonusDamage);
-        attacker.playSound(SoundEvents.PLAYER_LEVELUP, 1, 0);
+        playLevelUpSound(attacker, 0);
         victim.playSound(SoundEvents.PLAYER_LEVELUP, 1, 0);
 
         // v2.3 视觉：蓄力完成那一击的金色圣光柱（纯服务端广播，不影响任何机制）
@@ -233,6 +233,15 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
         if (attacker.level() instanceof ServerLevel serverLevel) {
             CarianStyleCombatArtEffects.prayerStrike(serverLevel, attacker);
         }
+    }
+
+    /**
+     * 播提示音，持有者自己也听得到。
+     * <p>{@code Player#playSound} 在服务端排除本人（默认由客户端自己播），这里不能走它。</p>
+     */
+    private static void playLevelUpSound(LivingEntity holder, float pitch) {
+        holder.level().playSound(null, holder.getX(), holder.getY(), holder.getZ(),
+                SoundEvents.PLAYER_LEVELUP, holder.getSoundSource(), 1, pitch);
     }
 
     private static void applyMaxHealthBonus(LivingEntity attacker, float bonusDamage) {
@@ -245,22 +254,17 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
         float maxBonus = attacker.getMaxHealth() * (float) HEAL_CAP_RATIO.get();
         AttributeModifier existing = attribute.getModifier(MAX_HEALTH_MODIFIER_ID);
 
-        if (existing == null) {
-            attribute.addPermanentModifier(new AttributeModifier(
-                    MAX_HEALTH_MODIFIER_ID, MAX_HEALTH_MODIFIER_NAME,
-                    healthBonus, AttributeModifier.Operation.ADDITION
-            ));
-        } else {
-            double newAmount = Math.min(
-                    existing.getAmount() + Math.min(healthBonus, maxBonus),
-                    ConfigLoader.prayerfulStrikeMaxHealth
-            );
-            attribute.removeModifier(MAX_HEALTH_MODIFIER_ID);
-            attribute.addPermanentModifier(new AttributeModifier(
-                    MAX_HEALTH_MODIFIER_ID, MAX_HEALTH_MODIFIER_NAME,
-                    newAmount, AttributeModifier.Operation.ADDITION
-            ));
-        }
+        // 第一次也受单次上限限制，没有修饰符时按 0 起算
+        double currentAmount = existing == null ? 0 : existing.getAmount();
+        double newAmount = Math.min(
+                currentAmount + Math.min(healthBonus, maxBonus),
+                ConfigLoader.prayerfulStrikeMaxHealth
+        );
+        attribute.removeModifier(MAX_HEALTH_MODIFIER_ID);
+        attribute.addPermanentModifier(new AttributeModifier(
+                MAX_HEALTH_MODIFIER_ID, MAX_HEALTH_MODIFIER_NAME,
+                newAmount, AttributeModifier.Operation.ADDITION
+        ));
     }
 
     @SubscribeEvent
@@ -284,7 +288,8 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
 
     @SubscribeEvent
     public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
-        if (evt.phase != TickEvent.Phase.START || evt.player.tickCount % TICK_INTERVAL.getInt() != 0) {
+        if (evt.player.level().isClientSide || evt.phase != TickEvent.Phase.START
+                || evt.player.tickCount % TICK_INTERVAL.getInt() != 0) {
             return;
         }
         Player player = evt.player;
@@ -295,7 +300,7 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
         boolean inChargingPeriod = EnchantmentDataManager.isOnCooldown(CHARGING_COOLDOWN_KEY, uuid);
         boolean stillWaiting = EnchantmentDataManager.isOnCooldown(NOT_READY_COOLDOWN_KEY, uuid);
         if (inChargingPeriod && stillWaiting) {
-            player.playSound(SoundEvents.PLAYER_LEVELUP, 1, 3);
+            playLevelUpSound(player, 3);
         }
     }
 

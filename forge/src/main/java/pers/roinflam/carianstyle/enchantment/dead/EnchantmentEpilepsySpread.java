@@ -24,6 +24,7 @@ import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.source.NewDamageSource;
+import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
@@ -235,16 +236,17 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
     /**
      * 濒死触发：保留 30% 生命 → 拉取无敌 1.5 秒 → 群体灼烧 → 自身死亡。
      *
-     * @param ctx   附魔上下文
-     * @param level 附魔等级
+     * @param ctx        附魔上下文
+     * @param pieceLevel 这一件的等级（实际按全身最高等级算）
      */
     @Override
-    protected void onDamageAsVictimLowest(@NotNull EnchantmentContext ctx, int level) {
+    protected void onDamageAsVictimLowest(@NotNull EnchantmentContext ctx, int pieceLevel) {
         if (ctx.canHarmInCreative()) {
             return;
         }
 
         LivingEntity hurter = ctx.getHolder();
+        int level = highestLevel(hurter);
 
         if (EnchantmentDataManager.isOnCooldown("epilepsy_spread_cooldown", hurter.getUUID())) {
             return;
@@ -337,7 +339,7 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
                                                     NewDamageSource.epilepsyFire(hurter.level()));
                                             this.cancel();
                                         }
-                                    } else {
+                                    } else if (!EnchantmentTimeReversal.isReversing(entityLivingBase)) {
                                         float damage = hurter.getMaxHealth() * finalLevel * (float) TARGET_DOT_PER_LEVEL.get() * 2 / 60;
                                         if (entityLivingBase.getHealth() - damage * 2 > 0) {
                                             EntityLivingUtil.damageHealthDirectly(entityLivingBase, damage);

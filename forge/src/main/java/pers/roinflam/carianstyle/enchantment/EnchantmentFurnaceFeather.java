@@ -4,8 +4,10 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
@@ -20,14 +22,18 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * <p>
  * 护甲附魔，以受到更多伤害换取机动性增益
  * 受击时：
- * - 受到的伤害增加50% * 附魔等级
+ * - 受到的伤害增加50% * 全身等级之和（只算一次，四件 Ⅲ 级 = 12 级，×7）
  * - 大幅增加无敌帧（invulnerableTime = max + max/2 × 等级 × 1.5）
  * - 获得速度效果（持续 = 等级 × 40tick，效果等级 = 附魔等级 - 1）
  * - 获得跳跃提升效果（持续 = 等级 × 40tick，效果等级 = 附魔等级 - 1）
+ * 后三项按等级最高的一件算，不叠加
+ * </p>
+ * <p>
+ * 分发器按件回调，以前每件各乘一次，四件 Ⅲ 级约 ×39。现在只在第一件上结算一次。
  * </p>
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 2.1
  */
 @AutoRegisterEnchantment(
         id = "furnace_feather",
@@ -96,9 +102,27 @@ public class EnchantmentFurnaceFeather extends EnchantmentBase {
     protected void onDamageAsVictimLowest(@NotNull EnchantmentContext ctx, int level) {
         LivingEntity victim = ctx.getHolder();
 
+        // 分发器每件回调一次，全身一起结算，只认扫到的第一件
+        int totalLevel = 0;
+        int highestLevel = 0;
+        ItemStack firstPiece = null;
+        for (EquipmentSlot slot : EquipmentSlot.values()) {
+            ItemStack stack = victim.getItemBySlot(slot);
+            int pieceLevel = applyLevelLimit(EnchantmentHelper.getItemEnchantmentLevel(this, stack));
+            if (pieceLevel > 0) {
+                if (firstPiece == null) {
+                    firstPiece = stack;
+                }
+                totalLevel += pieceLevel;
+                highestLevel = Math.max(highestLevel, pieceLevel);
+            }
+        }
+        if (ctx.getEnchantedItem() != firstPiece) {
+            return;
+        }
+
         // 手动应用等级限制（虽然 EnchantmentBase 已经限制过了，但为了保险再限制一次）
-        int effectiveLevel = level;
-        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
+        int effectiveLevel = capLevel(highestLevel, LEVEL_CAP.getInt());
 
         // 增加无敌帧
         victim.invulnerableTime = (int) (victim.invulnerableDuration +
@@ -118,7 +142,7 @@ public class EnchantmentFurnaceFeather extends EnchantmentBase {
                 effectiveLevel - 1
         ));
 
-        ctx.multiplyDamage(1 + (float) DAMAGE_PER_LEVEL.get() * level);
+        ctx.multiplyDamage(1 + (float) DAMAGE_PER_LEVEL.get() * totalLevel);
     }
 
     @Override

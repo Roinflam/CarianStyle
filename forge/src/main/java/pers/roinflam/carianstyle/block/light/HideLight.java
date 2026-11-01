@@ -4,12 +4,16 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.AirBlock;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import pers.roinflam.carianstyle.init.CarianStyleBlockEntities;
 import pers.roinflam.carianstyle.tileentity.MoveLight;
 
@@ -22,12 +26,15 @@ import javax.annotation.Nullable;
  * 用于实现动态光源效果的透明发光方块
  * 特性：
  * - 外观为空气（不可见）
- * - 发出最大亮度的光
+ * - 亮度由 {@link #LEVEL} 决定（默认 15）
  * - 不可被其他方块替换
  * - 配合MoveLight实体自动消失
  * </p>
  */
 public class HideLight extends AirBlock implements EntityBlock {
+
+    /** 光照等级，方块属性里用 {@code lightLevel} 读它 */
+    public static final IntegerProperty LEVEL = BlockStateProperties.LEVEL;
 
     /**
      * 构造函数
@@ -36,6 +43,12 @@ public class HideLight extends AirBlock implements EntityBlock {
      */
     public HideLight(BlockBehaviour.Properties properties) {
         super(properties);
+        registerDefaultState(stateDefinition.any().setValue(LEVEL, 15));
+    }
+
+    @Override
+    protected void createBlockStateDefinition(@Nonnull StateDefinition.Builder<Block, BlockState> builder) {
+        builder.add(LEVEL);
     }
 
     /**

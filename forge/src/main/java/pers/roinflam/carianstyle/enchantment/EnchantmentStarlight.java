@@ -10,6 +10,7 @@ import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -31,6 +32,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 星光附魔 - 优化: LivingTickEvent -&gt; PlayerTickEvent
+ * <p>
+ * 亮度 = 全身星光等级之和 × 3，最高 15；光源方块跟着亮度走（{@link HideLight#LEVEL}），
+ * 换装后已经放下的光源也会变亮变暗。
+ * </p>
  *
  * <h3>v2.2 性能优化：装备扫描缓存 + 方块更新标志</h3>
  *
@@ -106,6 +111,22 @@ public class EnchantmentStarlight extends EnchantmentBase {
             EnchantmentValues.define(VALUE_ID, "rescan_interval",
                     20, 1, 200);
 
+    /**
+     * 每级星光提供的亮度
+     * <p>默认 3，允许范围 1 ~ 15。</p>
+     */
+    private static final EnchantmentValues.Handle BRIGHTNESS_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "brightness_per_level",
+                    3, 1, 15);
+
+    /**
+     * 亮度上限
+     * <p>默认 15，允许范围 1 ~ 15。</p>
+     */
+    private static final EnchantmentValues.Handle MAX_BRIGHTNESS =
+            EnchantmentValues.define(VALUE_ID, "max_brightness",
+                    15, 1, 15);
+
 
     /**
      * 护甲扫描的重新检测间隔（tick）。
@@ -138,8 +159,8 @@ public class EnchantmentStarlight extends EnchantmentBase {
      */
     private static final class ArmorScanCache {
 
-        /** 上次扫描的结论：玩家是否装备了星光 */
-        private boolean equipped;
+        /** 上次扫描的结论：玩家身上星光的亮度，0 表示没装备 */
+        private int brightness;
 
         /**
          * 距上次扫描过去了多少 tick。
@@ -153,12 +174,12 @@ public class EnchantmentStarlight extends EnchantmentBase {
          *
          * @param player    玩家
          * @param starlight 星光附魔实例
-         * @return 玩家是否装备了星光
+         * @return 亮度，没装备时为 0
          */
-        private boolean isEquipped(@NotNull Player player, @NotNull Enchantment starlight) {
+        private int brightness(@NotNull Player player, @NotNull Enchantment starlight) {
             ticksSinceScan++;
             if (ticksSinceScan < RESCAN_INTERVAL.getInt()) {
-                return equipped;
+                return brightness;
             }
             ticksSinceScan = 0;
 
@@ -168,8 +189,8 @@ public class EnchantmentStarlight extends EnchantmentBase {
                     totalLevel += EnchantmentHelper.getItemEnchantmentLevel(starlight, armor);
                 }
             }
-            equipped = totalLevel > 0;
-            return equipped;
+            brightness = Math.min(decayLevel(starlight, totalLevel) * BRIGHTNESS_PER_LEVEL.getInt(), MAX_BRIGHTNESS.getInt());
+            return brightness;
         }
     }
 
@@ -191,7 +212,8 @@ public class EnchantmentStarlight extends EnchantmentBase {
         // v2.2：先查缓存再决定要不要解析 NBT。
         // computeIfAbsent 只在玩家首次 tick 时创建条目，之后是一次 Map 查询。
         ArmorScanCache cache = SCAN_CACHE.computeIfAbsent(entity.getUUID(), uuid -> new ArmorScanCache());
-        if (!cache.isEquipped(entity, starlight)) return;
+        int brightness = cache.brightness(entity, starlight);
+        if (brightness <= 0) return;
 
         Level world = entity.level();
         int blockX = Mth.floor(entity.getX());
@@ -199,9 +221,17 @@ public class EnchantmentStarlight extends EnchantmentBase {
         int blockZ = Mth.floor(entity.getZ());
         BlockPos blockPos = new BlockPos(blockX, blockY + 1, blockZ);
         if (!world.isEmptyBlock(blockPos)) return;
-        if (world.getBlockEntity(blockPos) instanceof MoveLight moveLight) { moveLight.retime(); return; }
+        BlockState lightState = CarianStyleBlocks.HIDE_LIGHT.get().defaultBlockState().setValue(HideLight.LEVEL, brightness);
+        if (world.getBlockEntity(blockPos) instanceof MoveLight moveLight) {
+            // 同种方块改状态不会重建方块实体，脚下这格直接换亮度
+            if (world.getBlockState(blockPos) != lightState) {
+                world.setBlock(blockPos, lightState, LIGHT_BLOCK_FLAGS);
+            }
+            moveLight.retime();
+            return;
+        }
         else if (world.getBlockState(blockPos).getBlock() instanceof HideLight) { world.removeBlock(blockPos, false); }
-        world.setBlock(blockPos, CarianStyleBlocks.HIDE_LIGHT.get().defaultBlockState(), LIGHT_BLOCK_FLAGS);
+        world.setBlock(blockPos, lightState, LIGHT_BLOCK_FLAGS);
     }
 
     /**

@@ -80,7 +80,8 @@ public class ClientSyncEffectHelper {
                 DynamicAttributes.DOOMED_DEATH_BURNING,
                 DynamicAttributes.DESTRUCTION_FIRE_BURNING,
                 DynamicAttributes.EPILEPSY_FIRE_BURNING,
-                DynamicAttributes.STEALTH
+                DynamicAttributes.STEALTH,
+                DynamicAttributes.CRAGBLADE
         };
     }
 }

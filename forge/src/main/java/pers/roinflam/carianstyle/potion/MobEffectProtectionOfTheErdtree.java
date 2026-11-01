@@ -19,7 +19,7 @@ import javax.annotation.Nonnull;
  * 黄金树庇护药水效果
  * <p>
  * 效果：
- * - 非生物来源的伤害(环境伤害)减免20%×(等级+1)
+ * - 非生物来源的伤害(环境伤害)减免20%×(等级+1)，最高100%
  * - 不对绝对伤害生效
  * </p>
  */
@@ -56,7 +56,8 @@ public class MobEffectProtectionOfTheErdtree extends IconBase {
         LivingEntity victim = evt.getEntity();
         if (victim.hasEffect(pers.roinflam.carianstyle.init.CarianStylePotion.PROTECTION_OF_THE_ERDTREE.get())) {
             int amplifier = victim.getEffect(pers.roinflam.carianstyle.init.CarianStylePotion.PROTECTION_OF_THE_ERDTREE.get()).getAmplifier();
-            evt.setAmount(evt.getAmount() * (1 - (amplifier + 1) * 0.2f));
+            // 倍率不能小于 0：效果等级还可能被野兽健壮这类附魔抬高，负的伤害量会变成回血
+            evt.setAmount(evt.getAmount() * Math.max(0.0f, 1 - (amplifier + 1) * 0.2f));
         }
     }
 

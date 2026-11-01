@@ -18,7 +18,7 @@ import javax.annotation.Nonnull;
  * 黄金誓约药水效果
  * <p>
  * 效果：
- * - 受到伤害时减免10%×(等级+1)
+ * - 受到伤害时减免10%×(等级+1)，最高100%
  * - 造成伤害时增加15%×(等级+1)
  * </p>
  */
@@ -50,7 +50,8 @@ public class MobEffectGoldenVow extends IconBase {
         // 受击者减伤
         if (victim.hasEffect(pers.roinflam.carianstyle.init.CarianStylePotion.GOLDEN_VOW.get())) {
             int amplifier = victim.getEffect(pers.roinflam.carianstyle.init.CarianStylePotion.GOLDEN_VOW.get()).getAmplifier();
-            evt.setAmount(evt.getAmount() * (1 - (amplifier + 1) * 0.1f));
+            // 倍率不能小于 0：效果等级还可能被野兽健壮这类附魔抬高，负的伤害量会被后面的增减伤带歪
+            evt.setAmount(evt.getAmount() * Math.max(0.0f, 1 - (amplifier + 1) * 0.1f));
         }
 
         // 攻击者增伤

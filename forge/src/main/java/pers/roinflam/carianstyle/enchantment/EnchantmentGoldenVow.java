@@ -74,6 +74,14 @@ public class EnchantmentGoldenVow extends EnchantmentBase {
                     5, 1, 100);
 
     /**
+     * 受击方效果等级的上限。10 级减免就是 100%，留一级不让它变成完全免伤
+     * <p>默认 9，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle VICTIM_AMPLIFIER_CAP =
+            EnchantmentValues.define(VALUE_ID, "victim_amplifier_cap",
+                    9, 1, 100);
+
+    /**
      * 每级的效果持续秒数
      * <p>默认 2.5，允许范围 0.1 ~ 120.0。</p>
      */
@@ -122,6 +130,8 @@ public class EnchantmentGoldenVow extends EnchantmentBase {
             victimLevel = applyLevelLimit(goldenVow, victimLevel, VICTIM_LEVEL_CAP.getInt());
 
             if (victimLevel > 0) {
+                victimLevel = Math.min(victimLevel, VICTIM_AMPLIFIER_CAP.getInt());
+
                 int duration = (int) (DURATION_SECONDS_PER_LEVEL.get() * victimLevel * 20);
                 victim.addEffect(new MobEffectInstance(
                         CarianStylePotion.GOLDEN_VOW.get(),

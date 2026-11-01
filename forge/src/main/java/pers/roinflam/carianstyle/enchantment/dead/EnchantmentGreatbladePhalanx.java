@@ -149,12 +149,13 @@ public class EnchantmentGreatbladePhalanx extends EnchantmentBase {
     }
 
     @Override
-    protected void onDeath(@NotNull EnchantmentContext ctx, int level) {
+    protected void onDeath(@NotNull EnchantmentContext ctx, int pieceLevel) {
         if (!(ctx.getDamageSource().getEntity() instanceof LivingEntity)) {
             return;
         }
 
         LivingEntity hurter = ctx.getHolder();
+        int level = highestLevel(hurter);
         LivingEntity attacker = (LivingEntity) ctx.getDamageSource().getEntity();
 
         // 检查冷却

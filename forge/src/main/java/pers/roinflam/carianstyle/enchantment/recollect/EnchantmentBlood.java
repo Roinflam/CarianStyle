@@ -20,6 +20,7 @@ import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import java.util.UUID;
 
 /** 血附魔 - 修复: getUsedItemHand -> InteractionHand.MAIN_HAND @version 2.1 */
@@ -99,7 +100,8 @@ public class EnchantmentBlood extends EnchantmentBase {
             EnchantmentDataManager.resetCounter(ATTACK_COUNT_KEY, uuid);
             float damage = victim.getHealth() * (float) DAMAGE_RATIO.get();
             attacker.heal(Math.min(damage, attacker.getMaxHealth() * (float) HEAL_CAP_RATIO.get()));
-            victim.setHealth(victim.getHealth() - damage);
+            // damage_ratio 允许配到 1 以上，归零时要走死亡，不能停在 0 血
+            EntityLivingUtil.damageHealthDirectly(victim, damage, ctx.getDamageSource());
             // 修复：使用主手检查
             int hemorrhageLevel = 0;
             ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);

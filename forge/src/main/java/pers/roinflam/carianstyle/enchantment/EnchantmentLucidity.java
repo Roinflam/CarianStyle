@@ -108,9 +108,10 @@ public class EnchantmentLucidity extends EnchantmentBase implements IEffectModif
 
         MobEffect effect = effectInstance.getEffect();
 
-        // 只对非瞬时、可见的负面效果生效
+        // 只对非瞬时、可见、有时限的负面效果生效（时长 -1 走下面的公式会被抬成 1 tick）
         if (effect.isInstantenous()
                 || !effectInstance.isVisible()
+                || effectInstance.isInfiniteDuration()
                 || !effect.getCategory().equals(MobEffectCategory.HARMFUL)) {
             return null;
         }

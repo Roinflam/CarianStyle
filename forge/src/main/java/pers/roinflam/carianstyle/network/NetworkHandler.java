@@ -55,8 +55,14 @@ public class NetworkHandler {
      * 2.1.0 客户端照样能进 2.2.0 服务器——而 2.1.0 客户端在独立服上既不藏模型也不藏碰撞箱，
      * 想看穿隐身的人只要不更新模组就行。升位后旧客户端在握手阶段即被拒绝。
      * </p>
+     *
+     * <h3>为什么从 "3" 升到 "4"（2.3.1）</h3>
+     * <p>
+     * 同样没有新增或调整任何包。隐藏光源方块多了亮度属性，方块状态数量变了，
+     * 旧客户端进服后方块状态 ID 全部错位；岩石剑的「无法跳跃」也在客户端执行，旧客户端照样能跳。
+     * </p>
      */
-    private static final String PROTOCOL_VERSION = "3";
+    private static final String PROTOCOL_VERSION = "4";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(Reference.MOD_ID, "main"),

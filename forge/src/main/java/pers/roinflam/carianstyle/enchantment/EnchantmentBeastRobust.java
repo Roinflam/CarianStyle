@@ -23,6 +23,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * 获得药水效果时：
  * - 持续时间变为 40%（不受附魔等级影响）
  * - 效果等级变为 原等级 × 2 + 1（不受附魔等级影响），最高不超过 100
+ * 无限时长的效果不处理：时长 -1 按比例缩放会取整成 0，效果当场消失
  * </p>
  *
  * @author RoinFlam
@@ -115,8 +116,8 @@ public class EnchantmentBeastRobust extends EnchantmentBase implements IEffectMo
 
         MobEffect effect = effectInstance.getEffect();
 
-        // 只对非瞬时、可见的效果生效
-        if (effect.isInstantenous() || !effectInstance.isVisible()) {
+        // 只对非瞬时、可见、有时限的效果生效
+        if (effect.isInstantenous() || !effectInstance.isVisible() || effectInstance.isInfiniteDuration()) {
             return null;
         }
 
