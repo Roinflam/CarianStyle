@@ -15,14 +15,20 @@ import pers.roinflam.carianstyle.enchantment.EnchantmentScarletCorruption;
 import pers.roinflam.carianstyle.enchantment.EnchantmentVicDragonThunder;
 import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+
 import javax.annotation.Nonnull;
 
 /**
  * 血刃附魔
  *
- * 消耗10%当前血量，造成额外伤害
- * 额外伤害 = (伤害×等级×0.33 + 目标血量×等级×0.033) × 自身血量比例
- * 玩家需刚挥剑，非玩家可直接触发
+ * 消耗15%最大生命值，造成额外伤害
+ * 额外伤害 = (伤害×等级×0.33 + 目标当前生命值×等级×0.033) × 自身血量比例，至多为目标最大生命值
+ * 玩家需满蓄力，非玩家可直接触发
+ * <p>
+ * 代价改为 15% 最大生命值、走 {@link EntityLivingUtil#payHealthCost}：血量不够付时正常死亡（不死图腾挡得住），
+ * 时间回溯期间不付。以前扣的是 10% 当前生命值，永远扣不死；额外伤害以前也没有上限。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "blood_blade",
@@ -38,6 +44,13 @@ import javax.annotation.Nonnull;
 )
 public class EnchantmentBloodBlade extends EnchantmentBase {
 
+    // 每级额外伤害：本次伤害的比例
+    private static final float DAMAGE_PER_LEVEL = 0.33F;
+    // 每级额外伤害：目标当前生命值的比例
+    private static final float VICTIM_HEALTH_PER_LEVEL = 0.033F;
+    // 每次触发消耗的最大生命值比例
+    private static final float SELF_DAMAGE_RATIO = 0.15F;
+
     public EnchantmentBloodBlade() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
@@ -51,19 +64,20 @@ public class EnchantmentBloodBlade extends EnchantmentBase {
             return;
         }
 
-        // 玩家需要刚挥剑，非玩家可直接触发
-        if (ctx.isHolderPlayer()) {
-            if (!isJustSwung(ctx.getHolderAsPlayer())) {
-                return;
-            }
+        // 玩家需要满蓄力，非玩家可直接触发
+        if (!isFullyCharged(attacker)) {
+            return;
         }
 
-        // 额外伤害 = (当前伤害×等级×0.33 + 目标血量×等级×0.033) × 自身血量比例
+        // 额外伤害 = (当前伤害×等级×0.33 + 目标当前生命值×等级×0.033) × 自身血量比例，上限为目标最大生命值
         float healthRatio = attacker.getHealth() / attacker.getMaxHealth();
-        float bonusDamage = (ctx.getDamage() * level * 0.33f + victim.getHealth() * level * 0.033f) * healthRatio;
+        float bonusDamage = Math.min(
+                (ctx.getDamage() * level * DAMAGE_PER_LEVEL + victim.getHealth() * level * VICTIM_HEALTH_PER_LEVEL) * healthRatio,
+                victim.getMaxHealth()
+        );
 
-        // 消耗自身10%当前血量
-        attacker.setHealth(attacker.getHealth() - attacker.getHealth() * 0.1f);
+        // 消耗自身15%最大生命值，血量不够付时正常死亡（不死图腾挡得住）
+        EntityLivingUtil.payHealthCost(attacker, attacker.getMaxHealth() * SELF_DAMAGE_RATIO);
 
         // 增加伤害
         ctx.addDamage(bonusDamage);

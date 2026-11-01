@@ -28,7 +28,7 @@ import java.util.List;
 /**
  * 灾厄附魔（诅咒）
  *
- * 受击伤害×2
+ * 受击伤害×1.5
  * 每tick 2%概率吸引32格内怪物
  */
 @AutoRegisterEnchantment(
@@ -40,8 +40,18 @@ import java.util.List;
 @Mod.EventBusSubscriber
 public class EnchantmentCalamity extends EnchantmentBase {
 
+    /** 参与计算的等级上限（只用来判断有没有） */
+    private static final int LEVEL_CAP = 10;
+    /** 受到的伤害倍率 */
+    private static final float DAMAGE_MULTIPLIER = 1.5F;
+    /** 每 tick 嘲讽一次的概率（百分比） */
+    private static final double TRIGGER_CHANCE = 2.0D;
+
+    /**
+     * 只能附在胸甲上；以前任意护甲件都能附
+     */
     public EnchantmentCalamity() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+        super(EnumEnchantmentType.ARMOR_CHEST, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
     }
 
     private static int getArmorLevel(EntityLivingBase entity) {
@@ -56,10 +66,7 @@ public class EnchantmentCalamity extends EnchantmentBase {
                 totalLevel += EnchantmentHelper.getEnchantmentLevel(calamity, armor);
             }
         }
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
-        }
-        return totalLevel;
+        return capLevel(totalLevel, LEVEL_CAP);
     }
 
     private static int getTotalLevel(EntityLivingBase entity) {
@@ -70,11 +77,8 @@ public class EnchantmentCalamity extends EnchantmentBase {
 
         int totalLevel = 0;
 
-        if (!entity.getHeldItem(entity.getActiveHand()).isEmpty()) {
-            totalLevel += EnchantmentHelper.getEnchantmentLevel(
-                    calamity,
-                    entity.getHeldItem(entity.getActiveHand()));
-        }
+        // 主手 + 四件护甲；以前看的是「正在用的那只手」
+        totalLevel += EnchantmentHelper.getEnchantmentLevel(calamity, entity.getHeldItemMainhand());
 
         for (ItemStack armor : entity.getArmorInventoryList()) {
             if (!armor.isEmpty()) {
@@ -82,10 +86,7 @@ public class EnchantmentCalamity extends EnchantmentBase {
             }
         }
 
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
-        }
-        return totalLevel;
+        return capLevel(totalLevel, LEVEL_CAP);
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
@@ -96,9 +97,14 @@ public class EnchantmentCalamity extends EnchantmentBase {
 
         EntityLivingBase victim = evt.getEntityLiving();
 
+        if (shouldBlockMobTrigger(victim, false)) {
+            return;
+        }
+
+        // 以前是 ×2，和说明写的 150% 不符
         int totalLevel = getArmorLevel(victim);
         if (totalLevel > 0) {
-            evt.setAmount(evt.getAmount() * 2);
+            evt.setAmount(evt.getAmount() * DAMAGE_MULTIPLIER);
         }
     }
 
@@ -112,7 +118,7 @@ public class EnchantmentCalamity extends EnchantmentBase {
             return;
         }
 
-        if (!RandomUtil.percentageChance(2)) {
+        if (!RandomUtil.percentageChance(TRIGGER_CHANCE)) {
             return;
         }
 

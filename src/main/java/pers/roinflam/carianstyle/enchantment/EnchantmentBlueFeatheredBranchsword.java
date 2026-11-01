@@ -26,6 +26,18 @@ import javax.annotation.Nonnull;
 )
 public class EnchantmentBlueFeatheredBranchsword extends EnchantmentBase {
 
+    /** 参与计算的等级上限（levelLimit 开时） */
+    private static final int LEVEL_CAP = 10;
+    /**
+     * 生效等级的硬上限，不受 levelLimit 开关影响，最多减伤 90%
+     * <p>以前 10 级时系数是 0（完全免疫生物伤害），关掉 levelLimit 到 11 级起系数为负，挨打反而加血。</p>
+     */
+    private static final int MAX_EFFECTIVE_LEVEL = 9;
+    /** 每级减伤 */
+    private static final float REDUCTION_PER_LEVEL = 0.1F;
+    /** 触发的生命比例门槛 */
+    private static final float HEALTH_THRESHOLD = 0.2F;
+
     public EnchantmentBlueFeatheredBranchsword() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
@@ -38,15 +50,13 @@ public class EnchantmentBlueFeatheredBranchsword extends EnchantmentBase {
         }
 
         // 手动应用等级限制
-        int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, 10);
-        }
+        int effectiveLevel = capLevel(level, LEVEL_CAP);
+        effectiveLevel = Math.min(effectiveLevel, MAX_EFFECTIVE_LEVEL);
 
         // 血量 <= 20%时触发
-        if (ctx.getHolder().getHealth() <= ctx.getHolder().getMaxHealth() * 0.2) {
+        if (ctx.getHolder().getHealth() <= ctx.getHolder().getMaxHealth() * HEALTH_THRESHOLD) {
             // 减伤 = 伤害 × 等级 × 10%
-            ctx.multiplyDamage(1 - effectiveLevel * 0.1f);
+            ctx.multiplyDamage(1 - effectiveLevel * REDUCTION_PER_LEVEL);
         }
     }
 

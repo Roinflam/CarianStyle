@@ -41,8 +41,16 @@ import javax.annotation.Nonnull;
 @Mod.EventBusSubscriber
 public class EnchantmentAncestralSpiritHorn extends EnchantmentBase {
 
+    /** 魔法伤害倍率（受到 75%） */
+    private static final float DAMAGE_MULTIPLIER = 0.75F;
+    /** 每级回复本次伤害的比例 */
+    private static final float HEAL_PER_LEVEL = 0.05F;
+
+    /**
+     * 只能附在胸甲上；以前任意护甲件都能附，全身叠加起来比单件强
+     */
     public EnchantmentAncestralSpiritHorn() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+        super(EnumEnchantmentType.ARMOR_CHEST, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
     }
 
     private static int getTotalLevel(EntityLivingBase entity) {
@@ -77,14 +85,18 @@ public class EnchantmentAncestralSpiritHorn extends EnchantmentBase {
 
         EntityLivingBase holder = evt.getEntityLiving();
 
+        if (shouldBlockMobTrigger(holder, false)) {
+            return;
+        }
+
         int totalLevel = getTotalLevel(holder);
         if (totalLevel <= 0) {
             return;
         }
 
-        evt.setAmount(evt.getAmount() * 0.75f);
+        evt.setAmount(evt.getAmount() * DAMAGE_MULTIPLIER);
 
-        float healPerTick = evt.getAmount() * totalLevel * 0.05f / 20;
+        float healPerTick = evt.getAmount() * totalLevel * HEAL_PER_LEVEL / 20;
 
         new SynchronizationTask(10, 10) {
             private int tick = 0;

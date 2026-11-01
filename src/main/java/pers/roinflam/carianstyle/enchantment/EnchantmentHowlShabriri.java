@@ -13,8 +13,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
-import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
 
 import javax.annotation.Nonnull;
 
@@ -23,9 +22,14 @@ import javax.annotation.Nonnull;
  *
  * 武器附魔，叠层诅咒系统
  * 攻击时：
- * - 给目标叠加沙布里里嚎叫效果（持续 = 等级 × 3秒，层数+1，最高5层）
- * - 目标满5层时，伤害增加 15% × 等级
- * - 攻击者自身受到癫火伤害（3秒内共5%最大生命值，创造模式免疫）
+ * - 满蓄力命中才触发
+ * - 给目标叠加沙布里里嚎叫效果（持续 = 等级 × 3秒，第一次命中 1 层，每次 +1，至多 6 层）
+ * - 目标满层时，伤害增加 15% × 等级
+ * - 攻击者自身受到癫火伤害（延迟 5 tick 后 3 秒内共 5% 最大生命值，创造模式免疫）
+ * <p>
+ * 以前没有效果时按 0 层再 +1，第一次命中就是 2 层，比说明早一级、满层少打一次；
+ * 自损改走持续伤害管理器，时间回溯期间暂停扣血，耗死时也走正常的死亡流程。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "howl_shabriri",
@@ -33,6 +37,19 @@ import javax.annotation.Nonnull;
         rarity = EnchantmentRarity.RARE
 )
 public class EnchantmentHowlShabriri extends EnchantmentBase {
+
+    /** 效果等级上限（amplifier 5 即 6 层） */
+    private static final int MAX_AMPLIFIER = 5;
+    /** 满层后每级增加的伤害比例 */
+    private static final float BONUS_DAMAGE_PER_LEVEL = 0.15F;
+    /** 每级效果持续秒数 */
+    private static final int STACK_SECONDS_PER_LEVEL = 3;
+    /** 自损总量占最大生命值的比例 */
+    private static final float SELF_DAMAGE_RATIO = 0.05F;
+    /** 自损持续 tick 数 */
+    private static final int SELF_DOT_DURATION = 60;
+    /** 自损起始延迟（tick） */
+    private static final int SELF_DOT_DELAY = 5;
 
     public EnchantmentHowlShabriri() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
@@ -50,30 +67,29 @@ public class EnchantmentHowlShabriri extends EnchantmentBase {
             return;
         }
 
-        // 玩家必须是刚挥动武器
-        if (attacker instanceof EntityPlayer) {
-            if (!isJustSwung((EntityPlayer) attacker)) {
-                return;
-            }
+        if (!isFullyCharged(attacker)) {
+            return;
         }
 
-        // 获取当前层数
-        int currentAmplifier = 0;
-        if (victim.isPotionActive(CarianStylePotion.HOWL_SHABRIRI)) {
-            currentAmplifier = victim.getActivePotionEffect(CarianStylePotion.HOWL_SHABRIRI).getAmplifier();
+        // 当前层数，没有效果时为 -1
+        int currentAmplifier = -1;
+        PotionEffect current = victim.getActivePotionEffect(CarianStylePotion.HOWL_SHABRIRI);
+        if (current != null) {
+            currentAmplifier = current.getAmplifier();
         }
 
-        // 满5层时增伤
-        if (currentAmplifier >= 5) {
-            float bonusDamage = ctx.getDamage() * level * 0.15f;
+        // 满层时增伤
+        if (currentAmplifier >= MAX_AMPLIFIER) {
+            float bonusDamage = ctx.getDamage() * level * BONUS_DAMAGE_PER_LEVEL;
             ctx.addDamage(bonusDamage);
         }
 
-        // 叠加沙布里里嚎叫效果（层数+1，最高5层）
+        // 叠加沙布里里嚎叫效果：第一次 1 层，之后每次 +1
+        int newAmplifier = currentAmplifier < 0 ? 0 : Math.min(currentAmplifier + 1, MAX_AMPLIFIER);
         victim.addPotionEffect(new PotionEffect(
                 CarianStylePotion.HOWL_SHABRIRI,
-                level * 3 * 20,
-                Math.min(currentAmplifier + 1, 5)
+                level * STACK_SECONDS_PER_LEVEL * 20,
+                newAmplifier
         ));
 
         // 攻击者受到癫火伤害（创造模式免疫）
@@ -84,26 +100,10 @@ public class EnchantmentHowlShabriri extends EnchantmentBase {
                     0
             ));
 
-            new SynchronizationTask(5, 1) {
-                private int tick = 0;
-
-                @Override
-                public void run() {
-                    if (++tick > 60 || !attacker.isEntityAlive()) {
-                        this.cancel();
-                        return;
-                    }
-
-                    // 每tick造成 5%/60 最大生命值伤害
-                    float damage = attacker.getMaxHealth() * 0.05f / 60;
-                    if (attacker.getHealth() - damage * 2 > 0) {
-                        attacker.setHealth(attacker.getHealth() - damage);
-                    } else {
-                        EntityLivingUtil.kill(attacker, NewDamageSource.EPILEPSY_FIRE);
-                        this.cancel();
-                    }
-                }
-            }.start();
+            // 每 tick 扣 5% 最大生命 / 60，以命中时的最大生命为准
+            float selfDamagePerTick = attacker.getMaxHealth() * SELF_DAMAGE_RATIO / SELF_DOT_DURATION;
+            DamageOverTimeManager.applySelfLinear(attacker, selfDamagePerTick, SELF_DOT_DURATION, SELF_DOT_DELAY,
+                    NewDamageSource.EPILEPSY_FIRE);
         }
     }
 

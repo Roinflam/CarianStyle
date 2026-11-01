@@ -6,7 +6,9 @@ import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.projectile.EntityArrow;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.DamageSource;
+import net.minecraft.util.math.Vec3d;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
@@ -24,10 +26,15 @@ import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import javax.annotation.Nonnull;
 
 /**
- * 卡利亚方阵附魔
- *
- * 弓箭伤害时概率生成魔法剑阵列攻击目标
- * 每把剑伤害 = 原伤害×等级×5%
+ * 卡利亚圆阵附魔
+ * <p>
+ * 弓箭伤害时按 [等级]×2% 概率在身后召出 9 把辉剑，排成头顶后方的扇形，跟着射手移动和转身，
+ * 45~85 tick 后依次追踪射向目标；每把伤害 = 触发那一箭的伤害 × [等级] × 5%。
+ * </p>
+ * <p>
+ * 以前剑阵是目标身上的 3×3 方阵、不追踪，箭直接把目标射死时整套剑阵一把都飞不出去；
+ * 现在目标死了剑照样飞向它倒下的地方。射手在发射前死了就不发。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "carian_phalanx",
@@ -39,6 +46,33 @@ import javax.annotation.Nonnull;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentCarianPhalanx extends EnchantmentBase {
+
+    /** 参与计算的等级上限 */
+    private static final int LEVEL_CAP = 10;
+    /** 辉剑数量 */
+    private static final int BLADE_COUNT = 9;
+    /** 扇形半径（格）：剑离射手的水平距离 */
+    private static final double FAN_RADIUS = 2.1D;
+    /** 第一把剑的发射延迟（tick） */
+    private static final int BASE_DELAY = 45;
+    /** 相邻两把剑的发射间隔（tick） */
+    private static final int DELAY_STEP = 5;
+    /** 每级触发概率（百分比） */
+    private static final double TRIGGER_CHANCE_PER_LEVEL = 2.0D;
+    /** 每级每把剑的伤害倍率 */
+    private static final float DAMAGE_PER_LEVEL = 0.05F;
+    /** 扇形张角的一半（度），以正后方为中心左右展开；第一人称只有最外侧一对落在余光边缘 */
+    private static final double FAN_HALF_SPREAD = 125.0D;
+    /** 扇形中心（正后方那把）离射手脚底的高度（格） */
+    private static final double FAN_HEIGHT_CENTER = 2.0D;
+    /** 扇形两端相对中心的下沉量（格），中间高两边低 */
+    private static final double FAN_HEIGHT_DROP = 0.75D;
+    /** 辉剑追踪强度 */
+    private static final float TRACKING_STRENGTH = 0.2F;
+    /** 辉剑寿命（tick） */
+    private static final int BLADE_LIFETIME = 80;
+    /** 辉剑速度 */
+    private static final float BLADE_SPEED = 1.5F;
 
     public EnchantmentCarianPhalanx() {
         super(EnumEnchantmentType.BOW, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
@@ -62,7 +96,12 @@ public class EnchantmentCarianPhalanx extends EnchantmentBase {
         EntityLivingBase victim = evt.getEntityLiving();
         EntityLivingBase attacker = (EntityLivingBase) damageSource.getTrueSource();
 
-        if (attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+        if (shouldBlockMobTrigger(attacker, false)) {
+            return;
+        }
+
+        ItemStack heldItem = attacker.getHeldItemMainhand();
+        if (heldItem.isEmpty()) {
             return;
         }
 
@@ -71,55 +110,85 @@ public class EnchantmentCarianPhalanx extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                carianPhalanx,
-                attacker.getHeldItem(attacker.getActiveHand()));
+        int level = EnchantmentHelper.getEnchantmentLevel(carianPhalanx, heldItem);
 
         if (ConfigLoader.levelLimit) {
-            level = Math.min(level, 10);
+            level = Math.min(level, LEVEL_CAP);
         }
 
         if (level <= 0) {
             return;
         }
 
-        if (!RandomUtil.percentageChance(level * 2)) {
+        if (!RandomUtil.percentageChance(level * TRIGGER_CHANCE_PER_LEVEL)) {
             return;
         }
 
         final int effectiveLevel = level;
         final float baseDamage = evt.getAmount();
 
-        for (int x = -1; x < 2; x++) {
-            for (int z = -1; z < 2; z++) {
-                int delay = (int) (55 + x * 7.5 + z * 7.5);
+        for (int i = 0; i < BLADE_COUNT; i++) {
+            // t: -1（最左）→ 0（正后方）→ +1（最右）
+            double t = BLADE_COUNT == 1 ? 0.0D : (i * 2.0D / (BLADE_COUNT - 1) - 1.0D);
+            double spreadRad = Math.toRadians(FAN_HALF_SPREAD * t);
 
-                EntityGlintblades showBlade = new EntityGlintblades(attacker, victim).setDeadTick(delay);
-                showBlade.posX += x;
-                showBlade.posY += 1;
-                showBlade.posZ += z;
-                victim.world.spawnEntity(showBlade);
+            // 局部轴：x=右，y=上，z=前。剑在身后，前向分量恒为负
+            final double offsetX = Math.sin(spreadRad) * FAN_RADIUS;
+            final double offsetY = FAN_HEIGHT_CENTER - FAN_HEIGHT_DROP * Math.abs(t);
+            final double offsetZ = -Math.cos(spreadRad) * FAN_RADIUS;
+            final int delay = BASE_DELAY + i * DELAY_STEP;
 
-                new SynchronizationTask(delay) {
-                    @Override
-                    public void run() {
-                        double posX = showBlade.posX;
-                        double posY = showBlade.posY;
-                        double posZ = showBlade.posZ;
+            // 悬浮展示用的剑：挂锚点跟随射手，延迟到期后自行消失
+            Vec3d spawn = localToWorld(attacker, offsetX, offsetY, offsetZ);
+            EntityGlintblades showBlade = new EntityGlintblades(attacker, victim)
+                    .setDeadTick(delay)
+                    .setSize(1.0f)
+                    .setHoverAnchor(new Vec3d(offsetX, offsetY, offsetZ));
+            showBlade.setPosition(spawn.x, spawn.y, spawn.z);
+            attacker.world.spawnEntity(showBlade);
 
-                        EntityGlintblades attackBlade = new EntityGlintblades(attacker, victim);
-                        attackBlade.posX = posX;
-                        attackBlade.posY = posY;
-                        attackBlade.posZ = posZ;
-
-                        attackBlade.setDamageSource(DamageSource.causeThrownDamage(attackBlade, attacker).setMagicDamage());
-                        attackBlade.setDamage(baseDamage * effectiveLevel * 0.05f);
-                        attackBlade.shoot(1);
-                        victim.world.spawnEntity(attackBlade);
+            new SynchronizationTask(delay) {
+                @Override
+                public void run() {
+                    // 射手没了就不发：发射点是相对他算的
+                    if (!attacker.isEntityAlive()) {
+                        return;
                     }
-                }.start();
-            }
+
+                    // 目标死了也照样发，朝它倒下的地方飞
+                    Vec3d aimPoint = new Vec3d(victim.posX, victim.posY + victim.getEyeHeight() * 0.8D, victim.posZ);
+
+                    // 从射手当前的位置和朝向推算发射点：悬浮剑这段时间一直跟着他
+                    Vec3d launch = localToWorld(attacker, offsetX, offsetY, offsetZ);
+
+                    EntityGlintblades attackBlade = new EntityGlintblades(attacker, victim)
+                            .setSize(1.0f)
+                            .setAimPoint(aimPoint)
+                            .setDamage(baseDamage * effectiveLevel * DAMAGE_PER_LEVEL)
+                            .setTrackingStrength(TRACKING_STRENGTH)
+                            .setMaxLifetime(BLADE_LIFETIME);
+                    attackBlade.setDamageSource(DamageSource.causeThrownDamage(attackBlade, attacker).setMagicDamage());
+                    attackBlade.setPosition(launch.x, launch.y, launch.z);
+                    attackBlade.shoot(BLADE_SPEED);
+                    attacker.world.spawnEntity(attackBlade);
+                }
+            }.start();
         }
+    }
+
+    /**
+     * 射手局部偏移（右 / 上 / 前）换算成世界坐标，和辉剑悬浮锚点同一个公式
+     */
+    @Nonnull
+    private static Vec3d localToWorld(@Nonnull EntityLivingBase owner, double right, double up, double forward) {
+        double yawRad = Math.toRadians(owner.rotationYaw);
+        double sin = Math.sin(yawRad);
+        double cos = Math.cos(yawRad);
+        return new Vec3d(
+                owner.posX + (-cos) * right + (-sin) * forward,
+                owner.posY + up,
+                owner.posZ + (-sin) * right + cos * forward
+        );
     }
 
     @Override

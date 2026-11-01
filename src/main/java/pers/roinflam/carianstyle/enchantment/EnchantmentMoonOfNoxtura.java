@@ -7,7 +7,8 @@ import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
-import net.minecraftforge.event.entity.living.LivingSetAttackTargetEvent;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
@@ -27,8 +28,12 @@ import java.util.List;
  * 诺克斯之月附魔
  *
  * 护甲附魔，夜间迷惑敌人
- * 夜间被怪物锁定时：
- * - 2.5%概率使怪物转移攻击目标到附近其他实体
+ * 夜间每秒有 2.5% 概率让 32 格内正以穿戴者为目标的怪物一齐转向：
+ * 各自在视线内、离自己不比穿戴者远的另一种生物里随机挑一个作为新目标。
+ * <p>
+ * 以前挂在怪物选目标的事件上，每只怪每次选中穿戴者各掷一次、不限距离，
+ * 怪越多、重选目标越频繁，转移得越多。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "moon_of_noxtura",
@@ -37,6 +42,15 @@ import java.util.List;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentMoonOfNoxtura extends EnchantmentBase {
+
+    /** 检查间隔（tick） */
+    private static final int TICK_INTERVAL = 20;
+    /** 每次检查的触发概率（%） */
+    private static final double TRIGGER_CHANCE = 2.5D;
+    /** 搜索以穿戴者为目标的怪物的半径（格） */
+    private static final int SEARCH_RADIUS = 32;
+    /** 参与计算的等级上限（开了等级上限时生效） */
+    private static final int LEVEL_CAP = 10;
 
     public EnchantmentMoonOfNoxtura() {
         super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
@@ -48,69 +62,64 @@ public class EnchantmentMoonOfNoxtura extends EnchantmentBase {
     }
 
     /**
-     * 被怪物锁定时概率转移仇恨
-     * 由于 LivingSetAttackTargetEvent 没有模板方法，且需要累加护甲等级，保留静态监听器
+     * 每秒检查一次，只在穿戴者周围 32 格里找盯着他的怪
      */
     @SubscribeEvent
-    public static void onLivingSetAttackTarget(@Nonnull LivingSetAttackTargetEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
+        EntityPlayer player = evt.player;
+        if (player.world.isRemote || evt.phase != TickEvent.Phase.START) {
             return;
         }
-
-        // 必须是夜间
-        if (evt.getEntity().world.isDaytime()) {
+        if (player.ticksExisted % TICK_INTERVAL != 0) {
             return;
         }
-
-        // 必须是EntityLiving锁定目标
-        if (!(evt.getEntityLiving() instanceof EntityLiving) || evt.getTarget() == null) {
+        // 只在夜晚生效
+        if (player.world.isDaytime()) {
             return;
         }
-
-        EntityLiving attacker = (EntityLiving) evt.getEntityLiving();
-        EntityLivingBase target = evt.getTarget();
+        if (!player.isEntityAlive()) {
+            return;
+        }
 
         Enchantment moonOfNoxtura = EnchantmentRegistry.getEnchantmentByClass(EnchantmentMoonOfNoxtura.class);
         if (moonOfNoxtura == null) {
             return;
         }
 
-        // 从目标的护甲累加附魔等级
         int totalLevel = 0;
-        for (ItemStack armor : target.getArmorInventoryList()) {
+        for (ItemStack armor : player.getArmorInventoryList()) {
             if (!armor.isEmpty()) {
                 totalLevel += EnchantmentHelper.getEnchantmentLevel(moonOfNoxtura, armor);
             }
         }
-
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
-        }
-
+        totalLevel = capLevel(totalLevel, LEVEL_CAP);
         if (totalLevel <= 0) {
             return;
         }
 
-        // 2.5%概率触发
-        if (!RandomUtil.percentageChance(2.5)) {
+        if (!RandomUtil.percentageChance(TRIGGER_CHANCE)) {
             return;
         }
 
-        // 获取攻击者与目标之间距离内的其他实体
-        double distance = attacker.getDistance(target);
-        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(
-                EntityLivingBase.class,
-                attacker,
-                (int) distance,
-                entity -> entity.getClass() != attacker.getClass()
-                        && attacker.canEntityBeSeen(entity)
-                        && !entity.equals(attacker)
-                        && !entity.equals(target)
-        );
+        List<EntityLiving> nearbyMobs = EntityUtil.getNearbyEntities(EntityLiving.class, player, SEARCH_RADIUS,
+                mob -> mob != null && player.equals(mob.getAttackTarget()));
 
-        if (!entities.isEmpty()) {
-            // 随机选择一个新目标
-            attacker.setAttackTarget(entities.get(RandomUtil.getInt(0, entities.size() - 1)));
+        for (EntityLiving mob : nearbyMobs) {
+            // 在怪物视线内、离它不比穿戴者远的另一种生物里挑新目标
+            double distance = mob.getDistance(player);
+            List<EntityLivingBase> alternatives = EntityUtil.getNearbyEntities(
+                    EntityLivingBase.class,
+                    mob,
+                    (int) distance,
+                    entity -> entity != null
+                            && entity.getClass() != mob.getClass()
+                            && mob.canEntityBeSeen(entity)
+                            && !entity.equals(mob)
+                            && !entity.equals(player)
+            );
+            if (!alternatives.isEmpty()) {
+                mob.setAttackTarget(alternatives.get(RandomUtil.getInt(0, alternatives.size() - 1)));
+            }
         }
     }
 

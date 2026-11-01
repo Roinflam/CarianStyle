@@ -28,8 +28,11 @@ import javax.annotation.Nonnull;
  *
  * 护甲附魔，战斗时双方都能获得护盾
  * 受到攻击时：
- * - 受击者获得黄金树庇佑效果（持续 = 2.5 × 等级 秒，效果等级 = 附魔等级 - 1）
- * - 攻击者也获得黄金树庇佑效果（等级上限额外限制为5）
+ * - 受击者获得黄金树庇佑效果（持续 = 2.5 × 等级 秒，效果等级 = 附魔等级 - 1，至多 5 级）
+ * - 攻击者也获得黄金树庇佑效果（同样至多 5 级）
+ * <p>
+ * 以前受击者没有上限，全身等级之和到 6 时减免超过 100%，伤害变成负数反而回血。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "protection_of_the_erdtree",
@@ -38,6 +41,15 @@ import javax.annotation.Nonnull;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentProtectionOfTheErdtree extends EnchantmentBase {
+
+    /** 受击者的效果等级上限：至多 5 级，减免最高 100% */
+    private static final int VICTIM_AMPLIFIER_CAP = 5;
+    /** 攻击者的效果等级上限 */
+    private static final int ATTACKER_AMPLIFIER_CAP = 5;
+    /** 参与计算的等级上限（开了等级上限时生效） */
+    private static final int LEVEL_CAP = 10;
+    /** 每级效果持续秒数 */
+    private static final double DURATION_SECONDS_PER_LEVEL = 2.5D;
 
     public EnchantmentProtectionOfTheErdtree() {
         super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
@@ -72,43 +84,44 @@ public class EnchantmentProtectionOfTheErdtree extends EnchantmentBase {
         }
 
         // 处理受击者
-        int victimLevel = 0;
-        for (ItemStack armor : victim.getArmorInventoryList()) {
-            if (!armor.isEmpty()) {
-                victimLevel += EnchantmentHelper.getEnchantmentLevel(protection, armor);
+        if (!shouldBlockMobTrigger(victim, false)) {
+            int victimLevel = 0;
+            for (ItemStack armor : victim.getArmorInventoryList()) {
+                if (!armor.isEmpty()) {
+                    victimLevel += EnchantmentHelper.getEnchantmentLevel(protection, armor);
+                }
+            }
+            victimLevel = capLevel(victimLevel, LEVEL_CAP);
+
+            if (victimLevel > 0) {
+                victimLevel = Math.min(victimLevel, VICTIM_AMPLIFIER_CAP);
+
+                // 持续时间 = 2.5 秒 × 等级（按封顶后的等级）
+                int duration = (int) (DURATION_SECONDS_PER_LEVEL * victimLevel * 20);
+                victim.addPotionEffect(new PotionEffect(
+                        CarianStylePotion.PROTECTION_OF_THE_ERDTREE,
+                        duration,
+                        victimLevel - 1
+                ));
             }
         }
 
-        if (ConfigLoader.levelLimit) {
-            victimLevel = Math.min(victimLevel, 10);
-        }
-
-        if (victimLevel > 0) {
-            int duration = (int) (2.5 * victimLevel * 20);
-            victim.addPotionEffect(new PotionEffect(
-                    CarianStylePotion.PROTECTION_OF_THE_ERDTREE,
-                    duration,
-                    victimLevel - 1
-            ));
-        }
-
         // 处理攻击者
+        if (shouldBlockMobTrigger(attacker, false)) {
+            return;
+        }
         int attackerLevel = 0;
         for (ItemStack armor : attacker.getArmorInventoryList()) {
             if (!armor.isEmpty()) {
                 attackerLevel += EnchantmentHelper.getEnchantmentLevel(protection, armor);
             }
         }
-
-        if (ConfigLoader.levelLimit) {
-            attackerLevel = Math.min(attackerLevel, 10);
-        }
+        attackerLevel = capLevel(attackerLevel, LEVEL_CAP);
 
         if (attackerLevel > 0) {
-            // 攻击者等级额外限制为5
-            attackerLevel = Math.min(attackerLevel, 5);
+            attackerLevel = Math.min(attackerLevel, ATTACKER_AMPLIFIER_CAP);
 
-            int duration = (int) (2.5 * attackerLevel * 20);
+            int duration = (int) (DURATION_SECONDS_PER_LEVEL * attackerLevel * 20);
             attacker.addPotionEffect(new PotionEffect(
                     CarianStylePotion.PROTECTION_OF_THE_ERDTREE,
                     duration,

@@ -6,6 +6,7 @@ import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.projectile.EntityArrow;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemStack;
 import net.minecraft.potion.PotionEffect;
 import net.minecraftforge.event.entity.ProjectileImpactEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -38,13 +39,25 @@ import java.util.List;
 @Mod.EventBusSubscriber
 public class EnchantmentDragonBreathCorruption extends EnchantmentBase {
 
+    /** 参与计算的等级上限 */
+    private static final int LEVEL_CAP = 10;
+    /** 范围半径上限（格），半径 = 等级 × 2 */
+    private static final int MAX_SEARCH_RADIUS = 10;
+    /** 一次至多影响的目标数 */
+    private static final int MAX_TARGETS = 20;
+    /** 每级腐败持续秒数 */
+    private static final int EFFECT_SECONDS_PER_LEVEL = 5;
+
     public EnchantmentDragonBreathCorruption() {
         super(EnumEnchantmentType.BOW, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
     /**
-     * 箭矢落地时对周围敌人施加猩红腐败
-     * 注意：ProjectileImpactEvent基类无模板方法，保留静态监听器
+     * 箭矢落地时对周围所有生物（含自己）施加猩红腐败
+     * <p>
+     * 半径 = 等级 × 2，至多 10 格；一次至多 20 个。以前半径能到 20 格、没有数量上限。
+     * 只认射手主手的弓；射手不是生物时不触发（以前直接强转会崩）。
+     * </p>
      */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onProjectileImpact_Arrow(@Nonnull ProjectileImpactEvent.Arrow evt) {
@@ -58,44 +71,52 @@ public class EnchantmentDragonBreathCorruption extends EnchantmentBase {
         }
 
         EntityArrow arrow = evt.getArrow();
+        if (!(arrow.shootingEntity instanceof EntityLivingBase)) {
+            return;
+        }
         EntityLivingBase attacker = (EntityLivingBase) arrow.shootingEntity;
-        Enchantment dragonBreath = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDragonBreathCorruption.class);
 
+        if (shouldBlockMobTrigger(attacker, false)) {
+            return;
+        }
+
+        ItemStack heldItem = attacker.getHeldItemMainhand();
+        if (heldItem.isEmpty()) {
+            return;
+        }
+
+        Enchantment dragonBreath = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDragonBreathCorruption.class);
         if (dragonBreath == null) {
             return;
         }
 
-        if (attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-            return;
-        }
-
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                dragonBreath,
-                attacker.getHeldItem(attacker.getActiveHand())
-        );
+        int level = EnchantmentHelper.getEnchantmentLevel(dragonBreath, heldItem);
 
         if (ConfigLoader.levelLimit) {
-            level = Math.min(level, 10);
+            level = Math.min(level, LEVEL_CAP);
         }
 
         if (level <= 0) {
             return;
         }
 
-        // 获取范围内的所有实体
         List<EntityLivingBase> targets = EntityUtil.getNearbyEntities(
                 EntityLivingBase.class,
                 arrow,
-                level * 2
+                Math.min(level * 2, MAX_SEARCH_RADIUS)
         );
 
-        // 对所有目标施加猩红腐败
+        int hitCount = 0;
         for (EntityLivingBase target : targets) {
+            if (hitCount >= MAX_TARGETS) {
+                break;
+            }
             target.addPotionEffect(new PotionEffect(
                     CarianStylePotion.SCARLET_ROT,
-                    level * 5 * 20,  // 持续时间：等级 × 5秒
-                    level - 1        // 效果等级：附魔等级 - 1
+                    level * EFFECT_SECONDS_PER_LEVEL * 20,
+                    level - 1
             ));
+            hitCount++;
         }
     }
 

@@ -52,6 +52,10 @@ public class EnchantmentAncestralSpirits extends EnchantmentBase {
 
         EntityLivingBase holder = evt.getEntityLiving();
 
+        if (shouldBlockMobTrigger(holder, false)) {
+            return;
+        }
+
         Enchantment ancestralSpirits = EnchantmentRegistry.getEnchantmentByClass(EnchantmentAncestralSpirits.class);
         if (ancestralSpirits == null) {
             return;
@@ -75,8 +79,6 @@ public class EnchantmentAncestralSpirits extends EnchantmentBase {
 
         // 持续回血
         if (holder.isEntityAlive()) {
-            float healPerTick = (holder.getMaxHealth() - holder.getHealth()) * 0.05f / 20;
-
             new SynchronizationTask(10, 10) {
                 private int tick = 0;
 
@@ -87,6 +89,8 @@ public class EnchantmentAncestralSpirits extends EnchantmentBase {
                         this.cancel();
                         return;
                     }
+                    // 每次按当时已损失的生命重新算（以前在受击瞬间算一次后固定，取的还是这一下扣血之前的值）
+                    float healPerTick = (holder.getMaxHealth() - holder.getHealth()) * 0.05f / 20;
                     holder.heal(healPerTick);
                 }
             }.start();

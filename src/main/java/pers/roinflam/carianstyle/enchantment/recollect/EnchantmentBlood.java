@@ -17,6 +17,7 @@ import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
 import java.util.UUID;
@@ -52,10 +53,9 @@ public class EnchantmentBlood extends EnchantmentBase {
             return;
         }
 
-        if (ctx.isHolderPlayer()) {
-            if (!isJustSwung(ctx.getHolderAsPlayer())) {
-                return;
-            }
+        // 满蓄力才计数（以前要求冷却恰好回满，现在和其它附魔一样按 90% 算）
+        if (!isFullyCharged(attacker)) {
+            return;
         }
 
         UUID uuid = attacker.getUniqueID();
@@ -66,11 +66,11 @@ public class EnchantmentBlood extends EnchantmentBase {
 
             float damage = victim.getHealth() * 0.12f;
             attacker.heal(Math.min(damage, attacker.getMaxHealth() * 0.18f));
-            victim.setHealth(victim.getHealth() - damage);
+            EntityLivingUtil.damageHealthDirectly(victim, damage, ctx.getDamageSource());
 
             // 检查是否同时有血斩和血收附魔
             int hemorrhageLevel = 0;
-            ItemStack heldItem = attacker.getHeldItem(attacker.getActiveHand());
+            ItemStack heldItem = attacker.getHeldItemMainhand();
 
             net.minecraft.enchantment.Enchantment bloodSlash = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBloodSlash.class);
             net.minecraft.enchantment.Enchantment bloodCollection = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBloodCollection.class);

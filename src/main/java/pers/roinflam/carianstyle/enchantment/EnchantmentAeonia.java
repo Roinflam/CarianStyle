@@ -6,7 +6,9 @@ import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.potion.PotionEffect;
-import net.minecraftforge.event.entity.living.LivingEvent;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.ItemStack;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
@@ -39,6 +41,12 @@ import javax.annotation.Nonnull;
 public class EnchantmentAeonia extends EnchantmentBase {
 
     private static final int RECOLLECT_ENCHANTABILITY = 35;
+    /** 回血比例（最大生命） */
+    private static final float HEAL_RATIO = 0.1F;
+    /** 自身腐败的刷新间隔（tick） */
+    private static final int TICK_INTERVAL = 20;
+    /** 每次给自己挂的腐败时长（tick），比间隔多 1 tick 保证不断档 */
+    private static final int SELF_ROT_DURATION = 21;
 
     public EnchantmentAeonia() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
@@ -57,28 +65,34 @@ public class EnchantmentAeonia extends EnchantmentBase {
             return;
         }
 
-        if (ctx.isHolderPlayer()) {
-            if (!isJustSwung(ctx.getHolderAsPlayer())) {
-                return;
-            }
+        if (!isFullyCharged(attacker)) {
+            return;
         }
 
-        attacker.heal(attacker.getMaxHealth() * 0.1f);
+        attacker.heal(attacker.getMaxHealth() * HEAL_RATIO);
     }
 
+    /**
+     * 主手拿着时自己身上保持 1 级猩红腐败
+     * <p>
+     * 只对玩家、只认主手。以前挂在所有生物的 LivingUpdate 上、按「正在用的那只手」判断，
+     * 每个生物每 tick 都要进一次；怪物拿着也会自己腐败。
+     * </p>
+     */
     @SubscribeEvent
-    public static void onLivingUpdate(@Nonnull LivingEvent.LivingUpdateEvent evt) {
-        if (evt.getEntity().world.isRemote) {
+    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
+        if (evt.player.world.isRemote || evt.phase != TickEvent.Phase.START) {
             return;
         }
 
-        if (evt.getEntity().world.getTotalWorldTime() % 20 != 0) {
+        if (evt.player.ticksExisted % TICK_INTERVAL != 0) {
             return;
         }
 
-        EntityLivingBase holder = evt.getEntityLiving();
+        EntityPlayer holder = evt.player;
+        ItemStack heldItem = holder.getHeldItemMainhand();
 
-        if (holder.getHeldItem(holder.getActiveHand()).isEmpty()) {
+        if (heldItem.isEmpty()) {
             return;
         }
 
@@ -87,12 +101,8 @@ public class EnchantmentAeonia extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                aeonia,
-                holder.getHeldItem(holder.getActiveHand()));
-
-        if (level > 0) {
-            holder.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_ROT, 21, 0));
+        if (EnchantmentHelper.getEnchantmentLevel(aeonia, heldItem) > 0) {
+            holder.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_ROT, SELF_ROT_DURATION, 0));
         }
     }
 

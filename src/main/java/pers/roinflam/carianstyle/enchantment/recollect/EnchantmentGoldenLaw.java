@@ -62,10 +62,10 @@ public class EnchantmentGoldenLaw extends EnchantmentBase {
         if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
             EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
 
-            if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+            if (!shouldBlockMobTrigger(attacker, false) && !attacker.getHeldItemMainhand().isEmpty()) {
                 int level = EnchantmentHelper.getEnchantmentLevel(
                         goldenLaw,
-                        attacker.getHeldItem(attacker.getActiveHand()));
+                        attacker.getHeldItemMainhand());
 
                 if (level > 0) {
                     float healthRatio = attacker.getHealth() / attacker.getMaxHealth();
@@ -78,10 +78,14 @@ public class EnchantmentGoldenLaw extends EnchantmentBase {
         // 受击者视角：减伤15%
         EntityLivingBase victim = evt.getEntityLiving();
 
-        if (!victim.getHeldItem(victim.getActiveHand()).isEmpty()) {
+        if (shouldBlockMobTrigger(victim, false)) {
+            return;
+        }
+
+        if (!victim.getHeldItemMainhand().isEmpty()) {
             int level = EnchantmentHelper.getEnchantmentLevel(
                     goldenLaw,
-                    victim.getHeldItem(victim.getActiveHand()));
+                    victim.getHeldItemMainhand());
 
             if (level > 0) {
                 evt.setAmount(evt.getAmount() * 0.85f);
@@ -100,6 +104,11 @@ public class EnchantmentGoldenLaw extends EnchantmentBase {
         }
 
         EntityLivingBase holder = evt.getEntityLiving();
+
+        if (shouldBlockMobTrigger(holder, false)) {
+            return;
+        }
+
         UUID uuid = holder.getUniqueID();
 
         if (holder.getHeldItemMainhand().isEmpty()) {

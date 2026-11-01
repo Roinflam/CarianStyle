@@ -3,7 +3,6 @@ package pers.roinflam.carianstyle.enchantment;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.potion.PotionEffect;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
@@ -25,9 +24,12 @@ import javax.annotation.Nullable;
  * 攻击时：
  * - 叠加攻击增益效果（最多叠到等级×7层）
  * - 满层后刷新为等级×16层，持续60tick
- * 伤害加成：
+ * 伤害加成（只在增幅期间）：
  * - 满层时增伤10%×等级
  * - 未满层时增伤5%×等级
+ * <p>
+ * 以前身上没有增幅时也照加 5%×等级，等于只要拿着就永久增伤。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "millicent_prosthesis",
@@ -35,6 +37,11 @@ import javax.annotation.Nullable;
         rarity = EnchantmentRarity.RARE
 )
 public class EnchantmentMillicentProsthesis extends EnchantmentBase {
+
+    /** 满层时每级增伤比例 */
+    private static final float DAMAGE_PER_LEVEL_FULL = 0.1F;
+    /** 增幅未满层时每级增伤比例 */
+    private static final float DAMAGE_PER_LEVEL_PARTIAL = 0.05F;
 
     public EnchantmentMillicentProsthesis() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
@@ -48,11 +55,9 @@ public class EnchantmentMillicentProsthesis extends EnchantmentBase {
     protected void onAttackLowest(@Nonnull EnchantmentContext ctx, int level) {
         EntityLivingBase attacker = ctx.getHolder();
 
-        // 玩家必须是刚挥动武器
-        if (attacker instanceof EntityPlayer) {
-            if (!isJustSwung((EntityPlayer) attacker)) {
-                return;
-            }
+        // 满蓄力挥击才叠层
+        if (!isFullyCharged(attacker)) {
+            return;
         }
 
         @Nullable PotionEffect currentEffect = attacker.getActivePotionEffect(CarianStylePotion.ATTACK_BOOST);
@@ -78,8 +83,7 @@ public class EnchantmentMillicentProsthesis extends EnchantmentBase {
     }
 
     /**
-     * 根据攻击增益层数增加伤害
-     * 注意：原代码没有等级上限检查
+     * 根据攻击增益层数增加伤害，没有增幅时不加
      */
     @Override
     protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
@@ -87,12 +91,15 @@ public class EnchantmentMillicentProsthesis extends EnchantmentBase {
 
         @Nullable PotionEffect currentEffect = attacker.getActivePotionEffect(CarianStylePotion.ATTACK_BOOST);
 
-        if (currentEffect != null && currentEffect.getAmplifier() >= level * 7 - 1) {
+        if (currentEffect == null) {
+            return;
+        }
+        if (currentEffect.getAmplifier() >= level * 7 - 1) {
             // 满层：增伤10%×等级
-            ctx.addDamage(ctx.getDamage() * level * 0.1f);
+            ctx.addDamage(ctx.getDamage() * level * DAMAGE_PER_LEVEL_FULL);
         } else {
             // 未满层：增伤5%×等级
-            ctx.addDamage(ctx.getDamage() * level * 0.05f);
+            ctx.addDamage(ctx.getDamage() * level * DAMAGE_PER_LEVEL_PARTIAL);
         }
     }
 

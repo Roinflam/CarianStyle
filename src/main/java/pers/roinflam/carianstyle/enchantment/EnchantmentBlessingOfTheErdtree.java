@@ -75,14 +75,15 @@ public class EnchantmentBlessingOfTheErdtree extends EnchantmentBase {
         EntityLivingBase victim = evt.getEntityLiving();
         EntityLivingBase attacker = (EntityLivingBase) damageSource.getTrueSource();
 
-        int victimLevel = getTotalLevel(victim);
+        // 怪物持有者受「允许怪物触发附魔」配置控制，受击方和攻击方各自判断
+        int victimLevel = shouldBlockMobTrigger(victim, false) ? 0 : getTotalLevel(victim);
         if (victimLevel > 0) {
             int duration = (int) (2.5 * victimLevel * 20);
             int amplifier = victimLevel - 1;
             victim.addPotionEffect(new PotionEffect(CarianStylePotion.BLESSING_OF_THE_ERDTREE, duration, amplifier));
         }
 
-        int attackerLevel = getTotalLevel(attacker);
+        int attackerLevel = shouldBlockMobTrigger(attacker, false) ? 0 : getTotalLevel(attacker);
         if (attackerLevel > 0) {
             attackerLevel = Math.min(attackerLevel, 5);
             int duration = (int) (2.5 * attackerLevel * 20);

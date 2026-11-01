@@ -14,6 +14,7 @@ import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import javax.annotation.Nonnull;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -36,12 +37,31 @@ import java.util.List;
 )
 public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
 
+    /** 参与计算的等级上限 */
+    private static final int LEVEL_CAP = 10;
+    /** 冻伤范围半径上限（格），等级再高也不超过它 */
+    private static final int MAX_SEARCH_RADIUS = 6;
+    /** 一次至多冻伤的目标数 */
+    private static final int MAX_TARGETS = 16;
+    /** 冻伤持续时间（tick） */
+    private static final int FROSTBITE_DURATION = 200;
+    /** 冻伤叠加的等级上限（amplifier，9 即 10 级） */
+    private static final int FROSTBITE_MAX_AMPLIFIER = 9;
+
     public EnchantmentAduraMoonlightSword() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
+    /**
+     * 满蓄力攻击转为魔法伤害，并冻伤目标和周围的生物
+     * <p>
+     * 半径 = 附魔等级，至多 6 格；一次至多 16 个。被打的目标一定吃冻伤，排在最前面不会被上限挤掉；
+     * 周围的只波及「别人」：同类（玩家不冻别的玩家）、队友和自己养的宠物不冻。
+     * 以前半径能到 10 格、没有数量上限，连队友和自己的宠物一起冻；改在普通优先级结算。
+     * </p>
+     */
     @Override
-    protected void onHurtAsAttackerHighest(@Nonnull EnchantmentContext ctx, int level) {
+    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
         EntityLivingBase attacker = ctx.getHolder();
         EntityLivingBase victim = ctx.getVictim();
 
@@ -49,17 +69,11 @@ public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
             return;
         }
 
-        // 手动应用等级限制
-        int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, 10);
-        }
+        int effectiveLevel = capLevel(level, LEVEL_CAP);
 
-        // 玩家需要刚挥剑，非玩家直接触发
-        if (ctx.isHolderPlayer()) {
-            if (!isJustSwung(ctx.getHolderAsPlayer())) {
-                return;
-            }
+        // 玩家需要满蓄力，非玩家直接触发
+        if (!isFullyCharged(attacker)) {
+            return;
         }
 
         // 伤害变为魔法伤害
@@ -67,30 +81,41 @@ public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
             ctx.getDamageSource().setMagicDamage();
         }
 
-        // 获取目标周围的敌人（范围=等级）
-        List<EntityLivingBase> nearbyEntities = EntityUtil.getNearbyEntities(
+        int searchRadius = Math.min(effectiveLevel, MAX_SEARCH_RADIUS);
+
+        List<EntityLivingBase> nearbyEntities = new ArrayList<>(EntityUtil.getNearbyEntities(
                 EntityLivingBase.class,
                 victim,
-                effectiveLevel,
-                entity -> !entity.equals(attacker)
-        );
+                searchRadius,
+                entity -> entity != null && (entity.equals(victim) || !isSameKindOrAlly(attacker, entity))
+        ));
 
-        // 施加冻伤效果
+        // 被打的目标排到最前面，保证它一定吃冻伤
+        if (nearbyEntities.remove(victim)) {
+            nearbyEntities.add(0, victim);
+        }
+
         boolean isNight = !attacker.world.isDaytime();
         int stackIncrease = isNight ? 2 : 1;
         int initialLevel = isNight ? 1 : 0;
 
+        int hitCount = 0;
         for (EntityLivingBase entity : nearbyEntities) {
+            if (hitCount >= MAX_TARGETS) {
+                break;
+            }
+
             PotionEffect existingEffect = entity.getActivePotionEffect(CarianStylePotion.FROSTBITE);
 
             int newLevel;
             if (existingEffect != null) {
-                newLevel = Math.min(existingEffect.getAmplifier() + stackIncrease, 9);
+                newLevel = Math.min(existingEffect.getAmplifier() + stackIncrease, FROSTBITE_MAX_AMPLIFIER);
             } else {
                 newLevel = initialLevel;
             }
 
-            entity.addPotionEffect(new PotionEffect(CarianStylePotion.FROSTBITE, 200, newLevel));
+            entity.addPotionEffect(new PotionEffect(CarianStylePotion.FROSTBITE, FROSTBITE_DURATION, newLevel));
+            hitCount++;
         }
     }
 

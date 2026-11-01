@@ -88,8 +88,12 @@ public class EnchantmentSkyShot extends EnchantmentBase {
         EntityLivingBase shooter = (EntityLivingBase) arrow.shootingEntity;
         EntityLivingBase target = (EntityLivingBase) evt.getRayTraceResult().entityHit;
 
+        if (shouldBlockMobTrigger(shooter, false)) {
+            return;
+        }
+
         // 检查射手是否持有弓
-        if (shooter.getHeldItem(shooter.getActiveHand()).isEmpty()) {
+        if (shooter.getHeldItemMainhand().isEmpty()) {
             return;
         }
 
@@ -102,7 +106,7 @@ public class EnchantmentSkyShot extends EnchantmentBase {
         // 获取附魔等级
         int level = EnchantmentHelper.getEnchantmentLevel(
                 skyShot,
-                shooter.getHeldItem(shooter.getActiveHand()));
+                shooter.getHeldItemMainhand());
 
         if (level <= 0) {
             return;

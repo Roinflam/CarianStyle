@@ -17,6 +17,10 @@ import javax.annotation.Nonnull;
  * - 受到伤害时减免10%×(等级+1)
  * - 造成伤害时增加15%×(等级+1)
  * </p>
+ * <p>
+ * 减伤倍率夹到不低于 0：效果等级还可能被别的附魔抬高，以前到 10 级以上倍率变负，
+ * 伤害量变成负数，原版遇到不大于 0 的伤害直接返回，等于完全免疫。
+ * </p>
  */
 public class MobEffectGoldenVow extends IconBase {
 
@@ -40,7 +44,7 @@ public class MobEffectGoldenVow extends IconBase {
         // 受击者减伤
         if (victim.isPotionActive(this)) {
             int amplifier = victim.getActivePotionEffect(this).getAmplifier();
-            evt.setAmount(evt.getAmount() * (1 - (amplifier + 1) * 0.1f));
+            evt.setAmount(evt.getAmount() * Math.max(0.0F, 1 - (amplifier + 1) * 0.1F));
         }
 
         // 攻击者增伤

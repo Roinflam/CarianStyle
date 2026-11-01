@@ -24,12 +24,15 @@ import javax.annotation.Nonnull;
 import java.util.UUID;
 
 /**
- * 时间逆转附魔
+ * 普拉顿桑克斯的回溯附魔
  *
- * 死亡时触发：取消死亡，进入逆转状态100tick
- * 逆转状态：免疫伤害并反弹，累积伤害值
- * 逆转结束：治疗累积伤害×25%
- * 冷却6000tick
+ * 死亡时触发（300 秒冷却）：取消死亡、生命设为 1 并获得 1 秒无敌，进入 5 秒逆转状态。
+ * 逆转状态：免疫伤害并把这一下原样反击给来源，累积受到的伤害；持续灼烧和流血不扣血，也不计入累积。
+ * 逆转结束：回复累积伤害的 25%。
+ * <p>
+ * 以前复活后没有无敌时间；两个都在逆转中的实体互相打时，反击会再触发对方的反击，来回递归。
+ * 现在反击期间置位，被反击的一方不再反击回来（免疫和累积照常）。怪物持有时按死亡类附魔的开关处理。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "time_reversal",
@@ -43,6 +46,20 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
     private static final String REVERSAL_STATE_KEY = "time_reversal_state";
     private static final String REVERSAL_DAMAGE_KEY = "time_reversal_damage";
     private static final int RECOLLECT_ENCHANTABILITY = 35;
+
+    /** 冷却（tick） */
+    private static final int REVERSAL_COOLDOWN = 6000;
+    /** 逆转持续时间（tick） */
+    private static final int ACCUMULATE_WINDOW = 100;
+    /** 结束时回复累积伤害的比例 */
+    private static final float HEAL_RATIO = 0.25F;
+    /** 复活后的无敌时间（tick） */
+    private static final int REVIVE_INVULNERABLE_TICKS = 20;
+
+    /**
+     * 正在结算反击时置位：反击伤害进入对方的回溯时，对方只免疫、累积，不再反击回来
+     */
+    private static boolean processingReflect = false;
 
     public EnchantmentTimeReversal() {
         super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
@@ -85,6 +102,11 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
         }
 
         EntityLivingBase holder = evt.getEntityLiving();
+
+        if (shouldBlockMobTrigger(holder, true)) {
+            return;
+        }
+
         UUID uuid = holder.getUniqueID();
 
         int totalLevel = getTotalLevel(holder);
@@ -102,18 +124,19 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
 
         evt.setCanceled(true);
         holder.setHealth(1);
+        holder.hurtResistantTime = REVIVE_INVULNERABLE_TICKS;
 
-        EnchantmentDataManager.setCooldown(REVERSAL_COOLDOWN_KEY, uuid, 6000);
+        EnchantmentDataManager.setCooldown(REVERSAL_COOLDOWN_KEY, uuid, REVERSAL_COOLDOWN);
         EnchantmentDataManager.setData(REVERSAL_STATE_KEY, uuid, true);
         EnchantmentDataManager.setData(REVERSAL_DAMAGE_KEY, uuid, 0f);
 
-        new SynchronizationTask(100) {
+        new SynchronizationTask(ACCUMULATE_WINDOW) {
             @Override
             public void run() {
                 if (holder.isEntityAlive()) {
                     Float accumulated = EnchantmentDataManager.getData(REVERSAL_DAMAGE_KEY, uuid);
                     if (accumulated != null) {
-                        holder.heal(accumulated * 0.25f);
+                        holder.heal(accumulated * HEAL_RATIO);
                     }
                 }
                 EnchantmentDataManager.removeData(REVERSAL_STATE_KEY, uuid);
@@ -154,8 +177,17 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
         EnchantmentDataManager.setData(REVERSAL_DAMAGE_KEY, uuid, accumulated + evt.getAmount());
 
         if (evt.getSource().getTrueSource() instanceof EntityLivingBase) {
+            if (processingReflect) {
+                return;
+            }
+
             EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
-            attacker.attackEntityFrom(evt.getSource(), evt.getAmount());
+            processingReflect = true;
+            try {
+                attacker.attackEntityFrom(evt.getSource(), evt.getAmount());
+            } finally {
+                processingReflect = false;
+            }
         }
     }
 

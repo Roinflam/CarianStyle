@@ -35,26 +35,30 @@ import javax.annotation.Nonnull;
 @Mod.EventBusSubscriber
 public class EnchantmentBeastVitality extends EnchantmentBase {
 
+    /** 参与计算的等级上限 */
+    private static final int LEVEL_CAP = 10;
+    /** 每级延长的时长比例 */
+    private static final double DURATION_PER_LEVEL = 0.3D;
+
     public EnchantmentBeastVitality() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+        super(EnumEnchantmentType.ARMOR_CHEST, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
     }
 
-    private static int getTotalLevel(EntityLivingBase entity) {
+    /**
+     * 只读胸甲一件的等级
+     * <p>只能附在胸甲上；以前任意护甲件都能附，全身每件的等级相加。</p>
+     */
+    private static int getChestLevel(EntityLivingBase entity) {
         Enchantment beastVitality = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBeastVitality.class);
         if (beastVitality == null) {
             return 0;
         }
 
-        int totalLevel = 0;
-        for (ItemStack armor : entity.getArmorInventoryList()) {
-            if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(beastVitality, armor);
-            }
+        ItemStack chest = entity.getItemStackFromSlot(EntityEquipmentSlot.CHEST);
+        if (chest.isEmpty()) {
+            return 0;
         }
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
-        }
-        return totalLevel;
+        return capLevel(EnchantmentHelper.getEnchantmentLevel(beastVitality, chest), LEVEL_CAP);
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
@@ -65,7 +69,7 @@ public class EnchantmentBeastVitality extends EnchantmentBase {
 
         EntityLivingBase holder = evt.getEntityLiving();
 
-        int totalLevel = getTotalLevel(holder);
+        int totalLevel = getChestLevel(holder);
         if (totalLevel <= 0) {
             return;
         }
@@ -78,7 +82,7 @@ public class EnchantmentBeastVitality extends EnchantmentBase {
         }
 
         int originalDuration = potionEffect.getDuration();
-        int newDuration = (int) (originalDuration + originalDuration * totalLevel * 0.3);
+        int newDuration = (int) (originalDuration + originalDuration * totalLevel * DURATION_PER_LEVEL);
 
         evt.getPotionEffect().combine(new PotionEffect(potion, newDuration, potionEffect.getAmplifier()));
     }

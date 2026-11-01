@@ -40,8 +40,26 @@ import javax.annotation.Nonnull;
 @Mod.EventBusSubscriber
 public class EnchantmentBlackFlameShelter extends EnchantmentBase {
 
+    /** 参与计算的等级上限（levelLimit 开时） */
+    private static final int LEVEL_CAP = 10;
+    /** 每级物理伤害减免 */
+    private static final float MELEE_REDUCTION_PER_LEVEL = 0.125F;
+    /** 每级恢复削减 */
+    private static final float HEAL_REDUCTION_PER_LEVEL = 0.25F;
+    /**
+     * 生效等级的硬上限，不受 levelLimit 开关影响
+     * <p>
+     * 8 级时减伤系数是 0（完全免疫物理伤害），9 级起系数为负，挨打反而加血。
+     * levelLimit 是可关的平衡开关，这个是正确性约束，两者分开。
+     * </p>
+     */
+    public static final int MAX_EFFECTIVE_LEVEL = 7;
+
+    /**
+     * 只能附在胸甲上；以前任意护甲件都能附
+     */
     public EnchantmentBlackFlameShelter() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+        super(EnumEnchantmentType.ARMOR_CHEST, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
     }
 
     private static int getTotalLevel(EntityLivingBase entity) {
@@ -56,10 +74,8 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
                 totalLevel += EnchantmentHelper.getEnchantmentLevel(blackFlameShelter, armor);
             }
         }
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
-        }
-        return totalLevel;
+        totalLevel = capLevel(totalLevel, LEVEL_CAP);
+        return Math.min(totalLevel, MAX_EFFECTIVE_LEVEL);
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
@@ -76,12 +92,16 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
 
         EntityLivingBase holder = evt.getEntityLiving();
 
+        if (shouldBlockMobTrigger(holder, false)) {
+            return;
+        }
+
         int totalLevel = getTotalLevel(holder);
         if (totalLevel <= 0) {
             return;
         }
 
-        evt.setAmount(evt.getAmount() * (1 - totalLevel * 0.125f));
+        evt.setAmount(evt.getAmount() * (1 - totalLevel * MELEE_REDUCTION_PER_LEVEL));
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
@@ -92,12 +112,16 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
 
         EntityLivingBase holder = evt.getEntityLiving();
 
+        if (shouldBlockMobTrigger(holder, false)) {
+            return;
+        }
+
         int totalLevel = getTotalLevel(holder);
         if (totalLevel <= 0) {
             return;
         }
 
-        evt.setAmount(evt.getAmount() * (1 - totalLevel * 0.25f));
+        evt.setAmount(evt.getAmount() * (1 - totalLevel * HEAL_REDUCTION_PER_LEVEL));
     }
 
     @Override

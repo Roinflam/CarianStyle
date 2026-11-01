@@ -23,8 +23,11 @@ import javax.annotation.Nonnull;
  *
  * 武器/弓箭附魔，攻击后获得隐身
  * 攻击时：
- * - 获得隐身效果（持续 = 等级 × 10 tick）
+ * - 获得隐身效果（持续 = 等级 × 1 秒）
  * - 箭矢攻击时持续时间 × 3
+ * <p>
+ * 以前是 等级 × 10 tick（半秒）。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "invisible_weapon",
@@ -32,6 +35,11 @@ import javax.annotation.Nonnull;
         rarity = EnchantmentRarity.RARE
 )
 public class EnchantmentInvisibleWeapon extends EnchantmentBase {
+
+    /** 每级隐身时长（tick） */
+    private static final int STEALTH_TICKS_PER_LEVEL = 20;
+    /** 箭矢命中时额外增加的倍率（总倍率 = 1 + 这个值） */
+    private static final int ARROW_BONUS_MAGNIFICATION = 2;
 
     public EnchantmentInvisibleWeapon() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
@@ -48,13 +56,13 @@ public class EnchantmentInvisibleWeapon extends EnchantmentBase {
         // 计算持续时间倍率
         int magnification = 1;
         if (damageSource != null && damageSource.getImmediateSource() instanceof EntityArrow) {
-            magnification += 2;  // 箭矢攻击倍率 = 3
+            magnification += ARROW_BONUS_MAGNIFICATION;  // 箭矢攻击倍率 = 3
         }
 
         // 施加隐身效果
         attacker.addPotionEffect(new PotionEffect(
                 CarianStylePotion.STEALTH,
-                level * 10 * magnification
+                level * STEALTH_TICKS_PER_LEVEL * magnification
         ));
     }
 

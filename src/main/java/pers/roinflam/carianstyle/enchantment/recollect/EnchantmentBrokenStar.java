@@ -5,6 +5,7 @@ import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemStack;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -19,9 +20,15 @@ import javax.annotation.Nonnull;
 
 /**
  * 碎星附魔
- *
- * 攻击者（血量>=50%）：夜晚伤害×2，白天×1.5
- * 受击者（血量<=50%）：夜晚减伤25%，白天减伤50%
+ * <p>
+ * 主手持有时：自身生命不低于 50% 时伤害 ×1.5（夜晚 ×2）；生命低于 50% 时受到的伤害 ×0.75（夜晚 ×0.5）。
+ * </p>
+ * <p>
+ * 以前受击一侧的昼夜系数写反了（夜晚 ×0.75、白天 ×0.5，和「夜晚效果翻倍」正好相反），
+ * 而且受击侧用的是「不高于 50%」，正好半血时攻守两档同时生效；现在受击侧是「低于 50%」。
+ * 武器以前按「最近一次使用物品的那只手」取，用副手吃东西、举盾后会一直指向副手，现在一律看主手。
+ * 怪物持有时按怪物触发附魔的开关处理。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "broken_star",
@@ -32,6 +39,19 @@ import javax.annotation.Nonnull;
 public class EnchantmentBrokenStar extends EnchantmentBase {
 
     private static final int RECOLLECT_ENCHANTABILITY = 35;
+
+    /** 攻守两档的生命分界（占最大生命） */
+    private static final float HEALTH_THRESHOLD = 0.5F;
+    /** 白天攻击倍率 */
+    private static final float ATTACK_MULTIPLIER_DAY = 1.5F;
+    /** 夜晚攻击倍率 */
+    private static final float ATTACK_MULTIPLIER_NIGHT = 2.0F;
+    /** 白天受伤倍率 */
+    private static final float DEFENSE_MULTIPLIER_DAY = 0.75F;
+    /** 夜晚受伤倍率 */
+    private static final float DEFENSE_MULTIPLIER_NIGHT = 0.5F;
+    /** 等级上限 */
+    private static final int LEVEL_CAP = 10;
 
     public EnchantmentBrokenStar() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
@@ -52,22 +72,13 @@ public class EnchantmentBrokenStar extends EnchantmentBase {
         if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
             EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
 
-            if (!attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
-                int level = EnchantmentHelper.getEnchantmentLevel(
-                        brokenStar,
-                        attacker.getHeldItem(attacker.getActiveHand()));
-
-                if (ConfigLoader.levelLimit) {
-                    level = Math.min(level, 10);
-                }
-
-                if (level > 0) {
-                    if (attacker.getHealth() >= attacker.getMaxHealth() / 2) {
-                        if (!attacker.world.isDaytime()) {
-                            evt.setAmount(evt.getAmount() * 2);
-                        } else {
-                            evt.setAmount(evt.getAmount() * 1.5f);
-                        }
+            if (!shouldBlockMobTrigger(attacker, false)) {
+                ItemStack heldItem = attacker.getHeldItemMainhand();
+                if (!heldItem.isEmpty()) {
+                    int level = capLevel(EnchantmentHelper.getEnchantmentLevel(brokenStar, heldItem), LEVEL_CAP);
+                    if (level > 0 && attacker.getHealth() >= attacker.getMaxHealth() * HEALTH_THRESHOLD) {
+                        evt.setAmount(evt.getAmount()
+                                * (!attacker.world.isDaytime() ? ATTACK_MULTIPLIER_NIGHT : ATTACK_MULTIPLIER_DAY));
                     }
                 }
             }
@@ -77,19 +88,16 @@ public class EnchantmentBrokenStar extends EnchantmentBase {
         if (!evt.getSource().canHarmInCreative()) {
             EntityLivingBase victim = evt.getEntityLiving();
 
-            if (!victim.getHeldItem(victim.getActiveHand()).isEmpty()) {
-                int level = EnchantmentHelper.getEnchantmentLevel(
-                        brokenStar,
-                        victim.getHeldItem(victim.getActiveHand()));
+            if (shouldBlockMobTrigger(victim, false)) {
+                return;
+            }
 
-                if (level > 0) {
-                    if (victim.getHealth() <= victim.getMaxHealth() / 2) {
-                        if (!victim.world.isDaytime()) {
-                            evt.setAmount(evt.getAmount() * 0.75f);
-                        } else {
-                            evt.setAmount(evt.getAmount() * 0.5f);
-                        }
-                    }
+            ItemStack heldItem = victim.getHeldItemMainhand();
+            if (!heldItem.isEmpty()) {
+                int level = capLevel(EnchantmentHelper.getEnchantmentLevel(brokenStar, heldItem), LEVEL_CAP);
+                if (level > 0 && victim.getHealth() < victim.getMaxHealth() * HEALTH_THRESHOLD) {
+                    evt.setAmount(evt.getAmount()
+                            * (!victim.world.isDaytime() ? DEFENSE_MULTIPLIER_NIGHT : DEFENSE_MULTIPLIER_DAY));
                 }
             }
         }

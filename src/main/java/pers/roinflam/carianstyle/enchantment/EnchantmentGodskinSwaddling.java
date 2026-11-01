@@ -20,6 +20,9 @@ import javax.annotation.Nonnull;
  * 每攻击4次触发一次治疗：
  * - 治疗量 = 最大生命值 × (3% + (等级 - 1) × 1%)
  * - 等级1: 3%，等级2: 4%，等级3: 5%...
+ * <p>
+ * 只统计满蓄力的命中，以前连点、半蓄力也会计数。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "godskin_swaddling",
@@ -42,22 +45,34 @@ public class EnchantmentGodskinSwaddling extends EnchantmentBase {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
+    /** 计数到这个数之后的下一次命中触发治疗 */
+    private static final int TRIGGER_COUNT = 3;
+    /** 基础治疗量占最大生命值的比例 */
+    private static final float BASE_HEAL_RATIO = 0.03F;
+    /** 每超过一级增加的治疗比例 */
+    private static final float HEAL_PER_EXTRA_LEVEL = 0.01F;
+
     /**
-     * 攻击时累计计数，每4次攻击触发治疗
+     * 满蓄力命中时累计计数，每 4 次触发治疗
      */
     @Override
     protected void onDamageAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
         EntityLivingBase attacker = ctx.getHolder();
 
+        // 蓄力不满的攻击既不计数也不回血
+        if (!isFullyCharged(attacker)) {
+            return;
+        }
+
         // 获取当前攻击计数
         int currentCount = EnchantmentDataManager.getCounter(ATTACK_COUNTER, attacker.getUniqueID());
 
-        if (currentCount == 3) {
+        if (currentCount == TRIGGER_COUNT) {
             // 第4次攻击，触发治疗并重置计数
             EnchantmentDataManager.resetCounter(ATTACK_COUNTER, attacker.getUniqueID());
 
             // 治疗量 = 最大生命值 × (3% + (等级-1) × 1%)
-            float healAmount = attacker.getMaxHealth() * 0.03f + attacker.getMaxHealth() * (level - 1) * 0.01f;
+            float healAmount = attacker.getMaxHealth() * BASE_HEAL_RATIO + attacker.getMaxHealth() * (level - 1) * HEAL_PER_EXTRA_LEVEL;
             attacker.heal(healAmount);
         } else {
             // 增加计数（带过期时间）

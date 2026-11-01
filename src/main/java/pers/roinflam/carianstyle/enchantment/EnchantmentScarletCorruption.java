@@ -30,24 +30,30 @@ import javax.annotation.Nonnull;
 )
 public class EnchantmentScarletCorruption extends EnchantmentBase {
 
+    // 每级腐败持续的秒数
+    private static final int SECONDS_PER_LEVEL = 20;
+
     public EnchantmentScarletCorruption() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
     /**
-     * 攻击时施加猩红腐败效果
+     * 满蓄力攻击时施加猩红腐败效果
+     * <p>
+     * 以前不判蓄力，连点能一下一个地给一群目标挂腐败。
+     * </p>
      */
     @Override
     protected void onDamageAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
         EntityLivingBase victim = ctx.getVictim();
-        if (victim == null) {
+        if (victim == null || !isFullyCharged(ctx.getHolder())) {
             return;
         }
 
         // 施加猩红腐败效果
         victim.addPotionEffect(new PotionEffect(
                 CarianStylePotion.SCARLET_ROT,
-                level * 20 * 20,
+                level * SECONDS_PER_LEVEL * 20,
                 0
         ));
     }

@@ -28,12 +28,17 @@ import javax.annotation.Nonnull;
 )
 public class EnchantmentCrucibleKnotTalisman extends EnchantmentBase {
 
+    /** 参与计算的等级上限 */
+    private static final int LEVEL_CAP = 10;
+    /** 每级减伤 */
+    private static final float REDUCTION_PER_LEVEL = 0.25F;
+
     /**
-     * 构造函数
+     * 胸甲附魔
+     * <p>以前类型写成了头盔、槽位却是胸甲，附魔台和铁砧只能上头盔。</p>
      */
     public EnchantmentCrucibleKnotTalisman() {
-        // 护甲附魔，可以附魔在头盔上
-        super(EnumEnchantmentType.ARMOR_HEAD, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+        super(EnumEnchantmentType.ARMOR_CHEST, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
     }
 
     /**
@@ -50,15 +55,12 @@ public class EnchantmentCrucibleKnotTalisman extends EnchantmentBase {
         }
 
         // 手动应用等级限制
-        int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, 10);
-        }
+        int effectiveLevel = capLevel(level, LEVEL_CAP);
 
         // 判断攻击者的Y坐标是否高于受击者
         if (attacker.posY > victim.posY) {
             // 减伤 = 伤害 × 等级 × 25%
-            float damageReduction = 1 - effectiveLevel * 0.25f;
+            float damageReduction = 1 - effectiveLevel * REDUCTION_PER_LEVEL;
             ctx.multiplyDamage(damageReduction);
         }
     }

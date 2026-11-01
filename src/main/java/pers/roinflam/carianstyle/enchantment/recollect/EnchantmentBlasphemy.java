@@ -53,11 +53,15 @@ public class EnchantmentBlasphemy extends EnchantmentBase {
         EntityLivingBase killer = (EntityLivingBase) evt.getSource().getImmediateSource();
         EntityLivingBase dead = evt.getEntityLiving();
 
+        if (shouldBlockMobTrigger(killer, false)) {
+            return;
+        }
+
         if (!killer.isEntityAlive() || dead.equals(killer)) {
             return;
         }
 
-        if (killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
+        if (killer.getHeldItemMainhand().isEmpty()) {
             return;
         }
 
@@ -68,7 +72,7 @@ public class EnchantmentBlasphemy extends EnchantmentBase {
 
         int level = EnchantmentHelper.getEnchantmentLevel(
                 blasphemy,
-                killer.getHeldItem(killer.getActiveHand()));
+                killer.getHeldItemMainhand());
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);

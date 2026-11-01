@@ -27,12 +27,17 @@ import java.util.UUID;
  * 连击附魔
  *
  * 效果：
- * - 对同一目标在10秒内重复攻击时，每次攻击伤害叠加 5% × 等级
- * - 攻击后刷新10秒持续时间
- * - 切换目标时清除之前的叠加
+ * - 满蓄力攻击同一目标时每击叠加1层，每层伤害 +5% × 等级（不封顶）
+ * - 每次满蓄力命中都把目标和层数的10秒计时一起刷新
+ * - 切换目标时清除之前的叠加（不满蓄力打到别的目标也会清）
  * - 同时只能对一个目标保持叠加
  * - 目标死亡时清除叠加
  * - 最大等级：5
+ * <p>
+ * 加层和增伤要求满蓄力：叠层与这一下打多少无关，以前连点能先攒层再一刀兑现。
+ * 以前同目标连续命中只刷新层数的计时、不刷新目标记录，目标记录第一次命中 10 秒后到期，
+ * 持续打同一个目标每 10 秒层数就被重置成 1。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "repeating_thrust",
@@ -57,6 +62,11 @@ public class EnchantmentRepeatingThrust extends EnchantmentBase {
      */
     private static final int STACK_DURATION = 200;
 
+    // 每层每级增伤比例
+    private static final float DAMAGE_PER_STACK_PER_LEVEL = 0.05F;
+    // 等级上限（开了等级限制时）
+    private static final int LEVEL_CAP = 10;
+
     /**
      * 构造函数
      */
@@ -77,11 +87,7 @@ public class EnchantmentRepeatingThrust extends EnchantmentBase {
             return;
         }
 
-        // 手动应用等级限制
-        int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, 10);
-        }
+        int effectiveLevel = capLevel(level, LEVEL_CAP);
 
         UUID attackerUUID = attacker.getUniqueID();
         UUID victimUUID = victim.getUniqueID();
@@ -97,21 +103,24 @@ public class EnchantmentRepeatingThrust extends EnchantmentBase {
         // 判断是否是同一个目标
         boolean isSameTarget = victimUUID.toString().equals(storedTargetUUID);
 
-        if (isSameTarget) {
-            // 同一目标：增加叠加层数
-            currentStacks++;
-        } else {
-            // 新目标：重置叠加层数
-            currentStacks = 1;
-            // 更新目标UUID
-            EnchantmentDataManager.setData(currentTargetKey, attackerUUID, victimUUID.toString(), STACK_DURATION);
+        // 不满蓄力：不加层、不增伤；换了目标照样清层（否则满蓄力打首领、轻点打小怪，首领身上的层数一直保得住）
+        if (!isFullyCharged(attacker)) {
+            if (!isSameTarget) {
+                EnchantmentDataManager.setData(currentTargetKey, attackerUUID, victimUUID.toString(), STACK_DURATION);
+                EnchantmentDataManager.setCounter(stackCountKey, attackerUUID, 0, STACK_DURATION);
+            }
+            return;
         }
 
-        // 更新叠加层数并刷新持续时间
+        // 同一目标加一层，新目标从 1 层开始
+        currentStacks = isSameTarget ? currentStacks + 1 : 1;
+
+        // 目标和层数的计时一起刷新
+        EnchantmentDataManager.setData(currentTargetKey, attackerUUID, victimUUID.toString(), STACK_DURATION);
         EnchantmentDataManager.setCounter(stackCountKey, attackerUUID, currentStacks, STACK_DURATION);
 
         // 计算伤害加成：每层 5% × 等级
-        float damageMultiplier = 1 + (currentStacks * effectiveLevel * 0.05f);
+        float damageMultiplier = 1 + (currentStacks * effectiveLevel * DAMAGE_PER_STACK_PER_LEVEL);
         ctx.multiplyDamage(damageMultiplier);
     }
 
@@ -140,14 +149,12 @@ public class EnchantmentRepeatingThrust extends EnchantmentBase {
 
         EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
 
-        // 检查攻击者是否持有此附魔
-        if (attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+        // 检查攻击者主手是否持有此附魔
+        if (attacker.getHeldItemMainhand().isEmpty()) {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                repeatingThrust,
-                attacker.getHeldItem(attacker.getActiveHand()));
+        int level = EnchantmentHelper.getEnchantmentLevel(repeatingThrust, attacker.getHeldItemMainhand());
 
         if (level <= 0) {
             return;

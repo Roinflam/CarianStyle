@@ -23,10 +23,14 @@ import java.util.List;
  * 箭步回旋斩附魔
  *
  * 效果：
- * - 冲刺攻击时，玩家快速转一圈（360度旋转）
- * - 对自身周围3格的所有敌人（包括被直接攻击的目标）造成额外伤害
- * - 伤害 = 本次攻击伤害 + 10% × 等级
- * - 不会伤害队友
+ * - 满蓄力冲刺攻击时，玩家快速转一圈（360度旋转）
+ * - 直接目标伤害 +10% × 等级；自身周围3格（水平圆）内其它敌人受到 本次伤害 + 10% × 等级，最多 20 个
+ * - 不会伤害自己和队友
+ * <p>
+ * 以前没有蓄力要求，冲刺连点每下都转一圈；范围目标不设上限；
+ * 范围伤害打到别人时又会回到本附魔再扫一圈，形成连锁。现在要求满蓄力、最多打 20 个，
+ * 结算范围伤害期间不再重入。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "stamp_sweep",
@@ -34,6 +38,21 @@ import java.util.List;
         rarity = EnchantmentRarity.RARE
 )
 public class EnchantmentStampSweep extends EnchantmentBase {
+
+        /** 单次横扫最多命中的其它目标数 */
+        private static final int MAX_TARGETS = 20;
+        /** 横扫半径（格） */
+        private static final double SWEEP_RADIUS = 3.0D;
+        /** 参与计算的等级上限 */
+        private static final int LEVEL_CAP = 10;
+        /** 每级的额外伤害倍率 */
+        private static final float DAMAGE_PER_LEVEL = 0.1F;
+
+        /**
+         * 正在结算范围伤害时置位：循环里的 attackEntityFrom 会同步触发新的伤害事件回到本附魔，
+         * 置位期间直接放行，一次冲刺斩只放一圈
+         */
+        private static boolean inSweep = false;
 
         /**
          * 构造函数
@@ -43,72 +62,67 @@ public class EnchantmentStampSweep extends EnchantmentBase {
         }
 
         /**
-         * 攻击时触发：冲刺状态下对周围敌人造成范围伤害并旋转视角
+         * 攻击时触发：满蓄力冲刺攻击时对周围敌人造成范围伤害并旋转视角
          */
         @Override
         protected void onDamageAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
+                if (inSweep) {
+                        return;
+                }
+
                 EntityLivingBase attacker = ctx.getHolder();
                 EntityLivingBase directTarget = ctx.getVictim();
 
-                // 被攻击的目标不能为空
                 if (directTarget == null) {
                         return;
                 }
 
-                // 必须在冲刺状态
                 if (!attacker.isSprinting()) {
                         return;
                 }
 
-                // 手动应用等级限制
-                int effectiveLevel = level;
-                if (ConfigLoader.levelLimit) {
-                        effectiveLevel = Math.min(effectiveLevel, 10);
+                // 不带击退的武器低蓄力命中不会打断疾跑，连点每下都放一圈，所以要求满蓄力
+                if (!isFullyCharged(attacker)) {
+                        return;
                 }
 
-                // 如果是玩家，执行旋转动画
+                int effectiveLevel = capLevel(level, LEVEL_CAP);
+
                 if (attacker instanceof EntityPlayerMP) {
                         performSpinAnimation((EntityPlayerMP) attacker);
                 }
 
-                // 计算额外伤害：原始伤害 × 10% × 等级
+                // 额外伤害：原始伤害 × 10% × 等级
                 float baseDamage = ctx.getDamage();
-                float bonusDamage = baseDamage * effectiveLevel * 0.1f;
+                float bonusDamage = baseDamage * effectiveLevel * DAMAGE_PER_LEVEL;
 
-                // 获取周围3格内的所有生物
+                // 直接目标单独加伤，不在范围里也照加
+                ctx.addDamage(bonusDamage);
+
+                // 周围3格内的其它生物（排除自己、直接目标、队友）
                 List<EntityLivingBase> nearbyEntities = EntityUtil.getNearbyEntities(
                         EntityLivingBase.class,
                         attacker,
-                        3,
-                        entity -> {
-                                // 排除自己
-                                if (entity.equals(attacker)) {
-                                        return false;
-                                }
-                                // 排除队友（同队的不攻击）
-                                if (entity.isOnSameTeam(attacker)) {
-                                        return false;
-                                }
-                                return true;
-                        }
+                        SWEEP_RADIUS,
+                        entity -> entity != null
+                                && !entity.equals(attacker)
+                                && !entity.equals(directTarget)
+                                && !entity.isOnSameTeam(attacker)
                 );
 
-                // 对周围所有敌人造成伤害
-                for (EntityLivingBase target : nearbyEntities) {
-                        // 如果是被直接攻击的目标，给它增加额外伤害
-                        if (target.equals(directTarget)) {
-                                // 直接目标：在原有伤害基础上增加10%
-                                ctx.addDamage(bonusDamage);
-                        } else {
-                                // 周围其他敌人：造成完整伤害（原始伤害 + 10%）
+                int hitCount = 0;
+                inSweep = true;
+                try {
+                        for (EntityLivingBase target : nearbyEntities) {
+                                if (hitCount >= MAX_TARGETS) {
+                                        break;
+                                }
                                 DamageSource damageSource = DamageSource.causeMobDamage(attacker);
                                 target.attackEntityFrom(damageSource, baseDamage + bonusDamage);
+                                hitCount++;
                         }
-                }
-
-                // 如果周围没有其他敌人，只给直接目标增加伤害
-                if (nearbyEntities.isEmpty() || !nearbyEntities.contains(directTarget)) {
-                        ctx.addDamage(bonusDamage);
+                } finally {
+                        inSweep = false;
                 }
         }
 

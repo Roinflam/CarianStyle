@@ -59,13 +59,11 @@ public class EnchantmentBloodCollection extends EnchantmentBase {
         float bonusDamage = ctx.getDamage() * lostHealthRatio * effectiveLevel * 0.15f;
         ctx.addDamage(bonusDamage);
 
-        // 检查是否有BloodSlash附魔
+        // 主手同时有鲜血斩击时回血翻倍（以前看的是「正在用的那只手」）
         float healMultiplier = 0.02f;
         Enchantment bloodSlash = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBloodSlash.class);
         if (bloodSlash != null) {
-            if (EnchantmentHelper.getEnchantmentLevel(
-                    bloodSlash,
-                    attacker.getHeldItem(attacker.getActiveHand())) > 0) {
+            if (EnchantmentHelper.getEnchantmentLevel(bloodSlash, attacker.getHeldItemMainhand()) > 0) {
                 healMultiplier = 0.04f;
             }
         }

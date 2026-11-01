@@ -35,26 +35,34 @@ import javax.annotation.Nonnull;
 @Mod.EventBusSubscriber
 public class EnchantmentBeastRobust extends EnchantmentBase {
 
+    /** 参与计算的等级上限 */
+    private static final int LEVEL_CAP = 10;
+    /** 时长倍率 */
+    private static final float DURATION_RATIO = 0.4F;
+    /** 等级倍率（新等级 = 原等级 × 它 + 1） */
+    private static final int AMPLIFIER_MULTIPLIER = 2;
+    /** 改写后的等级上限（amplifier），存档里是 byte，叠太高会溢出成负数 */
+    private static final int MAX_AMPLIFIER = 100;
+
     public EnchantmentBeastRobust() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+        super(EnumEnchantmentType.ARMOR_CHEST, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
     }
 
-    private static int getTotalLevel(EntityLivingBase entity) {
+    /**
+     * 只读胸甲一件的等级
+     * <p>只能附在胸甲上；以前任意护甲件都能附，全身每件的等级相加。</p>
+     */
+    private static int getChestLevel(EntityLivingBase entity) {
         Enchantment beastRobust = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBeastRobust.class);
         if (beastRobust == null) {
             return 0;
         }
 
-        int totalLevel = 0;
-        for (ItemStack armor : entity.getArmorInventoryList()) {
-            if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getEnchantmentLevel(beastRobust, armor);
-            }
+        ItemStack chest = entity.getItemStackFromSlot(EntityEquipmentSlot.CHEST);
+        if (chest.isEmpty()) {
+            return 0;
         }
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
-        }
-        return totalLevel;
+        return capLevel(EnchantmentHelper.getEnchantmentLevel(beastRobust, chest), LEVEL_CAP);
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
@@ -65,7 +73,7 @@ public class EnchantmentBeastRobust extends EnchantmentBase {
 
         EntityLivingBase holder = evt.getEntityLiving();
 
-        int totalLevel = getTotalLevel(holder);
+        int totalLevel = getChestLevel(holder);
         if (totalLevel <= 0) {
             return;
         }
@@ -77,8 +85,8 @@ public class EnchantmentBeastRobust extends EnchantmentBase {
             return;
         }
 
-        int newDuration = (int) (potionEffect.getDuration() * 0.4);
-        int newAmplifier = potionEffect.getAmplifier() * 2 + 1;
+        int newDuration = (int) (potionEffect.getDuration() * DURATION_RATIO);
+        int newAmplifier = Math.min(potionEffect.getAmplifier() * AMPLIFIER_MULTIPLIER + 1, MAX_AMPLIFIER);
 
         evt.getPotionEffect().combine(new PotionEffect(potion, newDuration, newAmplifier));
     }

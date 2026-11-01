@@ -20,13 +20,17 @@ import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import javax.annotation.Nonnull;
+import java.util.List;
 
 /**
  * 回归法则附魔
  *
  * 护甲附魔，清除周围实体的药水效果
  * 每tick有5%概率触发：
- * - 清除周围（等级×3格）内所有有药水效果的实体的所有药水
+ * - 清除周围（等级×3格，至多 8 格）内有药水效果的生物（含自身）的所有药水，一次至多 16 个
+ * <p>
+ * 以前半径和目标数都没有上限，等级和 10 时要扫 30 格。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "regressive_principle",
@@ -35,6 +39,17 @@ import javax.annotation.Nonnull;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentRegressivePrinciple extends EnchantmentBase {
+
+    /** 搜索半径上限（格） */
+    private static final int MAX_SEARCH_RADIUS = 8;
+    /** 单次触发至多清除的目标数 */
+    private static final int MAX_TARGETS = 16;
+    /** 每 tick 的触发概率（%） */
+    private static final double TRIGGER_CHANCE = 5.0D;
+    /** 每级的搜索半径（格） */
+    private static final int RADIUS_PER_LEVEL = 3;
+    /** 参与计算的等级上限（开了等级上限时生效） */
+    private static final int LEVEL_CAP = 10;
 
     public EnchantmentRegressivePrinciple() {
         super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
@@ -60,7 +75,7 @@ public class EnchantmentRegressivePrinciple extends EnchantmentBase {
         }
 
         // 5%概率触发
-        if (!RandomUtil.percentageChance(5)) {
+        if (!RandomUtil.percentageChance(TRIGGER_CHANCE)) {
             return;
         }
 
@@ -82,21 +97,29 @@ public class EnchantmentRegressivePrinciple extends EnchantmentBase {
             }
         }
 
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
-        }
+        totalLevel = capLevel(totalLevel, LEVEL_CAP);
 
         if (totalLevel <= 0) {
             return;
         }
 
-        // 清除周围有药水效果的实体的所有药水
-        EntityUtil.getNearbyEntities(
+        int searchRadius = Math.min(totalLevel * RADIUS_PER_LEVEL, MAX_SEARCH_RADIUS);
+
+        List<EntityLivingBase> targets = EntityUtil.getNearbyEntities(
                 EntityLivingBase.class,
                 player,
-                totalLevel * 3,
-                entity -> !entity.getActivePotionEffects().isEmpty()
-        ).forEach(EntityLivingBase::clearActivePotions);
+                searchRadius,
+                entity -> entity != null && !entity.getActivePotionEffects().isEmpty()
+        );
+
+        int hitCount = 0;
+        for (EntityLivingBase target : targets) {
+            if (hitCount >= MAX_TARGETS) {
+                break;
+            }
+            target.clearActivePotions();
+            hitCount++;
+        }
     }
 
     @Override

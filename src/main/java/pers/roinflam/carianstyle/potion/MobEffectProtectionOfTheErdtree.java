@@ -18,6 +18,9 @@ import javax.annotation.Nonnull;
  * - 非生物来源的伤害（环境伤害）减免20%×(等级+1)
  * - 不对绝对伤害生效
  * </p>
+ * <p>
+ * 减免倍率夹到不低于 0，最高 100%。以前 6 级以上倍率变负，伤害量成了负数，扣血变成回血。
+ * </p>
  */
 public class MobEffectProtectionOfTheErdtree extends IconBase {
 
@@ -44,7 +47,7 @@ public class MobEffectProtectionOfTheErdtree extends IconBase {
         EntityLivingBase victim = evt.getEntityLiving();
         if (victim.isPotionActive(this)) {
             int amplifier = victim.getActivePotionEffect(this).getAmplifier();
-            evt.setAmount(evt.getAmount() * (1 - (amplifier + 1) * 0.2f));
+            evt.setAmount(evt.getAmount() * Math.max(0.0F, 1 - (amplifier + 1) * 0.2F));
         }
     }
 

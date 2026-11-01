@@ -4,20 +4,22 @@ import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.SoundEvents;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemShield;
 import net.minecraft.item.ItemStack;
-import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import javax.annotation.Nonnull;
@@ -30,6 +32,10 @@ import java.util.List;
  * 减伤：-5%×等级（叠加）
  * 治疗：最大血量×1.5%×等级（每60tick）
  * 护盾：吸收量+3%×等级，上限=最大血量/3×等级
+ * <p>
+ * 只能附在盾牌上（以前所有可损坏物品都能附，附在别的东西上不起作用）。
+ * 治疗 / 护盾光环只由玩家施放（玩家 tick 里结算），以前任何生物举着都会结算。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "holy_ground",
@@ -39,8 +45,19 @@ import java.util.List;
 @Mod.EventBusSubscriber
 public class EnchantmentHolyGround extends EnchantmentBase {
 
+    // 每级减伤比例（每个举盾者各算一次，依次乘算）
+    private static final float DAMAGE_REDUCTION_PER_LEVEL = 0.05F;
+    // 光环脉冲间隔（tick）
+    private static final int PULSE_INTERVAL_TICKS = 60;
+    // 每级每次回复的最大生命值比例
+    private static final float HEAL_PER_LEVEL = 0.015F;
+    // 每级每次获得的吸收盾（最大生命值比例）
+    private static final float ABSORPTION_PER_LEVEL = 0.03F;
+    // 光环半径（格）
+    private static final int RADIUS = 16;
+
     public EnchantmentHolyGround() {
-        super(EnumEnchantmentType.BREAKABLE, new EntityEquipmentSlot[]{
+        super(CarianStyleEnchantments.SHIELD, new EntityEquipmentSlot[]{
                 EntityEquipmentSlot.MAINHAND,
                 EntityEquipmentSlot.OFFHAND
         });
@@ -56,6 +73,9 @@ public class EnchantmentHolyGround extends EnchantmentBase {
         }
 
         EntityLivingBase victim = evt.getEntityLiving();
+        if (shouldBlockMobTrigger(victim, false)) {
+            return;
+        }
 
         Enchantment holyGround = EnchantmentRegistry.getEnchantmentByClass(EnchantmentHolyGround.class);
         if (holyGround == null) {
@@ -66,7 +86,7 @@ public class EnchantmentHolyGround extends EnchantmentBase {
         List<EntityLivingBase> nearbyEntities = EntityUtil.getNearbyEntities(
                 EntityLivingBase.class,
                 victim,
-                16,
+                RADIUS,
                 entity -> entity.getClass() == victim.getClass()
         );
 
@@ -85,21 +105,28 @@ public class EnchantmentHolyGround extends EnchantmentBase {
 
             if (level > 0) {
                 // 减伤 -5% × 等级
-                evt.setAmount(evt.getAmount() - evt.getAmount() * level * 0.05f);
+                evt.setAmount(evt.getAmount() - evt.getAmount() * level * DAMAGE_REDUCTION_PER_LEVEL);
             }
         }
     }
 
     /**
-     * 治疗/护盾光环：举盾时每60tick为附近同类生物提供治疗和护盾
+     * 治疗/护盾光环：玩家举盾时每60tick为附近同类生物提供治疗和护盾
      */
     @SubscribeEvent
-    public static void onLivingUpdate(@Nonnull LivingEvent.LivingUpdateEvent evt) {
-        if (evt.getEntity().ticksExisted % 60 != 0) {
+    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
+        if (evt.player.world.isRemote || evt.phase != TickEvent.Phase.START) {
             return;
         }
 
-        EntityLivingBase holder = evt.getEntityLiving();
+        if (evt.player.ticksExisted % PULSE_INTERVAL_TICKS != 0) {
+            return;
+        }
+
+        EntityPlayer holder = evt.player;
+        if (!holder.isEntityAlive()) {
+            return;
+        }
 
         // 检查是否正在举盾
         if (!holder.isHandActive()) {
@@ -126,7 +153,7 @@ public class EnchantmentHolyGround extends EnchantmentBase {
         List<EntityLivingBase> nearbyEntities = EntityUtil.getNearbyEntities(
                 EntityLivingBase.class,
                 holder,
-                16,
+                RADIUS,
                 entity -> entity.getClass() == holder.getClass()
         );
 
@@ -135,7 +162,7 @@ public class EnchantmentHolyGround extends EnchantmentBase {
 
             // 治疗：最大血量 × 等级 × 1.5%
             if (entity.getHealth() < entity.getMaxHealth()) {
-                entity.heal(entity.getMaxHealth() * level * 0.015f);
+                entity.heal(entity.getMaxHealth() * level * HEAL_PER_LEVEL);
                 effectApplied = true;
             }
 
@@ -143,7 +170,7 @@ public class EnchantmentHolyGround extends EnchantmentBase {
             float maxAbsorption = entity.getMaxHealth() / 3 * level;
             if (entity.getAbsorptionAmount() < maxAbsorption) {
                 float newAbsorption = Math.min(
-                        entity.getAbsorptionAmount() + entity.getMaxHealth() * level * 0.03f,
+                        entity.getAbsorptionAmount() + entity.getMaxHealth() * level * ABSORPTION_PER_LEVEL,
                         maxAbsorption
                 );
                 entity.setAbsorptionAmount(newAbsorption);

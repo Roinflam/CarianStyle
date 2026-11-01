@@ -6,6 +6,7 @@ import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.init.MobEffects;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemStack;
 import net.minecraft.potion.PotionEffect;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
@@ -40,14 +41,25 @@ import javax.annotation.Nonnull;
 public class EnchantmentEatShit extends EnchantmentBase {
 
     private static final String DEBUFF_KEY = "eat_shit_debuff";
+    /** 参与计算的等级上限 */
+    private static final int LEVEL_CAP = 10;
+    /** 目标每级反胃 / 玷污时长（tick） */
+    private static final int VICTIM_TICKS_PER_LEVEL = 80;
+    /** 自己每级反胃时长（tick） */
+    private static final int SELF_TICKS_PER_LEVEL = 30;
+    /** 玷污期间恢复量倍率 */
+    private static final float HEAL_MULTIPLIER = 0.25F;
 
     public EnchantmentEatShit() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
     /**
-     * 攻击时给双方施加反胃效果
-     * 保留静态监听器，因为需要特殊的immediate source检查
+     * 满蓄力近战造成伤害后，目标反胃并被玷污（恢复 -75%），自己也反胃一小会儿
+     * <p>
+     * 以前每一下都挂，连点就能让目标一直反胃、一直吃治疗削减，现在要求满蓄力（自己的反胃也一起跳过）。
+     * 只认主手。
+     * </p>
      */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
@@ -61,43 +73,45 @@ public class EnchantmentEatShit extends EnchantmentBase {
 
         EntityLivingBase victim = evt.getEntityLiving();
         EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
-        Enchantment eatShit = EnchantmentRegistry.getEnchantmentByClass(EnchantmentEatShit.class);
 
+        if (shouldBlockMobTrigger(attacker, false)) {
+            return;
+        }
+
+        Enchantment eatShit = EnchantmentRegistry.getEnchantmentByClass(EnchantmentEatShit.class);
         if (eatShit == null) {
             return;
         }
 
-        if (attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+        ItemStack heldItem = attacker.getHeldItemMainhand();
+        if (heldItem.isEmpty()) {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                eatShit,
-                attacker.getHeldItem(attacker.getActiveHand())
-        );
+        int level = EnchantmentHelper.getEnchantmentLevel(eatShit, heldItem);
 
         if (ConfigLoader.levelLimit) {
-            level = Math.min(level, 10);
+            level = Math.min(level, LEVEL_CAP);
         }
 
         if (level <= 0) {
             return;
         }
 
-        // 给敌人施加反胃效果（等级 × 4秒）
-        int victimDuration = level * 80;  // 等级 × 80 tick = 等级 × 4秒
-        victim.addPotionEffect(new PotionEffect(MobEffects.NAUSEA, victimDuration));
+        if (!isFullyCharged(attacker)) {
+            return;
+        }
 
-        // 给自己施加反胃效果（等级 × 1.5秒）
-        int attackerDuration = level * 30;  // 等级 × 30 tick = 等级 × 1.5秒
-        attacker.addPotionEffect(new PotionEffect(MobEffects.NAUSEA, attackerDuration));
+        int victimDuration = level * VICTIM_TICKS_PER_LEVEL;
+        victim.addPotionEffect(new PotionEffect(MobEffects.NAUSEA, victimDuration));
+        attacker.addPotionEffect(new PotionEffect(MobEffects.NAUSEA, level * SELF_TICKS_PER_LEVEL));
 
         // 标记敌人处于治疗减益状态
         EnchantmentDataManager.setCooldown(DEBUFF_KEY, victim.getUniqueID(), victimDuration);
     }
 
     /**
-     * 被标记的实体治疗量减少75%
+     * 被玷污的实体恢复量 -75%
      */
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
@@ -105,10 +119,12 @@ public class EnchantmentEatShit extends EnchantmentBase {
             return;
         }
 
-        // 检查是否在治疗减益状态中
+        if (shouldBlockMobTrigger(evt.getEntityLiving(), false)) {
+            return;
+        }
+
         if (EnchantmentDataManager.isOnCooldown(DEBUFF_KEY, evt.getEntity().getUniqueID())) {
-            // 减少75%的治疗量
-            evt.setAmount(evt.getAmount() * 0.25f);
+            evt.setAmount(evt.getAmount() * HEAL_MULTIPLIER);
         }
     }
 

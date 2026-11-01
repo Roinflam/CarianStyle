@@ -36,6 +36,13 @@ import javax.annotation.Nonnull;
 @Mod.EventBusSubscriber
 public class EnchantmentDaedicarWoe extends EnchantmentBase {
 
+    /** 参与计算的等级上限（只用来判断有没有） */
+    private static final int LEVEL_CAP = 10;
+    /** 受到的伤害倍率 */
+    private static final float DAMAGE_MULTIPLIER = 3.0F;
+    /** 受伤后无敌时间占最大值的比例（有效保护窗口减半） */
+    private static final float INVULNERABLE_RATIO = 0.75F;
+
     public EnchantmentDaedicarWoe() {
         super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
                 EntityEquipmentSlot.HEAD,
@@ -53,6 +60,10 @@ public class EnchantmentDaedicarWoe extends EnchantmentBase {
 
         EntityLivingBase victim = evt.getEntityLiving();
 
+        if (shouldBlockMobTrigger(victim, false)) {
+            return;
+        }
+
         Enchantment daedicarWoe = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDaedicarWoe.class);
         if (daedicarWoe == null) {
             return;
@@ -65,16 +76,15 @@ public class EnchantmentDaedicarWoe extends EnchantmentBase {
             }
         }
 
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
-        }
+        totalLevel = capLevel(totalLevel, LEVEL_CAP);
 
         if (totalLevel <= 0) {
             return;
         }
 
-        victim.hurtResistantTime = (int) (victim.maxHurtResistantTime * 0.75);
-        evt.setAmount(evt.getAmount() * 5);
+        // 以前是 ×5，和说明写的 300% 不符
+        victim.hurtResistantTime = (int) (victim.maxHurtResistantTime * INVULNERABLE_RATIO);
+        evt.setAmount(evt.getAmount() * DAMAGE_MULTIPLIER);
     }
 
     @Override

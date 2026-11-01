@@ -82,6 +82,10 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
         EntityLivingBase holder = evt.getEntityLiving();
         EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
 
+        if (shouldBlockMobTrigger(holder, false)) {
+            return;
+        }
+
         if (EntityUtil.getFire(holder) <= 0) {
             return;
         }
@@ -105,6 +109,10 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
         }
 
         EntityLivingBase holder = evt.getEntityLiving();
+
+        if (shouldBlockMobTrigger(holder, false)) {
+            return;
+        }
 
         int totalLevel = getTotalLevel(holder);
         if (totalLevel <= 0) {
@@ -130,6 +138,11 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
         }
 
         EntityLivingBase holder = evt.getEntityLiving();
+
+        if (shouldBlockMobTrigger(holder, false)) {
+            return;
+        }
+
         UUID uuid = holder.getUniqueID();
 
         int totalLevel = getTotalLevel(holder);

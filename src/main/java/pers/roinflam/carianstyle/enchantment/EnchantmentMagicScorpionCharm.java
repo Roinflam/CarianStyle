@@ -14,6 +14,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 
 import javax.annotation.Nonnull;
+import java.util.Locale;
 
 /**
  * 魔力蝎符附魔
@@ -23,6 +24,11 @@ import javax.annotation.Nonnull;
  * - 造成魔法伤害时恢复自身已损失生命值 1% × 等级
  * - 受到物理伤害时伤害增加 10% × 等级
  * - 最大等级：5
+ * <p>
+ * 魔法伤害 = 原版标记为魔法的伤害（药水、喷溅、荆棘等），或伤害类型名里带 magic 的；
+ * 其余全部算物理伤害（近战、箭、火焰、摔落、爆炸……）。
+ * 以前把所有投射物和间接伤害也当魔法，物理伤害又只算生物直接近战，增益和代价都偏了。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "magic_scorpion_charm",
@@ -30,6 +36,13 @@ import javax.annotation.Nonnull;
         rarity = EnchantmentRarity.UNCOMMON
 )
 public class EnchantmentMagicScorpionCharm extends EnchantmentBase {
+
+    /** 每级伤害倍率加成（魔法增伤、物理承伤共用） */
+    private static final float DAMAGE_PER_LEVEL = 0.1F;
+    /** 每级按已损失生命回复的比例 */
+    private static final float HEAL_PER_LEVEL = 0.01F;
+    /** 参与计算的等级上限（开了等级上限时生效） */
+    private static final int LEVEL_CAP = 10;
 
     /**
      * 构造函数
@@ -53,13 +66,10 @@ public class EnchantmentMagicScorpionCharm extends EnchantmentBase {
         }
 
         // 手动应用等级限制
-        int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, 10);
-        }
+        int effectiveLevel = capLevel(level, LEVEL_CAP);
 
         // 增加魔法伤害 10% × 等级
-        ctx.multiplyDamage(1 + effectiveLevel * 0.1f);
+        ctx.multiplyDamage(1 + effectiveLevel * DAMAGE_PER_LEVEL);
 
         // 恢复已损失生命值 1% × 等级
         float maxHealth = attacker.getMaxHealth();
@@ -67,7 +77,7 @@ public class EnchantmentMagicScorpionCharm extends EnchantmentBase {
         float lostHealth = maxHealth - currentHealth;
 
         if (lostHealth > 0) {
-            float healAmount = lostHealth * effectiveLevel * 0.01f;
+            float healAmount = lostHealth * effectiveLevel * HEAL_PER_LEVEL;
             attacker.heal(healAmount);
         }
     }
@@ -85,55 +95,31 @@ public class EnchantmentMagicScorpionCharm extends EnchantmentBase {
         }
 
         // 手动应用等级限制
-        int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, 10);
-        }
+        int effectiveLevel = capLevel(level, LEVEL_CAP);
 
         // 受到的物理伤害增加 10% × 等级
-        ctx.multiplyDamage(1 + effectiveLevel * 0.1f);
+        ctx.multiplyDamage(1 + effectiveLevel * DAMAGE_PER_LEVEL);
     }
 
     /**
-     * 判断是否为魔法伤害
+     * 判断是否为魔法伤害：原版魔法标记，或伤害类型名里带 magic（别的模组自定义的魔法伤害）
      *
      * @param source 伤害源
      * @return 是否为魔法伤害
      */
-    private boolean isMagicDamage(@Nonnull DamageSource source) {
-        // 魔法伤害包括：
-        // 1. 标记为魔法的伤害
-        // 2. 投射物伤害（箭、火球等）
-        // 3. 间接伤害（非直接攻击）
-        return source.isMagicDamage() ||
-                source.isProjectile() ||
-                (source.getImmediateSource() != source.getTrueSource());
+    private static boolean isMagicDamage(@Nonnull DamageSource source) {
+        return source.isMagicDamage()
+                || source.getDamageType().toLowerCase(Locale.ROOT).contains("magic");
     }
 
     /**
-     * 判断是否为物理伤害
+     * 判断是否为物理伤害：魔法以外的一切伤害
      *
      * @param source 伤害源
      * @return 是否为物理伤害
      */
-    private boolean isPhysicalDamage(@Nonnull DamageSource source) {
-        // 物理伤害的特征：
-        // 1. 不是魔法伤害
-        // 2. 不是投射物
-        // 3. 直接来源是生物（近战攻击）
-        // 4. 排除环境伤害（火焰、摔落等）
-        if (source.isMagicDamage() || source.isProjectile()) {
-            return false;
-        }
-
-        // 排除环境伤害
-        if (source.isFireDamage() || source.getDamageType().equals("fall") ||
-                source.getDamageType().equals("drown") || source.getDamageType().equals("starve")) {
-            return false;
-        }
-
-        // 必须有直接来源且是生物
-        return source.getImmediateSource() instanceof EntityLivingBase;
+    private static boolean isPhysicalDamage(@Nonnull DamageSource source) {
+        return !isMagicDamage(source);
     }
 
     @Override

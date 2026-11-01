@@ -22,6 +22,10 @@ public class MoveLight extends TileEntity implements ITickable {
 
     @Override
     public void update() {
+        // 只由服务端回收：客户端自己删的话，玩家站着不动时服务端没有新的方块变化发过来，客户端这边的光就灭了
+        if (world == null || world.isRemote) {
+            return;
+        }
         existedTick++;
 
         // 存在超过1tick后移除

@@ -7,6 +7,7 @@ import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemStack;
 import net.minecraft.potion.PotionEffect;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -26,9 +27,9 @@ import javax.annotation.Nonnull;
  * 岩石剑附魔
  *
  * 效果：
- * - 攻击时给自己施加持续10秒的增益效果
- * - 无法跳跃
- * - 获得击退抗性 10% × 等级
+ * - 攻击时给自己施加持续10秒的增益效果（再次造成伤害重新计时）
+ * - 无法跳跃（玩家的跳跃在客户端算，由 {@code client.CragbladeJumpLock} 拦）
+ * - 击退抗性 +10% × 等级（直接相加，100% 完全免疫击退）
  * - 攻击力提高 10% × 等级
  * - 护甲提高 10% × 等级
  * - 韧性提高 10% × 等级
@@ -44,6 +45,9 @@ public class EnchantmentCragblade extends EnchantmentBase {
     /**
      * 构造函数
      */
+    // 增益持续时间（tick）
+    private static final int EFFECT_DURATION_TICKS = 200;
+
     public EnchantmentCragblade() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
@@ -62,8 +66,12 @@ public class EnchantmentCragblade extends EnchantmentBase {
         }
 
         EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
+        if (shouldBlockMobTrigger(attacker, false)) {
+            return;
+        }
 
-        if (attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+        ItemStack heldItem = attacker.getHeldItemMainhand();
+        if (heldItem.isEmpty()) {
             return;
         }
 
@@ -72,18 +80,14 @@ public class EnchantmentCragblade extends EnchantmentBase {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                cragblade,
-                attacker.getHeldItem(attacker.getActiveHand()));
+        int level = EnchantmentHelper.getEnchantmentLevel(cragblade, heldItem);
 
         if (level <= 0) {
             return;
         }
 
         // 给攻击者自己施加岩石剑增益效果
-        int potionDuration = 200; // 10秒（200 tick）
-        int potionLevel = level - 1;
-        attacker.addPotionEffect(new PotionEffect(CarianStylePotion.CRAGBLADE, potionDuration, potionLevel));
+        attacker.addPotionEffect(new PotionEffect(CarianStylePotion.CRAGBLADE, EFFECT_DURATION_TICKS, level - 1));
     }
 
     @Override

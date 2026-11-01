@@ -3,9 +3,12 @@ package pers.roinflam.carianstyle.enchantment;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.IProjectile;
 import net.minecraft.entity.effect.EntityLightningBolt;
+import net.minecraft.entity.projectile.EntityFireball;
+import net.minecraft.entity.projectile.EntityShulkerBullet;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.DamageSource;
@@ -25,6 +28,7 @@ import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * 精准落雷附魔
@@ -35,6 +39,10 @@ import javax.annotation.Nonnull;
  * - 每次落雷造成30%原伤害的雷电伤害
  * - 下雨时伤害×2，雷暴时伤害×4
  * - 击退攻击者
+ * <p>
+ * 以前先判下雨再判雷暴，雷暴天必然也在下雨，×4 那一支永远走不到。
+ * 投射物也算上火球、凋灵之首、潜影贝导弹这类不实现 IProjectile 的。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "precise_lightning",
@@ -43,6 +51,15 @@ import javax.annotation.Nonnull;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentPreciseLightning extends EnchantmentBase {
+
+    /** 每道落雷的伤害占这一下伤害的比例 */
+    private static final float DAMAGE_RATIO = 0.3F;
+    /** 雷暴天的伤害倍率 */
+    private static final int MAGNIFICATION_HIGH = 4;
+    /** 下雨天的伤害倍率 */
+    private static final int MAGNIFICATION_MID = 2;
+    /** 参与计算的等级上限（开了等级上限时生效） */
+    private static final int LEVEL_CAP = 10;
 
     public EnchantmentPreciseLightning() {
         super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
@@ -66,7 +83,7 @@ public class EnchantmentPreciseLightning extends EnchantmentBase {
         DamageSource damageSource = evt.getSource();
 
         // 必须是投射物攻击且有攻击者
-        if (!(damageSource.getImmediateSource() instanceof IProjectile)) {
+        if (!isProjectile(damageSource.getImmediateSource())) {
             return;
         }
         if (!(damageSource.getTrueSource() instanceof EntityLivingBase)) {
@@ -74,6 +91,9 @@ public class EnchantmentPreciseLightning extends EnchantmentBase {
         }
 
         EntityLivingBase victim = evt.getEntityLiving();
+        if (shouldBlockMobTrigger(victim, false)) {
+            return;
+        }
         EntityLivingBase attacker = (EntityLivingBase) damageSource.getTrueSource();
 
         Enchantment preciseLightning = EnchantmentRegistry.getEnchantmentByClass(EnchantmentPreciseLightning.class);
@@ -89,9 +109,7 @@ public class EnchantmentPreciseLightning extends EnchantmentBase {
             }
         }
 
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
-        }
+        totalLevel = capLevel(totalLevel, LEVEL_CAP);
 
         if (totalLevel <= 0) {
             return;
@@ -125,16 +143,16 @@ public class EnchantmentPreciseLightning extends EnchantmentBase {
                 // 重置无敌帧
                 attacker.hurtResistantTime = attacker.maxHurtResistantTime / 2;
 
-                // 计算天气加成
+                // 计算天气加成：先判雷暴（雷暴天同时也在下雨）
                 int magnification = 1;
-                if (attacker.world.isRaining()) {
-                    magnification *= 2;
-                } else if (attacker.world.isThundering()) {
-                    magnification *= 4;
+                if (attacker.world.isThundering()) {
+                    magnification = MAGNIFICATION_HIGH;
+                } else if (attacker.world.isRaining()) {
+                    magnification = MAGNIFICATION_MID;
                 }
 
                 // 造成雷电伤害
-                attacker.attackEntityFrom(DamageSource.LIGHTNING_BOLT, originalDamage * 0.3f * magnification);
+                attacker.attackEntityFrom(DamageSource.LIGHTNING_BOLT, originalDamage * DAMAGE_RATIO * magnification);
 
                 // 击退攻击者
                 if (attacker.onGround) {
@@ -156,5 +174,18 @@ public class EnchantmentPreciseLightning extends EnchantmentBase {
     public boolean canApplyTogether(Enchantment ench) {
         return super.canApplyTogether(ench)
                 && !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentCausalityPrinciple.class));
+    }
+
+    /**
+     * 直接伤害来源是不是投射物：箭、雪球、羊驼唾沫这类 IProjectile，
+     * 以及火球、凋灵之首、潜影贝导弹
+     *
+     * @param entity 直接伤害来源
+     * @return 是投射物时为 true
+     */
+    private static boolean isProjectile(@Nullable Entity entity) {
+        return entity instanceof IProjectile
+                || entity instanceof EntityFireball
+                || entity instanceof EntityShulkerBullet;
     }
 }

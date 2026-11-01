@@ -69,6 +69,11 @@ public class EnchantmentDragoncrestGreatshield extends EnchantmentBase {
         }
 
         EntityLivingBase victim = evt.getEntityLiving();
+
+        if (shouldBlockMobTrigger(victim, false)) {
+            return;
+        }
+
         Enchantment dragoncrest = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDragoncrestGreatshield.class);
 
         if (dragoncrest == null) {

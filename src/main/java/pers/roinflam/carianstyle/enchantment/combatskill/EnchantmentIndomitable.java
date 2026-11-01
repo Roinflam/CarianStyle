@@ -26,6 +26,9 @@ import javax.annotation.Nonnull;
  *
  * 血量越低越有概率完全免疫伤害
  * 免疫概率 = 损失血量百分比 × 75%
+ * <p>
+ * 只能附在胸甲上（以前任意护甲都能附，并且按全身累加生效）。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "indomitable",
@@ -36,8 +39,11 @@ import javax.annotation.Nonnull;
 @Mod.EventBusSubscriber
 public class EnchantmentIndomitable extends EnchantmentBase {
 
+    // 免疫概率系数：已损失生命值百分比 × 该系数 = 免疫概率（%）
+    private static final double IMMUNE_CHANCE_FACTOR = 0.75D;
+
     public EnchantmentIndomitable() {
-        super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+        super(EnumEnchantmentType.ARMOR_CHEST, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
     }
 
     /**
@@ -55,6 +61,9 @@ public class EnchantmentIndomitable extends EnchantmentBase {
         }
 
         EntityLivingBase holder = evt.getEntityLiving();
+        if (shouldBlockMobTrigger(holder, false)) {
+            return;
+        }
 
         Enchantment indomitable = EnchantmentRegistry.getEnchantmentByClass(EnchantmentIndomitable.class);
         if (indomitable == null) {
@@ -75,7 +84,7 @@ public class EnchantmentIndomitable extends EnchantmentBase {
 
         // 免疫概率 = 损失血量百分比 × 75%
         float missingHealthPercent = 1 - holder.getHealth() / holder.getMaxHealth();
-        double immuneChance = missingHealthPercent * 100 * 0.75;
+        double immuneChance = missingHealthPercent * 100 * IMMUNE_CHANCE_FACTOR;
 
         if (RandomUtil.percentageChance(immuneChance)) {
             evt.setCanceled(true);

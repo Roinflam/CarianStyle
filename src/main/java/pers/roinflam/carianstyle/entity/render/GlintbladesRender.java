@@ -9,6 +9,7 @@ import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.math.Vec3d;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
@@ -35,6 +36,14 @@ public class GlintbladesRender<T extends EntityGlintblades> extends Render<T> {
 
     @Override
     public void doRender(@Nonnull T entity, double x, double y, double z, float entityYaw, float partialTicks) {
+        // 悬浮期跟随释放者时，按释放者这一帧的插值位置和朝向现算，跑动、转身时剑阵不会一顿一顿
+        Vec3d offset = entity.getRenderOffset(partialTicks);
+        if (offset != null) {
+            x += offset.x;
+            y += offset.y;
+            z += offset.z;
+        }
+
         GlStateManager.pushMatrix();
         GlStateManager.translate((float) x, (float) y, (float) z);
         GlStateManager.enableRescaleNormal();

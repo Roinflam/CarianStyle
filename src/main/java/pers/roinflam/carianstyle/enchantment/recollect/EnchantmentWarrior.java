@@ -16,8 +16,7 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
-import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
 
 import javax.annotation.Nonnull;
 
@@ -27,6 +26,10 @@ import javax.annotation.Nonnull;
  * 攻击：增伤25%
  * 受击：伤害减半，剩余伤害分60tick扣血
  * 击杀：治疗损失血量×25%
+ * <p>
+ * 以前受击后的持续扣血每次各开一个任务直接改血量；现在交给持续伤害管理器统一结算。
+ * 武器以前按「最近一次使用物品的那只手」取，现在一律看主手；怪物持有时按怪物触发附魔的开关处理。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "warrior",
@@ -37,6 +40,11 @@ import javax.annotation.Nonnull;
 public class EnchantmentWarrior extends EnchantmentBase {
 
     private static final int RECOLLECT_ENCHANTABILITY = 35;
+
+    /** 受击后持续扣血的时长（tick） */
+    private static final int DOT_DURATION = 60;
+    /** 持续扣血的起始延迟（tick） */
+    private static final int DOT_DELAY = 5;
 
     public EnchantmentWarrior() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
@@ -54,7 +62,11 @@ public class EnchantmentWarrior extends EnchantmentBase {
 
         EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
 
-        if (attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+        if (shouldBlockMobTrigger(attacker, false)) {
+            return;
+        }
+
+        if (attacker.getHeldItemMainhand().isEmpty()) {
             return;
         }
 
@@ -65,7 +77,7 @@ public class EnchantmentWarrior extends EnchantmentBase {
 
         int level = EnchantmentHelper.getEnchantmentLevel(
                 warrior,
-                attacker.getHeldItem(attacker.getActiveHand()));
+                attacker.getHeldItemMainhand());
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
@@ -84,7 +96,11 @@ public class EnchantmentWarrior extends EnchantmentBase {
 
         EntityLivingBase victim = evt.getEntityLiving();
 
-        if (victim.getHeldItem(victim.getActiveHand()).isEmpty()) {
+        if (shouldBlockMobTrigger(victim, false)) {
+            return;
+        }
+
+        if (victim.getHeldItemMainhand().isEmpty()) {
             return;
         }
 
@@ -95,7 +111,7 @@ public class EnchantmentWarrior extends EnchantmentBase {
 
         int level = EnchantmentHelper.getEnchantmentLevel(
                 warrior,
-                victim.getHeldItem(victim.getActiveHand()));
+                victim.getHeldItemMainhand());
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);
@@ -107,26 +123,9 @@ public class EnchantmentWarrior extends EnchantmentBase {
 
         evt.setAmount(evt.getAmount() * 0.5f);
 
-        float damagePerTick = evt.getAmount() / 60;
-
-        new SynchronizationTask(5, 1) {
-            private int tick = 0;
-
-            @Override
-            public void run() {
-                if (++tick > 60 || !victim.isEntityAlive()) {
-                    this.cancel();
-                    return;
-                }
-
-                if (victim.getHealth() - damagePerTick * 2 > 0) {
-                    victim.setHealth(victim.getHealth() - damagePerTick);
-                } else {
-                    EntityLivingUtil.kill(victim, evt.getSource());
-                    this.cancel();
-                }
-            }
-        }.start();
+        // 剩下的一半分 60 tick 扣完；走持续伤害管理器，致死时直接处决，普拉顿桑克斯的回溯期间暂停
+        float damagePerTick = evt.getAmount() / DOT_DURATION;
+        DamageOverTimeManager.applyLinear(victim, damagePerTick, DOT_DURATION, DOT_DELAY, evt.getSource(), true);
     }
 
     @SubscribeEvent
@@ -141,7 +140,11 @@ public class EnchantmentWarrior extends EnchantmentBase {
 
         EntityLivingBase killer = (EntityLivingBase) evt.getSource().getImmediateSource();
 
-        if (killer.getHeldItem(killer.getActiveHand()).isEmpty()) {
+        if (shouldBlockMobTrigger(killer, false)) {
+            return;
+        }
+
+        if (killer.getHeldItemMainhand().isEmpty()) {
             return;
         }
 
@@ -152,7 +155,7 @@ public class EnchantmentWarrior extends EnchantmentBase {
 
         int level = EnchantmentHelper.getEnchantmentLevel(
                 warrior,
-                killer.getHeldItem(killer.getActiveHand()));
+                killer.getHeldItemMainhand());
 
         if (ConfigLoader.levelLimit) {
             level = Math.min(level, 10);

@@ -53,8 +53,36 @@ import javax.annotation.Nullable;
 @Mod.EventBusSubscriber
 public class EnchantmentDarkMoon extends EnchantmentBase {
 
+    /** 参与计算的等级上限（只用来判断有没有） */
+    private static final int LEVEL_CAP = 10;
+    /** 魔法减伤 / 增伤 / 恢复加成比例 */
+    private static final float RATIO = 0.25F;
+    /** 同时装备满月时的比例（+50%） */
+    private static final float RATIO_WITH_FULL_MOON = 0.375F;
+    /** 对正在以你为目标的生物的额外伤害（当前生命比例） */
+    private static final float EXTRA_DAMAGE = 0.05F;
+    /** 同时装备满月时的额外伤害 */
+    private static final float EXTRA_DAMAGE_WITH_FULL_MOON = 0.075F;
+    /** 夜视每次给的时长（tick） */
+    private static final int NIGHT_VISION_TICKS = 210;
+
     public EnchantmentDarkMoon() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
+
+    private static float ratio(boolean hasFullMoon) {
+        return hasFullMoon ? RATIO_WITH_FULL_MOON : RATIO;
+    }
+
+    /**
+     * 主手这把武器上的暗月等级
+     */
+    private static int mainHandLevel(@Nonnull EntityLivingBase entity, @Nonnull Enchantment darkMoon) {
+        ItemStack heldItem = entity.getHeldItemMainhand();
+        if (heldItem.isEmpty()) {
+            return 0;
+        }
+        return capLevel(EnchantmentHelper.getEnchantmentLevel(darkMoon, heldItem), LEVEL_CAP);
     }
 
     /**
@@ -77,8 +105,11 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
     }
 
     /**
-     * 处理伤害事件
-     * 由于涉及复杂的双向逻辑和特殊检查，保留静态监听器
+     * 夜晚：受到的魔法伤害 -25%；满蓄力近战魔法伤害 +25%，对正以你为目标的生物额外造成其当前生命 5% 并吸血
+     * <p>
+     * 受击减伤对玩家也生效，以前只对怪物生效（玩家拿着没有减伤）。
+     * 只认主手，以前看的是「正在用的那只手」。
+     * </p>
      */
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
@@ -100,26 +131,9 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
             return;
         }
 
-        // 受击者视角（减伤）
-        if (victim instanceof EntityLiving) {
-            EntityLiving livingVictim = (EntityLiving) victim;
-
-            if (!livingVictim.getHeldItem(livingVictim.getActiveHand()).isEmpty()) {
-                int level = EnchantmentHelper.getEnchantmentLevel(
-                        darkMoon,
-                        livingVictim.getHeldItem(livingVictim.getActiveHand())
-                );
-
-                if (ConfigLoader.levelLimit) {
-                    level = Math.min(level, 10);
-                }
-
-                if (level > 0) {
-                    boolean hasFullMoon = hasFullMoonEnchantment(livingVictim);
-                    float reduction = hasFullMoon ? 0.375f : 0.25f;
-                    evt.setAmount(evt.getAmount() * (1 - reduction));
-                }
-            }
+        // 受击者视角（减伤），玩家和怪物都生效
+        if (!shouldBlockMobTrigger(victim, false) && mainHandLevel(victim, darkMoon) > 0) {
+            evt.setAmount(evt.getAmount() * (1 - ratio(hasFullMoonEnchantment(victim))));
         }
 
         // 攻击者视角（增伤+吸血）
@@ -129,38 +143,25 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
 
         EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
 
-        if (attacker.getHeldItem(attacker.getActiveHand()).isEmpty()) {
+        if (shouldBlockMobTrigger(attacker, false)) {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                darkMoon,
-                attacker.getHeldItem(attacker.getActiveHand())
-        );
-
-        if (ConfigLoader.levelLimit) {
-            level = Math.min(level, 10);
-        }
-
-        if (level <= 0) {
+        if (mainHandLevel(attacker, darkMoon) <= 0) {
             return;
         }
 
-        if (attacker instanceof EntityPlayer) {
-            if (EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) attacker) != 1) {
-                return;
-            }
+        if (!isFullyCharged(attacker)) {
+            return;
         }
 
         boolean hasFullMoon = hasFullMoonEnchantment(attacker);
-        float damageBonus = hasFullMoon ? 0.375f : 0.25f;
-
-        evt.setAmount(evt.getAmount() * (1 + damageBonus));
+        evt.setAmount(evt.getAmount() * (1 + ratio(hasFullMoon)));
 
         if (victim instanceof EntityLiving) {
             EntityLiving livingVictim = (EntityLiving) victim;
             if (livingVictim.getAttackTarget() != null && livingVictim.getAttackTarget().equals(attacker)) {
-                float extraDamage = hasFullMoon ? 0.075f : 0.05f;
+                float extraDamage = hasFullMoon ? EXTRA_DAMAGE_WITH_FULL_MOON : EXTRA_DAMAGE;
 
                 evt.setAmount(evt.getAmount() + livingVictim.getHealth() * extraDamage);
 
@@ -171,7 +172,7 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
     }
 
     /**
-     * 治疗增强
+     * 夜晚恢复效果 +25%
      */
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
@@ -184,35 +185,25 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
         }
 
         EntityLivingBase healer = evt.getEntityLiving();
+
+        if (shouldBlockMobTrigger(healer, false)) {
+            return;
+        }
+
         Enchantment darkMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDarkMoon.class);
         if (darkMoon == null) {
             return;
         }
 
-        if (healer.getHeldItem(healer.getActiveHand()).isEmpty()) {
+        if (mainHandLevel(healer, darkMoon) <= 0) {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                darkMoon,
-                healer.getHeldItem(healer.getActiveHand())
-        );
-
-        if (ConfigLoader.levelLimit) {
-            level = Math.min(level, 10);
-        }
-
-        if (level <= 0) {
-            return;
-        }
-
-        boolean hasFullMoon = hasFullMoonEnchantment(healer);
-        float healBonus = hasFullMoon ? 0.375f : 0.25f;
-        evt.setAmount(evt.getAmount() * (1 + healBonus));
+        evt.setAmount(evt.getAmount() * (1 + ratio(hasFullMoonEnchantment(healer))));
     }
 
     /**
-     * 持续夜视效果
+     * 夜晚主手拿着时持续夜视
      */
     @SubscribeEvent
     public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
@@ -238,21 +229,8 @@ public class EnchantmentDarkMoon extends EnchantmentBase {
             return;
         }
 
-        if (player.getHeldItem(player.getActiveHand()).isEmpty()) {
-            return;
-        }
-
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                darkMoon,
-                player.getHeldItem(player.getActiveHand())
-        );
-
-        if (ConfigLoader.levelLimit) {
-            level = Math.min(level, 10);
-        }
-
-        if (level > 0) {
-            player.addPotionEffect(new PotionEffect(MobEffects.NIGHT_VISION, 210));
+        if (mainHandLevel(player, darkMoon) > 0) {
+            player.addPotionEffect(new PotionEffect(MobEffects.NIGHT_VISION, NIGHT_VISION_TICKS));
         }
     }
 

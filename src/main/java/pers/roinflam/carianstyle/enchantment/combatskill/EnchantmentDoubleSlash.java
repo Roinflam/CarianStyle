@@ -11,6 +11,7 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
+import pers.roinflam.carianstyle.utils.helper.AttackCooldownHelper;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 
 import javax.annotation.Nonnull;
@@ -19,7 +20,12 @@ import javax.annotation.Nonnull;
  * 双斩附魔
  *
  * 玩家攻击时有概率（等级×5+20%）触发二段斩
- * 触发时减少敌人无敌帧，额外造成魔法伤害（伤害×等级×0.2）
+ * 触发时减少敌人无敌帧，额外造成魔法伤害（伤害×等级×0.2，无视护甲）
+ * <p>
+ * 要求满蓄力（蓄力超过 90%），每一下挥击只结算一次：以前横扫打到几个目标就各掷一次概率、各追加一次伤害。
+ * 不再把这一下的伤害类型名改成 waterfowlDance：以前靠它防递归，打死目标时的死亡信息会变成水鸟乱舞那条，
+ * 同一把武器带水鸟乱舞时连首段都触发不了。追加的魔法伤害没有攻击者，本来就不会再进到这里。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "double_slash",
@@ -28,17 +34,21 @@ import javax.annotation.Nonnull;
 )
 public class EnchantmentDoubleSlash extends EnchantmentBase {
 
+    // 基础触发概率（%）
+    private static final int BASE_CHANCE = 20;
+    // 每级触发概率（%）
+    private static final int CHANCE_PER_LEVEL = 5;
+    // 每级追加伤害（本次伤害的比例）
+    private static final float DAMAGE_PER_LEVEL = 0.2F;
+    // 追加前目标的无敌时间（tick）
+    private static final int EXTRA_HIT_INVULNERABLE_TIME = 10;
+
     public EnchantmentDoubleSlash() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
     @Override
     protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
-        // 排除水鸟乱舞伤害（防止递归）
-        if (ctx.getDamageSource() != null && "waterfowlDance".equals(ctx.getDamageSource().damageType)) {
-            return;
-        }
-
         // 只有玩家能触发
         if (!ctx.isHolderPlayer()) {
             return;
@@ -51,27 +61,27 @@ public class EnchantmentDoubleSlash extends EnchantmentBase {
             return;
         }
 
-        // 检查刚挥剑
-        if (!isJustSwung(player)) {
+        // 满蓄力
+        if (!isFullyCharged(player)) {
             return;
         }
 
-        // 重置攻击冷却
-        player.resetCooldown();
+        // 消耗这一下挥击：同一 tick 只结算一次（横扫副目标、主副手都带本附魔的重复分发不再各结算一遍），
+        // 冷却推迟到下一 tick 开头清零
+        if (!AttackCooldownHelper.spendSwing(player)) {
+            return;
+        }
 
         // 概率触发：等级×5 + 20%
-        if (!RandomUtil.percentageChance(level * 5 + 20)) {
+        if (!RandomUtil.percentageChance(level * CHANCE_PER_LEVEL + BASE_CHANCE)) {
             return;
         }
 
         // 减少敌人无敌帧
-        victim.hurtResistantTime = victim.maxHurtResistantTime / 2;
-
-        // 修改伤害类型防止递归
-        ctx.getDamageSource().damageType = "waterfowlDance";
+        victim.hurtResistantTime = EXTRA_HIT_INVULNERABLE_TIME;
 
         // 额外魔法伤害
-        float extraDamage = ctx.getDamage() * level * 0.2f;
+        float extraDamage = ctx.getDamage() * level * DAMAGE_PER_LEVEL;
         victim.attackEntityFrom(DamageSource.MAGIC, extraDamage);
     }
 

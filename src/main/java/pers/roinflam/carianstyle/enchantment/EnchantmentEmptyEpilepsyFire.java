@@ -7,6 +7,7 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.projectile.EntityArrow;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemStack;
 import net.minecraft.potion.PotionEffect;
 import net.minecraftforge.event.entity.ProjectileImpactEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -19,7 +20,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
-import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
@@ -29,8 +30,8 @@ import javax.annotation.Nonnull;
  *
  * 弓箭附魔,双刃剑效果
  * 箭矢命中敌人时：
- * - 对敌人造成持续3秒的癫火伤害(攻击者最大生命值 × 15% × 等级)
- * - 对自己造成持续3秒的癫火伤害(自己最大生命值 × 15%)
+ * - 对敌人造成持续3秒的癫火伤害(攻击者最大生命值 × 10% × 等级 × 20%)
+ * - 对自己造成持续3秒的癫火伤害(自己最大生命值 × 10%)
  * - 创造模式玩家免疫自损
  */
 @AutoRegisterEnchantment(
@@ -41,16 +42,31 @@ import javax.annotation.Nonnull;
 @Mod.EventBusSubscriber
 public class EnchantmentEmptyEpilepsyFire extends EnchantmentBase {
 
-    private static final int BURN_DURATION = 65;  // 3秒 + 5 tick
-    private static final int DAMAGE_TICKS = 60;   // 持续伤害60 tick (3秒)
+    /** 火焰显示时长（tick） */
+    private static final int BURN_VISUAL_DURATION = 65;
+    /** 燃烧时长（tick） */
+    private static final int DAMAGE_TICKS = 60;
+    /** 起始延迟（tick） */
+    private static final int DOT_DELAY = 5;
+    /** 参与计算的等级上限 */
+    private static final int LEVEL_CAP = 10;
+    /** 自己烧掉的比例（按自己最大生命） */
+    private static final float SELF_DAMAGE_RATIO = 0.1F;
+    /** 对目标每级的比例（乘在自损量上） */
+    private static final float VICTIM_DAMAGE_PER_LEVEL = 0.2F;
 
     public EnchantmentEmptyEpilepsyFire() {
         super(EnumEnchantmentType.BOW, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
     /**
-     * 箭矢命中实体时对双方施加癫火伤害
-     * 注意：ProjectileImpactEvent基类无模板方法,保留静态监听器
+     * 箭命中生物时双方一起燃烧 3 秒：自己烧掉最大生命的 10%，目标烧掉「射手最大生命 ×10% × 等级 ×20%」
+     * <p>
+     * 以前自损 15%、对目标是自损量的「等级」倍（5 级就是射手最大生命的 75%）。
+     * 两份伤害都按命中那一刻射手的最大生命一次算好，走持续伤害管理器：癫火是绝对伤害，抗性提升 V 挡不住；
+     * 对目标剩不到两跳时直接处决，对自己的致死一击走伤害管线（不死图腾挡得住）。
+     * 只认射手主手的弓，射手不是生物时不触发（以前直接强转会崩）。
+     * </p>
      */
     @SubscribeEvent
     public static void onProjectileImpact_Arrow(@Nonnull ProjectileImpactEvent.Arrow evt) {
@@ -58,95 +74,49 @@ public class EnchantmentEmptyEpilepsyFire extends EnchantmentBase {
             return;
         }
 
-        // 必须有射击者且击中实体
-        if (evt.getArrow().shootingEntity == null) {
+        EntityArrow arrow = evt.getArrow();
+        if (!(arrow.shootingEntity instanceof EntityLivingBase)) {
             return;
         }
         if (!(evt.getRayTraceResult().entityHit instanceof EntityLivingBase)) {
             return;
         }
 
-        EntityArrow arrow = evt.getArrow();
         EntityLivingBase attacker = (EntityLivingBase) arrow.shootingEntity;
-        EntityLivingBase victim = (EntityLivingBase) evt.getRayTraceResult().entityHit;
-        Enchantment emptyEpilepsyFire = EnchantmentRegistry.getEnchantmentByClass(EnchantmentEmptyEpilepsyFire.class);
 
+        if (shouldBlockMobTrigger(attacker, false)) {
+            return;
+        }
+
+        EntityLivingBase victim = (EntityLivingBase) evt.getRayTraceResult().entityHit;
+
+        Enchantment emptyEpilepsyFire = EnchantmentRegistry.getEnchantmentByClass(EnchantmentEmptyEpilepsyFire.class);
         if (emptyEpilepsyFire == null) {
             return;
         }
 
-        int level = EnchantmentHelper.getEnchantmentLevel(
-                emptyEpilepsyFire,
-                attacker.getHeldItem(attacker.getActiveHand())
-        );
-
-        if (ConfigLoader.levelLimit) {
-            level = Math.min(level, 10);
+        ItemStack heldItem = attacker.getHeldItemMainhand();
+        if (heldItem.isEmpty()) {
+            return;
         }
 
+        int level = capLevel(EnchantmentHelper.getEnchantmentLevel(emptyEpilepsyFire, heldItem), LEVEL_CAP);
         if (level <= 0) {
             return;
         }
 
-        final int effectiveLevel = level;
+        float selfDamageTotal = attacker.getMaxHealth() * SELF_DAMAGE_RATIO;
 
-        // 对攻击者造成癫火伤害(创造模式玩家免疫)
+        // 创造模式玩家不烧自己
         if (!(attacker instanceof EntityPlayer) || !((EntityPlayer) attacker).isCreative()) {
-            attacker.addPotionEffect(new PotionEffect(
-                    CarianStylePotion.EPILEPSY_FIRE_BURNING,
-                    BURN_DURATION,
-                    0
-            ));
-
-            new SynchronizationTask(5, 1) {
-                private int tick = 0;
-
-                @Override
-                public void run() {
-                    if (++tick > DAMAGE_TICKS || !attacker.isEntityAlive()) {
-                        this.cancel();
-                        return;
-                    }
-
-                    // 每tick造成 最大生命值×15%/60 的伤害
-                    float damage = attacker.getMaxHealth() * 0.15f / 60;
-                    if (attacker.getHealth() - damage * 2 > 0) {
-                        attacker.setHealth(attacker.getHealth() - damage);
-                    } else {
-                        EntityLivingUtil.kill(attacker, NewDamageSource.EPILEPSY_FIRE);
-                        this.cancel();
-                    }
-                }
-            }.start();
+            attacker.addPotionEffect(new PotionEffect(CarianStylePotion.EPILEPSY_FIRE_BURNING, BURN_VISUAL_DURATION, 0));
+            DamageOverTimeManager.applySelfLinear(attacker, selfDamageTotal / DAMAGE_TICKS, DAMAGE_TICKS, DOT_DELAY,
+                    NewDamageSource.EPILEPSY_FIRE);
         }
 
-        // 对受击者造成癫火伤害
-        victim.addPotionEffect(new PotionEffect(
-                CarianStylePotion.EPILEPSY_FIRE_BURNING,
-                BURN_DURATION,
-                0
-        ));
-
-        new SynchronizationTask(5, 1) {
-            private int tick = 0;
-
-            @Override
-            public void run() {
-                if (++tick > DAMAGE_TICKS || !victim.isEntityAlive()) {
-                    this.cancel();
-                    return;
-                }
-
-                // 每tick造成 攻击者最大生命值×15%×等级/60 的伤害
-                float damage = attacker.getMaxHealth() * 0.15f * effectiveLevel / 60;
-                if (victim.getHealth() - damage * 2 > 0) {
-                    victim.setHealth(victim.getHealth() - damage);
-                } else {
-                    EntityLivingUtil.kill(victim, NewDamageSource.EPILEPSY_FIRE);
-                    this.cancel();
-                }
-            }
-        }.start();
+        victim.addPotionEffect(new PotionEffect(CarianStylePotion.EPILEPSY_FIRE_BURNING, BURN_VISUAL_DURATION, 0));
+        DamageOverTimeManager.applyLinear(victim, selfDamageTotal * level * VICTIM_DAMAGE_PER_LEVEL / DAMAGE_TICKS,
+                DAMAGE_TICKS, DOT_DELAY, NewDamageSource.EPILEPSY_FIRE, true);
     }
 
     @Override

@@ -68,6 +68,11 @@ public class EnchantmentFullMoon extends EnchantmentBase {
         }
 
         EntityLivingBase holder = evt.getEntityLiving();
+
+        if (shouldBlockMobTrigger(holder, true)) {
+            return;
+        }
+
         UUID uuid = holder.getUniqueID();
 
         Enchantment fullMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentFullMoon.class);
@@ -100,10 +105,10 @@ public class EnchantmentFullMoon extends EnchantmentBase {
                 // 检查是否有DarkMoon附魔
                 boolean hasDarkMoon = false;
                 Enchantment darkMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDarkMoon.class);
-                if (darkMoon != null && !holder.getHeldItem(holder.getActiveHand()).isEmpty()) {
+                if (darkMoon != null && !holder.getHeldItemMainhand().isEmpty()) {
                     if (EnchantmentHelper.getEnchantmentLevel(
                             darkMoon,
-                            holder.getHeldItem(holder.getActiveHand())) > 0) {
+                            holder.getHeldItemMainhand()) > 0) {
                         hasDarkMoon = true;
                     }
                 }
@@ -143,6 +148,11 @@ public class EnchantmentFullMoon extends EnchantmentBase {
         }
 
         EntityLivingBase holder = evt.getEntityLiving();
+
+        if (shouldBlockMobTrigger(holder, false)) {
+            return;
+        }
+
         UUID uuid = holder.getUniqueID();
 
         Enchantment fullMoon = EnchantmentRegistry.getEnchantmentByClass(EnchantmentFullMoon.class);

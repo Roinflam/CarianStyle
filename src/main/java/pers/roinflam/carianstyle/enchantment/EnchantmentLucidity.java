@@ -28,6 +28,10 @@ import javax.annotation.Nonnull;
  * 获得负面效果时：
  * - 持续时间减少 15% × 等级
  * - 效果等级+1（效果更强但更短）
+ * - 持续时间至少 1 tick
+ * <p>
+ * 以前没有下限，全身等级之和到 7 时持续时间变成 0 或负数，效果当场过期，等于免疫一切负面效果。
+ * </p>
  */
 @AutoRegisterEnchantment(
         id = "lucidity",
@@ -36,6 +40,13 @@ import javax.annotation.Nonnull;
 )
 @Mod.EventBusSubscriber
 public class EnchantmentLucidity extends EnchantmentBase {
+
+    /** 每级缩短的持续时间比例 */
+    private static final double DURATION_REDUCTION_PER_LEVEL = 0.15D;
+    /** 效果等级加成 */
+    private static final int AMPLIFIER_BONUS = 1;
+    /** 参与计算的等级上限（开了等级上限时生效） */
+    private static final int LEVEL_CAP = 10;
 
     public EnchantmentLucidity() {
         super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
@@ -57,7 +68,6 @@ public class EnchantmentLucidity extends EnchantmentBase {
         }
 
         EntityLivingBase entity = evt.getEntityLiving();
-
         Enchantment lucidity = EnchantmentRegistry.getEnchantmentByClass(EnchantmentLucidity.class);
         if (lucidity == null) {
             return;
@@ -71,9 +81,7 @@ public class EnchantmentLucidity extends EnchantmentBase {
             }
         }
 
-        if (ConfigLoader.levelLimit) {
-            totalLevel = Math.min(totalLevel, 10);
-        }
+        totalLevel = capLevel(totalLevel, LEVEL_CAP);
 
         if (totalLevel <= 0) {
             return;
@@ -87,12 +95,13 @@ public class EnchantmentLucidity extends EnchantmentBase {
             return;
         }
 
-        // 修改效果：持续时间减少，等级+1
-        int newDuration = (int) (potionEffect.getDuration() - potionEffect.getDuration() * totalLevel * 0.15);
+        // 修改效果：持续时间减少（至少 1 tick），等级+1
+        int newDuration = (int) (potionEffect.getDuration() * (1.0 - totalLevel * DURATION_REDUCTION_PER_LEVEL));
+        newDuration = Math.max(newDuration, 1);
         evt.getPotionEffect().combine(new PotionEffect(
                 potion,
                 newDuration,
-                potionEffect.getAmplifier() + 1
+                potionEffect.getAmplifier() + AMPLIFIER_BONUS
         ));
     }
 

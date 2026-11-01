@@ -51,6 +51,10 @@ public class EnchantmentCrucibleScaleTalisman extends EnchantmentBase {
 
         EntityLivingBase victim = evt.getEntityLiving();
 
+        if (shouldBlockMobTrigger(victim, false)) {
+            return;
+        }
+
         if (evt.getAmount() < victim.getMaxHealth()) {
             return;
         }

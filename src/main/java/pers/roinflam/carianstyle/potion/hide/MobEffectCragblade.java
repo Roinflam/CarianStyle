@@ -16,7 +16,7 @@ import javax.annotation.Nonnull;
  *
  * 效果：
  * - 攻击力提高 10% × 等级
- * - 击退抗性 +10% × 等级
+ * - 击退抗性 +10% × 等级（直接相加）
  * - 护甲提高 10% × 等级
  * - 韧性提高 10% × 等级
  * - 无法跳跃
@@ -34,12 +34,12 @@ public class MobEffectCragblade extends HideBase {
                 2
         );
 
-        // 击退抗性 +10% × 等级
+        // 击退抗性 +10% × 等级：直接相加（玩家和大多数生物的基础值是 0，以前按比例乘等于没有）
         this.registerPotionAttributeModifier(
                 SharedMonsterAttributes.KNOCKBACK_RESISTANCE,
                 "8c4a9e3d-7b2f-4e1a-9d5c-6f3e8a2b1c0d",
                 0.1,
-                2
+                0
         );
 
         // 护甲提高 10% × 等级
@@ -61,6 +61,9 @@ public class MobEffectCragblade extends HideBase {
 
     /**
      * 岩石剑状态下无法跳跃
+     * <p>
+     * 怪物的跳跃在服务端算，这里就拦得住；玩家的跳跃在客户端算，另由 {@code client.CragbladeJumpLock} 在本地拦。
+     * </p>
      */
     @SubscribeEvent
     public void onLivingUpdate(@Nonnull LivingEvent.LivingUpdateEvent evt) {

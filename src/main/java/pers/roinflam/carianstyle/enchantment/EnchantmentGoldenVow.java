@@ -39,6 +39,15 @@ import javax.annotation.Nonnull;
 @Mod.EventBusSubscriber
 public class EnchantmentGoldenVow extends EnchantmentBase {
 
+    /** 受击者的效果等级上限：至多 9 级，减伤最高 90%，永远吃得到伤害 */
+    private static final int VICTIM_AMPLIFIER_CAP = 9;
+    /** 攻击者的效果等级上限 */
+    private static final int ATTACKER_AMPLIFIER_CAP = 5;
+    /** 参与计算的等级上限（开了等级上限时生效） */
+    private static final int LEVEL_CAP = 10;
+    /** 每级效果持续秒数 */
+    private static final double DURATION_SECONDS_PER_LEVEL = 2.5D;
+
     public EnchantmentGoldenVow() {
         super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
                 EntityEquipmentSlot.HEAD,
@@ -50,7 +59,11 @@ public class EnchantmentGoldenVow extends EnchantmentBase {
 
     /**
      * 战斗时双方都获得黄金誓约效果
-     * 由于需要累加护甲等级且同时检查双方，保留静态监听器
+     * <p>
+     * 由于需要累加护甲等级且同时检查双方，保留静态监听器。
+     * 受击者至多 9 级、攻击者至多 5 级。以前受击者没有上限，全身等级之和到 10 时
+     * 减伤到 100%，等于免疫一切伤害。
+     * </p>
      */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
@@ -72,44 +85,44 @@ public class EnchantmentGoldenVow extends EnchantmentBase {
         }
 
         // 处理受击者
-        int victimLevel = 0;
-        for (ItemStack armor : victim.getArmorInventoryList()) {
-            if (!armor.isEmpty()) {
-                victimLevel += EnchantmentHelper.getEnchantmentLevel(goldenVow, armor);
+        if (!shouldBlockMobTrigger(victim, false)) {
+            int victimLevel = 0;
+            for (ItemStack armor : victim.getArmorInventoryList()) {
+                if (!armor.isEmpty()) {
+                    victimLevel += EnchantmentHelper.getEnchantmentLevel(goldenVow, armor);
+                }
+            }
+            victimLevel = capLevel(victimLevel, LEVEL_CAP);
+
+            if (victimLevel > 0) {
+                victimLevel = Math.min(victimLevel, VICTIM_AMPLIFIER_CAP);
+
+                // 持续时间 = 2.5 秒 × 等级（按封顶后的等级）
+                int duration = (int) (DURATION_SECONDS_PER_LEVEL * victimLevel * 20);
+                victim.addPotionEffect(new PotionEffect(
+                        CarianStylePotion.GOLDEN_VOW,
+                        duration,
+                        victimLevel - 1
+                ));
             }
         }
 
-        if (ConfigLoader.levelLimit) {
-            victimLevel = Math.min(victimLevel, 10);
-        }
-
-        if (victimLevel > 0) {
-            // 持续时间 = 2.5 × 等级 × 20tick
-            int duration = (int) (2.5 * victimLevel * 20);
-            victim.addPotionEffect(new PotionEffect(
-                    CarianStylePotion.GOLDEN_VOW,
-                    duration,
-                    victimLevel - 1
-            ));
-        }
-
         // 处理攻击者
+        if (shouldBlockMobTrigger(attacker, false)) {
+            return;
+        }
         int attackerLevel = 0;
         for (ItemStack armor : attacker.getArmorInventoryList()) {
             if (!armor.isEmpty()) {
                 attackerLevel += EnchantmentHelper.getEnchantmentLevel(goldenVow, armor);
             }
         }
-
-        if (ConfigLoader.levelLimit) {
-            attackerLevel = Math.min(attackerLevel, 10);
-        }
+        attackerLevel = capLevel(attackerLevel, LEVEL_CAP);
 
         if (attackerLevel > 0) {
-            // 攻击者等级额外限制为5
-            attackerLevel = Math.min(attackerLevel, 5);
+            attackerLevel = Math.min(attackerLevel, ATTACKER_AMPLIFIER_CAP);
 
-            int duration = (int) (2.5 * attackerLevel * 20);
+            int duration = (int) (DURATION_SECONDS_PER_LEVEL * attackerLevel * 20);
             attacker.addPotionEffect(new PotionEffect(
                     CarianStylePotion.GOLDEN_VOW,
                     duration,
