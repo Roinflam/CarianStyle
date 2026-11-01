@@ -22,9 +22,7 @@ This is the **1.20.1** branch. The Minecraft 1.12.2 version is on the [`1.12.2` 
 <details open>
 <summary><h2>English</h2></summary>
 
-**CarianStyle** turns the Ashes of War, sorceries, incantations, talismans and Remembrances of *Elden Ring* into **113 enchantments**. You get them the vanilla way: the enchanting table, the anvil and loot. Nothing new to learn, but every enchantment keeps the temper of the original: the flame school only shows its full strength while you are on fire, the stars and moons wake up at night, Remembrance enchantments are extremely rare and exclude one another, and great power usually comes with a price.
-
-Most effects scale with a percentage of the damage dealt or of health, so they stay balanced whether you swing a vanilla diamond sword or a modded weapon that hits for thousands.
+**CarianStyle** turns the Ashes of War, sorceries, incantations, talismans and Remembrances of *Elden Ring* into **113 enchantments**. You get them like vanilla enchantments, from the enchanting table, the anvil and loot. Effects follow the original game where possible: flame enchantments need you to be on fire to reach full strength, star and moon enchantments are stronger at night, Remembrance enchantments are the rarest and conflict with each other, and some powerful enchantments have drawbacks.
 
 ### Versions
 
@@ -305,9 +303,7 @@ Yes, no need to ask. Please credit the author; commercial use is not allowed (se
 <details>
 <summary><h2>中文</h2></summary>
 
-卡利亚式附魔把《艾尔登法环》里的战技、魔法、祷告、护符和追忆做成了 **113 个附魔**。它们都从原版的附魔台、铁砧和战利品里获得，不用学新系统；但每一个都带着原作的脾气：火焰流派要自己身上着火才能发挥全力，群星和月亮的力量在夜里才会苏醒，追忆附魔极难获得、彼此互斥，强大的效果往往伴随着代价。
-
-大多数效果按伤害或生命值的百分比结算，所以无论拿的是原版的钻石剑，还是其他模组里一刀上千伤害的武器，强度都不会失控。
+卡利亚式附魔把《艾尔登法环》里的战技、魔法、祷告、护符和追忆做成了 **113 个附魔**。它们和原版附魔一样，从附魔台、铁砧和战利品获得。效果尽量还原原作：火焰类要自身着火才能发挥全力，群星、月亮类在夜晚更强，追忆附魔最稀有且互相冲突，部分强力附魔带有副作用。
 
 ### 版本须知
 
