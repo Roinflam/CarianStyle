@@ -1,90 +1,39 @@
 package pers.roinflam.carianstyle.entity.render;
 
-import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.client.renderer.RenderItem;
-import net.minecraft.client.renderer.block.model.ItemCameraTransforms;
 import net.minecraft.client.renderer.entity.Render;
 import net.minecraft.client.renderer.entity.RenderManager;
-import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.math.Vec3d;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
- * 魔法剑实体渲染器
- * <p>
- * 渲染悬浮旋转和飞行中的魔法剑
- * </p>
+ * PORT-STUB(V3)
+ * <p>辉剑渲染器：桩里什么都不画。</p>
  */
+@Deprecated
 @SideOnly(Side.CLIENT)
-public class GlintbladesRender<T extends EntityGlintblades> extends Render<T> {
+public class GlintbladesRender extends Render<EntityGlintblades> {
 
     protected final Item item;
-    private final RenderItem itemRenderer;
 
-    public GlintbladesRender(@Nonnull RenderManager renderManager, Item item, RenderItem itemRenderer) {
+    public GlintbladesRender(@Nonnull RenderManager renderManager, @Nonnull Item item) {
         super(renderManager);
         this.item = item;
-        this.itemRenderer = itemRenderer;
     }
 
     @Override
-    public void doRender(@Nonnull T entity, double x, double y, double z, float entityYaw, float partialTicks) {
-        // 悬浮期跟随释放者时，按释放者这一帧的插值位置和朝向现算，跑动、转身时剑阵不会一顿一顿
-        Vec3d offset = entity.getRenderOffset(partialTicks);
-        if (offset != null) {
-            x += offset.x;
-            y += offset.y;
-            z += offset.z;
-        }
-
-        GlStateManager.pushMatrix();
-        GlStateManager.translate((float) x, (float) y, (float) z);
-        GlStateManager.enableRescaleNormal();
-
-        // 应用实体大小
-        float size = entity.getSize();
-        GlStateManager.scale(size, size, size);
-        GlStateManager.rotate(entityYaw, 0.0f, 1.0f, 0.0f);
-
-        if (entity.isShooted()) {
-            // 飞行状态：根据俯仰角旋转
-            float pitch = Math.max(Math.min(80 - entity.rotationPitch * 1.25f, 140), 0);
-            GlStateManager.rotate(pitch, 1.0f, 0.0f, 0.0f);
-            GlStateManager.rotate(180.0f, 0.0f, 1.0f, 0.0f);
-        } else {
-            // 悬浮状态：持续旋转
-            GlStateManager.rotate(entity.ticksExisted * 20, 0.0f, 1.0f, 0.0f);
-        }
-
-        this.bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
-
-        if (this.renderOutlines) {
-            GlStateManager.enableColorMaterial();
-            GlStateManager.enableOutlineMode(this.getTeamColor(entity));
-        }
-
-        this.itemRenderer.renderItem(new ItemStack(item), ItemCameraTransforms.TransformType.THIRD_PERSON_RIGHT_HAND);
-
-        if (this.renderOutlines) {
-            GlStateManager.disableOutlineMode();
-            GlStateManager.disableColorMaterial();
-        }
-
-        GlStateManager.disableRescaleNormal();
-        GlStateManager.popMatrix();
-
-        super.doRender(entity, x, y, z, entityYaw, partialTicks);
+    public void doRender(@Nonnull EntityGlintblades entity, double x, double y, double z, float entityYaw, float partialTicks) {
+        // 桩
     }
 
+    @Nullable
     @Override
-    protected ResourceLocation getEntityTexture(T entity) {
-        return TextureMap.LOCATION_BLOCKS_TEXTURE;
+    protected ResourceLocation getEntityTexture(@Nonnull EntityGlintblades entity) {
+        return null;
     }
 }

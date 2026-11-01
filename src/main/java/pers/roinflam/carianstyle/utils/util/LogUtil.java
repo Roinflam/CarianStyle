@@ -1,5 +1,3 @@
-// 文件：LogUtil.java
-// 路径：src/main/java/pers/roinflam/carianstyle/utils/util/LogUtil.java
 package pers.roinflam.carianstyle.utils.util;
 
 import org.apache.logging.log4j.LogManager;
@@ -148,5 +146,4 @@ public class LogUtil {
     public static void separator() {
         LOGGER.info("========================================");
     }
-
 }

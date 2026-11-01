@@ -1,47 +1,28 @@
 package pers.roinflam.carianstyle.potion;
 
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.util.ResourceLocation;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
 
 /**
- * 黄金树祝福药水效果
- * <p>
- * 效果：
- * - 最大生命值+15%×等级
- * - 每3秒回复最大生命值×4%×(等级+1)
- * </p>
+ * PORT-STUB(B2a)
+ * <p>只有构造器和图标，效果逻辑还没写；注册名、好坏、颜色已经和正式版一致。</p>
  */
+@Deprecated
 public class MobEffectBlessingOfTheErdtree extends IconBase {
 
     public MobEffectBlessingOfTheErdtree(boolean isBadEffectIn, int liquidColorIn) {
-        super(isBadEffectIn, liquidColorIn, "blessing_of_the_erdtree");
-
-        this.registerPotionAttributeModifier(
-                SharedMonsterAttributes.MAX_HEALTH,
-                "c407bffa-97df-adf8-51db-5681fdef4b8c",
-                0.15,
-                2
-        );
-    }
-
-    @Override
-    public boolean isReady(int duration, int amplifier) {
-        return duration % 60 == 0;
-    }
-
-    @Override
-    public void performEffect(@Nonnull EntityLivingBase entityLivingBaseIn, int amplifier) {
-        entityLivingBaseIn.heal(entityLivingBaseIn.getMaxHealth() * (amplifier + 1) * 0.04f);
+        super(isBadEffectIn, liquidColorIn);
     }
 
     @Nonnull
     @Override
-    protected ResourceLocation getResourceLocation() {
+    @SideOnly(Side.CLIENT)
+    protected ResourceLocation getIconTexture() {
         return new ResourceLocation(Reference.MOD_ID, "textures/effect/blessing_of_the_erdtree.png");
     }
 }

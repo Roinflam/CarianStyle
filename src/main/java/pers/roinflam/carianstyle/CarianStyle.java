@@ -1,115 +1,168 @@
 package pers.roinflam.carianstyle;
 
-import net.minecraft.creativetab.CreativeTabs;
-import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.util.ResourceLocation;
+import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.SidedProxy;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
+import net.minecraftforge.fml.common.event.FMLServerStoppedEvent;
+import net.minecraftforge.fml.common.network.NetworkCheckHandler;
+import net.minecraftforge.fml.common.versioning.DefaultArtifactVersion;
+import net.minecraftforge.fml.common.registry.ForgeRegistries;
+import net.minecraftforge.fml.relauncher.Side;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.enchantment.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.*;
-import pers.roinflam.carianstyle.network.NetworkRegistryHandler;
-import pers.roinflam.carianstyle.proxy.CommonProxy;
+import pers.roinflam.carianstyle.mc112.hook.CreativeTabHook;
+import pers.roinflam.carianstyle.mc112.migration.LegacyConfigMigration;
+import pers.roinflam.carianstyle.mc112.util.ServerLifecycle;
+import pers.roinflam.carianstyle.network.NetworkHandler;
+import pers.roinflam.carianstyle.network.VisualNetwork;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
+import pers.roinflam.carianstyle.visual.CarianStyleCombatStateDisplay;
+import pers.roinflam.carianstyle.visual.CarianStyleConditionDisplay;
+import pers.roinflam.carianstyle.visual.CarianStyleFireStyleDisplay;
+import pers.roinflam.carianstyle.visual.CarianStyleStackDisplays;
+import pers.roinflam.carianstyle.visual.CarianStyleTimeReversalDisplay;
 
 import javax.annotation.Nonnull;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
+import java.util.Map;
 
 /**
  * 卡利亚式附魔模组主类
  * <p>
- * 这是模组的核心入口类，负责协调模组的初始化流程
+ * 1.12.2 版：生命周期照 1.20.1 拆到 preInit / init / postInit 三步（1.20.1 是模组构造器 + {@code FMLCommonSetupEvent}）。
+ * 客户端专用的初始化放在 {@link ClientSetupHandler}，这里只在客户端调用它，不用 {@code @SidedProxy}。
+ * 握手时的版本检查见 {@link #checkRemote}。
  * </p>
  */
 @Mod(
         modid = Reference.MOD_ID,
+        version = Reference.VERSION,
         useMetadata = true,
-        guiFactory = "pers.roinflam.carianstyle.gui.ConfigGuiFactory"
+        acceptedMinecraftVersions = "[1.12.2]",
+        guiFactory = "pers.roinflam.carianstyle.config.ConfigGuiFactory"
 )
 public class CarianStyle {
 
-    @Mod.Instance
+    @Mod.Instance(Reference.MOD_ID)
     public static CarianStyle instance;
 
-    @SidedProxy(
-            clientSide = Reference.CLIENT_PROXY_CLASS,
-            serverSide = Reference.COMMON_PROXY_CLASS
-    )
-    public static CommonProxy proxy;
+    public CarianStyle() {
+        // 旧版 carianstyle.cfg 迁移到 carianstyle-common.cfg：要赶在 FML 构造完模组后第一次同步 @Config 之前
+        LegacyConfigMigration.run();
+    }
+
+    /**
+     * 握手时检查对方的卡利亚式附魔版本
+     * <p>
+     * FML 默认的检查器只有服务端会拒绝客户端（客户端从来不拒绝服务端），以后改了协议，
+     * 新客户端进旧服会连上、包格式对不上。这里换掉默认检查器，两边都查：
+     * </p>
+     * <ul>
+     *   <li>对方没装：对方是服务端就放行（装了本模组的客户端可以进没装的服务器，这时收不到任何包，数值按本地文件）；
+     *       对方是客户端就拒绝（注册表要同步）；</li>
+     *   <li>对方装了：版本不低于 {@link NetworkHandler#PROTOCOL_SINCE} 才放行。</li>
+     * </ul>
+     * <p>拒绝时 FML 给玩家的提示不够具体，所以日志里自己打一行。</p>
+     *
+     * @param mods       对方的模组列表（modid → 版本）
+     * @param remoteSide 对方是哪一侧
+     * @return 能不能连
+     */
+    @NetworkCheckHandler
+    public boolean checkRemote(Map<String, String> mods, Side remoteSide) {
+        String v = mods.get(Reference.MOD_ID);
+        if (v == null) {
+            // 服务端没装：放行；客户端没装：拒绝
+            return remoteSide == Side.SERVER;
+        }
+        boolean ok = new DefaultArtifactVersion(v)
+                .compareTo(new DefaultArtifactVersion(NetworkHandler.PROTOCOL_SINCE)) >= 0;
+        if (!ok) {
+            LogUtil.warn("对方的卡利亚式附魔版本是 " + v + "，至少要 " + NetworkHandler.PROTOCOL_SINCE);
+        }
+        return ok;
+    }
 
     @Mod.EventHandler
-    public static void preInit(@Nonnull FMLPreInitializationEvent evt) {
+    public void preInit(@Nonnull FMLPreInitializationEvent event) {
         LogUtil.separator();
-        LogUtil.info("卡利亚式附魔 - 开始预初始化阶段");
-        LogUtil.debug("卡利亚式附魔 - 当前运行环境：%s", evt.getSide().name());
+        LogUtil.info("卡利亚式附魔 - 开始加载模组");
 
         try {
-            // 注册EnchantmentBase到事件总线
-            LogUtil.info("卡利亚式附魔 - 正在注册附魔事件处理器");
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(
-                    pers.roinflam.carianstyle.base.enchantment.EnchantmentBase.class
-            );
-            LogUtil.debug("卡利亚式附魔 - 附魔事件处理器注册成功");
+            ConfigLoader.bake();
 
-            // 注册数据管理器到事件总线
-            LogUtil.info("卡利亚式附魔 - 正在注册数据管理器");
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(
-                    pers.roinflam.carianstyle.enchantment.data.EnchantmentDataManager.class
-            );
-            LogUtil.debug("卡利亚式附魔 - 数据管理器注册成功");
+            // ==================== 注册 DeferredRegister ====================
+            LogUtil.info("卡利亚式附魔 - 正在注册游戏内容");
 
-            // 扫描并注册所有带注解的附魔
+            CarianStyleBlocks.BLOCKS.register(MinecraftForge.EVENT_BUS);
+            LogUtil.info("卡利亚式附魔 - 方块注册器已挂载");
+
+            CarianStyleEntity.ENTITY_TYPES.register(MinecraftForge.EVENT_BUS);
+            LogUtil.info("卡利亚式附魔 - 实体类型注册器已挂载");
+
+            CarianStyleItem.ITEMS.register(MinecraftForge.EVENT_BUS);
+            LogUtil.info("卡利亚式附魔 - 物品注册器已挂载");
+
+            CarianStylePotion.MOB_EFFECTS.register(MinecraftForge.EVENT_BUS);
+            LogUtil.info("卡利亚式附魔 - 药水效果注册器已挂载");
+
+            CarianStyleEnchantments.ENCHANTMENTS_REGISTER.register(MinecraftForge.EVENT_BUS);
+            LogUtil.info("卡利亚式附魔 - 附魔注册器已挂载");
+
+            // 扫描并登记所有附魔（注册事件在 preInit 之后才发，这里登记就来得及）
             LogUtil.info("卡利亚式附魔 - 正在扫描并注册附魔");
-            EnchantmentRegistry.scanAndRegister("pers.roinflam.carianstyle.enchantment");
-            LogUtil.debug("卡利亚式附魔 - 附魔扫描注册完成");
+            EnchantmentRegistry.scanAndRegister(event.getAsmData(), "pers.roinflam.carianstyle.enchantment");
+            LogUtil.info("卡利亚式附魔 - 附魔扫描注册完成");
 
-            // 注册网络通信处理器
             LogUtil.info("卡利亚式附魔 - 正在注册网络通信处理器");
-            NetworkRegistryHandler.register();
-            LogUtil.debug("卡利亚式附魔 - 网络通信处理器注册成功");
+            NetworkHandler.register();
+            // 可视化系统专用网络通道（叠层 HUD、演出包，与 NetworkHandler 独立）
+            VisualNetwork.register();
+            LogUtil.info("卡利亚式附魔 - 网络通信处理器注册成功");
 
-            // 注册实体渲染器
-            LogUtil.info("卡利亚式附魔 - 正在注册实体渲染器");
-            proxy.registerEntityRenderer();
-            LogUtil.debug("卡利亚式附魔 - 实体渲染器注册成功");
+            // 方块实体（1.12.2 没有注册表，直接登记）
+            CarianStyleBlockEntities.register();
 
-            // 设置创造模式标签页
-            LogUtil.info("卡利亚式附魔 - 正在配置创造模式标签页");
-            setupCreativeTabEnchantmentTypes();
-            LogUtil.debug("卡利亚式附魔 - 创造模式标签页配置完成");
+            if (event.getSide().isClient()) {
+                ClientSetupHandler.preInit();
+            }
 
-            // 加载并验证配置
-            LogUtil.info("卡利亚式附魔 - 正在加载配置文件");
-            loadAndValidateConfig();
-            LogUtil.debug("卡利亚式附魔 - 配置文件加载并验证完成");
-
-            LogUtil.info("卡利亚式附魔 - 预初始化阶段完成");
             LogUtil.separator();
-
         } catch (Exception e) {
             LogUtil.error("卡利亚式附魔 - 预初始化阶段发生错误", e);
-            throw new RuntimeException("卡利亚式附魔预初始化失败", e);
+            throw new RuntimeException("卡利亚式附魔加载失败", e);
         }
     }
 
     @Mod.EventHandler
-    public static void init(@Nonnull FMLInitializationEvent evt) {
+    public void init(@Nonnull FMLInitializationEvent event) {
         LogUtil.separator();
         LogUtil.info("卡利亚式附魔 - 开始初始化阶段");
-        LogUtil.debug("卡利亚式附魔 - 当前运行环境：%s", evt.getSide().name());
 
         try {
-            LogUtil.debug("卡利亚式附魔 - 执行自定义初始化逻辑");
-            logRegisteredContent();
+            // 注册叠层显示读取器（HUD 数据源，双端都需要；默认无读取器，接入后才显示）
+            LogUtil.info("卡利亚式附魔 - 正在注册叠层显示");
+            CarianStyleStackDisplays.init();
+            CarianStyleCombatStateDisplay.init();
+            CarianStyleConditionDisplay.init();
+            CarianStyleFireStyleDisplay.init();
+            CarianStyleTimeReversalDisplay.init();
+            LogUtil.debug("卡利亚式附魔 - 叠层显示注册完成");
+
+            CreativeTabHook.install();
+
+            if (event.getSide().isClient()) {
+                ClientSetupHandler.init();
+            }
 
             LogUtil.info("卡利亚式附魔 - 初始化阶段完成");
             LogUtil.separator();
-
         } catch (Exception e) {
             LogUtil.error("卡利亚式附魔 - 初始化阶段发生错误", e);
             throw new RuntimeException("卡利亚式附魔初始化失败", e);
@@ -117,19 +170,27 @@ public class CarianStyle {
     }
 
     @Mod.EventHandler
-    public static void postInit(@Nonnull FMLPostInitializationEvent evt) {
+    public void postInit(@Nonnull FMLPostInitializationEvent event) {
         LogUtil.separator();
         LogUtil.info("卡利亚式附魔 - 开始后初始化阶段");
-        LogUtil.debug("卡利亚式附魔 - 当前运行环境：%s", evt.getSide().name());
 
         try {
-            LogUtil.debug("卡利亚式附魔 - 执行自定义后初始化逻辑");
+            // 所有附魔类的静态块都已经跑过，define 句柄齐了，这时读数值文件不会缺键
+            EnchantmentValues.reload();
+
+            // 加载并验证配置
+            LogUtil.info("卡利亚式附魔 - 正在验证配置文件");
+            loadAndValidateConfig();
+            LogUtil.debug("卡利亚式附魔 - 配置文件验证完成");
+
+            // 记录注册内容统计
+            logRegisteredContent();
+
+            // 执行最终验证
             performFinalValidation();
 
             LogUtil.info("卡利亚式附魔 - 后初始化阶段完成");
-            LogUtil.info("卡利亚式附魔 - 模组加载完成，祝你游戏愉快！");
             LogUtil.separator();
-
         } catch (Exception e) {
             LogUtil.error("卡利亚式附魔 - 后初始化阶段发生错误", e);
             throw new RuntimeException("卡利亚式附魔后初始化失败", e);
@@ -137,50 +198,37 @@ public class CarianStyle {
     }
 
     /**
-     * 设置创造模式标签页的附魔类型
+     * 服务器停止之后：清掉服务端那一侧的静态表（1.12.2 的停服事件只发给主类）
      */
-    private static void setupCreativeTabEnchantmentTypes() {
-        LogUtil.debug("卡利亚式附魔 - 正在设置战斗标签页的附魔类型");
-
-        @Nonnull List<EnumEnchantmentType> combatTypeList = new ArrayList<>(
-                Arrays.asList(CreativeTabs.COMBAT.getRelevantEnchantmentTypes())
-        );
-
-        if (CarianStyleEnchantments.ARMS != null) {
-            combatTypeList.add(CarianStyleEnchantments.ARMS);
-            LogUtil.debug("卡利亚式附魔 - 已添加武器附魔类型到战斗标签页");
-        }
-
-        CreativeTabs.COMBAT.setRelevantEnchantmentTypes(
-                combatTypeList.toArray(new EnumEnchantmentType[0])
-        );
-
-        LogUtil.debug("卡利亚式附魔 - 正在设置工具标签页的附魔类型");
-
-        @Nonnull List<EnumEnchantmentType> toolTypeList = new ArrayList<>(
-                Arrays.asList(CreativeTabs.TOOLS.getRelevantEnchantmentTypes())
-        );
-
-        if (CarianStyleEnchantments.PICKAEX != null) {
-            toolTypeList.add(CarianStyleEnchantments.PICKAEX);
-            LogUtil.debug("卡利亚式附魔 - 已添加镐子附魔类型到工具标签页");
-        }
-
-        CreativeTabs.TOOLS.setRelevantEnchantmentTypes(
-                toolTypeList.toArray(new EnumEnchantmentType[0])
-        );
+    @Mod.EventHandler
+    public void serverStopped(@Nonnull FMLServerStoppedEvent event) {
+        ServerLifecycle.onServerStopped(event);
     }
 
     /**
      * 加载并验证配置文件
      */
-    private static void loadAndValidateConfig() {
+    private void loadAndValidateConfig() {
         LogUtil.debug("卡利亚式附魔 - 正在验证配置文件");
 
         // 检查禁用的附魔
         if (ConfigLoader.uninstallEnchantment != null && ConfigLoader.uninstallEnchantment.length > 0) {
             LogUtil.warn("卡利亚式附魔 - 检测到 %d 个被禁用的附魔", ConfigLoader.uninstallEnchantment.length);
             LogUtil.debug("卡利亚式附魔 - 禁用的附魔列表：%s", Arrays.toString(ConfigLoader.uninstallEnchantment));
+
+            // 对不上任何附魔的条目不会报错，只会悄悄不生效（例如填了显示名、拼错了 id），逐条点名
+            for (String entry : ConfigLoader.uninstallEnchantment) {
+                boolean known = false;
+                for (ResourceLocation key : ForgeRegistries.ENCHANTMENTS.getKeys()) {
+                    if (Reference.MOD_ID.equals(key.getResourceDomain()) && ConfigLoader.entryNamesEnchantment(entry, key.getResourcePath())) {
+                        known = true;
+                        break;
+                    }
+                }
+                if (!known) {
+                    LogUtil.warn("卡利亚式附魔 - uninstallEnchantment 中的「%s」没有对应的附魔，这一项不会生效（应填附魔 id，例如 prayerful_strike）", entry);
+                }
+            }
         }
 
         // 检查碎岩者范围
@@ -226,27 +274,27 @@ public class CarianStyle {
     /**
      * 记录已注册内容的统计信息
      */
-    private static void logRegisteredContent() {
+    private void logRegisteredContent() {
         LogUtil.info("卡利亚式附魔 - 正在统计已注册内容");
 
         // 统计附魔
-        int enchantmentCount = CarianStyleEnchantments.ENCHANTMENTS.size();
+        int enchantmentCount = CarianStyleEnchantments.getRegisteredCount();
         LogUtil.info("卡利亚式附魔 - 已注册附魔数量：%d", enchantmentCount);
 
         // 统计药水效果
-        int potionCount = CarianStylePotion.POTIONS.size();
+        int potionCount = CarianStylePotion.MOB_EFFECTS.getEntries().size();
         LogUtil.info("卡利亚式附魔 - 已注册药水效果数量：%d", potionCount);
 
         // 统计方块
-        int blockCount = CarianStyleBlocks.BLOCKS.size();
+        int blockCount = CarianStyleBlocks.BLOCKS.getEntries().size();
         LogUtil.info("卡利亚式附魔 - 已注册方块数量：%d", blockCount);
 
         // 统计物品
-        int itemCount = CarianStyleItem.ITEMS.size();
+        int itemCount = CarianStyleItem.ITEMS.getEntries().size();
         LogUtil.info("卡利亚式附魔 - 已注册物品数量：%d", itemCount);
 
         // 统计实体
-        int entityCount = CarianStyleEntity.ENTITY_ENTRIES.size();
+        int entityCount = CarianStyleEntity.ENTITY_TYPES.getEntries().size();
         LogUtil.info("卡利亚式附魔 - 已注册实体数量：%d", entityCount);
 
         // 总计
@@ -256,29 +304,33 @@ public class CarianStyle {
 
     /**
      * 执行最终验证
+     * <p>
+     * 药水、实体缺了直接报错退出；附魔一个都没有时只记一条错误日志，不中断加载
+     * （禁用、扫描出错都只影响附魔本身，方块、药水、网络照常可用，方便排查）。
+     * </p>
      */
-    private static void performFinalValidation() {
+    private void performFinalValidation() {
         LogUtil.debug("卡利亚式附魔 - 正在执行最终验证");
 
         boolean isValid = true;
 
-        if (CarianStyleEnchantments.ENCHANTMENTS.isEmpty()) {
+        if (CarianStyleEnchantments.getRegisteredCount() == 0) {
             LogUtil.error("卡利亚式附魔 - 错误：没有附魔被注册");
-            isValid = false;
         }
 
-        if (CarianStylePotion.POTIONS.isEmpty()) {
+        if (CarianStylePotion.MOB_EFFECTS.getEntries().isEmpty()) {
             LogUtil.error("卡利亚式附魔 - 错误：没有药水效果被注册");
             isValid = false;
         }
 
-        if (CarianStyleEntity.ENTITY_ENTRIES.isEmpty()) {
+        if (CarianStyleEntity.ENTITY_TYPES.getEntries().isEmpty()) {
             LogUtil.error("卡利亚式附魔 - 错误：没有实体被注册");
             isValid = false;
         }
 
         if (isValid) {
             LogUtil.debug("卡利亚式附魔 - 最终验证通过，所有组件已正确初始化");
+            LogUtil.info("卡利亚式附魔 - 模组加载完成，祝你游戏愉快！");
         } else {
             LogUtil.error("卡利亚式附魔 - 最终验证失败，部分组件未正确初始化");
             throw new RuntimeException("卡利亚式附魔验证失败");

@@ -2,7 +2,7 @@
   {
     "modid": "carianstyle",
     "name": "CarianStyle",
-    "description": "Carian Grandeur!",
+    "description": "Carian Style!",
     "version": "${version}",
     "mcversion": "1.12.2",
     "url": "https://www.curseforge.com/minecraft/mc-mods/carianstyle",
@@ -10,7 +10,7 @@
     "authorList": [
       "Roinflam"
     ],
-    "credits": "",
+    "credits": "ELDEN RING is a trademark of FromSoftware / BANDAI NAMCO; this is an unofficial fan-made mod and is not affiliated with them. / 《艾尔登法环》相关名称与美术素材版权归 FromSoftware / BANDAI NAMCO 所有，本模组为非官方同人作品，与其无关联。",
     "logoFile": "logo.png",
     "screenshots": [],
     "dependencies": []

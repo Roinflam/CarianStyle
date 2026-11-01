@@ -1,13 +1,13 @@
 package pers.roinflam.carianstyle.block.fire;
 
-import net.minecraft.creativetab.CreativeTabs;
 import pers.roinflam.carianstyle.base.block.flame.FireBase;
 
+/**
+ * 白色火焰方块
+ */
 public class WhiteFlame extends FireBase {
 
-    public WhiteFlame(String name, CreativeTabs creativeTabs) {
-        super(name, creativeTabs);
+    public WhiteFlame() {
+        super();
     }
-
 }
-

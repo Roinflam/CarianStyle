@@ -1,0 +1,35 @@
+{
+  "_comment": "1.12.2 和 1.20.1 不一样的翻译，以及 1.12.2 才有的键。值按原文写（单个 %），由 json2lang.py 统一转义。改完重新跑 python tools/lang/json2lang.py。",
+  "enchantment.carianstyle.beast_robust.desc": {
+    "en_us": "All buff and debuff levels are doubled, but their durations are reduced by 60% (instant effects are unaffected).",
+    "zh_cn": "所有增益和负面效果等级翻倍，但持续时间-60%（瞬间效果除外）"
+  },
+  "enchantment.carianstyle.beast_vitality.desc": {
+    "en_us": "All buff and debuff durations +[Level] x 30%.",
+    "zh_cn": "所有增益和负面效果持续时间+[附魔等级]×30%"
+  },
+  "enchantment.carianstyle.lucidity.desc": {
+    "en_us": "Debuffs you receive are one level higher, but their durations are reduced by [Level] x 15% (levels add up across armor pieces).",
+    "zh_cn": "受到的负面效果等级+1，但持续时间-[附魔等级]×15%（多件盔甲等级相加）"
+  },
+  "tile.carianstyle.crimson_flame.name": {
+    "en_us": "Crimson Flame",
+    "zh_cn": "猩红火焰"
+  },
+  "tile.carianstyle.white_flame.name": {
+    "en_us": "White Flame",
+    "zh_cn": "白色火焰"
+  },
+  "tile.carianstyle.yellow_flame.name": {
+    "en_us": "Yellow Flame",
+    "zh_cn": "黄色火焰"
+  },
+  "tile.carianstyle.hide_light.name": {
+    "en_us": "Hidden Light",
+    "zh_cn": "隐藏光源"
+  },
+  "config.carianstyle.category.levelDecay": {
+    "en_us": "High Level Decay",
+    "zh_cn": "高等级衰减"
+  }
+}

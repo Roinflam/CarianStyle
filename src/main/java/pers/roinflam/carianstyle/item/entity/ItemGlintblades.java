@@ -1,24 +1,23 @@
 package pers.roinflam.carianstyle.item.entity;
 
-import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.item.ItemSword;
-import pers.roinflam.carianstyle.init.CarianStyleItem;
-import pers.roinflam.carianstyle.utils.IHasModel;
-import pers.roinflam.carianstyle.utils.util.ItemUtil;
 
 import javax.annotation.Nonnull;
 
 /**
  * 魔法剑物品
  * <p>
- * 用于EntityGlintblades实体的渲染模型
+ * 用于EntityGlintblades实体的渲染模型，不放进创造模式标签页
  * </p>
  */
-public class ItemGlintblades extends ItemSword implements IHasModel {
+public class ItemGlintblades extends ItemSword {
 
-    public ItemGlintblades(String name, CreativeTabs creativeTabs, @Nonnull ToolMaterial material) {
+    /**
+     * 构造函数
+     *
+     * @param material 物品材质等级（1.20.1 的 {@code Tier}）
+     */
+    public ItemGlintblades(@Nonnull ToolMaterial material) {
         super(material);
-        ItemUtil.registerItem(this, name, creativeTabs);
-        CarianStyleItem.ITEMS.add(this);
     }
 }

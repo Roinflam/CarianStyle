@@ -3,7 +3,6 @@ package pers.roinflam.carianstyle.tileentity;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.ITickable;
 import pers.roinflam.carianstyle.block.light.HideLight;
-import pers.roinflam.carianstyle.utils.Reference;
 
 /**
  * 移动光源方块实体
@@ -11,11 +10,12 @@ import pers.roinflam.carianstyle.utils.Reference;
  * 用于实现跟随实体移动的动态光源效果
  * 存在超过1tick后自动消失
  * </p>
+ * <p>
+ * 1.12.2 版：实现 {@link ITickable}（1.20.1 是方块的 {@code getTicker} 返回静态 tick 方法，而且只在服务端返回）。
+ * 方块实体在 preInit 用 {@code GameRegistry.registerTileEntity} 注册（见 {@code CarianStyleBlockEntities}）。
+ * </p>
  */
 public class MoveLight extends TileEntity implements ITickable {
-
-    /** 方块实体注册ID */
-    public static final String ID = Reference.MOD_ID + ":move_light";
 
     /** 已存在的tick数 */
     private int existedTick = 0;
@@ -30,7 +30,7 @@ public class MoveLight extends TileEntity implements ITickable {
 
         // 存在超过1tick后移除
         if (existedTick > 1) {
-            if (world != null && world.getBlockState(pos).getBlock() instanceof HideLight) {
+            if (world.getBlockState(pos).getBlock() instanceof HideLight) {
                 world.setBlockToAir(pos);
                 world.removeTileEntity(pos);
             }
@@ -45,5 +45,6 @@ public class MoveLight extends TileEntity implements ITickable {
      */
     public void retime() {
         existedTick = 0;
+        markDirty();
     }
 }

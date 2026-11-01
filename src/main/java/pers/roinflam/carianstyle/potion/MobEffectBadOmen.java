@@ -1,84 +1,28 @@
 package pers.roinflam.carianstyle.potion;
 
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.util.ResourceLocation;
-import net.minecraftforge.event.entity.living.LivingHealEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
 
 /**
- * 不祥预感药水效果
- * <p>
- * 效果：
- * - 攻击伤害降低20%
- * - 攻击速度降低20%
- * - 受到伤害增加25%
- * - 治疗量减少50%
- * </p>
+ * PORT-STUB(B2a)
+ * <p>只有构造器和图标，效果逻辑还没写；注册名、好坏、颜色已经和正式版一致。</p>
  */
+@Deprecated
 public class MobEffectBadOmen extends IconBase {
 
     public MobEffectBadOmen(boolean isBadEffectIn, int liquidColorIn) {
-        super(isBadEffectIn, liquidColorIn, "bad_omen");
-
-        this.registerPotionAttributeModifier(
-                SharedMonsterAttributes.ATTACK_DAMAGE,
-                "5154bf3b-743a-cee6-cf4f-2a62cf832d25",
-                -0.2,
-                2
-        );
-        this.registerPotionAttributeModifier(
-                SharedMonsterAttributes.ATTACK_SPEED,
-                "d545b2e6-98a0-c8c7-a7f3-345df7ec14dc",
-                -0.2,
-                2
-        );
-    }
-
-    /**
-     * 受到伤害增加25%
-     */
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public void onLivingHurt(@Nonnull LivingHurtEvent evt) {
-        if (evt.getEntity().world.isRemote) {
-            return;
-        }
-
-        EntityLivingBase victim = evt.getEntityLiving();
-        if (victim.isPotionActive(this)) {
-            evt.setAmount(evt.getAmount() * 1.25f);
-        }
-    }
-
-    /**
-     * 治疗量减少50%
-     */
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public void onLivingHeal(@Nonnull LivingHealEvent evt) {
-        if (evt.getEntity().world.isRemote) {
-            return;
-        }
-
-        EntityLivingBase healer = evt.getEntityLiving();
-        if (healer.isPotionActive(this)) {
-            evt.setAmount(evt.getAmount() * 0.5f);
-        }
-    }
-
-    @Override
-    public boolean isReady(int duration, int amplifier) {
-        return duration % 20 == 0;
+        super(isBadEffectIn, liquidColorIn);
     }
 
     @Nonnull
     @Override
-    protected ResourceLocation getResourceLocation() {
+    @SideOnly(Side.CLIENT)
+    protected ResourceLocation getIconTexture() {
         return new ResourceLocation(Reference.MOD_ID, "textures/effect/bad_omen.png");
     }
 }

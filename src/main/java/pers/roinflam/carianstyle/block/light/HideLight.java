@@ -9,9 +9,7 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
-import pers.roinflam.carianstyle.init.CarianStyleBlocks;
 import pers.roinflam.carianstyle.tileentity.MoveLight;
-import pers.roinflam.carianstyle.utils.util.BlockUtil;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -21,25 +19,26 @@ import javax.annotation.Nullable;
  * <p>
  * 用于实现动态光源效果的透明发光方块
  * 特性：
- * - 外观为空气（不可见）
- * - 亮度由方块状态 {@link #LEVEL} 决定（0~15，默认 15），存在元数据里
+ * - 外观为空气（不可见，渲染类型 INVISIBLE，从来不画）
+ * - 亮度由 {@link #LEVEL} 决定（0~15，默认 15），存在元数据里
  * - 不可被其他方块替换
  * - 配合MoveLight实体自动消失
  * </p>
  * <p>
- * 亮度改成逐方块的状态：以前是对方块单例调 {@code setLightLevel}，全服共用一个亮度值，
- * 几个玩家穿不同等级的星光时，最后结算的那个决定所有光源的亮度。
+ * 亮度是逐方块的状态：几个玩家穿不同等级的星光时各自的光源亮度互不影响。
+ * </p>
+ * <p>
+ * 1.12.2 版：16 个状态在客户端都映射到同一个 {@code normal} 变体（{@code ClientSetupHandler} 里设状态映射，
+ * 资源里有对应的 blockstate 和只带粒子贴图的空模型），不会再报缺模型。没有物品形态。
  * </p>
  */
 public class HideLight extends BlockAir implements ITileEntityProvider {
 
-    /** 光照等级 */
+    /** 光照等级，{@link #getLightValue} 读它 */
     public static final PropertyInteger LEVEL = PropertyInteger.create("level", 0, 15);
 
-    public HideLight(String name) {
+    public HideLight() {
         super();
-        BlockUtil.registerBlock(this, name, null, false);
-        CarianStyleBlocks.BLOCKS.add(this);
         setDefaultState(blockState.getBaseState().withProperty(LEVEL, 15));
     }
 
@@ -72,11 +71,21 @@ public class HideLight extends BlockAir implements ITileEntityProvider {
         return state.getValue(LEVEL);
     }
 
+    /**
+     * 判断方块是否可被替换
+     *
+     * @return 始终返回 false，防止被其他方块替换
+     */
     @Override
     public boolean isReplaceable(IBlockAccess world, BlockPos pos) {
         return false;
     }
 
+    /**
+     * 创建方块实体
+     *
+     * @return MoveLight 方块实体实例
+     */
     @Nullable
     @Override
     public TileEntity createNewTileEntity(World world, int meta) {

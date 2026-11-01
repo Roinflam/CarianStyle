@@ -1,64 +1,28 @@
 package pers.roinflam.carianstyle.potion;
 
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.util.DamageSource;
 import net.minecraft.util.ResourceLocation;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
 
 /**
- * 黄金树庇护药水效果
- * <p>
- * 效果：
- * - 非生物来源的伤害（环境伤害）减免20%×(等级+1)
- * - 不对绝对伤害生效
- * </p>
- * <p>
- * 减免倍率夹到不低于 0，最高 100%。以前 6 级以上倍率变负，伤害量成了负数，扣血变成回血。
- * </p>
+ * PORT-STUB(B2a)
+ * <p>只有构造器和图标，效果逻辑还没写；注册名、好坏、颜色已经和正式版一致。</p>
  */
+@Deprecated
 public class MobEffectProtectionOfTheErdtree extends IconBase {
 
     public MobEffectProtectionOfTheErdtree(boolean isBadEffectIn, int liquidColorIn) {
-        super(isBadEffectIn, liquidColorIn, "protection_of_the_erdtree");
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (evt.getEntity().world.isRemote) {
-            return;
-        }
-
-        DamageSource damageSource = evt.getSource();
-
-        // 排除创造模式伤害、绝对伤害、生物来源伤害
-        if (damageSource.canHarmInCreative() || damageSource.isDamageAbsolute()) {
-            return;
-        }
-        if (damageSource.getTrueSource() instanceof EntityLivingBase) {
-            return;
-        }
-
-        EntityLivingBase victim = evt.getEntityLiving();
-        if (victim.isPotionActive(this)) {
-            int amplifier = victim.getActivePotionEffect(this).getAmplifier();
-            evt.setAmount(evt.getAmount() * Math.max(0.0F, 1 - (amplifier + 1) * 0.2F));
-        }
-    }
-
-    @Override
-    public boolean isReady(int duration, int amplifier) {
-        return true;
+        super(isBadEffectIn, liquidColorIn);
     }
 
     @Nonnull
     @Override
-    protected ResourceLocation getResourceLocation() {
+    @SideOnly(Side.CLIENT)
+    protected ResourceLocation getIconTexture() {
         return new ResourceLocation(Reference.MOD_ID, "textures/effect/protection_of_the_erdtree.png");
     }
 }

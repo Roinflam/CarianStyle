@@ -13,36 +13,37 @@ import javax.annotation.Nonnull;
 /**
  * 带图标的药水效果基类
  * <p>
- * 在物品栏和HUD上显示自定义图标的药水效果
+ * 在物品栏和 HUD 上显示自定义图标的药水效果。
+ * 1.12.2 版：图标是 {@code textures/effect/<id>.png} 一张 18×18 的图，由 Forge 的
+ * {@code renderInventoryEffect} / {@code renderHUDEffect} 画（1.20.1 按注册名自动找 {@code mob_effect/<id>.png}）。
  * </p>
  */
 public abstract class IconBase extends PotionBase {
 
-    protected IconBase(boolean isBadEffectIn, int liquidColorIn, String name) {
-        super(isBadEffectIn, liquidColorIn, name);
+    protected IconBase(boolean isBadEffect, int liquidColor) {
+        super(isBadEffect, liquidColor);
     }
 
     /**
-     * 获取效果图标资源位置
+     * 效果图标
      *
-     * @return 图标资源位置
+     * @return 图标贴图
      */
     @Nonnull
-    protected abstract ResourceLocation getResourceLocation();
+    @SideOnly(Side.CLIENT)
+    protected abstract ResourceLocation getIconTexture();
 
     @SideOnly(Side.CLIENT)
     @Override
     public void renderInventoryEffect(int x, int y, PotionEffect effect, Minecraft minecraft) {
-        ResourceLocation resourceLocation = getResourceLocation();
-        minecraft.getTextureManager().bindTexture(resourceLocation);
+        minecraft.getTextureManager().bindTexture(getIconTexture());
         Gui.drawModalRectWithCustomSizedTexture(x + 6, y + 7, 0, 0, 18, 18, 18, 18);
     }
 
     @SideOnly(Side.CLIENT)
     @Override
     public void renderHUDEffect(int x, int y, PotionEffect effect, Minecraft minecraft, float alpha) {
-        ResourceLocation resourceLocation = getResourceLocation();
-        minecraft.getTextureManager().bindTexture(resourceLocation);
+        minecraft.getTextureManager().bindTexture(getIconTexture());
         Gui.drawModalRectWithCustomSizedTexture(x + 3, y + 3, 0, 0, 18, 18, 18, 18);
     }
 }
