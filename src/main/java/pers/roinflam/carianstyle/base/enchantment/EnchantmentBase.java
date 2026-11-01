@@ -196,6 +196,57 @@ public abstract class EnchantmentBase extends Enchantment {
         return EntityLivingUtil.getTicksSinceLastSwing(player) == 1;
     }
 
+    /**
+     * 等级上限：开了 {@code levelLimit} 时按各附魔自己的上限截断
+     *
+     * @param level 等级
+     * @param cap   上限
+     * @return 截断后的等级
+     */
+    public static int capLevel(int level, int cap) {
+        if (ConfigLoader.levelLimit) {
+            return Math.min(level, cap);
+        }
+        return level;
+    }
+
+    /**
+     * 这一下是不是满蓄力
+     * <p>
+     * 非玩家恒为 true。1.12.2 的玩家攻击在发伤害事件之前就把冷却清零了，伤害事件里读
+     * {@code getCooledAttackStrength} 永远接近 0，所以读出手前一 tick 记下的冷却。
+     * 连点会破坏平衡的命中类效果都要过这一关。
+     * </p>
+     *
+     * @param holder 持有者
+     * @return 满蓄力（或不是玩家）时为 true
+     */
+    public static boolean isFullyCharged(@Nullable EntityLivingBase holder) {
+        if (!(holder instanceof EntityPlayer)) {
+            return true;
+        }
+        return EntityLivingUtil.getTicksSinceLastSwing((EntityPlayer) holder) > 0.9F;
+    }
+
+    /**
+     * 持有者全身这个附魔的最高等级（已应用等级上限）
+     * <p>
+     * 给分发器按件回调、而效果只结算一次的附魔用：第一件触发后就进冷却，
+     * 回调里的 level 只是扫到的第一件的等级，不一定是最高的。
+     * </p>
+     *
+     * @param holder 持有者
+     * @return 最高等级；没有则为 0
+     */
+    protected int highestLevel(@Nonnull EntityLivingBase holder) {
+        int highest = 0;
+        for (EntityEquipmentSlot slot : EntityEquipmentSlot.values()) {
+            highest = Math.max(highest,
+                    applyLevelLimit(EnchantmentHelper.getEnchantmentLevel(this, holder.getItemStackFromSlot(slot))));
+        }
+        return highest;
+    }
+
     // ==================== LivingAttackEvent 模板方法 (10个) ====================
 
     protected void onAttackHighest(@Nonnull EnchantmentContext ctx, int level) {

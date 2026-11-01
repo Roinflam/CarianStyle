@@ -7,7 +7,7 @@ import pers.roinflam.carianstyle.base.potion.hide.HideBase;
  * 注定死亡药水效果（隐藏）
  * <p>
  * 效果：
- * - 最大生命值-25%×等级
+ * - 最大生命值 -10%（命定之死、死亡刀刃挂的，45 秒）
  * </p>
  */
 public class MobEffectDoomedDeath extends HideBase {
@@ -18,7 +18,7 @@ public class MobEffectDoomedDeath extends HideBase {
         this.registerPotionAttributeModifier(
                 SharedMonsterAttributes.MAX_HEALTH,
                 "58993fe2-d11c-2b97-4958-6a8304ff8ad8",
-                -0.25,
+                -0.1,
                 2
         );
     }

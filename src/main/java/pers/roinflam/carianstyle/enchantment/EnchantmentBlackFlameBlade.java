@@ -11,8 +11,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.context.EnchantmentContext;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
-import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
 
 import javax.annotation.Nonnull;
 
@@ -33,49 +32,41 @@ import javax.annotation.Nonnull;
 )
 public class EnchantmentBlackFlameBlade extends EnchantmentBase {
 
+    /** 燃烧时长（tick） */
+    private static final int DOT_DURATION = 100;
+    /** 起始延迟（tick） */
+    private static final int DOT_DELAY = 5;
+    /** 参与计算的等级上限 */
+    private static final int LEVEL_CAP = 10;
+    /** 燃烧火焰显示秒数 */
+    private static final int BURNING_SECONDS = 5;
+    /** 每级燃烧比例（按本次伤害） */
+    private static final float DAMAGE_PER_LEVEL = 0.15F;
+
     public EnchantmentBlackFlameBlade() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
 
+    /**
+     * 目标在 5 秒内燃烧「本次伤害 ×15% × 等级」
+     * <p>
+     * 本次伤害取护甲和抗性减免之前的值（以前取减免之后的，抗性提升 V 下是 0，一点都烧不掉）；
+     * 燃烧剩不到两跳时直接处决。
+     * </p>
+     */
     @Override
-    protected void onDamageAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
+    protected void onHurtAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
         EntityLivingBase victim = ctx.getVictim();
-
         if (victim == null) {
             return;
         }
 
-        // 手动应用等级限制
-        int effectiveLevel = level;
-        if (ConfigLoader.levelLimit) {
-            effectiveLevel = Math.min(effectiveLevel, 10);
-        }
+        int effectiveLevel = capLevel(level, LEVEL_CAP);
 
-        // 施加灭绝火焰燃烧效果
-        victim.addPotionEffect(new PotionEffect(CarianStylePotion.DESTRUCTION_FIRE_BURNING, 5 * 20 + 5, 0));
+        victim.addPotionEffect(new PotionEffect(CarianStylePotion.DESTRUCTION_FIRE_BURNING, BURNING_SECONDS * 20 + 5, 0));
 
-        // 每tick伤害 = 原伤害×等级×0.15/100
-        float damagePerTick = ctx.getDamage() * effectiveLevel * 0.15f / 100;
-
-        // 持续伤害任务
-        new SynchronizationTask(5, 1) {
-            private int tick = 0;
-
-            @Override
-            public void run() {
-                if (++tick > 100 || !victim.isEntityAlive()) {
-                    this.cancel();
-                    return;
-                }
-
-                if (victim.getHealth() - damagePerTick * 2 > 0) {
-                    victim.setHealth(victim.getHealth() - damagePerTick);
-                } else {
-                    EntityLivingUtil.kill(victim, ctx.getDamageSource());
-                    this.cancel();
-                }
-            }
-        }.start();
+        float damagePerTick = ctx.getDamage() * effectiveLevel * DAMAGE_PER_LEVEL / DOT_DURATION;
+        DamageOverTimeManager.applyLinear(victim, damagePerTick, DOT_DURATION, DOT_DELAY, ctx.getDamageSource(), true);
     }
 
     @Override

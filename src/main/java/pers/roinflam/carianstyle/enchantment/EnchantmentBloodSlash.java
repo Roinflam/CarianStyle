@@ -71,11 +71,8 @@ public class EnchantmentBloodSlash extends EnchantmentBase {
         ctx.addDamage(bonusDamage);
 
         if (!(attacker instanceof EntityPlayer) || !((EntityPlayer) attacker).isCreative()) {
-            if (attacker.getHealth() > attacker.getMaxHealth() * 0.1) {
-                attacker.setHealth(attacker.getHealth() - attacker.getMaxHealth() * 0.1f);
-            } else {
-                EntityLivingUtil.kill(attacker, NewDamageSource.HEMORRHAGE);
-            }
+            // 血量不够付时正常死亡（不死图腾挡得住），回溯期间不付
+            EntityLivingUtil.payHealthCost(attacker, attacker.getMaxHealth() * 0.1f);
         }
     }
 

@@ -48,6 +48,21 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
         super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
     }
 
+    /**
+     * 实体是否正处于逆转状态
+     * <p>
+     * 逆转靠 {@link #onLivingAttack} 取消伤害，而持续灼烧、出血、切腹这些直接扣血的不走这个事件，
+     * 持有者会在「无敌」里被烧死。这些地方都先问这里：逆转期间不扣血，持续时间照走，也不计入储存伤害。
+     * </p>
+     *
+     * @param entity 实体
+     * @return 逆转中返回 true
+     */
+    public static boolean isReversing(@Nonnull EntityLivingBase entity) {
+        Boolean state = EnchantmentDataManager.getData(REVERSAL_STATE_KEY, entity.getUniqueID());
+        return state != null && state;
+    }
+
     private static int getTotalLevel(EntityLivingBase entity) {
         Enchantment timeReversal = EnchantmentRegistry.getEnchantmentByClass(EnchantmentTimeReversal.class);
         if (timeReversal == null) {

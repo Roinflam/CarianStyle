@@ -8,6 +8,8 @@ import net.minecraftforge.fml.common.ObfuscationReflectionHelper;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.relauncher.ReflectionHelper;
+import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
+import pers.roinflam.carianstyle.source.NewDamageSource;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -26,6 +28,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Mod.EventBusSubscriber
 public class EntityLivingUtil {
+
+    /** 代价付不起时致死一击的伤害（倍最大生命） */
+    private static final float LETHAL_DAMAGE_MULTIPLIER = 10.0F;
 
     /** 当前tick的攻击冷却 */
     private static final Map<UUID, Float> NOW_TICKS_SINCE_LAST_SWING = new ConcurrentHashMap<>();
@@ -189,20 +194,83 @@ public class EntityLivingUtil {
 
     /**
      * 强制击杀实体
+     * <p>
+     * 血量清零后直接走死亡流程，不经过伤害管线：抗性提升、护甲、无敌时间、不死图腾都拦不住。
+     * 以前先用 {@code attackEntityFrom(来源, 最大生命×100)} 试一下再补 {@code onDeath}，
+     * 伤害被抗性提升 V 减成 0 时会以「还活着」的状态先发一次死亡事件、再把血量设 0；
+     * 复活类监听取消了死亡事件也照样设 0，实体变成没有死亡事件的半死状态。
+     * 现在照 setHealth → 血量真的归零才 onDeath；血量没归零（setHealth 被模组生物改写）时
+     * 退回用虚空伤害打一下，至少让它走一遍正常死亡。
+     * </p>
      *
      * @param entity       实体
-     * @param damageSource 伤害来源
+     * @param damageSource 伤害来源（死亡消息、击杀归属用）
      */
     public static void kill(@Nullable EntityLivingBase entity, @Nonnull DamageSource damageSource) {
-        if (entity == null || entity.isDead) {
+        if (entity == null || entity.isDead || entity.getHealth() <= 0.0F) {
             return;
         }
 
-        entity.attackEntityFrom(damageSource, entity.getMaxHealth() * 100);
-
-        if (entity.isEntityAlive()) {
+        entity.setHealth(0.0F);
+        if (entity.getHealth() <= 0.0F) {
             entity.onDeath(damageSource);
-            entity.setHealth(0);
+        } else {
+            entity.attackEntityFrom(DamageSource.OUT_OF_WORLD, Float.MAX_VALUE);
+        }
+    }
+
+    /**
+     * 直接扣血，不走伤害管线
+     *
+     * @param entity 实体
+     * @param damage 扣多少
+     */
+    public static void damageHealthDirectly(@Nonnull EntityLivingBase entity, float damage) {
+        if (entity.isDead || entity.getHealth() <= 0.0F) {
+            return;
+        }
+        entity.setHealth(Math.max(0.0F, entity.getHealth() - damage));
+    }
+
+    /**
+     * 直接扣血，这一下扣死了就以给定来源走死亡流程
+     * <p>
+     * 只在「扣之前活着、扣完血量归零」时 onDeath，同一个目标连扣两次不会发两次死亡事件。
+     * </p>
+     *
+     * @param entity 实体
+     * @param damage 扣多少
+     * @param source 死亡来源
+     */
+    public static void damageHealthDirectly(@Nonnull EntityLivingBase entity, float damage, @Nonnull DamageSource source) {
+        boolean wasAlive = !entity.isDead && entity.getHealth() > 0.0F;
+        damageHealthDirectly(entity, damage);
+
+        if (wasAlive && entity.getHealth() <= 0.0F) {
+            entity.onDeath(source);
+        }
+    }
+
+    /**
+     * 支付以生命值计的代价（血刃、切腹、鲜血斩击等）
+     * <p>
+     * 血量够付就直接扣；不够付时走伤害管线正常死亡（出血伤害、10 倍最大生命），
+     * 不死图腾挡得住。以前直接 setHealth 到 0 以下会被夹成 0，实体卡在 0 血不死也不活。
+     * 回溯期间不付代价，否则这一下会被算进储存伤害。
+     * </p>
+     *
+     * @param entity 付代价的实体
+     * @param cost   代价（生命值）
+     */
+    public static void payHealthCost(@Nonnull EntityLivingBase entity, float cost) {
+        if (EnchantmentTimeReversal.isReversing(entity)) {
+            return;
+        }
+        float remaining = entity.getHealth() - cost;
+        if (remaining > 0.0F) {
+            entity.setHealth(remaining);
+        } else {
+            entity.attackEntityFrom(NewDamageSource.HEMORRHAGE, entity.getMaxHealth() * LETHAL_DAMAGE_MULTIPLIER);
         }
     }
 

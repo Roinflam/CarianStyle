@@ -5,6 +5,7 @@ import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.potion.PotionEffect;
+import net.minecraft.util.CombatRules;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
@@ -171,15 +172,33 @@ public class MobEffectScarletRot extends IconBase {
                                 bonusLevel = Math.min(bonusLevel, 10);
                             }
                             if (bonusLevel > 0) {
-                                entityLivingBaseIn.attackEntityFrom(NewDamageSource.SCARLET_ROT, damage * 2.5f);
+                                hurtThroughProtection(entityLivingBaseIn, damage * 2.5f);
                                 return;
                             }
                         }
                     }
                 }
-                entityLivingBaseIn.attackEntityFrom(NewDamageSource.SCARLET_ROT, damage);
+                hurtThroughProtection(entityLivingBaseIn, damage);
             }
         }
+    }
+
+    /**
+     * 造成猩红腐败伤害：无视抗性提升，保护类附魔照常减免
+     * <p>
+     * 伤害源是绝对伤害，原版会把抗性和保护附魔一起跳过，所以保护附魔这里先按原版公式算掉。
+     * 以前抗性提升 V 能把腐败整个挡掉。
+     * </p>
+     *
+     * @param entity 目标
+     * @param damage 伤害
+     */
+    private static void hurtThroughProtection(@Nonnull EntityLivingBase entity, float damage) {
+        int protection = EnchantmentHelper.getEnchantmentModifierDamage(entity.getArmorInventoryList(), NewDamageSource.SCARLET_ROT);
+        if (protection > 0) {
+            damage = CombatRules.getDamageAfterMagicAbsorb(damage, (float) protection);
+        }
+        entity.attackEntityFrom(NewDamageSource.SCARLET_ROT, damage);
     }
 
     @Override

@@ -12,8 +12,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
-import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
-import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
 
 import javax.annotation.Nonnull;
 import java.util.UUID;
@@ -35,6 +34,9 @@ public class MobEffectIncision extends IconBase {
 
     public static final UUID ID = UUID.fromString("0a6b62ca-ead9-3641-c4dd-a4d33daf5cc1");
     public static final String NAME = "potion.incision";
+
+    /** 致死一击的伤害（倍最大生命） */
+    private static final float LETHAL_DAMAGE_MULTIPLIER = 10.0F;
 
     public MobEffectIncision(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn, liquidColorIn, "incision");
@@ -100,19 +102,22 @@ public class MobEffectIncision extends IconBase {
 
     @Override
     public void performEffect(@Nonnull EntityLivingBase entityLivingBaseIn, int amplifier) {
-        // 每tick扣血（最大生命值×12.5%/20）
-        float damage = entityLivingBaseIn.getMaxHealth() * 0.125f / 20;
+        if (entityLivingBaseIn.world.isRemote) {
+            return;
+        }
 
-        new SynchronizationTask(1) {
-            @Override
-            public void run() {
-                if (entityLivingBaseIn.getHealth() - damage * 2 > 0) {
-                    entityLivingBaseIn.setHealth(entityLivingBaseIn.getHealth() - damage);
-                } else {
-                    EntityLivingUtil.kill(entityLivingBaseIn, NewDamageSource.HEMORRHAGE);
-                }
+        // 每tick扣血（最大生命值×12.5%/20）；回溯无敌期间不掉血
+        if (!EnchantmentTimeReversal.isReversing(entityLivingBaseIn)) {
+            float damage = entityLivingBaseIn.getMaxHealth() * 0.125f / 20;
+            if (entityLivingBaseIn.getHealth() - damage * 2 > 0) {
+                entityLivingBaseIn.setHealth(entityLivingBaseIn.getHealth() - damage);
+            } else {
+                // 致死一击走伤害管线，不死图腾挡得住；出血伤害是绝对伤害，抗性提升 V 挡不住
+                entityLivingBaseIn.attackEntityFrom(NewDamageSource.HEMORRHAGE,
+                        entityLivingBaseIn.getMaxHealth() * LETHAL_DAMAGE_MULTIPLIER);
+                return;
             }
-        }.start();
+        }
 
         // 移动速度随时间衰减
         IAttributeInstance attributeInstance = entityLivingBaseIn.getEntityAttribute(SharedMonsterAttributes.MOVEMENT_SPEED);
