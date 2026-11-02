@@ -6,6 +6,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
 import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
@@ -16,11 +17,12 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E4)
@@ -31,6 +33,16 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 2.2
  */
+@AutoRegisterEnchantment(
+        id = "protection_of_the_erdtree",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.ARMOR,
+        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET},
+        forceTreasure = true,
+        baseEnchantability = 35,
+        levelMultiplier = 25
+)
 @Deprecated
 public class EnchantmentProtectionOfTheErdtree extends EnchantmentBase {
     private static final String VALUE_ID = "protection_of_the_erdtree";
@@ -44,14 +56,14 @@ public class EnchantmentProtectionOfTheErdtree extends EnchantmentBase {
                     5, 1, 100);
     private static final EnchantmentValues.Handle DURATION_SECONDS_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "duration_seconds_per_level",
                     2.5D, 0.1D, 120.0D);
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
+    public EnchantmentProtectionOfTheErdtree() {
+        super(EnchantTarget.ARMOR, new EquipmentSlot[]{
+                EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
+        });
     }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
-    }
-    protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        return false;
+    @Override
+    protected boolean checkCompatibility(@NotNull EnchantKey ench) {
+        return super.checkCompatibility(ench) && !ench.is(Enchantments.PROTECTION);
     }
 }
 

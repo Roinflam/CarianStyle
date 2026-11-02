@@ -5,6 +5,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
@@ -20,10 +21,11 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E4)
@@ -38,6 +40,15 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 2.2
  */
+@AutoRegisterEnchantment(
+        id = "sacred_order",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantTarget.ARMOR,
+        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET},
+        baseEnchantability = 35,
+        levelMultiplier = 0
+)
 @Deprecated
 public class EnchantmentSacredOrder extends EnchantmentBase {
     private static final String VALUE_ID = "sacred_order";
@@ -52,14 +63,14 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
     private static final EnchantmentValues.Handle VS_SHIELDED_MULTIPLIER = EnchantmentValues.define(VALUE_ID, "vs_shielded_multiplier",
                     1.5D, 0.0D, 10.0D);
     private static final String INITIAL_SHIELD_GIVEN_KEY = "carianstyle_sacred_order_shield_given";
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
+    public EnchantmentSacredOrder() {
+        super(EnchantTarget.ARMOR, new EquipmentSlot[]{
+                EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
+        });
     }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
-    }
-    protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        return false;
+    @Override
+    protected boolean checkCompatibility(@NotNull EnchantKey ench) {
+        return super.checkCompatibility(ench) && !ench.is(Enchantments.PROTECTION);
     }
 }
 

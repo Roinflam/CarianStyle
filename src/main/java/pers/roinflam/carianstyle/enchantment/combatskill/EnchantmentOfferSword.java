@@ -2,11 +2,11 @@ package pers.roinflam.carianstyle.enchantment.combatskill;
 
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
@@ -29,18 +29,24 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * @author RoinFlam
  * @version 2.0
  */
+@AutoRegisterEnchantment(
+        id = "offer_sword",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        baseEnchantability = 5,
+        levelMultiplier = 10
+)
 @Deprecated
 public class EnchantmentOfferSword extends EnchantmentBase {
     private static final String VALUE_ID = "offer_sword";
     private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "damage_per_level",
                     0.1D, 0.0D, 5.0D);
+    public EnchantmentOfferSword() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

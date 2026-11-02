@@ -2,11 +2,11 @@ package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EquipmentSlot;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeInstance;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
@@ -42,6 +42,16 @@ import pers.roinflam.carianstyle.utils.util.BossUtil;
  * @author RoinFlam
  * @version 3.2
  */
+@AutoRegisterEnchantment(
+        id = "death_blade",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        forceTreasure = true,
+        baseEnchantability = 50,
+        levelMultiplier = 0
+)
 @Deprecated
 public class EnchantmentDeathBlade extends EnchantmentBase {
     private static final String VALUE_ID = "death_blade";
@@ -61,13 +71,10 @@ public class EnchantmentDeathBlade extends EnchantmentBase {
                     5, 1, 120);
     private static final EnchantmentValues.Handle DOOM_SECONDS = EnchantmentValues.define(VALUE_ID, "doom_seconds",
                     45, 1, 120);
+    public EnchantmentDeathBlade() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onHurtAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

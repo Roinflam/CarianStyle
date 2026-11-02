@@ -5,6 +5,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
@@ -15,7 +16,6 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
@@ -24,7 +24,9 @@ import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E2)
@@ -49,6 +51,15 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 2.2
  */
+@AutoRegisterEnchantment(
+        id = "living_corpse",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantTarget.ARMOR_CHEST,
+        slots = {EquipmentSlot.CHEST},
+        baseEnchantability = 35,
+        levelMultiplier = 0
+)
 @Deprecated
 public class EnchantmentLivingCorpse extends EnchantmentBase {
     private static final String VALUE_ID = "living_corpse";
@@ -62,6 +73,9 @@ public class EnchantmentLivingCorpse extends EnchantmentBase {
     private static final String BLEEDING_STATE_KEY = "living_corpse_bleeding";
     private static final int RECOLLECT_ENCHANTABILITY = 35;
     private static final Map<UUID, BleedTask> RUNNING_BLEEDS = new ConcurrentHashMap<>();
+    public EnchantmentLivingCorpse() {
+        super(EnchantTarget.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
+    }
 
     private static final class BleedTask extends SynchronizationTask {
         BleedTask(LivingEntity holder, DamageSource lethalSource, int baseMultiplier, int rampDivisor) {
@@ -70,14 +84,15 @@ public class EnchantmentLivingCorpse extends EnchantmentBase {
         public void run() {
         }
     }
-    protected boolean checkCompatibility(Enchantment ench) {
-        return false;
+    @Override
+    protected boolean checkCompatibility(EnchantKey ench) {
+        if (isDeadEnchantment(ench)) {
+            return false;
+        }
+        return super.checkCompatibility(ench);
     }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
+    private boolean isDeadEnchantment(EnchantKey ench) {
+        return ench.isOf(EnchantmentFullMoon.class) || ench.isOf(EnchantmentTimeReversal.class);
     }
 }
 

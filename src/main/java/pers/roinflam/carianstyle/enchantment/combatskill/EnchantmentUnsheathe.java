@@ -7,13 +7,13 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
@@ -49,6 +49,15 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 2.1
  */
+@AutoRegisterEnchantment(
+        id = "unsheathe",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        baseEnchantability = 28,
+        levelMultiplier = 8
+)
 @Deprecated
 public class EnchantmentUnsheathe extends EnchantmentBase {
     private static final String VALUE_ID = "unsheathe";
@@ -61,13 +70,10 @@ public class EnchantmentUnsheathe extends EnchantmentBase {
     private static final UUID ATTACK_SPEED_MODIFIER_ID = UUID.fromString("a9f7b1c6-4c2d-4f0e-9f2c-3a8b3f7d0a5b");
     private static final String ATTACK_SPEED_MODIFIER_NAME = "enchantment.unsheathe";
     private static final String ATTACK_COUNT_KEY = "unsheathe_attack_count";
+    public EnchantmentUnsheathe() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

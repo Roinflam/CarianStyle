@@ -5,6 +5,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
 import net.neoforged.bus.api.EventPriority;
@@ -15,13 +16,13 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
@@ -33,6 +34,15 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 3.1
  */
+@AutoRegisterEnchantment(
+        id = "epilepsy_fire",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        baseEnchantability = 5,
+        levelMultiplier = 25
+)
 @Deprecated
 public class EnchantmentEpilepsyFire extends EnchantmentBase {
     private static final String VALUE_ID = "epilepsy_fire";
@@ -48,11 +58,8 @@ public class EnchantmentEpilepsyFire extends EnchantmentBase {
                     0.2D, 0.0D, 1.0D);
     private static final EnchantmentValues.Handle VICTIM_DAMAGE_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "victim_damage_per_level",
                     0.1D, 0.0D, 2.0D);
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
+    public EnchantmentEpilepsyFire() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 }
 

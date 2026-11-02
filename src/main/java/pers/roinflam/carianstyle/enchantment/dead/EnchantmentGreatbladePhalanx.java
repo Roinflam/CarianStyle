@@ -2,11 +2,11 @@ package pers.roinflam.carianstyle.enchantment.dead;
 
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
@@ -44,6 +44,15 @@ import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
  * @author RoinFlam
  * @version 3.0
  */
+@AutoRegisterEnchantment(
+        id = "greatblade_phalanx",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.DEAD,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.ARMOR,
+        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET},
+        baseEnchantability = 30,
+        levelMultiplier = 15
+)
 @Deprecated
 public class EnchantmentGreatbladePhalanx extends EnchantmentBase {
     private static final String VALUE_ID = "greatblade_phalanx";
@@ -65,13 +74,15 @@ public class EnchantmentGreatbladePhalanx extends EnchantmentBase {
                     0.08D, 0.0D, 1.0D);
     private static final EnchantmentValues.Handle MAX_LIFETIME = EnchantmentValues.define(VALUE_ID, "max_lifetime",
                     120, 20, 1200);
+    public EnchantmentGreatbladePhalanx() {
+        super(EnchantTarget.ARMOR, new EquipmentSlot[]{
+                EquipmentSlot.HEAD,
+                EquipmentSlot.CHEST,
+                EquipmentSlot.LEGS,
+                EquipmentSlot.FEET
+        });
+    }
     protected void onDeath(@NotNull EnchantmentContext ctx, int pieceLevel) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

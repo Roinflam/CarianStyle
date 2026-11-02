@@ -5,11 +5,11 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
@@ -72,6 +72,16 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
  * @author RoinFlam
  * @version 2.2
  */
+@AutoRegisterEnchantment(
+        id = "waterfowl_flurry",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        forceTreasure = true,
+        baseEnchantability = 30,
+        levelMultiplier = 30
+)
 @Deprecated
 public class EnchantmentWaterfowlFlurry extends EnchantmentBase {
     private static final String VALUE_ID = "waterfowl_flurry";
@@ -82,13 +92,10 @@ public class EnchantmentWaterfowlFlurry extends EnchantmentBase {
     private static final EnchantmentValues.Handle HIT_INVULNERABLE_TIME = EnchantmentValues.define(VALUE_ID, "hit_invulnerable_time",
                     10, 0, 40);
     private static final String DAMAGE_TYPE_MARKER = "waterfowl_dance_marker";
+    public EnchantmentWaterfowlFlurry() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onHurtAsAttackerHighest(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

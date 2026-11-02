@@ -5,6 +5,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -13,7 +14,6 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
@@ -32,6 +32,16 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  * @author RoinFlam
  * @version 2.2
  */
+@AutoRegisterEnchantment(
+        id = "calamity",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantTarget.ARMOR_CHEST,
+        slots = {EquipmentSlot.CHEST},
+        isCurse = true,
+        baseEnchantability = 35,
+        levelMultiplier = 0
+)
 @Deprecated
 public class EnchantmentCalamity extends EnchantmentBase {
     private static final String VALUE_ID = "calamity";
@@ -41,11 +51,8 @@ public class EnchantmentCalamity extends EnchantmentBase {
                     1.5D, 0.0D, 10.0D);
     private static final EnchantmentValues.Handle TRIGGER_CHANCE = EnchantmentValues.define(VALUE_ID, "trigger_chance",
                     2.0D, 0.0D, 100.0D);
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
+    public EnchantmentCalamity() {
+        super(EnchantTarget.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
 }
 

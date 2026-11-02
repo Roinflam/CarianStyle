@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.annotation.context;
 
+import net.minecraft.core.Holder;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffect;
@@ -12,6 +13,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.entity.living.*;
 import net.neoforged.neoforge.event.entity.player.CriticalHitEvent;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
@@ -19,8 +21,6 @@ import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
 import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
 
 /**
- * PORT-STUB(B1a)
- *
  * 附魔上下文对象
  * <p>
  * 封装事件处理所需的所有信息和常用操作，让附魔实现代码更加简洁清晰
@@ -33,142 +33,662 @@ import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
  *   内部取反后对手被推向远离持有者的方向。
  *   原代码传的是 opponent.x - holder.x，效果是把对手拉向持有者。
  * </p>
+ * <p>
+ * 1.21.1：伤害相关的方法（{@link #addDamage}、{@link #setDamage}、{@link #cancelEvent} 等）操作的是本模组
+ * 伤害适配层的三个事件（{@code event.damage} 包），它们由 mixin 在 1.20.1 Forge 发事件的原位置发出，
+ * 调用方写法不变。药水参数从 {@code MobEffect} 换成 {@code Holder<MobEffect>}（本模组的
+ * {@code CarianStylePotion.X} 和原版的 {@code MobEffects.X} 都能直接传，不用再 {@code .get()}）；
+ * 暴击倍率对应 NeoForge 的 {@code CriticalHitEvent#setDamageMultiplier}。
+ * </p>
  *
  * @author RoinFlam
  * @version 2.1
  */
-@Deprecated
 public class EnchantmentContext {
-    public EnchantmentContext(@Nonnull Object event, @Nonnull LivingEntity holder, @Nonnull ItemStack item, int level, @Nullable LivingEntity attacker, @Nullable LivingEntity victim, @Nullable DamageSource damageSource) {
+
+    // ==================== 基础信息 ====================
+
+    /**
+     * 原始事件对象
+     */
+    private final Object originalEvent;
+
+    /**
+     * 附魔持有者（装备附魔的实体）
+     */
+    private final LivingEntity enchantmentHolder;
+
+    /**
+     * 附魔所在的物品
+     */
+    private final ItemStack enchantedItem;
+
+    /**
+     * 附魔等级（已经过等级上限验证）
+     */
+    private final int enchantmentLevel;
+
+    /**
+     * 世界对象
+     */
+    private final Level world;
+
+    // ==================== 角色信息 ====================
+
+    /**
+     * 攻击者（如果当前上下文涉及攻击）
+     */
+    @Nullable
+    private final LivingEntity attacker;
+
+    /**
+     * 受击者（如果当前上下文涉及受击）
+     */
+    @Nullable
+    private final LivingEntity victim;
+
+    /**
+     * 伤害来源
+     */
+    @Nullable
+    private final DamageSource damageSource;
+
+    /**
+     * 当前实体是否为攻击者
+     */
+    private final boolean isAttacker;
+
+    // ==================== 构造函数 ====================
+
+    /**
+     * 创建伤害相关事件的上下文
+     *
+     * @param event 原始事件
+     * @param holder 附魔持有者
+     * @param item 附魔物品
+     * @param level 附魔等级
+     * @param attacker 攻击者
+     * @param victim 受击者
+     * @param damageSource 伤害来源
+     */
+    public EnchantmentContext(
+            @Nonnull Object event,
+            @Nonnull LivingEntity holder,
+            @Nonnull ItemStack item,
+            int level,
+            @Nullable LivingEntity attacker,
+            @Nullable LivingEntity victim,
+            @Nullable DamageSource damageSource
+    ) {
+        this.originalEvent = event;
+        this.enchantmentHolder = holder;
+        this.enchantedItem = item;
+        this.enchantmentLevel = level;
+        this.world = holder.level();
+        this.attacker = attacker;
+        this.victim = victim;
+        this.damageSource = damageSource;
+        this.isAttacker = holder.equals(attacker);
     }
-    public EnchantmentContext(@Nonnull Object event, @Nonnull LivingEntity holder, @Nonnull ItemStack item, int level) {
+
+    /**
+     * 创建简单事件的上下文（不涉及攻击）
+     *
+     * @param event 原始事件
+     * @param holder 附魔持有者
+     * @param item 附魔物品
+     * @param level 附魔等级
+     */
+    public EnchantmentContext(
+            @Nonnull Object event,
+            @Nonnull LivingEntity holder,
+            @Nonnull ItemStack item,
+            int level
+    ) {
         this(event, holder, item, level, null, null, null);
     }
-    @SuppressWarnings("unchecked") public <T> T getOriginalEvent() {
-        return null;
+
+    // ==================== 基础获取方法 ====================
+
+    /**
+     * 获取原始事件对象
+     *
+     * @param <T> 事件类型
+     * @return 原始事件
+     */
+    @SuppressWarnings("unchecked")
+    public <T> T getOriginalEvent() {
+        return (T) originalEvent;
     }
-    @Nonnull public LivingEntity getHolder() {
-        return null;
+
+    /**
+     * 获取附魔持有者
+     *
+     * @return 附魔持有者
+     */
+    @Nonnull
+    public LivingEntity getHolder() {
+        return enchantmentHolder;
     }
-    @Nonnull public ItemStack getEnchantedItem() {
-        return null;
+
+    /**
+     * 获取附魔物品
+     *
+     * @return 附魔物品
+     */
+    @Nonnull
+    public ItemStack getEnchantedItem() {
+        return enchantedItem;
     }
+
+    /**
+     * 获取附魔等级
+     *
+     * @return 附魔等级
+     */
     public int getLevel() {
-        return 0;
+        return enchantmentLevel;
     }
-    @Nonnull public Level getWorld() {
-        return null;
+
+    /**
+     * 获取世界对象
+     *
+     * @return 世界对象
+     */
+    @Nonnull
+    public Level getWorld() {
+        return world;
     }
-    @Nullable public LivingEntity getAttacker() {
-        return null;
+
+    /**
+     * 获取攻击者
+     *
+     * @return 攻击者，如果不涉及攻击则为null
+     */
+    @Nullable
+    public LivingEntity getAttacker() {
+        return attacker;
     }
-    @Nullable public LivingEntity getVictim() {
-        return null;
+
+    /**
+     * 获取受击者
+     *
+     * @return 受击者，如果不涉及受击则为null
+     */
+    @Nullable
+    public LivingEntity getVictim() {
+        return victim;
     }
-    @Nullable public DamageSource getDamageSource() {
-        return null;
+
+    /**
+     * 获取伤害来源
+     *
+     * @return 伤害来源，如果不涉及伤害则为null
+     */
+    @Nullable
+    public DamageSource getDamageSource() {
+        return damageSource;
     }
+
+    /**
+     * 判断附魔持有者是否为攻击者
+     *
+     * @return 如果持有者是攻击者返回true
+     */
     public boolean isAttacker() {
-        return false;
+        return isAttacker;
     }
+
+    /**
+     * 判断附魔持有者是否为受击者
+     *
+     * @return 如果持有者是受击者返回true
+     */
     public boolean isVictim() {
-        return false;
+        return !isAttacker && victim != null;
     }
-    @Nullable public LivingEntity getOpponent() {
-        return null;
+
+    /**
+     * 获取对手实体（如果持有者是攻击者则返回受击者，反之返回攻击者）
+     *
+     * @return 对手实体，如果无法确定则为null
+     */
+    @Nullable
+    public LivingEntity getOpponent() {
+        if (isAttacker) {
+            return victim;
+        } else {
+            return attacker;
+        }
     }
+
+    // ==================== 状态判断方法 ====================
+
+    /**
+     * 判断持有者是否正在格挡
+     *
+     * @return 如果正在格挡返回true
+     */
     public boolean isHolderBlocking() {
-        return false;
+        return enchantmentHolder.isUsingItem() &&
+                enchantmentHolder.getUseItem().getItem() instanceof ShieldItem;
     }
+
+    /**
+     * 判断受击者是否正在格挡
+     *
+     * @return 如果受击者正在格挡返回true
+     */
     public boolean isVictimBlocking() {
-        return false;
+        return victim != null && victim.isUsingItem() &&
+                victim.getUseItem().getItem() instanceof ShieldItem;
     }
+
+    /**
+     * 判断持有者是否在燃烧
+     *
+     * @return 如果在燃烧返回true
+     */
     public boolean isHolderBurning() {
-        return false;
+        return enchantmentHolder.isOnFire();
     }
+
+    /**
+     * 判断是否为魔法伤害
+     *
+     * @return 如果是魔法伤害返回true
+     */
     public boolean isMagicDamage() {
-        return false;
+        return damageSource != null && (damageSource.getMsgId().contains("magic") || damageSource.is(DamageTypeTags.WITCH_RESISTANT_TO));
     }
+
+    /**
+     * 判断伤害是否可以伤害创造模式玩家
+     *
+     * @return 如果可以伤害创造模式玩家返回true
+     */
     public boolean canHarmInCreative() {
-        return false;
+        return damageSource != null &&
+                damageSource.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY);
     }
+
+    /**
+     * 判断是否为白天
+     *
+     * @return 如果是白天返回true
+     */
     public boolean isDaytime() {
-        return false;
+        return world.isDay();
     }
+
+    /**
+     * 判断是否在下雨
+     *
+     * @return 如果在下雨返回true
+     */
     public boolean isRaining() {
-        return false;
+        return world.isRaining();
     }
+
+    /**
+     * 判断是否在打雷
+     *
+     * @return 如果在打雷返回true
+     */
     public boolean isThundering() {
-        return false;
+        return world.isThundering();
     }
-    public boolean holderHasPotion(@Nonnull MobEffect effect) {
-        return false;
+
+    /**
+     * 判断持有者是否拥有指定药水效果
+     *
+     * @param effect 药水效果
+     * @return 如果拥有该效果返回true
+     */
+    public boolean holderHasPotion(@Nonnull Holder<MobEffect> effect) {
+        return enchantmentHolder.hasEffect(effect);
     }
-    public boolean opponentHasPotion(@Nonnull MobEffect effect) {
-        return false;
+
+    /**
+     * 判断对手是否拥有指定药水效果
+     *
+     * @param effect 药水效果
+     * @return 如果拥有该效果返回true
+     */
+    public boolean opponentHasPotion(@Nonnull Holder<MobEffect> effect) {
+        LivingEntity opponent = getOpponent();
+        return opponent != null && opponent.hasEffect(effect);
     }
+
+    // ==================== 伤害修改方法 ====================
+
+    /**
+     * 增加伤害（绝对值）
+     *
+     * @param amount 增加的伤害值
+     */
     public void addDamage(float amount) {
+        if (originalEvent instanceof LivingHurtEvent) {
+            LivingHurtEvent event = (LivingHurtEvent) originalEvent;
+            event.setAmount(event.getAmount() + amount);
+        } else if (originalEvent instanceof LivingDamageEvent) {
+            LivingDamageEvent event = (LivingDamageEvent) originalEvent;
+            event.setAmount(event.getAmount() + amount);
+        }
     }
+
+    /**
+     * 减少伤害（绝对值）
+     *
+     * @param amount 减少的伤害值
+     */
     public void reduceDamage(float amount) {
+        addDamage(-amount);
     }
+
+    /**
+     * 伤害倍率修改（百分比）
+     *
+     * @param multiplier 倍率（1.5表示增加50%，0.5表示减少50%）
+     */
     public void multiplyDamage(float multiplier) {
+        if (originalEvent instanceof LivingHurtEvent) {
+            LivingHurtEvent event = (LivingHurtEvent) originalEvent;
+            event.setAmount(event.getAmount() * multiplier);
+        } else if (originalEvent instanceof LivingDamageEvent) {
+            LivingDamageEvent event = (LivingDamageEvent) originalEvent;
+            event.setAmount(event.getAmount() * multiplier);
+        }
     }
+
+    /**
+     * 设置伤害值
+     *
+     * @param amount 新的伤害值
+     */
     public void setDamage(float amount) {
+        if (originalEvent instanceof LivingHurtEvent) {
+            LivingHurtEvent event = (LivingHurtEvent) originalEvent;
+            event.setAmount(amount);
+        } else if (originalEvent instanceof LivingDamageEvent) {
+            LivingDamageEvent event = (LivingDamageEvent) originalEvent;
+            event.setAmount(amount);
+        }
     }
+
+    /**
+     * 获取当前伤害值
+     *
+     * @return 当前伤害值
+     */
     public float getDamage() {
-        return 0.0F;
+        if (originalEvent instanceof LivingHurtEvent) {
+            return ((LivingHurtEvent) originalEvent).getAmount();
+        } else if (originalEvent instanceof LivingDamageEvent) {
+            return ((LivingDamageEvent) originalEvent).getAmount();
+        }
+        return 0.0f;
     }
+
+    /**
+     * 取消事件（阻止伤害或效果）
+     */
     public void cancelEvent() {
+        if (originalEvent instanceof LivingAttackEvent) {
+            ((LivingAttackEvent) originalEvent).setCanceled(true);
+        } else if (originalEvent instanceof LivingHurtEvent) {
+            ((LivingHurtEvent) originalEvent).setCanceled(true);
+        } else if (originalEvent instanceof LivingDamageEvent) {
+            ((LivingDamageEvent) originalEvent).setCanceled(true);
+        } else if (originalEvent instanceof LivingDeathEvent) {
+            ((LivingDeathEvent) originalEvent).setCanceled(true);
+        }
     }
+
+    // ==================== 击退方法 ====================
+
+    /**
+     * 对对手施加击退效果（自动计算方向，推离持有者）
+     * <p>
+     * v2.1修复：knockback(strength, ratioX, ratioZ) 内部将(ratioX, ratioZ)归一化后
+     * 从实体速度中减去。要把对手推离持有者，需要传入 holder→opponent 的反方向
+     * （即从opponent指向holder的方向），内部取反后对手被推向远离holder的方向。
+     * </p>
+     *
+     * @param strength 击退强度
+     */
     public void knockback(double strength) {
+        LivingEntity opponent = getOpponent();
+        if (opponent != null && enchantmentHolder != null) {
+            // 修复：方向应为 holder - opponent（从opponent指向holder）
+            // knockback内部取反后，对手被推向远离holder的方向
+            double dx = enchantmentHolder.getX() - opponent.getX();
+            double dz = enchantmentHolder.getZ() - opponent.getZ();
+            opponent.knockback(strength, dx, dz);
+        }
     }
+
+    /**
+     * 对指定实体施加击退效果（推离持有者）
+     * <p>
+     * v2.1修复：方向修正，与无参版本一致
+     * </p>
+     *
+     * @param target 目标实体
+     * @param strength 击退强度
+     */
     public void knockback(@Nonnull LivingEntity target, double strength) {
+        if (enchantmentHolder != null) {
+            // 修复：方向应为 holder - target（从target指向holder）
+            double dx = enchantmentHolder.getX() - target.getX();
+            double dz = enchantmentHolder.getZ() - target.getZ();
+            target.knockback(strength, dx, dz);
+        }
     }
+
+    // ==================== 治疗方法 ====================
+
+    /**
+     * 治疗持有者
+     *
+     * @param amount 治疗量
+     */
     public void healHolder(float amount) {
+        if (enchantmentHolder != null) {
+            enchantmentHolder.heal(amount);
+        }
     }
+
+    /**
+     * 治疗对手
+     *
+     * @param amount 治疗量
+     */
     public void healOpponent(float amount) {
+        LivingEntity opponent = getOpponent();
+        if (opponent != null) {
+            opponent.heal(amount);
+        }
     }
+
+    /**
+     * 修改治疗量（仅在LivingHealEvent中有效）
+     *
+     * @param amount 新的治疗量
+     */
     public void setHealAmount(float amount) {
+        if (originalEvent instanceof LivingHealEvent) {
+            ((LivingHealEvent) originalEvent).setAmount(amount);
+        }
     }
+
+    /**
+     * 获取治疗量（仅在LivingHealEvent中有效）
+     *
+     * @return 治疗量
+     */
     public float getHealAmount() {
-        return 0.0F;
+        if (originalEvent instanceof LivingHealEvent) {
+            return ((LivingHealEvent) originalEvent).getAmount();
+        }
+        return 0.0f;
     }
-    public void addPotionToHolder(@Nonnull MobEffect effect, int duration, int amplifier) {
+
+    // ==================== 药水效果方法 ====================
+
+    /**
+     * 给持有者添加药水效果
+     *
+     * @param effect 药水效果
+     * @param duration 持续时间（tick）
+     * @param amplifier 效果等级
+     */
+    public void addPotionToHolder(@Nonnull Holder<MobEffect> effect, int duration, int amplifier) {
+        if (enchantmentHolder != null) {
+            enchantmentHolder.addEffect(new MobEffectInstance(effect, duration, amplifier));
+        }
     }
-    public void addPotionToOpponent(@Nonnull MobEffect effect, int duration, int amplifier) {
+
+    /**
+     * 给对手添加药水效果
+     *
+     * @param effect 药水效果
+     * @param duration 持续时间（tick）
+     * @param amplifier 效果等级
+     */
+    public void addPotionToOpponent(@Nonnull Holder<MobEffect> effect, int duration, int amplifier) {
+        LivingEntity opponent = getOpponent();
+        if (opponent != null) {
+            opponent.addEffect(new MobEffectInstance(effect, duration, amplifier));
+        }
     }
-    public void removePotionFromHolder(@Nonnull MobEffect effect) {
+
+    /**
+     * 移除持有者的药水效果
+     *
+     * @param effect 要移除的药水效果
+     */
+    public void removePotionFromHolder(@Nonnull Holder<MobEffect> effect) {
+        if (enchantmentHolder != null) {
+            enchantmentHolder.removeEffect(effect);
+        }
     }
-    @Nullable public MobEffectInstance getHolderPotionEffect(@Nonnull MobEffect effect) {
+
+    /**
+     * 获取持有者的药水效果
+     *
+     * @param effect 药水效果
+     * @return 药水效果实例，如果没有则为null
+     */
+    @Nullable
+    public MobEffectInstance getHolderPotionEffect(@Nonnull Holder<MobEffect> effect) {
+        if (enchantmentHolder != null) {
+            return enchantmentHolder.getEffect(effect);
+        }
         return null;
     }
+
+    // ==================== 生命值相关方法 ====================
+
+    /**
+     * 获取持有者当前生命值
+     *
+     * @return 当前生命值
+     */
     public float getHolderHealth() {
-        return 0.0F;
+        return enchantmentHolder.getHealth();
     }
+
+    /**
+     * 获取持有者最大生命值
+     *
+     * @return 最大生命值
+     */
     public float getHolderMaxHealth() {
-        return 0.0F;
+        return enchantmentHolder.getMaxHealth();
     }
+
+    /**
+     * 获取持有者生命值百分比
+     *
+     * @return 生命值百分比（0.0-1.0）
+     */
     public float getHolderHealthPercentage() {
-        return 0.0F;
+        return enchantmentHolder.getHealth() / enchantmentHolder.getMaxHealth();
     }
+
+    /**
+     * 设置持有者生命值
+     *
+     * @param health 新的生命值
+     */
     public void setHolderHealth(float health) {
+        enchantmentHolder.setHealth(health);
     }
+
+    /**
+     * 获取对手当前生命值
+     *
+     * @return 当前生命值，如果没有对手则为0
+     */
     public float getOpponentHealth() {
-        return 0.0F;
+        LivingEntity opponent = getOpponent();
+        return opponent != null ? opponent.getHealth() : 0.0f;
     }
+
+    /**
+     * 获取对手最大生命值
+     *
+     * @return 最大生命值，如果没有对手则为0
+     */
     public float getOpponentMaxHealth() {
-        return 0.0F;
+        LivingEntity opponent = getOpponent();
+        return opponent != null ? opponent.getMaxHealth() : 0.0f;
     }
-    @Nullable public Player getHolderAsPlayer() {
-        return null;
+
+    // ==================== 玩家特定方法 ====================
+
+    /**
+     * 获取持有者作为玩家（如果是玩家）
+     *
+     * @return 玩家实例，如果不是玩家则为null
+     */
+    @Nullable
+    public Player getHolderAsPlayer() {
+        return enchantmentHolder instanceof Player ? (Player) enchantmentHolder : null;
     }
+
+    /**
+     * 判断持有者是否为玩家
+     *
+     * @return 如果是玩家返回true
+     */
     public boolean isHolderPlayer() {
-        return false;
+        return enchantmentHolder instanceof Player;
     }
+
+    // ==================== 暴击相关方法 ====================
+
+    /**
+     * 修改暴击倍率（仅在CriticalHitEvent中有效）
+     *
+     * @param modifier 暴击倍率修正值
+     */
     public void setCriticalDamageModifier(float modifier) {
+        if (originalEvent instanceof CriticalHitEvent) {
+            ((CriticalHitEvent) originalEvent).setDamageMultiplier(modifier);
+        }
     }
+
+    /**
+     * 获取暴击倍率（仅在CriticalHitEvent中有效）
+     *
+     * @return 暴击倍率
+     */
     public float getCriticalDamageModifier() {
-        return 0.0F;
+        if (originalEvent instanceof CriticalHitEvent) {
+            return ((CriticalHitEvent) originalEvent).getDamageMultiplier();
+        }
+        return 1.0f;
     }
 }
-

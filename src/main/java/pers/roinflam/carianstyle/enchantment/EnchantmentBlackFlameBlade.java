@@ -2,11 +2,11 @@ package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
@@ -29,6 +29,19 @@ import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
  * @author RoinFlam
  * @version 3.0
  */
+@AutoRegisterEnchantment(
+        id = "black_flame_blade",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        forceTreasure = true,
+        conflictsWith = {
+                EnchantmentInvisibleWeapon.class
+        },
+        baseEnchantability = 25,
+        levelMultiplier = 15
+)
 @Deprecated
 public class EnchantmentBlackFlameBlade extends EnchantmentBase {
     private static final String VALUE_ID = "black_flame_blade";
@@ -42,13 +55,10 @@ public class EnchantmentBlackFlameBlade extends EnchantmentBase {
                     5, 1, 120);
     private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "damage_per_level",
                     0.15D, 0.0D, 5.0D);
+    public EnchantmentBlackFlameBlade() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onHurtAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

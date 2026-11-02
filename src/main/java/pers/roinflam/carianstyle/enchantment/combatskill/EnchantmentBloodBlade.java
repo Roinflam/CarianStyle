@@ -3,11 +3,11 @@ package pers.roinflam.carianstyle.enchantment.combatskill;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.EnchantmentDarkMoon;
 import pers.roinflam.carianstyle.enchantment.EnchantmentFireDevoured;
 import pers.roinflam.carianstyle.enchantment.EnchantmentFireGivesPower;
@@ -42,6 +42,22 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
  * @author RoinFlam
  * @version 2.1
  */
+@AutoRegisterEnchantment(
+        id = "blood_blade",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        conflictsWith = {
+                EnchantmentScarletCorruption.class,
+                EnchantmentFireGivesPower.class,
+                EnchantmentFireDevoured.class,
+                EnchantmentVicDragonThunder.class,
+                EnchantmentDarkMoon.class
+        },
+        baseEnchantability = 10,
+        levelMultiplier = 15
+)
 @Deprecated
 public class EnchantmentBloodBlade extends EnchantmentBase {
     private static final String VALUE_ID = "blood_blade";
@@ -51,13 +67,10 @@ public class EnchantmentBloodBlade extends EnchantmentBase {
                     0.033D, 0.0D, 1.0D);
     private static final EnchantmentValues.Handle SELF_DAMAGE_RATIO = EnchantmentValues.define(VALUE_ID, "self_damage_ratio",
                     0.15D, 0.0D, 0.9D);
+    public EnchantmentBloodBlade() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

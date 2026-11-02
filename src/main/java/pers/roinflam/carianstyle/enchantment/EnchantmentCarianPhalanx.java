@@ -7,6 +7,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.phys.Vec3;
 import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
@@ -17,13 +18,13 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
@@ -63,6 +64,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
  *
  * @version 3.0
  */
+@AutoRegisterEnchantment(id = "carian_phalanx", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.RARE, type = EnchantTarget.BOW, slots = {EquipmentSlot.MAINHAND}, conflictsWith = {EnchantmentPyroxeneIce.class}, baseEnchantability = 20, levelMultiplier = 10)
 @Deprecated
 public class EnchantmentCarianPhalanx extends EnchantmentBase {
     private static final String VALUE_ID = "carian_phalanx";
@@ -79,11 +81,8 @@ public class EnchantmentCarianPhalanx extends EnchantmentBase {
     private static final double FAN_HALF_SPREAD = 125.0;
     private static final double FAN_HEIGHT_CENTER = 2.0;
     private static final double FAN_HEIGHT_DROP = 0.75;
-    public int getMinCost(int l) {
-        return 0;
-    }
-    public int getMaxCost(int l) {
-        return 0;
+    public EnchantmentCarianPhalanx() {
+        super(EnchantTarget.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 }
 

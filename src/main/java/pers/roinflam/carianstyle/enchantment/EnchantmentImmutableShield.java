@@ -5,15 +5,16 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E4)
@@ -26,6 +27,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  *
  * @version 2.1
  */
+@AutoRegisterEnchantment(id = "immutable_shield", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.RARE, type = EnchantTarget.SHIELD, slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND}, baseEnchantability = 5, levelMultiplier = 10)
 @Deprecated
 public class EnchantmentImmutableShield extends EnchantmentBase {
     private static final String VALUE_ID = "immutable_shield";
@@ -33,16 +35,17 @@ public class EnchantmentImmutableShield extends EnchantmentBase {
                     0.01D, 0.0D, 1.0D);
     private static final EnchantmentValues.Handle REDUCTION_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "reduction_per_level",
                     0.1D, 0.0D, 1.0D);
+    public EnchantmentImmutableShield() {
+        super(CarianStyleEnchantments.getCustomEnchantmentCategory("SHIELD"), new EquipmentSlot[]{
+                EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND
+        });
+    }
     protected void onHurtAsVictimLow(@NotNull EnchantmentContext ctx, int level) {
     }
-    public int getMinCost(int l) {
-        return 0;
-    }
-    public int getMaxCost(int l) {
-        return 0;
-    }
-    protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        return false;
+    @Override
+    protected boolean checkCompatibility(@NotNull EnchantKey ench) {
+        return super.checkCompatibility(ench)
+                && !ench.isOf(EnchantmentScholarShield.class);
     }
 }
 

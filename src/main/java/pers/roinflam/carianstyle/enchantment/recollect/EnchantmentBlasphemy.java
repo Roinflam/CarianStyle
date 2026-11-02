@@ -7,6 +7,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.food.FoodData;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.bus.api.EventPriority;
@@ -16,9 +17,9 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
@@ -29,6 +30,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
  *
  * @version 2.2
  */
+@AutoRegisterEnchantment(id = "blasphemy", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantTarget.WEAPON, slots = {EquipmentSlot.MAINHAND}, baseEnchantability = 35, levelMultiplier = 0)
 @Deprecated
 public class EnchantmentBlasphemy extends EnchantmentBase {
     private static final String VALUE_ID = "blasphemy";
@@ -37,11 +39,8 @@ public class EnchantmentBlasphemy extends EnchantmentBase {
     private static final EnchantmentValues.Handle FOOD_RESTORE = EnchantmentValues.define(VALUE_ID, "food_restore",
                     2, 0, 20);
     private static final int RECOLLECT_ENCHANTABILITY = 35;
-    public int getMinCost(int l) {
-        return 0;
-    }
-    public int getMaxCost(int l) {
-        return 0;
+    public EnchantmentBlasphemy() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 }
 

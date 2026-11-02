@@ -6,6 +6,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
 import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
@@ -16,11 +17,12 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E3)
@@ -31,6 +33,16 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 2.1
  */
+@AutoRegisterEnchantment(
+        id = "blessing_of_the_erdtree",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.ARMOR_CHEST,
+        slots = {EquipmentSlot.CHEST},
+        forceTreasure = true,
+        baseEnchantability = 35,
+        levelMultiplier = 25
+)
 @Deprecated
 public class EnchantmentBlessingOfTheErdtree extends EnchantmentBase {
     private static final String VALUE_ID = "blessing_of_the_erdtree";
@@ -40,14 +52,15 @@ public class EnchantmentBlessingOfTheErdtree extends EnchantmentBase {
                     5, 1, 100);
     private static final EnchantmentValues.Handle DURATION_SECONDS_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "duration_seconds_per_level",
                     2.5D, 0.1D, 120.0D);
-    protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        return false;
+    public EnchantmentBlessingOfTheErdtree() {
+        super(EnchantTarget.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
+    @Override
+    protected boolean checkCompatibility(@NotNull EnchantKey ench) {
+        if (ench.is(Enchantments.PROTECTION)) {
+            return false;
+        }
+        return super.checkCompatibility(ench);
     }
 }
 

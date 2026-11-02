@@ -11,6 +11,7 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
@@ -29,6 +30,7 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 import java.util.UUID;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
@@ -49,6 +51,17 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  * @author RoinFlam
  * @version 2.3
  */
+@AutoRegisterEnchantment(
+        id = "prayerful_strike",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        forceTreasure = true,
+        conflictsWith = {EnchantmentScarletCorruption.class},
+        baseEnchantability = 35,
+        levelMultiplier = 0
+)
 @Deprecated
 public class EnchantmentPrayerfulStrike extends EnchantmentBase {
     private static final String VALUE_ID = "prayerful_strike";
@@ -72,11 +85,8 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
     private static final String MAX_HEALTH_MODIFIER_NAME = "enchantment.prayerful_strike";
     private static final String CHARGING_COOLDOWN_KEY = "prayerful_strike_charging";
     private static final String NOT_READY_COOLDOWN_KEY = "prayerful_strike_not_ready";
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
+    public EnchantmentPrayerfulStrike() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 }
 

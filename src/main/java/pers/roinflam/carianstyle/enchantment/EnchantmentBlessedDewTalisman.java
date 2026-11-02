@@ -3,6 +3,7 @@ package pers.roinflam.carianstyle.enchantment;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.neoforged.bus.api.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
@@ -12,10 +13,10 @@ import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E3)
@@ -29,6 +30,15 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  * @author RoinFlam
  * @version 2.1 - 性能优化版
  */
+@AutoRegisterEnchantment(
+        id = "blessed_dew_talisman",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantTarget.ARMOR_CHEST,
+        slots = {EquipmentSlot.CHEST},
+        baseEnchantability = 5,
+        levelMultiplier = 10
+)
 @Deprecated
 public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
     private static final String VALUE_ID = "blessed_dew_talisman";
@@ -39,14 +49,15 @@ public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
     private static final EnchantmentValues.Handle HEAL_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "heal_per_level",
                     0.002D, 0.0D, 1.0D);
     private static final String COUNTER_ID = "blessed_dew_talisman_tick";
-    protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        return false;
+    public EnchantmentBlessedDewTalisman() {
+        super(EnchantTarget.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
+    @Override
+    protected boolean checkCompatibility(@NotNull EnchantKey ench) {
+        if (ench.is(Enchantments.PROTECTION)) {
+            return false;
+        }
+        return super.checkCompatibility(ench);
     }
 }
 

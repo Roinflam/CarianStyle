@@ -1,6 +1,7 @@
 package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.world.entity.EquipmentSlot;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -41,6 +42,18 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * @author RoinFlam
  * @version 2.1
  */
+@AutoRegisterEnchantment(
+        id = "blue_feathered_branchsword",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        conflictsWith = {
+                EnchantmentCorruptedWingSword.class
+        },
+        baseEnchantability = 15,
+        levelMultiplier = 10
+)
 @Deprecated
 public class EnchantmentBlueFeatheredBranchsword extends EnchantmentBase {
     private static final String VALUE_ID = "blue_feathered_branchsword";
@@ -52,13 +65,10 @@ public class EnchantmentBlueFeatheredBranchsword extends EnchantmentBase {
                     10, 1, 100);
     private static final EnchantmentValues.Handle HEALTH_THRESHOLD = EnchantmentValues.define(VALUE_ID, "health_threshold",
                     0.2D, 0.0D, 1.0D);
+    public EnchantmentBlueFeatheredBranchsword() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onHurtAsVictim(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

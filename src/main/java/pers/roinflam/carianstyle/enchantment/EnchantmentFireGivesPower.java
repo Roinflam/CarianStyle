@@ -3,11 +3,11 @@ package pers.roinflam.carianstyle.enchantment;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
@@ -27,6 +27,15 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * @author RoinFlam
  * @version 2.0
  */
+@AutoRegisterEnchantment(
+        id = "fire_gives_power",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        baseEnchantability = 5,
+        levelMultiplier = 10
+)
 @Deprecated
 public class EnchantmentFireGivesPower extends EnchantmentBase {
     private static final String VALUE_ID = "fire_gives_power";
@@ -36,15 +45,12 @@ public class EnchantmentFireGivesPower extends EnchantmentBase {
                     0.0375D, 0.0D, 1.0D);
     private static final EnchantmentValues.Handle IGNITE_SECONDS = EnchantmentValues.define(VALUE_ID, "ignite_seconds",
                     10, 1, 300);
+    public EnchantmentFireGivesPower() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onDamageAsAttackerLow(@NotNull EnchantmentContext ctx, int level) {
     }
     protected void onDamageAsVictimLow(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

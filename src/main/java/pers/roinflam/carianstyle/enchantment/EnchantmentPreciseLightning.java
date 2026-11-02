@@ -9,6 +9,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.level.Level;
 import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
@@ -20,10 +21,10 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
@@ -34,6 +35,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
  *
  * @version 2.2
  */
+@AutoRegisterEnchantment(id = "precise_lightning", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.RARE, type = EnchantTarget.ARMOR, slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}, conflictsWith = {EnchantmentCausalityPrinciple.class}, baseEnchantability = 30, levelMultiplier = 10)
 @Deprecated
 public class EnchantmentPreciseLightning extends EnchantmentBase {
     private static final String VALUE_ID = "precise_lightning";
@@ -45,11 +47,10 @@ public class EnchantmentPreciseLightning extends EnchantmentBase {
                     4, 1, 100);
     private static final EnchantmentValues.Handle MAGNIFICATION_MID = EnchantmentValues.define(VALUE_ID, "magnification_mid",
                     2, 1, 100);
-    public int getMinCost(int l) {
-        return 0;
-    }
-    public int getMaxCost(int l) {
-        return 0;
+    public EnchantmentPreciseLightning() {
+        super(EnchantTarget.ARMOR, new EquipmentSlot[]{
+                EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
+        });
     }
 }
 

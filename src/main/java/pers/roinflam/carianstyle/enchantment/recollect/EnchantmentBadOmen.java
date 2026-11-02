@@ -3,11 +3,11 @@ package pers.roinflam.carianstyle.enchantment.recollect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
@@ -30,6 +30,15 @@ import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
  * @author RoinFlam
  * @version 2.1
  */
+@AutoRegisterEnchantment(
+        id = "bad_omen",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        baseEnchantability = 38,
+        levelMultiplier = 0
+)
 @Deprecated
 public class EnchantmentBadOmen extends EnchantmentBase {
     private static final String VALUE_ID = "bad_omen";
@@ -41,13 +50,10 @@ public class EnchantmentBadOmen extends EnchantmentBase {
                     0.5D, 0.0D, 5.0D);
     private static final EnchantmentValues.Handle EFFECT_DURATION = EnchantmentValues.define(VALUE_ID, "effect_duration",
                     200, 20, 6000);
+    public EnchantmentBadOmen() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onHurtAsAttackerLow(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

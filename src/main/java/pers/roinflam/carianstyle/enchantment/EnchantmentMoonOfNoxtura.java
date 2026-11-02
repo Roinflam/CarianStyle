@@ -5,13 +5,13 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.neoforged.bus.api.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.dead.EnchantmentAncientDragonLightning;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
@@ -32,6 +32,7 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  * </p>
  * @version 2.1
  */
+@AutoRegisterEnchantment(id = "moon_of_noxtura", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.VERY_RARE, type = EnchantTarget.ARMOR, slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}, conflictsWith = {EnchantmentHealingByFire.class, EnchantmentShelterOfFire.class, EnchantmentPreciseLightning.class, EnchantmentAncientDragonLightning.class}, forceTreasure = true, baseEnchantability = 35, levelMultiplier = 0)
 @Deprecated
 public class EnchantmentMoonOfNoxtura extends EnchantmentBase {
     private static final String VALUE_ID = "moon_of_noxtura";
@@ -41,11 +42,8 @@ public class EnchantmentMoonOfNoxtura extends EnchantmentBase {
                     2.5D, 0.0D, 100.0D);
     private static final EnchantmentValues.Handle SEARCH_RADIUS = EnchantmentValues.define(VALUE_ID, "search_radius",
                     32, 1, 64);
-    public int getMinCost(int l) {
-        return 0;
-    }
-    public int getMaxCost(int l) {
-        return 0;
+    public EnchantmentMoonOfNoxtura() {
+        super(EnchantTarget.ARMOR, new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET});
     }
 }
 

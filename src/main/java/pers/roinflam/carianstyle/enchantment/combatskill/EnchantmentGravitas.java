@@ -7,6 +7,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
 import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
@@ -21,7 +22,6 @@ import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
@@ -30,8 +30,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E1)
@@ -64,6 +66,15 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  * @author RoinFlam
  * @version 2.4
  */
+@AutoRegisterEnchantment(
+        id = "gravitas",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        baseEnchantability = 35,
+        levelMultiplier = 0
+)
 @Deprecated
 public class EnchantmentGravitas extends EnchantmentBase {
     private static final String VALUE_ID = "gravitas";
@@ -76,14 +87,15 @@ public class EnchantmentGravitas extends EnchantmentBase {
     public static final EnchantmentValues.Handle FIELD_RADIUS = EnchantmentValues.defineShared(VALUE_ID, "field_radius", 12, 1, 64);
     public static final int GRAVITY_FIELD_SERIAL = 6;
     private static final Set<UUID> ACTIVE_FIELD_HOLDERS = ConcurrentHashMap.newKeySet();
-    protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        return false;
+    public EnchantmentGravitas() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
+    @Override
+    protected boolean checkCompatibility(@NotNull EnchantKey ench) {
+        if (ench.is(Enchantments.KNOCKBACK)) {
+            return false;
+        }
+        return super.checkCompatibility(ench);
     }
 }
 

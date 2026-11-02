@@ -7,6 +7,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.phys.Vec3;
 import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
@@ -17,14 +18,15 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E3)
@@ -50,6 +52,19 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 3.0
  */
+@AutoRegisterEnchantment(
+        id = "carian_retaliation",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.SHIELD,
+        slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND},
+        conflictsWith = {
+                EnchantmentScholarShield.class,
+                EnchantmentImmutableShield.class
+        },
+        baseEnchantability = 20,
+        levelMultiplier = 15
+)
 @Deprecated
 public class EnchantmentCarianRetaliation extends EnchantmentBase {
     private static final String VALUE_ID = "carian_retaliation";
@@ -67,14 +82,14 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
                     0.15D, 0.0D, 1.0D);
     private static final double RING_RADIUS = 1.5;
     private static final double RING_HEIGHT = 0.5;
-    protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        return false;
+    public EnchantmentCarianRetaliation() {
+        super(CarianStyleEnchantments.getCustomEnchantmentCategory("SHIELD"),
+                new EquipmentSlot[]{EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND});
     }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
+    @Override
+    protected boolean checkCompatibility(@NotNull EnchantKey ench) {
+        return !ench.isOf(EnchantmentScholarShield.class) &&
+                !ench.isOf(EnchantmentImmutableShield.class);
     }
 }
 

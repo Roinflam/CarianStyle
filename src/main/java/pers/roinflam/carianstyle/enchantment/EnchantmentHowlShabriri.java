@@ -3,11 +3,11 @@ package pers.roinflam.carianstyle.enchantment;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
@@ -34,6 +34,15 @@ import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
  * @author RoinFlam
  * @version 3.0
  */
+@AutoRegisterEnchantment(
+        id = "howl_shabriri",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        baseEnchantability = 25,
+        levelMultiplier = 10
+)
 @Deprecated
 public class EnchantmentHowlShabriri extends EnchantmentBase {
     private static final String VALUE_ID = "howl_shabriri";
@@ -49,13 +58,10 @@ public class EnchantmentHowlShabriri extends EnchantmentBase {
                     0.05D, 0.0D, 1.0D);
     private static final EnchantmentValues.Handle STACK_SECONDS_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "stack_seconds_per_level",
                     3, 1, 120);
+    public EnchantmentHowlShabriri() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onDamageAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

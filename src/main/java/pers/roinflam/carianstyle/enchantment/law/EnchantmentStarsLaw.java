@@ -3,11 +3,11 @@ package pers.roinflam.carianstyle.enchantment.law;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.EnchantmentFireDevoured;
 import pers.roinflam.carianstyle.enchantment.EnchantmentFireGivesPower;
 import pers.roinflam.carianstyle.enchantment.EnchantmentScarletCorruption;
@@ -18,6 +18,7 @@ import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E1)
@@ -37,6 +38,21 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * @author RoinFlam
  * @version 2.1
  */
+@AutoRegisterEnchantment(
+        id = "stars_law",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.LAW,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        conflictsWith = {
+                EnchantmentScarletCorruption.class,
+                EnchantmentFireGivesPower.class,
+                EnchantmentFireDevoured.class,
+                EnchantmentVicDragonThunder.class
+        },
+        baseEnchantability = 35,
+        levelMultiplier = 0
+)
 @Deprecated
 public class EnchantmentStarsLaw extends EnchantmentBase {
     private static final String VALUE_ID = "stars_law";
@@ -51,6 +67,9 @@ public class EnchantmentStarsLaw extends EnchantmentBase {
     private static final EnchantmentValues.Handle HEAL_MULTIPLIER = EnchantmentValues.define(VALUE_ID, "heal_multiplier",
                     1.5D, 0.0D, 10.0D);
     private static final int RECOLLECT_ENCHANTABILITY = 35;
+    public EnchantmentStarsLaw() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onHurtAsAttackerLow(@NotNull EnchantmentContext ctx, int level) {
     }
     protected void onHurtAsVictim(@NotNull EnchantmentContext ctx, int level) {
@@ -59,14 +78,19 @@ public class EnchantmentStarsLaw extends EnchantmentBase {
     }
     protected void onPlayerTick(@NotNull EnchantmentContext ctx, int level) {
     }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
+    @Override
+    protected boolean checkCompatibility(EnchantKey ench) {
+        if (isRecollectEnchantment(ench) && !isDarkAbandonedChild(ench)) {
+            return false;
+        }
+        return super.checkCompatibility(ench);
     }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
+    private boolean isRecollectEnchantment(EnchantKey ench) {
+        return ench.enchantClass().getPackage().getName().contains("recollect")
+                || ench.enchantClass().getPackage().getName().contains("law");
     }
-    protected boolean checkCompatibility(Enchantment ench) {
-        return false;
+    private boolean isDarkAbandonedChild(EnchantKey ench) {
+        return ench.isOf(EnchantmentDarkAbandonedChild.class);
     }
 }
 

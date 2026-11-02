@@ -2,17 +2,18 @@ package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.Enchantments;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E3)
@@ -43,26 +44,38 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * @author RoinFlam
  * @version 2.1
  */
+@AutoRegisterEnchantment(
+        id = "concealing_veil",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantTarget.ARMOR,
+        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET},
+        baseEnchantability = 30,
+        levelMultiplier = 0
+)
 @Deprecated
 public class EnchantmentConcealingVeil extends EnchantmentBase {
     private static final String VALUE_ID = "concealing_veil";
     public static final String BATTLE_COOLDOWN_KEY = "concealing_veil_battle";
     public static final EnchantmentValues.Handle BATTLE_DURATION = EnchantmentValues.defineShared(VALUE_ID, "battle_duration", 60, 1, 12000);
     private static final EnchantmentValues.Handle STEALTH_REFRESH_TICKS = EnchantmentValues.define(VALUE_ID, "stealth_refresh_ticks", 2, 1, 100);
+    public EnchantmentConcealingVeil() {
+        super(EnchantTarget.ARMOR, new EquipmentSlot[]{
+                EquipmentSlot.HEAD,
+                EquipmentSlot.CHEST,
+                EquipmentSlot.LEGS,
+                EquipmentSlot.FEET
+        });
+    }
     protected void onAttackLowest(@NotNull EnchantmentContext ctx, int level) {
     }
     protected void onHurtAsVictimLowest(@NotNull EnchantmentContext ctx, int level) {
     }
     protected void onPlayerTick(@NotNull EnchantmentContext ctx, int level) {
     }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
-    }
-    protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        return false;
+    @Override
+    protected boolean checkCompatibility(@NotNull EnchantKey ench) {
+        return super.checkCompatibility(ench) && !ench.is(Enchantments.PROTECTION);
     }
 }
 

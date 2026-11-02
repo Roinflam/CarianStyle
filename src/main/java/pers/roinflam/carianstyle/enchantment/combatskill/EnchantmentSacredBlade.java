@@ -7,6 +7,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -15,7 +16,6 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.EnchantmentBlackFlameBlade;
 import pers.roinflam.carianstyle.enchantment.EnchantmentDeathBlade;
 import pers.roinflam.carianstyle.enchantment.EnchantmentScarletCorruption;
@@ -24,6 +24,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
 import java.util.UUID;
 import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E1)
@@ -119,6 +120,20 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 3.1
  */
+@AutoRegisterEnchantment(
+        id = "sacred_blade",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        conflictsWith = {
+                EnchantmentScarletCorruption.class,
+                EnchantmentDeathBlade.class,
+                EnchantmentBlackFlameBlade.class
+        },
+        baseEnchantability = 10,
+        levelMultiplier = 15
+)
 @Deprecated
 public class EnchantmentSacredBlade extends EnchantmentBase {
     private static final String VALUE_ID = "sacred_blade";
@@ -132,16 +147,17 @@ public class EnchantmentSacredBlade extends EnchantmentBase {
     private static final String ATTACK_DAMAGE_MODIFIER_NAME = "enchantment.sacred_blade";
     private static final double PENALTY_STEP_PER_LEVEL = -0.05;
     private static final double PENALTY_FLOOR = -0.99;
+    public EnchantmentSacredBlade() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
     }
-    protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        return false;
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
+    @Override
+    protected boolean checkCompatibility(@NotNull EnchantKey ench) {
+        if (ench.is(Enchantments.SHARPNESS)) {
+            return false;
+        }
+        return super.checkCompatibility(ench);
     }
 }
 

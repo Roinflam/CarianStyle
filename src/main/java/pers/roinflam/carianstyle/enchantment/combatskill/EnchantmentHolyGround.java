@@ -7,6 +7,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
@@ -14,7 +15,6 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
@@ -33,6 +33,15 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  * @author RoinFlam
  * @version 2.2
  */
+@AutoRegisterEnchantment(
+        id = "holy_ground",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.SHIELD,
+        slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND},
+        baseEnchantability = 20,
+        levelMultiplier = 15
+)
 @Deprecated
 public class EnchantmentHolyGround extends EnchantmentBase {
     private static final String VALUE_ID = "holy_ground";
@@ -44,11 +53,11 @@ public class EnchantmentHolyGround extends EnchantmentBase {
                     0.015D, 0.0D, 0.5D);
     private static final EnchantmentValues.Handle ABSORPTION_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "absorption_per_level",
                     0.03D, 0.0D, 0.5D);
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
+    public EnchantmentHolyGround() {
+        super(CarianStyleEnchantments.getCustomEnchantmentCategory("SHIELD"), new EquipmentSlot[]{
+                EquipmentSlot.MAINHAND,
+                EquipmentSlot.OFFHAND
+        });
     }
 }
 

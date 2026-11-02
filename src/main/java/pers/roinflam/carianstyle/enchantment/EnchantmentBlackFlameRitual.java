@@ -7,6 +7,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.Enchantments;
 import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
 import net.neoforged.bus.api.EventPriority;
@@ -16,13 +17,13 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E3)
@@ -33,6 +34,7 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  *
  * @version 2.2
  */
+@AutoRegisterEnchantment(id = "black_flame_ritual", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.VERY_RARE, type = EnchantTarget.ARMOR_CHEST, slots = {EquipmentSlot.CHEST}, conflictsWith = {EnchantmentShelterOfFire.class, EnchantmentHealingByFire.class}, baseEnchantability = 30, levelMultiplier = 0)
 @Deprecated
 public class EnchantmentBlackFlameRitual extends EnchantmentBase {
     private static final String VALUE_ID = "black_flame_ritual";
@@ -44,14 +46,12 @@ public class EnchantmentBlackFlameRitual extends EnchantmentBase {
                     20, 1, 600);
     private static final EnchantmentValues.Handle HEALTH_RETAIN_RATIO = EnchantmentValues.define(VALUE_ID, "health_retain_ratio",
                     0.95D, 0.5D, 1.0D);
-    protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        return false;
+    public EnchantmentBlackFlameRitual() {
+        super(EnchantTarget.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
-    public int getMinCost(int l) {
-        return 0;
-    }
-    public int getMaxCost(int l) {
-        return 0;
+    @Override
+    protected boolean checkCompatibility(@NotNull EnchantKey ench) {
+        return super.checkCompatibility(ench) && !ench.is(Enchantments.PROTECTION);
     }
 }
 

@@ -4,22 +4,20 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.api.IEffectModifier;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 
 /**
- * PORT-STUB(B1a)
- *
  * 药水效果修改处理器
  * <p>
  * 只负责找到所有实现了 IEffectModifier 的附魔并调用
@@ -30,8 +28,9 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
  * </p>
  * <p>
  * <b>问题：</b>本处理器由 {@code MixinEffectModifier} 挂在 {@code LivingEntity.addEffect(MobEffectInstance, Entity)}
- * 的方法头，全服每一次 addEffect 都要把护甲 + 主副手逐件跑一遍 {@code EnchantmentHelper.getEnchantments}
- * （把物品 NBT 里的附魔列表逐条反序列化、解析 ResourceLocation、查注册表）。
+ * 的方法头，全服每一次 addEffect 都要把护甲 + 主副手逐件跑一遍 {@code EnchantmentLevels.all}
+ * （1.20.1 是 {@code EnchantmentHelper.getEnchantments}：把物品 NBT 里的附魔列表逐条反序列化、解析 ResourceLocation、查注册表；
+ * 1.21.1 附魔已是组件，开销小了，但同 tick 重复扫描仍然没必要）。
  * 很多饰品每 tick 都给佩戴者续 buff，同一个玩家同一 tick 会连续进来好几次，装备根本没变，
  * 扫描结果每次都一样，有的饰品每次饰品 tick 会对佩戴者连调两次 addEffect。
  * 性能分析里本处理器的耗时大部分落在旧实现的 {@code addModifiersFromItem}
@@ -70,23 +69,223 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
  *
  * @author RoinFlam
  */
-@Deprecated
 public class EffectModifierHandler {
+
+    /**
+     * 保护 {@link #CACHE}、{@link #cacheDimension}、{@link #cacheGameTime}。
+     * 锁内只做表操作（外加 WeakHashMap 查表时调用的实体 equals/hashCode），物品/附魔/装备读取都在锁外，
+     * 避免持锁期间回调进别的模组逻辑。
+     */
     private static final Object CACHE_LOCK = new Object();
+
+    /**
+     * 实体 → 本 tick 的扫描快照。只存当前 {@link #cacheDimension} + {@link #cacheGameTime} 这一代的数据，
+     * 换代即 clear。{@code Entity} 的 equals/hashCode 按实体 id 覆写，id 相同的两个对象会共用一格；
+     * 这不影响正确性，因为命中还要求扫到的物品对象逐个引用相同，而结果只由这些物品对象决定。
+     */
     private static final Map<LivingEntity, EquipmentSnapshot> CACHE = new WeakHashMap<>();
 
+    private static ResourceKey<Level> cacheDimension = null;
+    private static long cacheGameTime = Long.MIN_VALUE;
+
+    /**
+     * 一次装备扫描的结果：扫到的物品对象（按原扫描顺序）、当时各件是否为空（位掩码），
+     * 以及从中找到的 IEffectModifier 附魔集合。字段创建后都不再修改，只在锁内发布，可以安全地被多次读取/迭代。
+     */
     private static final class EquipmentSnapshot {
-        ItemStack[] equipment;
-        long emptyMask;
-        Set<IEffectModifier> modifiers;
+        final ItemStack[] equipment;
+        final long emptyMask;
+        final Set<IEffectModifier> modifiers;
+
         EquipmentSnapshot(ItemStack[] equipment, long emptyMask, Set<IEffectModifier> modifiers) {
+            this.equipment = equipment;
+            this.emptyMask = emptyMask;
+            this.modifiers = modifiers;
         }
+
         boolean matches(ItemStack[] current, long currentEmptyMask) {
-            return false;
+            if (this.equipment.length != current.length || this.emptyMask != currentEmptyMask) {
+                return false;
+            }
+            for (int i = 0; i < current.length; i++) {
+                if (this.equipment[i] != current[i]) {
+                    return false;
+                }
+            }
+            return true;
         }
     }
-    public static MobEffectInstance handleEffectModification(@NotNull LivingEntity entity, @NotNull MobEffectInstance effectInstance) {
-        return effectInstance;
+
+    /**
+     * 处理药水效果修改
+     * <p>
+     * 找到实体装备上所有的 IEffectModifier 附魔，依次调用它们的修改方法
+     * </p>
+     * <p>
+     * Mohist 系服务端正在 tick 该实体的药水效果时原样返回：那次调用只入队，
+     * 重放时会再进来一次并在那时改写，保证每个效果只被改一次（见 {@link BukkitTickingEffectsProbe}）。
+     * </p>
+     *
+     * @param entity 接受药水效果的实体
+     * @param effectInstance 原始药水效果实例
+     * @return 修改后的药水效果实例
+     */
+    public static MobEffectInstance handleEffectModification(@NotNull LivingEntity entity,
+                                                             @NotNull MobEffectInstance effectInstance) {
+        // 客户端不处理
+        if (entity.level().isClientSide) {
+            return effectInstance;
+        }
+
+        // Mohist（CraftBukkit 系）药水 tick 期间：这次 addEffect 只会入队，tickEffects 末尾重放时会再从方法头进来一次，
+        // 交给那一次改；这里就改的话同一个效果会被改两次。原版 Forge、非 Mohist 结构的混合端上恒为 false。详见 BukkitTickingEffectsProbe
+        if (BukkitTickingEffectsProbe.isTickingEffects(entity)) {
+            return effectInstance;
+        }
+
+        // 收集实体装备上所有实现了 IEffectModifier 的附魔（去重）；同 tick 同装备时复用上次的结果
+        Set<IEffectModifier> modifiers;
+        try {
+            modifiers = resolveModifiers(entity);
+        } catch (Throwable t) {
+            // 缓存逻辑出任何意外都退回原始扫描；若异常本来就来自扫描本身，这里会原样再抛一次，与原实现一致
+            modifiers = collectModifiers(captureEquipment(entity));
+        }
+
+        if (modifiers.isEmpty()) {
+            return effectInstance;
+        }
+
+        // 依次调用每个附魔的修改方法
+        MobEffectInstance result = effectInstance;
+        for (IEffectModifier modifier : modifiers) {
+            // 让附魔自己获取等级（不缓存，与原实现一样每次现算）
+            int level = modifier.getEnchantmentLevel(entity);
+
+            if (level > 0) {
+                MobEffectInstance modified = modifier.modifyEffect(entity, result, level);
+                if (modified != null) {
+                    result = modified;
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * 取本 tick、当前装备下的附魔集合；命中缓存直接复用，否则重新扫描并写回。
+     */
+    private static Set<IEffectModifier> resolveModifiers(@NotNull LivingEntity entity) {
+        Level level = entity.level();
+        ResourceKey<Level> dimension = level.dimension();
+        long gameTime = level.getGameTime();
+        ItemStack[] equipment = captureEquipment(entity);
+        if (equipment.length > Long.SIZE) {
+            // 空/非空状态用 long 位掩码记录；装备件数超过 64 的实体（不存在于原版，防御用）不走缓存
+            return collectModifiers(equipment);
+        }
+        long emptyMask = emptyMask(equipment);
+
+        synchronized (CACHE_LOCK) {
+            // 原版/模组维度走 DerivedLevelData，共用主世界的 gameTime；但 Bukkit 插件 createWorld 建的世界
+            // 有自己的 PrimaryLevelData 和 gameTime（CraftServer 核实），所以「代」要用 (世界, gameTime) 一起判定。
+            // ResourceKey 是驻留的（ResourceKey.create 走 VALUES 表）且没覆写 equals，!= 即按值比较。
+            if (gameTime != cacheGameTime || dimension != cacheDimension) {
+                CACHE.clear();
+                cacheGameTime = gameTime;
+                cacheDimension = dimension;
+            } else {
+                EquipmentSnapshot cached = CACHE.get(entity);
+                if (cached != null && cached.matches(equipment, emptyMask)) {
+                    return cached.modifiers;
+                }
+            }
+        }
+
+        Set<IEffectModifier> modifiers = collectModifiers(equipment);
+
+        synchronized (CACHE_LOCK) {
+            // 扫描期间别的线程可能已经换代，只有还在同一代时才写回
+            if (gameTime == cacheGameTime && dimension == cacheDimension) {
+                CACHE.put(entity, new EquipmentSnapshot(equipment, emptyMask, modifiers));
+            }
+        }
+        return modifiers;
+    }
+
+    /**
+     * 按原实现的顺序取出要扫描的物品对象：先 {@code getArmorSlots()}，再 {@code getHandSlots()}。
+     * <p>
+     * 故意不改用 {@code getItemBySlot}：模组实体可以各自覆写这两个 Iterable
+     * （比如一些 NPC 模组的实体），逐槽取值不一定与之相同，
+     * 且槽位顺序会影响 HashSet 的迭代顺序（见类注释）。玩家/普通生物都是 4 + 2 = 6 件，数组一次分配到位。
+     * </p>
+     */
+    private static ItemStack[] captureEquipment(@NotNull LivingEntity entity) {
+        ItemStack[] buffer = new ItemStack[6];
+        int size = 0;
+
+        // 遍历所有护甲槽位
+        for (ItemStack armor : entity.getArmorSlots()) {
+            if (size == buffer.length) {
+                buffer = Arrays.copyOf(buffer, size * 2);
+            }
+            buffer[size++] = armor;
+        }
+
+        // 遍历手持物品（主手 + 副手）
+        for (ItemStack hand : entity.getHandSlots()) {
+            if (size == buffer.length) {
+                buffer = Arrays.copyOf(buffer, size * 2);
+            }
+            buffer[size++] = hand;
+        }
+
+        return size == buffer.length ? buffer : Arrays.copyOf(buffer, size);
+    }
+
+    /**
+     * 第 i 位为 1 表示第 i 件物品当前 {@code isEmpty()}。与 {@link #collectModifiers} 跳过空物品的判断一致。
+     */
+    private static long emptyMask(@NotNull ItemStack[] equipment) {
+        long mask = 0L;
+        for (int i = 0; i < equipment.length; i++) {
+            if (equipment[i].isEmpty()) {
+                mask |= 1L << i;
+            }
+        }
+        return mask;
+    }
+
+    /**
+     * 收集实体装备上的所有 IEffectModifier 附魔（去重）
+     * <p>
+     * 按 {@link #captureEquipment} 给出的顺序逐件找出所有实现了接口的附魔，插入顺序与原实现一致
+     * </p>
+     *
+     * @param equipment 要扫描的物品（护甲在前、手持在后）
+     * @return 实现了 IEffectModifier 的附魔集合；没有则返回不可变空集合（调用方只判空、不修改）
+     */
+    private static Set<IEffectModifier> collectModifiers(@NotNull ItemStack[] equipment) {
+        Set<IEffectModifier> modifiers = null;
+
+        for (ItemStack item : equipment) {
+            if (item.isEmpty()) {
+                continue;
+            }
+
+            Map<EnchantmentBase, Integer> enchantments = EnchantmentLevels.all(item);
+            for (EnchantmentBase enchantment : enchantments.keySet()) {
+                if (enchantment instanceof IEffectModifier) {
+                    if (modifiers == null) {
+                        modifiers = new HashSet<>();
+                    }
+                    modifiers.add((IEffectModifier) enchantment);
+                }
+            }
+        }
+
+        return modifiers == null ? Collections.emptySet() : modifiers;
     }
 }
-

@@ -7,6 +7,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
@@ -18,9 +19,9 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
@@ -32,6 +33,15 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 2.1
  */
+@AutoRegisterEnchantment(
+        id = "loretta_big_bow",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantTarget.BOW,
+        slots = {EquipmentSlot.MAINHAND},
+        baseEnchantability = 25,
+        levelMultiplier = 0
+)
 @Deprecated
 public class EnchantmentLorettaBigBow extends EnchantmentBase {
     private static final String VALUE_ID = "loretta_big_bow";
@@ -43,13 +53,10 @@ public class EnchantmentLorettaBigBow extends EnchantmentBase {
                     2.0D, 0.0D, 20.0D);
     private static final EnchantmentValues.Handle EXPLOSION_STRENGTH_ON_FIRE = EnchantmentValues.define(VALUE_ID, "explosion_strength_on_fire",
                     3.0D, 0.0D, 20.0D);
+    public EnchantmentLorettaBigBow() {
+        super(EnchantTarget.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     static void spawnBlastCloud(Level level, double x, double y, double z) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

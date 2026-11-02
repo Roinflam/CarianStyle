@@ -16,14 +16,15 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 import java.util.UUID;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 
 /**
  * PORT-STUB(E1)
@@ -75,6 +76,16 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 2.4
  */
+@AutoRegisterEnchantment(
+        id = "parry",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantTarget.SHIELD,
+        slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND},
+        baseEnchantability = 10,
+        levelMultiplier = 10
+        // v2.3：type = BREAKABLE → customType = "SHIELD"，与下方构造函数保持一致
+)
 @Deprecated
 public class EnchantmentParry extends EnchantmentBase {
     private static final String VALUE_ID = "parry";
@@ -86,11 +97,11 @@ public class EnchantmentParry extends EnchantmentBase {
                     40, 0, 2400);
     private static final String PARRY_LEVEL_KEY = "parry_level";
     private static final String PARRY_COOLDOWN_KEY = "parry_cooldown";
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
+    public EnchantmentParry() {
+        super(CarianStyleEnchantments.getCustomEnchantmentCategory("SHIELD"), new EquipmentSlot[]{
+                EquipmentSlot.MAINHAND,
+                EquipmentSlot.OFFHAND
+        });
     }
 }
 

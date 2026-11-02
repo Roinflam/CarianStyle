@@ -7,6 +7,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.neoforged.neoforge.event.entity.living.LivingEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -16,7 +17,6 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
@@ -105,6 +105,15 @@ import pers.roinflam.carianstyle.event.LivingTickEvent;
  * @author RoinFlam
  * @version 3.1
  */
+@AutoRegisterEnchantment(
+        id = "scarlet_lonia",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.DEAD,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.ARMOR,
+        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET},
+        baseEnchantability = 36,
+        levelMultiplier = 20
+)
 @Deprecated
 public class EnchantmentScarletLonia extends EnchantmentBase {
     private static final String VALUE_ID = "scarlet_lonia";
@@ -133,6 +142,14 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
     private static final EnchantmentValues.Handle FINAL_KNOCKBACK_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "final_knockback_per_level",
                     0.75D, 0.0D, 5.0D);
     private static final String PENDING_DEATH_KEY = "scarlet_lonia_pending_death";
+    public EnchantmentScarletLonia() {
+        super(EnchantTarget.ARMOR, new EquipmentSlot[]{
+                EquipmentSlot.HEAD,
+                EquipmentSlot.CHEST,
+                EquipmentSlot.LEGS,
+                EquipmentSlot.FEET
+        });
+    }
     protected void onDeath(@NotNull EnchantmentContext ctx, int pieceLevel) {
     }
     protected void onDefendHighest(@NotNull EnchantmentContext ctx, int level) {
@@ -142,12 +159,6 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
     }
 
     public static class ServerEventHandler {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

@@ -3,13 +3,13 @@ package pers.roinflam.carianstyle.enchantment.combatskill;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.neoforged.bus.api.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
@@ -35,6 +35,15 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  * @author RoinFlam
  * @version 2.1
  */
+@AutoRegisterEnchantment(
+        id = "quickstep",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantTarget.ARMOR_FEET,
+        slots = {EquipmentSlot.FEET},
+        baseEnchantability = 25,
+        levelMultiplier = 30
+)
 @Deprecated
 public class EnchantmentQuickstep extends EnchantmentBase {
     private static final String VALUE_ID = "quickstep";
@@ -44,11 +53,8 @@ public class EnchantmentQuickstep extends EnchantmentBase {
                     5.0D, 1.0D, 100.0D);
     private static final EnchantmentValues.Handle SPEED_DURATION_TICKS = EnchantmentValues.define(VALUE_ID, "speed_duration_ticks",
                     6, 1, 200);
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
+    public EnchantmentQuickstep() {
+        super(EnchantTarget.ARMOR_FEET, new EquipmentSlot[]{EquipmentSlot.FEET});
     }
 }
 

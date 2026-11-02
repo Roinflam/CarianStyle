@@ -2,11 +2,11 @@ package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
@@ -21,6 +21,15 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * @author RoinFlam
  * @version 2.0
  */
+@AutoRegisterEnchantment(
+        id = "crucible_knot_talisman",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.ARMOR_CHEST,
+        slots = {EquipmentSlot.CHEST},
+        baseEnchantability = 20,
+        levelMultiplier = 15
+)
 @Deprecated
 public class EnchantmentCrucibleKnotTalisman extends EnchantmentBase {
     private static final String VALUE_ID = "crucible_knot_talisman";
@@ -28,13 +37,10 @@ public class EnchantmentCrucibleKnotTalisman extends EnchantmentBase {
                     10, 1, 100);
     private static final EnchantmentValues.Handle REDUCTION_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "reduction_per_level",
                     0.25D, 0.0D, 1.0D);
+    public EnchantmentCrucibleKnotTalisman() {
+        super(EnchantTarget.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
+    }
     protected void onHurtAsVictim(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

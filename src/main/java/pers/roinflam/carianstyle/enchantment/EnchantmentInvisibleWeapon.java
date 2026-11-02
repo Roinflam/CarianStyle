@@ -9,13 +9,14 @@ import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E4)
@@ -53,6 +54,16 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * @author RoinFlam
  * @version 2.1
  */
+@AutoRegisterEnchantment(
+        id = "invisible_weapon",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.ARMS,
+        slots = {EquipmentSlot.MAINHAND},
+        forceTreasure = true,
+        baseEnchantability = 20,
+        levelMultiplier = 10
+)
 @Deprecated
 public class EnchantmentInvisibleWeapon extends EnchantmentBase {
     private static final String VALUE_ID = "invisible_weapon";
@@ -60,16 +71,17 @@ public class EnchantmentInvisibleWeapon extends EnchantmentBase {
                     2, 0, 20);
     private static final EnchantmentValues.Handle STEALTH_TICKS_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "stealth_ticks_per_level",
                     20, 1, 400);
+    public EnchantmentInvisibleWeapon() {
+        super(CarianStyleEnchantments.getCustomEnchantmentCategory("ARMS"),
+                new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onDamageAsAttackerHighest(@NotNull EnchantmentContext ctx, int level) {
     }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
-    }
-    protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        return false;
+    @Override
+    protected boolean checkCompatibility(@NotNull EnchantKey ench) {
+        return super.checkCompatibility(ench)
+                && !ench.isOf(EnchantmentEmptyEpilepsyFire.class)
+                && !ench.isOf(EnchantmentHypnoticArrow.class);
     }
 }
 

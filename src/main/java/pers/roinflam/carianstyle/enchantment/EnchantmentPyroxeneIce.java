@@ -6,16 +6,17 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.Enchantments;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E4)
@@ -38,21 +39,31 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
  * @author RoinFlam
  * @version 2.1
  */
+@AutoRegisterEnchantment(
+        id = "pyroxene_ice",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.UNCOMMON,
+        type = EnchantTarget.BOW,
+        slots = {EquipmentSlot.MAINHAND},
+        baseEnchantability = 15,
+        levelMultiplier = 10
+        // v2.1修复：移除 conflictsWith = {Enchantments.class}，该配置无效
+        // 与火矢(FLAMING_ARROWS)的互斥通过下方 checkCompatibility 方法实现
+)
 @Deprecated
 public class EnchantmentPyroxeneIce extends EnchantmentBase {
     private static final String VALUE_ID = "pyroxene_ice";
     private static final EnchantmentValues.Handle EFFECT_SECONDS = EnchantmentValues.define(VALUE_ID, "effect_seconds",
                     10, 1, 300);
+    public EnchantmentPyroxeneIce() {
+        super(EnchantTarget.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onHurtAsAttackerHighest(@NotNull EnchantmentContext ctx, int level) {
     }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
-    }
-    protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        return false;
+    @Override
+    protected boolean checkCompatibility(@NotNull EnchantKey ench) {
+        // 与火矢互斥
+        return super.checkCompatibility(ench) && !ench.is(Enchantments.FLAME);
     }
 }
 

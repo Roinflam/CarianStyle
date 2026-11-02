@@ -2,12 +2,12 @@ package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 import java.util.List;
@@ -44,6 +44,15 @@ import java.util.List;
  * @author RoinFlam
  * @version 2.3
  */
+@AutoRegisterEnchantment(
+        id = "fire_devoured",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        baseEnchantability = 10,
+        levelMultiplier = 15
+)
 @Deprecated
 public class EnchantmentFireDevoured extends EnchantmentBase {
     private static final String VALUE_ID = "fire_devoured";
@@ -57,13 +66,10 @@ public class EnchantmentFireDevoured extends EnchantmentBase {
                     0.15D, 0.0D, 5.0D);
     private static final EnchantmentValues.Handle IGNITE_SECONDS = EnchantmentValues.define(VALUE_ID, "ignite_seconds",
                     10, 1, 300);
+    public EnchantmentFireDevoured() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onDamageAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

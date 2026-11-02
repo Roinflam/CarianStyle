@@ -6,6 +6,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.living.LivingHealEvent;
@@ -19,14 +20,15 @@ import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.EnchantmentDarkMoon;
 import pers.roinflam.carianstyle.enchantment.EnchantmentHealingByFire;
 import pers.roinflam.carianstyle.enchantment.EnchantmentShelterOfFire;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
 import java.util.UUID;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E2)
@@ -63,6 +65,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
  *
  * @version 2.5
  */
+@AutoRegisterEnchantment(id = "full_moon", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantTarget.ARMOR_CHEST, slots = {EquipmentSlot.CHEST}, conflictsWith = {EnchantmentHealingByFire.class, EnchantmentShelterOfFire.class}, baseEnchantability = 35, levelMultiplier = 0)
 @Deprecated
 public class EnchantmentFullMoon extends EnchantmentBase {
     private static final String FULL_MOON_STATE_KEY = "full_moon_state";
@@ -70,14 +73,13 @@ public class EnchantmentFullMoon extends EnchantmentBase {
     private static final int RECOLLECT_ENCHANTABILITY = 35;
     private static final int HEAL_DURATION_TICKS = 200;
     private static final int HEAL_DURATION_TICKS_DARK_MOON = 400;
-    protected boolean checkCompatibility(Enchantment ench) {
-        return false;
+    public EnchantmentFullMoon() {
+        super(EnchantTarget.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
-    public int getMinCost(int l) {
-        return 0;
-    }
-    public int getMaxCost(int l) {
-        return 0;
+    @Override
+    protected boolean checkCompatibility(EnchantKey ench) {
+        if (ench.isOf(EnchantmentTimeReversal.class)) return false;
+        return super.checkCompatibility(ench);
     }
 }
 

@@ -5,6 +5,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -16,6 +17,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
@@ -55,6 +57,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
  *
  * @version 2.3
  */
+@AutoRegisterEnchantment(id = "broken_star", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantTarget.WEAPON, slots = {EquipmentSlot.MAINHAND}, baseEnchantability = 35, levelMultiplier = 0)
 @Deprecated
 public class EnchantmentBrokenStar extends EnchantmentBase {
     private static final String VALUE_ID = "broken_star";
@@ -69,11 +72,8 @@ public class EnchantmentBrokenStar extends EnchantmentBase {
     private static final EnchantmentValues.Handle DEFENSE_MULTIPLIER_DAY = EnchantmentValues.define(VALUE_ID, "defense_multiplier_day",
                     0.75D, 0.0D, 2.0D);
     private static final int RECOLLECT_ENCHANTABILITY = 35;
-    public int getMinCost(int l) {
-        return 0;
-    }
-    public int getMaxCost(int l) {
-        return 0;
+    public EnchantmentBrokenStar() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 }
 

@@ -6,6 +6,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
 import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
@@ -21,7 +22,9 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E3)
@@ -96,6 +99,19 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 2.2
  */
+@AutoRegisterEnchantment(
+        id = "black_flame_shelter",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.ARMOR_CHEST,
+        slots = {EquipmentSlot.CHEST},
+        conflictsWith = {
+                EnchantmentShelterOfFire.class,
+                EnchantmentHealingByFire.class
+        },
+        baseEnchantability = 20,
+        levelMultiplier = 15
+)
 @Deprecated
 public class EnchantmentBlackFlameShelter extends EnchantmentBase {
     private static final String VALUE_ID = "black_flame_shelter";
@@ -106,14 +122,15 @@ public class EnchantmentBlackFlameShelter extends EnchantmentBase {
     private static final EnchantmentValues.Handle PROJECTILE_REDUCTION_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "projectile_reduction_per_level",
                     0.25D, 0.0D, 0.5D);
     public static final int MAX_EFFECTIVE_LEVEL = 7;
-    protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        return false;
+    public EnchantmentBlackFlameShelter() {
+        super(EnchantTarget.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
+    @Override
+    protected boolean checkCompatibility(@NotNull EnchantKey ench) {
+        if (ench.is(Enchantments.PROTECTION)) {
+            return false;
+        }
+        return super.checkCompatibility(ench);
     }
 }
 

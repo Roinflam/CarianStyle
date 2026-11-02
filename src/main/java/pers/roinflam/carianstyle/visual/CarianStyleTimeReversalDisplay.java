@@ -10,6 +10,8 @@ import pers.roinflam.carianstyle.utils.Reference;
 import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
+ * PORT-STUB(V2)
+ *
  * 时间逆转「储存伤害」的 HUD 叠层注册（双端通用）。
  *
  * <h3>它显示什么，为什么值得单独占一行</h3>
@@ -76,106 +78,13 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 1.1
  */
-@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
+@Deprecated
 public final class CarianStyleTimeReversalDisplay {
-
-    /**
-     * 「回溯储存」的叠层序列号。
-     * <p>{@code CarianStyleStackDisplays} 已用到 1~22，故本项取 23；
-     * {@link CarianStyleFireStyleDisplay} 占 24。新增其它显示项请从 25 起。</p>
-     */
     public static final int TIME_REVERSAL_STORED = 23;
-
-    /**
-     * 逆转期间累积伤害的数据键（值类型 {@code Float}）。
-     * <p>
-     * <b>必须与 {@code EnchantmentTimeReversal.REVERSAL_DAMAGE_KEY} 逐字一致</b>，
-     * 改动那边务必同步改这里，否则 HUD 会静默地永远读不到值（不会报错，只是永远不显示）。
-     * </p>
-     * <p>
-     * 复制一份字符串而不是把那边的常量提为 public，是沿用
-     * {@code CarianStyleStackDisplays} 的既有惯例——那边十余个 key 全部是这么做的，
-     * 且都在注释里标注了来源。保持一致比引入一种新写法更好维护。
-     * </p>
-     */
     private static final String REVERSAL_DAMAGE_KEY = "time_reversal_damage";
-
-    /**
-     * 名称翻译键。
-     * <p>需要在 {@code zh_cn.json} 中补上，否则 HUD 会直接显示这个原始键名。</p>
-     */
     private static final String STORED_NAME_KEY = "carianstyle.hud.time_reversal_stored";
-
-    /**
-     * 主题色（苍白金）。
-     * <p>刻意比冷却项的 {@code 0xB8902A} 亮且偏白——二者在逆转期间会同屏显示，
-     * 需要一眼分得开（详见类注释）。</p>
-     */
     private static final int STORED_COLOR = 0xF0E0B0;
-
-    /** 防止重复注册（{@code register} 抛 IllegalArgumentException 会打断整个 setup） */
-    private static boolean initialized = false;
-
     private CarianStyleTimeReversalDisplay() {
     }
-
-    /**
-     * 公共初始化阶段注册显示项。
-     * <p>
-     * 用 {@code enqueueWork} 而非直接注册：{@link FMLCommonSetupEvent} 的监听器
-     * 可能并行执行，而 {@code StackDisplayRegistry} 内部是普通 {@code ArrayList} /
-     * {@code HashMap}，并发写入会损坏结构。{@code enqueueWork} 保证在主线程串行执行。
-     * </p>
-     *
-     * @param event 公共初始化事件
-     */
-    @SubscribeEvent
-    public static void onCommonSetup(FMLCommonSetupEvent event) {
-        event.enqueueWork(CarianStyleTimeReversalDisplay::register);
-    }
-
-    /**
-     * 实际注册逻辑。重复调用安全。
-     */
-    private static void register() {
-        if (initialized) {
-            return;
-        }
-        initialized = true;
-
-        StackDisplayRegistry.register(
-                TIME_REVERSAL_STORED,
-                new StackDisplayRegistry.Info(STORED_NAME_KEY, STORED_COLOR),
-                (player, ctx) -> {
-                    // 门控：护甲上没带时间逆转就不显示。
-                    // 用护甲口径而非主手 —— 时间逆转是 ARMOR_CHEST 附魔，
-                    // 拿在手上不生效，视觉上也不该显示
-                    Enchantment timeReversal = resolveTimeReversal();
-                    if (timeReversal == null || ctx.armorMaxLevel(timeReversal) <= 0) {
-                        return StackDisplayRegistry.Stacks.NONE;
-                    }
-                    Float stored = EnchantmentDataManager.getData(REVERSAL_DAMAGE_KEY, player.getUUID());
-                    if (stored == null || stored <= 0f) {
-                        // 未处于逆转状态、或刚触发还没挨打：不显示
-                        return StackDisplayRegistry.Stacks.NONE;
-                    }
-                    // max 填 0：储存伤害无上限，画进度条会骗人（详见类注释）
-                    return new StackDisplayRegistry.Stacks(Math.round(stored), 0);
-                });
-    }
-
-    /**
-     * 解析时间逆转附魔对象。
-     * <p>
-     * 走 {@link EnchantmentRegistry#getEnchantmentByClass}（内部是 HashMap 查询，
-     * 本身已足够廉价），与 {@code CarianStyleStackDisplays} 中按类解析的写法一致，
-     * 无需像按 id 解析那样额外加缓存。
-     * </p>
-     *
-     * @return 附魔对象；未注册（如被 {@code uninstallEnchantment} 配置禁用）时返回 null，
-     *         此时本项不显示
-     */
-    private static Enchantment resolveTimeReversal() {
-        return EnchantmentRegistry.getEnchantmentByClass(EnchantmentTimeReversal.class);
-    }
 }
+

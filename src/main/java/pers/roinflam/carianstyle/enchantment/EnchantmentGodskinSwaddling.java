@@ -2,11 +2,11 @@ package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
@@ -25,6 +25,15 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * @author RoinFlam
  * @version 2.0
  */
+@AutoRegisterEnchantment(
+        id = "godskin_swaddling",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        baseEnchantability = 20,
+        levelMultiplier = 10
+)
 @Deprecated
 public class EnchantmentGodskinSwaddling extends EnchantmentBase {
     private static final String VALUE_ID = "godskin_swaddling";
@@ -37,13 +46,10 @@ public class EnchantmentGodskinSwaddling extends EnchantmentBase {
     private static final EnchantmentValues.Handle HEAL_PER_EXTRA_LEVEL = EnchantmentValues.define(VALUE_ID, "heal_per_extra_level",
                     0.01D, 0.0D, 1.0D);
     private static final String ATTACK_COUNTER = "godskin_swaddling_attack";
+    public EnchantmentGodskinSwaddling() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onDamageAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

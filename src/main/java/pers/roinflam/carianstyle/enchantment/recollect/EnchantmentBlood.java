@@ -6,12 +6,12 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.EnchantmentBloodCollection;
 import pers.roinflam.carianstyle.enchantment.EnchantmentBloodSlash;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
@@ -21,10 +21,12 @@ import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import java.util.UUID;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 
 /**
  * PORT-STUB(E2)
  * 血附魔 - 修复: getUsedItemHand -> InteractionHand.MAIN_HAND @version 2.1 */
+@AutoRegisterEnchantment(id = "blood", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantTarget.WEAPON, slots = {EquipmentSlot.MAINHAND}, baseEnchantability = 35, levelMultiplier = 0)
 @Deprecated
 public class EnchantmentBlood extends EnchantmentBase {
     private static final String VALUE_ID = "blood";
@@ -42,13 +44,10 @@ public class EnchantmentBlood extends EnchantmentBase {
                     6000, 20, 72000);
     private static final String ATTACK_COUNT_KEY = "blood_attack_count";
     private static final int RECOLLECT_ENCHANTABILITY = 35;
+    public EnchantmentBlood() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onHurtAsAttackerLow(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int l) {
-        return 0;
-    }
-    public int getMaxCost(int l) {
-        return 0;
     }
 }
 

@@ -9,6 +9,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
 import net.neoforged.bus.api.EventPriority;
@@ -18,10 +19,10 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
@@ -37,6 +38,15 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 2.3
  */
+@AutoRegisterEnchantment(
+        id = "sky_shot",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.BOW,
+        slots = {EquipmentSlot.MAINHAND},
+        baseEnchantability = 10,
+        levelMultiplier = 15
+)
 @Deprecated
 public class EnchantmentSkyShot extends EnchantmentBase {
     private static final String VALUE_ID = "sky_shot";
@@ -46,11 +56,8 @@ public class EnchantmentSkyShot extends EnchantmentBase {
                     10, 1, 100);
     private static final EnchantmentValues.Handle TARGET_HEALTH_DAMAGE = EnchantmentValues.define(VALUE_ID, "target_health_damage",
                     0.1D, 0.0D, 1.0D);
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
+    public EnchantmentSkyShot() {
+        super(EnchantTarget.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 }
 

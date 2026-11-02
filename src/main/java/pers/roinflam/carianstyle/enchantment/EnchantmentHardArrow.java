@@ -7,6 +7,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.phys.EntityHitResult;
@@ -19,14 +20,15 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 import java.util.List;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E4)
@@ -55,6 +57,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
  *
  * @version 2.4
  */
+@AutoRegisterEnchantment(id = "hard_arrow", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.UNCOMMON, type = EnchantTarget.BOW, slots = {EquipmentSlot.MAINHAND}, baseEnchantability = 5, levelMultiplier = 10)
 @Deprecated
 public class EnchantmentHardArrow extends EnchantmentBase {
     private static final String VALUE_ID = "hard_arrow";
@@ -66,16 +69,11 @@ public class EnchantmentHardArrow extends EnchantmentBase {
                     0.75D, 0.0D, 10.0D);
     private static final EnchantmentValues.Handle AOE_RADIUS = EnchantmentValues.define(VALUE_ID, "aoe_radius",
                     12, 1, 64);
+    public EnchantmentHardArrow() {
+        super(EnchantTarget.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onHurtAsVictimHighest(@NotNull EnchantmentContext ctx, int level) {
     }
-    public int getMinCost(int l) {
-        return 0;
-    }
-    public int getMaxCost(int l) {
-        return 0;
-    }
-    protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        return false;
-    }
+    @Override protected boolean checkCompatibility(@NotNull EnchantKey ench) { return super.checkCompatibility(ench) && !ench.is(Enchantments.POWER); }
 }
 

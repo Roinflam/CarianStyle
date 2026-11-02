@@ -4,6 +4,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
@@ -14,7 +15,6 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
@@ -23,7 +23,9 @@ import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E2)
@@ -89,6 +91,15 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 2.4
  */
+@AutoRegisterEnchantment(
+        id = "time_reversal",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantTarget.ARMOR_CHEST,
+        slots = {EquipmentSlot.CHEST},
+        baseEnchantability = 35,
+        levelMultiplier = 0
+)
 @Deprecated
 public class EnchantmentTimeReversal extends EnchantmentBase {
     private static final String VALUE_ID = "time_reversal";
@@ -105,17 +116,21 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
     private static final int RECOLLECT_ENCHANTABILITY = 35;
     private static final ThreadLocal<Boolean> PROCESSING_REFLECT = ThreadLocal.withInitial(() -> Boolean.FALSE);
     private static final Set<UUID> REVERSING = ConcurrentHashMap.newKeySet();
+    public EnchantmentTimeReversal() {
+        super(EnchantTarget.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
+    }
     public static boolean isReversing(@NotNull LivingEntity entity) {
         return false;
     }
-    protected boolean checkCompatibility(Enchantment ench) {
-        return false;
+    @Override
+    protected boolean checkCompatibility(EnchantKey ench) {
+        if (isDeadEnchantment(ench)) {
+            return false;
+        }
+        return super.checkCompatibility(ench);
     }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
+    private boolean isDeadEnchantment(EnchantKey ench) {
+        return ench.isOf(EnchantmentFullMoon.class) || ench.isOf(EnchantmentLivingCorpse.class);
     }
 }
 

@@ -3,6 +3,7 @@ package pers.roinflam.carianstyle.enchantment.dead;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.level.Level;
 import org.apache.commons.lang3.RandomUtils;
 import org.jetbrains.annotations.NotNull;
@@ -11,7 +12,6 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
@@ -121,6 +121,15 @@ import java.util.List;
  * @author RoinFlam
  * @version 3.2
  */
+@AutoRegisterEnchantment(
+        id = "ancient_dragon_lightning",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.DEAD,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.ARMOR_CHEST,
+        slots = {EquipmentSlot.CHEST},
+        baseEnchantability = 36,
+        levelMultiplier = 20
+)
 @Deprecated
 public class EnchantmentAncientDragonLightning extends EnchantmentBase {
     private static final String VALUE_ID = "ancient_dragon_lightning";
@@ -142,13 +151,10 @@ public class EnchantmentAncientDragonLightning extends EnchantmentBase {
                     4, 1, 100);
     private static final EnchantmentValues.Handle MAGNIFICATION_MID = EnchantmentValues.define(VALUE_ID, "magnification_mid",
                     2, 1, 100);
+    public EnchantmentAncientDragonLightning() {
+        super(EnchantTarget.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
+    }
     protected void onDeath(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

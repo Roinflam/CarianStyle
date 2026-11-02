@@ -7,6 +7,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
 import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
@@ -18,13 +19,14 @@ import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 import java.util.UUID;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E2)
@@ -51,6 +53,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
  *
  * @version 2.3
  */
+@AutoRegisterEnchantment(id = "golden_law", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantTarget.WEAPON, slots = {EquipmentSlot.MAINHAND}, baseEnchantability = 35, levelMultiplier = 0)
 @Deprecated
 public class EnchantmentGoldenLaw extends EnchantmentBase {
     private static final String VALUE_ID = "golden_law";
@@ -66,14 +69,12 @@ public class EnchantmentGoldenLaw extends EnchantmentBase {
                     100, 1, 12000);
     private static final String IMMUNITY_COOLDOWN_KEY = "golden_law_immunity";
     private static final int RECOLLECT_ENCHANTABILITY = 35;
-    protected boolean checkCompatibility(Enchantment ench) {
-        return false;
+    public EnchantmentGoldenLaw() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
-    public int getMinCost(int l) {
-        return 0;
-    }
-    public int getMaxCost(int l) {
-        return 0;
+    @Override protected boolean checkCompatibility(EnchantKey ench) {
+        if (ench.enchantClass().getPackage().getName().contains("law") && ench.base() != this) return false;
+        return super.checkCompatibility(ench);
     }
 }
 

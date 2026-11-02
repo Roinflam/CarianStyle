@@ -2,11 +2,11 @@ package pers.roinflam.carianstyle.enchantment.combatskill;
 
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
@@ -42,6 +42,15 @@ import java.util.List;
  * @author RoinFlam
  * @version 2.1
  */
+@AutoRegisterEnchantment(
+        id = "vowed_revenge",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        baseEnchantability = 10,
+        levelMultiplier = 10
+)
 @Deprecated
 public class EnchantmentVowedRevenge extends EnchantmentBase {
     private static final String VALUE_ID = "vowed_revenge";
@@ -52,13 +61,10 @@ public class EnchantmentVowedRevenge extends EnchantmentBase {
     private static final EnchantmentValues.Handle REVENGE_DAMAGE_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "revenge_damage_per_level",
                     0.05D, 0.0D, 2.0D);
     private static final int MAX_COUNTED_TARGETS = 20;
+    public EnchantmentVowedRevenge() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

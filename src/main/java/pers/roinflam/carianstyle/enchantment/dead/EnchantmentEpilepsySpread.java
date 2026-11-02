@@ -8,6 +8,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.neoforged.neoforge.event.entity.living.LivingEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -17,7 +18,6 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
@@ -102,6 +102,15 @@ import pers.roinflam.carianstyle.event.LivingTickEvent;
  * @author RoinFlam
  * @version 3.1
  */
+@AutoRegisterEnchantment(
+        id = "epilepsy_spread",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.DEAD,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.ARMOR,
+        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET},
+        baseEnchantability = 36,
+        levelMultiplier = 20
+)
 @Deprecated
 public class EnchantmentEpilepsySpread extends EnchantmentBase {
     private static final String VALUE_ID = "epilepsy_spread";
@@ -128,6 +137,14 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
     private static final EnchantmentValues.Handle TARGET_DOT_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "target_dot_per_level",
                     0.3D, 0.0D, 2.0D);
     private static final String PENDING_DEATH_KEY = "epilepsy_spread_pending_death";
+    public EnchantmentEpilepsySpread() {
+        super(EnchantTarget.ARMOR, new EquipmentSlot[]{
+                EquipmentSlot.HEAD,
+                EquipmentSlot.CHEST,
+                EquipmentSlot.LEGS,
+                EquipmentSlot.FEET
+        });
+    }
     protected void onDamageAsVictimLowest(@NotNull EnchantmentContext ctx, int pieceLevel) {
     }
     protected void onDefendHighest(@NotNull EnchantmentContext ctx, int level) {
@@ -137,12 +154,6 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
     }
 
     public static class ServerEventHandler {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

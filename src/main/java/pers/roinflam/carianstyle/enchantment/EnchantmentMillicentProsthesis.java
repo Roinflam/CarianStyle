@@ -3,11 +3,11 @@ package pers.roinflam.carianstyle.enchantment;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
@@ -30,6 +30,24 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * @author RoinFlam
  * @version 2.0
  */
+@AutoRegisterEnchantment(
+        id = "millicent_prosthesis",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        conflictsWith = {
+                EnchantmentScarletCorruption.class,
+                EnchantmentFireGivesPower.class,
+                EnchantmentFireDevoured.class,
+                EnchantmentVicDragonThunder.class,
+                EnchantmentDarkMoon.class,
+                EnchantmentRedFeatheredBranchsword.class,
+                EnchantmentBlueFeatheredBranchsword.class
+        },
+        baseEnchantability = 30,
+        levelMultiplier = 25
+)
 @Deprecated
 public class EnchantmentMillicentProsthesis extends EnchantmentBase {
     private static final String VALUE_ID = "millicent_prosthesis";
@@ -37,15 +55,12 @@ public class EnchantmentMillicentProsthesis extends EnchantmentBase {
                     0.1D, 0.0D, 5.0D);
     private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL_PARTIAL = EnchantmentValues.define(VALUE_ID, "damage_per_level_partial",
                     0.05D, 0.0D, 5.0D);
+    public EnchantmentMillicentProsthesis() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onAttackLowest(@NotNull EnchantmentContext ctx, int level) {
     }
     protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

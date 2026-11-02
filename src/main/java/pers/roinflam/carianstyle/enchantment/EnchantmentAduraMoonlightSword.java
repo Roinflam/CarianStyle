@@ -3,11 +3,11 @@ package pers.roinflam.carianstyle.enchantment;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
@@ -41,6 +41,22 @@ import java.util.List;
  * @author RoinFlam
  * @version 2.2
  */
+@AutoRegisterEnchantment(
+        id = "adura_moonlight_sword",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        conflictsWith = {
+                EnchantmentEpilepsyFire.class,
+                EnchantmentEatShit.class,
+                EnchantmentHypnoticSmoke.class,
+                EnchantmentFireGivesPower.class,
+                EnchantmentFireDevoured.class
+        },
+        baseEnchantability = 30,
+        levelMultiplier = 10
+)
 @Deprecated
 public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
     private static final String VALUE_ID = "adura_moonlight_sword";
@@ -54,13 +70,10 @@ public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
                     200, 20, 6000);
     private static final EnchantmentValues.Handle FROSTBITE_MAX_AMPLIFIER = EnchantmentValues.define(VALUE_ID, "frostbite_max_amplifier",
                     9, 0, 127);
+    public EnchantmentAduraMoonlightSword() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

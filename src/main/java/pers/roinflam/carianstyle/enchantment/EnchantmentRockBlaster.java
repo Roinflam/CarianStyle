@@ -27,8 +27,11 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import java.util.*;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
+import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
  * PORT-STUB(E4)
@@ -67,6 +70,18 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 3.2
  */
+@AutoRegisterEnchantment(
+        id = "rock_blaster",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
+        rarity = EnchantmentRarity.RARE,
+        type = EnchantTarget.PICKAXE,
+        slots = {EquipmentSlot.MAINHAND},
+        forceTreasure = true,
+        conflictsWith = {},
+        baseEnchantability = 30,
+        levelMultiplier = 35
+        // v3.2：DIGGER（镐斧锹锄）→ PICKAXE（仅镐），与下方 onBreak 的 PickaxeItem 判定一致
+)
 @Deprecated
 public class EnchantmentRockBlaster extends EnchantmentBase {
     private static final String VALUE_ID = "rock_blaster";
@@ -93,14 +108,13 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
             "minecraft:blackstone",
             "minecraft:end_stone"
     );
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
+    public EnchantmentRockBlaster() {
+        super(CarianStyleEnchantments.getCustomEnchantmentCategory("PICKAXE"),
+                new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
-    }
-    protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        return false;
+    @Override
+    protected boolean checkCompatibility(@NotNull EnchantKey ench) {
+        return super.checkCompatibility(ench) && !ench.is(Enchantments.UNBREAKING);
     }
 }
 

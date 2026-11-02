@@ -2,11 +2,11 @@ package pers.roinflam.carianstyle.enchantment.recollect;
 
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
@@ -43,6 +43,15 @@ import pers.roinflam.carianstyle.utils.util.BossUtil;
  * @author RoinFlam
  * @version 3.1
  */
+@AutoRegisterEnchantment(
+        id = "doomed_death",
+        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT,
+        rarity = EnchantmentRarity.VERY_RARE,
+        type = EnchantTarget.WEAPON,
+        slots = {EquipmentSlot.MAINHAND},
+        baseEnchantability = 38,
+        levelMultiplier = 0
+)
 @Deprecated
 public class EnchantmentDoomedDeath extends EnchantmentBase {
     private static final String VALUE_ID = "doomed_death";
@@ -64,13 +73,10 @@ public class EnchantmentDoomedDeath extends EnchantmentBase {
                     0.1D, 0.0D, 0.9D);
     private static final EnchantmentValues.Handle BOSS_MULTIPLIER = EnchantmentValues.define(VALUE_ID, "boss_multiplier",
                     0.5D, 0.0D, 1.0D);
+    public EnchantmentDoomedDeath() {
+        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+    }
     protected void onHurtAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
-    }
-    public int getMinCost(int enchantmentLevel) {
-        return 0;
-    }
-    public int getMaxCost(int enchantmentLevel) {
-        return 0;
     }
 }
 

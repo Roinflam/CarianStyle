@@ -6,6 +6,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -18,13 +19,13 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.block.light.HideLight;
-import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleBlocks;
 import pers.roinflam.carianstyle.tileentity.MoveLight;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
@@ -91,6 +92,7 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  *
  * @version 2.2
  */
+@AutoRegisterEnchantment(id = "starlight", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.UNCOMMON, type = EnchantTarget.ARMOR, slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}, baseEnchantability = 23, levelMultiplier = 9)
 @Deprecated
 public class EnchantmentStarlight extends EnchantmentBase {
     private static final String VALUE_ID = "starlight";
@@ -102,14 +104,11 @@ public class EnchantmentStarlight extends EnchantmentBase {
                     15, 1, 15);
     private static final int LIGHT_BLOCK_FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
     private static final Map<UUID, ArmorScanCache> SCAN_CACHE = new ConcurrentHashMap<>();
+    public EnchantmentStarlight() {
+        super(EnchantTarget.ARMOR, new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET});
+    }
 
     private static final class ArmorScanCache {
-    }
-    public int getMinCost(int l) {
-        return 0;
-    }
-    public int getMaxCost(int l) {
-        return 0;
     }
 }
 
