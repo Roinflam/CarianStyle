@@ -23,7 +23,7 @@ import java.util.Arrays;
 /**
  * 客户端特效开关（纯客户端，默认全开）。
  *
- * <h3>为什么用普通 JSON 而不是 Forge 的 CLIENT 配置</h3>
+ * <h3>为什么用普通 JSON 而不是 NeoForge 的 CLIENT 配置</h3>
  * <p>
  * 这个开关会在<b>渲染热路径</b>上每帧被查询 20 多次
  * （每个渲染器一次）。{@code ModConfigSpec.BooleanValue#get()} 内部有

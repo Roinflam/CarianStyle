@@ -39,8 +39,10 @@ import pers.roinflam.carianstyle.network.StealthHitboxSyncHelper;
  *     <li><b>碰撞箱</b>：{@code renderHitbox} 的 HEAD 注入，实体挂着
  *         {@link StealthHitboxSyncHelper#STEALTH_HITBOX_SERIAL}（序列号 19）时取消。
  *         该序列号只在服务端配置 {@code hideStealthHitbox} 打开时下发，客户端不读任何配置。
- *         取消的是整个 {@code renderHitbox}：白色碰撞箱、红色眼高线、蓝色视线向量一并不画。
- *         该方法只在 F3+B 打开时才会被调用。</li>
+ *         取消的是整个 {@code renderHitbox}：白色碰撞箱、红色眼高线、蓝色视线向量一并不画；
+ *         多部件实体的子部件框也在这个方法里循环画，一起不画。
+ *         该方法只在 F3+B 打开时才会被调用（单人游戏另有一路画内置服务端那份实体的碰撞箱，
+ *         同样走这个方法、实体编号相同，也一起取消）。</li>
  *     <li><b>影子</b>：{@code renderShadow} 的 HEAD 注入，实体挂着
  *         {@link ClientSyncStealthRenderer#STEALTH_SERIAL}（序列号 4，与隐藏模型同一个）且是玩家时取消。
  *         只管玩家是因为模型隐藏只作用于玩家——序列号 4 对带隐身的怪物也会下发，
@@ -56,14 +58,14 @@ import pers.roinflam.carianstyle.network.StealthHitboxSyncHelper;
  *
  * <h3>映射说明</h3>
  * <p>
- * 目标是原版类，未写 {@code remap = false}：方法名用 Mojmap 的 {@code renderHitbox} / {@code renderShadow}，
- * Loom 在 remapJar 时直接把注解字符串改写成 SRG 名 {@code m_114441_} / {@code m_114457_}
- * （jar 里没有 refmap 文件，这是正常的）。描述符里的类名一律是 Mojmap。
- * 两个目标的签名已对照 1.20.1 / Forge 47.4.13 的字节码与客户端 SRG jar 核实：
+ * NeoForge 1.21.1 运行期就是 Mojmap，不做任何名字重映射（也没有 refmap），方法名和描述符照 Mojmap 原样写。
+ * 两个目标在 1.21.1 / NeoForge 21.1.265 的签名：
  * </p>
  * <ul>
- *     <li>{@code private static void renderHitbox(PoseStack, VertexConsumer, Entity, float)}</li>
- *     <li>{@code private static void renderShadow(PoseStack, MultiBufferSource, Entity, float, float, LevelReader, float)}</li>
+ *     <li>{@code private static void renderHitbox(PoseStack, VertexConsumer, Entity, float, float, float, float)}——
+ *         比 1.20.1 多了末尾三个 float（碰撞箱线框的 RGB：普通实体白色，单人游戏里内置服务端那份是绿色），
+ *         所以描述符从 {@code ...Entity;F)V} 改成了 {@code ...Entity;FFFF)V}；</li>
+ *     <li>{@code private static void renderShadow(PoseStack, MultiBufferSource, Entity, float, float, LevelReader, float)}——没变。</li>
  * </ul>
  * <p>
  * 目标都是静态方法，所以注入处理器也必须是 {@code static}。
@@ -72,7 +74,7 @@ import pers.roinflam.carianstyle.network.StealthHitboxSyncHelper;
  * <h3>为什么放在 client 列表</h3>
  * <p>
  * {@link EntityRenderDispatcher} 是纯客户端类，物理服务端不存在；
- * 放在 {@code client} 数组中，Mohist 等混合端的服务端根本不会尝试加载本 Mixin。
+ * 放在 {@code client} 数组中，物理服务端根本不会尝试加载本 Mixin。
  * </p>
  *
  * @author RoinFlam
@@ -88,15 +90,19 @@ public class MixinEntityRenderDispatcher {
      * @param buffer       线框顶点缓冲
      * @param entity       正在绘制碰撞箱的实体
      * @param partialTicks 部分 tick
+     * @param red          线框颜色 R
+     * @param green        线框颜色 G
+     * @param blue         线框颜色 B
      * @param ci           回调信息（用于取消原版方法）
      */
     @Inject(
-            method = "renderHitbox(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/world/entity/Entity;F)V",
+            method = "renderHitbox(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/world/entity/Entity;FFFF)V",
             at = @At("HEAD"),
             cancellable = true
     )
     private static void carianstyle$hideStealthHitbox(PoseStack poseStack, VertexConsumer buffer,
-                                                      Entity entity, float partialTicks, CallbackInfo ci) {
+                                                      Entity entity, float partialTicks,
+                                                      float red, float green, float blue, CallbackInfo ci) {
         if (ClientSyncEffectManager.shouldRenderEffect(
                 StealthHitboxSyncHelper.STEALTH_HITBOX_SERIAL, entity.getId())) {
             ci.cancel();

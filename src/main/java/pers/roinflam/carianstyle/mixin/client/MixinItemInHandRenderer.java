@@ -26,7 +26,7 @@ import pers.roinflam.carianstyle.visual.client.ShieldWardRenderer;
  * 不存在两套几何要同步维护的问题。
  * </p>
  *
- * <h3>为什么不能用 Forge 的 RenderHandEvent</h3>
+ * <h3>为什么不能用 NeoForge 的 RenderHandEvent</h3>
  * <p>
  * {@code RenderHandEvent} 在<b>手臂变换之前</b>触发，那时 PoseStack 还停在相机空间，
  * 拿不到盾牌被渲染出来的位置——用它画出来的东西会浮在屏幕正中央，
@@ -60,7 +60,7 @@ import pers.roinflam.carianstyle.visual.client.ShieldWardRenderer;
  * <p>
  * 两者都在正确的位置（{@code renderItem} 之后、{@code popPose} 之前），
  * 但 {@code PoseStack.popPose()} 的描述符是 {@code ()V}——<b>没有参数，
- * 不可能因为映射差异而对不上</b>；而 {@code renderItem} 的参数表里有
+ * 跨版本也不会对不上</b>；而 {@code renderItem} 的参数表里有
  * {@code ItemDisplayContext} 这类跨版本改过名的类型，风险高得多。
  * </p>
  * <p>
@@ -68,8 +68,9 @@ import pers.roinflam.carianstyle.visual.client.ShieldWardRenderer;
  * 用它做锚点还要处理 ordinal，反而更啰嗦。
  * </p>
  * <p>
- * <b>{@code remap = false} 是必需的</b>：{@code com.mojang.blaze3d} 下的类
- * 不参与混淆映射，标记 remap 会让 Mixin 去查一个不存在的映射项。
+ * 注入点上的 {@code remap = false} 是 1.20.1 留下来的写法（那时 {@code com.mojang.blaze3d}
+ * 下的类不参与混淆映射）。NeoForge 1.21.1 运行期就是 Mojmap、不做任何重映射，写不写都一样，保留不动。
+ * 目标方法签名 1.21.1 与 1.20.1 相同，方法里也仍只有一处 {@code popPose}。
  * </p>
  *
  * <h3>为什么用 @Inject 而不是 @Overwrite / @Redirect</h3>

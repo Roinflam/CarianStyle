@@ -11,8 +11,8 @@ import net.neoforged.api.distmarker.OnlyIn;
  *
  * <h3>为什么需要这个类</h3>
  * <p>
- * {@link VisualBatch} 那条渲染路径是「在 {@code RenderLevelStageEvent} 里自己开一个
- * {@link com.mojang.blaze3d.vertex.Tesselator} 批次」，它只在世界渲染阶段可用。
+ * {@link VisualBatch} 那条渲染路径是「在 {@code RenderLevelStageEvent} 里用自己的缓冲开一个
+ * 批次」，它只在世界渲染阶段可用。
  * 而把特效画到<b>手持物品</b>上时，我们处在实体渲染阶段，
  * 拿到的是原版给的 {@link net.minecraft.client.renderer.MultiBufferSource}，
  * 必须向它索取一个 {@code RenderType} 才能写顶点。
@@ -34,11 +34,12 @@ import net.neoforged.api.distmarker.OnlyIn;
  *
  * <h3>实现手法</h3>
  * <p>
- * {@code RenderType.create(...)} 与 {@code RenderStateShard.POSITION_COLOR_SHADER}
- * 都是 {@code protected}，只有 {@link RenderType} 的子类能访问。
- * 因此本类<b>继承 RenderType 纯粹是为了拿到访问权限</b>，
- * 从不实例化——构造函数存在只是因为 Java 要求，调用它是错误用法。
- * 这是 Minecraft 模组里注册自定义 RenderType 的标准做法。
+ * 1.20.1 里 {@code RenderType.create(...)} 与 {@code RenderStateShard.POSITION_COLOR_SHADER}
+ * 等状态常量都是 {@code protected}，只有 {@link RenderType} 的子类能访问，
+ * 所以本类<b>继承 RenderType 纯粹是为了拿到访问权限</b>。
+ * 1.21.1 上 NeoForge 的访问转换器已把两个 {@code create} 重载和 {@code RenderStateShard} 的常量都放宽成
+ * {@code public}，参数表和 1.20.1 一样；继承关系照旧保留，下面的常量就能不加类名前缀直接写，代码不用动。
+ * 本类从不实例化——构造函数存在只是因为 Java 要求，调用它是错误用法。
  * </p>
  *
  * <h3>状态选择的理由</h3>
@@ -80,8 +81,8 @@ public final class CarianStyleRenderTypes extends RenderType {
 
     /**
      * <b>禁止调用。</b>
-     * <p>本类继承 {@link RenderType} 只为取得对 {@code protected} 的
-     * {@code create} 与各 {@code RenderStateShard} 常量的访问权限，从不实例化。
+     * <p>本类继承 {@link RenderType} 只为直接引用 {@code create} 与各 {@code RenderStateShard} 常量
+     * （1.20.1 里它们是 {@code protected}），从不实例化。
      * 构造函数存在仅因 Java 语法要求。</p>
      *
      * @throws UnsupportedOperationException 恒抛出

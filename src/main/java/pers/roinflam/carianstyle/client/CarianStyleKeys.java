@@ -21,7 +21,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * <h3>为什么用两个 EventBusSubscriber</h3>
  * <p>
  * {@link RegisterKeyMappingsEvent} 走 <b>MOD</b> 总线（模组生命周期事件），
- * {@link TickEvent.ClientTickEvent} 走 <b>FORGE</b> 总线（游戏运行时事件），
+ * {@link ClientTickEvent.Post} 走<b>游戏</b>总线（运行时事件），
  * 二者不在同一条总线上，因此拆成外层类与内层类分别订阅。
  * </p>
  * <p>
@@ -69,7 +69,7 @@ public final class CarianStyleKeys {
     }
 
     /**
-     * 运行时按键处理（FORGE 总线）。
+     * 运行时按键处理（游戏总线）。
      */
     @EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
     public static final class Handler {
@@ -80,7 +80,7 @@ public final class CarianStyleKeys {
         /**
          * 客户端 tick：消费按键点击并打开界面。
          * <p>
-         * 只在 {@code Phase.END} 且当前没有其它界面打开时响应。
+         * 只在 tick 末尾（{@code ClientTickEvent.Post}）且当前没有其它界面打开时响应。
          * {@code consumeClick()} 会把积压的点击一次性取走，
          * 因此不会出现「按一下开两次」的问题。
          * </p>

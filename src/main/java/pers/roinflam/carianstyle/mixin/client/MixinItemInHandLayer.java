@@ -28,7 +28,7 @@ import pers.roinflam.carianstyle.visual.client.ShieldWardRenderer;
  *
  * <h3>为什么必须用 Mixin</h3>
  * <p>
- * Forge 为第一人称提供了 {@code RenderHandEvent}，但<b>第三人称的手持物品渲染没有任何事件</b>——
+ * NeoForge 为第一人称提供了 {@code RenderHandEvent}，但<b>第三人称的手持物品渲染没有任何事件</b>——
  * {@code ItemInHandLayer} 是 {@code LivingEntityRenderer} 的一个内部图层，
  * 既不发事件也不可替换。要在盾牌<b>自己的局部空间</b>里画东西，只能注入这里。
  * </p>
@@ -46,7 +46,7 @@ import pers.roinflam.carianstyle.visual.client.ShieldWardRenderer;
  * 因为原版在方法内部对物品变换所做的 push/pop 是配平的」——推理正好反了。
  * </p>
  * <p>
- * 目标方法在 1.20.1 的结构是：
+ * 目标方法的结构（1.21.1）：
  * </p>
  * <pre>
  * if (!stack.isEmpty()) {
@@ -56,7 +56,7 @@ import pers.roinflam.carianstyle.visual.client.ShieldWardRenderer;
  *     poseStack.mulPose(Axis.YP.rotationDegrees(180.0F));
  *     boolean flag = arm == HumanoidArm.LEFT;
  *     poseStack.translate((flag ? -1 : 1) / 16.0F, 0.125F, -0.625F);
- *     this.itemRenderer.renderStatic(entity, stack, displayContext, flag, poseStack, ...);
+ *     this.itemInHandRenderer.renderItem(entity, stack, displayContext, flag, poseStack, ...);
  *     poseStack.popPose();   // ← 就在方法末尾，方法体<b>内部</b>
  * }
  * </pre>
@@ -73,15 +73,14 @@ import pers.roinflam.carianstyle.visual.client.ShieldWardRenderer;
  * 该方法内 {@code popPose} 只出现一次，不存在选错调用点的问题。
  * </p>
  * <p>
- * <b>为什么不用 {@code renderStatic} 作锚点：</b>它就在 {@code popPose} 前一行，
- * 位置等价，但参数表里有 {@code ItemDisplayContext} 这类跨版本改过名的类型；
- * 而 {@code PoseStack.popPose()} 的描述符是 {@code ()V}——<b>没有参数，
- * 不可能因为映射差异而对不上</b>。第一人称那份补丁出于同样的理由选了 popPose，
+ * <b>为什么不用画物品那一行作锚点：</b>它就在 {@code popPose} 前一行，
+ * 位置等价，但参数表里有 {@code ItemDisplayContext} 这类跨版本改过名的类型；而 {@code PoseStack.popPose()} 的描述符是 {@code ()V}——<b>没有参数，
+ * 跨版本也不会对不上</b>。第一人称那份补丁出于同样的理由选了 popPose，
  * 两边保持一致。
  * </p>
  * <p>
- * <b>{@code remap = false} 是必需的</b>：{@code com.mojang.blaze3d} 下的类
- * 不参与混淆映射，标记 remap 会让 Mixin 去查一个不存在的映射项。
+ * 注入点上的 {@code remap = false} 是 1.20.1 留下来的写法（那时 {@code com.mojang.blaze3d}
+ * 下的类不参与混淆映射）。NeoForge 1.21.1 运行期就是 Mojmap、不做任何重映射，写不写都一样，保留不动。
  * </p>
  *
  * <h3>为什么不注入 HEAD</h3>
@@ -102,12 +101,12 @@ import pers.roinflam.carianstyle.visual.client.ShieldWardRenderer;
  * （配置里 {@code defaultRequire = 1}），而不是安静地不生效——后者要难查得多。
  * </p>
  * <p>
- * 该签名按 <b>Minecraft 1.20.1 官方（Mojang）映射</b>书写。
+ * 该签名按 Mojmap 书写，1.21.1 与 1.20.1 完全相同（目标仍是 {@code protected void renderArmWithItem}）。
  * 1.20 起原版把第三个参数的类型从 {@code ItemTransforms.TransformType}
  * 改成了 {@code ItemDisplayContext}，此处用的是后者。
  * </p>
  * <p>
- * <b>若启动时报 mixin apply 失败</b>，几乎可以肯定是这一行描述符与你的映射不符。
+ * <b>若启动时报 mixin apply 失败</b>，几乎可以肯定是这一行描述符与当前版本的签名不符。
  * 请在 IDE 里打开 {@code ItemInHandLayer} 核对
  * {@code renderArmWithItem} 的真实参数表，并同步修改
  * {@code method} 字符串与下方处理方法的形参——两处必须一致。

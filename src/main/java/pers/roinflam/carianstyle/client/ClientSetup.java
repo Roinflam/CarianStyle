@@ -6,7 +6,6 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import pers.roinflam.carianstyle.init.CarianStyleBlocks;
 import pers.roinflam.carianstyle.utils.Reference;
-import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 客户端渲染设置
