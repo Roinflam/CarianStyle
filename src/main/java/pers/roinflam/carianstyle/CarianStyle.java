@@ -250,8 +250,8 @@ public class CarianStyle {
         boolean isValid = true;
 
         if (CarianStyleEnchantments.getRegisteredCount() == 0) {
-            // 移植期间附魔框架还是占位实现，数量为 0 时只报错不中断启动（移植收尾时恢复为验证失败）
             LogUtil.error("卡利亚式附魔 - 错误：没有附魔被注册");
+            isValid = false;
         }
 
         if (CarianStylePotion.MOB_EFFECTS.getEntries().isEmpty()) {

@@ -125,6 +125,13 @@ public class EnchantmentRegistry {
             LogUtil.info("卡利亚式附魔 - 扫描完成，扫描了 %d 个类，注册了 %d 个附魔，耗时 %d 毫秒",
                     scannedCount, registeredCount, endTime - startTime);
 
+            // 有附魔类没建成就不开服。1.21.1 的附魔在数据包注册表里，少了哪一条，存档里带它的物品读出来就丢掉这条附魔，
+            // 下次存盘就永久没了（1.20.1 认不出的 id 原样留在 NBT 里，修好重开还在）。宁可开不起来，也别带着残缺的表存盘。
+            if (registeredCount != scannedCount) {
+                throw new IllegalStateException(String.format(
+                        "%d 个附魔类里只建成了 %d 个，详见上面的「注册失败」「处理类时出错」日志", scannedCount, registeredCount));
+            }
+
         } catch (Exception e) {
             LogUtil.error("卡利亚式附魔 - 扫描过程发生错误", e);
             throw new RuntimeException("附魔自动注册失败", e);

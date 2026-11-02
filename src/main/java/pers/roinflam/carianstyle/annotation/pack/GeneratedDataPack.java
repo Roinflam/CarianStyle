@@ -83,9 +83,10 @@ public final class GeneratedDataPack implements PackResources {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
+    /** 标题在 {@code /datapack list} 里显示，按客户端语言翻译；客户端没装本模组时显示英文原文。 */
     private static final PackLocationInfo LOCATION = new PackLocationInfo(
             PACK_ID,
-            Component.literal("CarianStyle (generated)"),
+            Component.translatableWithFallback("pack.carianstyle.generated", "CarianStyle (generated)"),
             PackSource.BUILT_IN,
             Optional.empty());
 
@@ -123,11 +124,11 @@ public final class GeneratedDataPack implements PackResources {
         }
         event.addRepositorySource(consumer -> {
             Pack pack = Pack.readMetaAndCreate(LOCATION, SUPPLIER, PackType.SERVER_DATA, SELECTION);
-            if (pack != null) {
-                consumer.accept(pack);
-            } else {
-                LogUtil.error("卡利亚式附魔 - 内置数据包 %s 创建失败，本模组的附魔不会出现在注册表里", PACK_ID);
+            if (pack == null) {
+                // 没有这个包，注册表里一个本模组附魔都没有，存档里的本模组附魔读出来全部丢掉、存盘后永久没了：直接拒绝加载世界
+                throw new IllegalStateException("卡利亚式附魔：内置数据包 " + PACK_ID + " 创建失败，拒绝加载世界以免存档里的附魔被清掉");
             }
+            consumer.accept(pack);
         });
     }
 
@@ -223,7 +224,8 @@ public final class GeneratedDataPack implements PackResources {
                 .sorted((a, b) -> a.getId().compareTo(b.getId()))
                 .toList();
         if (enchantments.isEmpty()) {
-            LogUtil.error("卡利亚式附魔 - 生成内置数据包时没有任何附魔行为对象，注解扫描可能失败了");
+            // 同上：生成出一个空包等于把全部本模组附魔从注册表里拿掉
+            throw new IllegalStateException("卡利亚式附魔：生成内置数据包时没有任何附魔行为对象（注解扫描失败），拒绝加载世界");
         }
 
         Map<ResourceLocation, byte[]> out = new TreeMap<>();
