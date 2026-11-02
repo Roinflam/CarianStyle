@@ -30,11 +30,11 @@ This is the **1.20.1** branch. The Minecraft 1.12.2 version is on the [`1.12.2` 
 |---|---|---|
 | Loader / Java | Forge 47.x, Java 17 | Forge 14.23.5.2855 or newer, Java 8 |
 | Install on | Client and server | Client and server |
-| Dependencies | None (Cloth Config API for the config screen is bundled) | None |
-| Enchantment Codex (`K`) | Yes | No |
-| Config files | `config/carianstyle-common.toml`, plus `config/carianstyle/enchantment_values.json` for every enchantment's numbers | `config/carianstyle.cfg` |
+| Dependencies | None (Cloth Config API for the config screen is bundled) | None (uses Forge's built-in config screen) |
+| Enchantment Codex (`K`) | Yes | Yes |
+| Config files | `config/carianstyle-common.toml`, plus `config/carianstyle/enchantment_values.json` for every enchantment's numbers | `config/carianstyle-common.cfg`, plus `config/carianstyle/enchantment_values.json` for every enchantment's numbers |
 
-Both versions have the same set of enchantments.
+Both versions have the same enchantments, numbers, effects and codex; on 1.12.2 a few edge cases follow the 1.12.2 game rules.
 
 ### Enchantment types
 
@@ -311,11 +311,11 @@ Yes, no need to ask. Please credit the author; commercial use is not allowed (se
 |---|---|---|
 | 加载器与 Java | Forge 47.x，Java 17 | Forge 14.23.5.2855 及以上，Java 8 |
 | 安装位置 | 客户端和服务端都要装 | 客户端和服务端都要装 |
-| 前置模组 | 无（配置界面用到的 Cloth Config API 已内置） | 无 |
-| 附魔百科（`K` 键） | 有 | 无 |
-| 配置文件 | `config/carianstyle-common.toml`，以及各附魔数值 `config/carianstyle/enchantment_values.json` | `config/carianstyle.cfg` |
+| 前置模组 | 无（配置界面用到的 Cloth Config API 已内置） | 无（配置界面用 Forge 自带的） |
+| 附魔百科（`K` 键） | 有 | 有 |
+| 配置文件 | `config/carianstyle-common.toml`，以及各附魔数值 `config/carianstyle/enchantment_values.json` | `config/carianstyle-common.cfg`，以及各附魔数值 `config/carianstyle/enchantment_values.json` |
 
-两个版本的附魔种类相同。
+两个版本的附魔、数值、特效和附魔百科都相同；1.12.2 版少数细节按 1.12.2 的游戏规则处理。
 
 ### 附魔分类
 
