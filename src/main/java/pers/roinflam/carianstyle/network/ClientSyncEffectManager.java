@@ -9,7 +9,6 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.loading.FMLEnvironment;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 import javax.annotation.Nonnull;
 import java.util.*;
@@ -113,10 +112,11 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * 且从未启用过的序列号不会产生无意义的空包。
  * </p>
  *
- * <h3>1.21.1：发送改用 NeoForge 的 {@code PacketDistributor} 静态方法</h3>
+ * <h3>1.21.1：发送改走 {@link PayloadSend}</h3>
  * <p>
- * 按维度广播用 {@code sendToPlayersInDimension}（内部同样是
- * {@code server.getPlayerList().broadcastAll(packet, dimension)}），单发用 {@code sendToPlayer}。
+ * 按维度广播用 {@link PayloadSend#toDimension}（范围同 NeoForge 的 {@code sendToPlayersInDimension}，
+ * 即 {@code server.getPlayerList().broadcastAll(packet, dimension)}），单发用 {@link PayloadSend#toPlayer}；
+ * 没协商过本模组频道的假人跳过，不抛异常（见 {@link PayloadSend}）。
  * 1.21.1 没有 {@code PacketTarget} 对象了，下面 v3.2 里「复用 / 惰性创建 PacketTarget」的那部分随之取消，
  * 「按维度一次发送」的结论不变。
  * </p>
@@ -307,7 +307,7 @@ public class ClientSyncEffectManager {
 
         for (Map.Entry<Integer, Set<Integer>> entry : dimMap.entrySet()) {
             if (entry.getValue().remove(entityId)) {
-                PacketDistributor.sendToPlayersInDimension(level, ClientSyncEffectPacket.delta(
+                PayloadSend.toDimension(level, ClientSyncEffectPacket.delta(
                         entry.getKey(), ClientSyncEffectPacket.Action.REMOVE, entityId));
             }
         }
@@ -325,7 +325,7 @@ public class ClientSyncEffectManager {
     private static void broadcastDelta(@Nonnull ServerLevel level, int serialNumber,
                                        ClientSyncEffectPacket.Action action, int entityId) {
         ClientSyncEffectPacket packet = ClientSyncEffectPacket.delta(serialNumber, action, entityId);
-        PacketDistributor.sendToPlayersInDimension(level, packet);
+        PayloadSend.toDimension(level, packet);
     }
 
     /**
@@ -368,7 +368,7 @@ public class ClientSyncEffectManager {
             }
 
             ClientSyncEffectPacket packet = ClientSyncEffectPacket.fullSync(serialNumber, payload);
-            PacketDistributor.sendToPlayer(player, packet);
+            PayloadSend.toPlayer(player, packet);
         }
     }
 
@@ -441,7 +441,7 @@ public class ClientSyncEffectManager {
 
                 ClientSyncEffectPacket packet = ClientSyncEffectPacket.fullSync(
                         serialNumber, new ArrayList<>(entityIds));
-                PacketDistributor.sendToPlayersInDimension(level, packet);
+                PayloadSend.toDimension(level, packet);
             }
         }
     }

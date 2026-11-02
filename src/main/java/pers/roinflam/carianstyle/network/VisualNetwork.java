@@ -46,7 +46,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  * （{@code carianstyle:stack_display}、{@code aoe_effect}、{@code combat_art_effect}），版本号照旧是
  * {@link #PROTOCOL_VERSION}（按包记，和主通道的 "4" 互不影响），都不是可选包。
  * 都用 {@code playToClient} 登记，方向由 NeoForge 校验，客户端反向发来的包在入口就被拒，
- * 与上面 v3 的方向声明等价。发送改用 {@link PacketDistributor} 的静态方法。
+ * 与上面 v3 的方向声明等价。发送走 {@link PayloadSend}（只发给协商过频道的玩家，范围同 {@link PacketDistributor}）。
  * </p>
  *
  * @author RoinFlam
@@ -82,13 +82,13 @@ public final class VisualNetwork {
      * @param packet 叠层显示包
      */
     public static void sendToPlayer(ServerPlayer player, StackDisplayPacket packet) {
-        PacketDistributor.sendToPlayer(player, packet);
+        PayloadSend.toPlayer(player, packet);
     }
 
     /**
      * 把包广播给某点附近一定范围内的玩家（用于定点 AOE 自绘特效）。
      * <p>
-     * 使用 {@link PacketDistributor#sendToPlayersNear}，原版只会发给该维度内距 (x,y,z) 在 {@code range} 格内、
+     * 走 {@link PayloadSend#toNear}（范围同 {@link PacketDistributor#sendToPlayersNear}），只会发给该维度内距 (x,y,z) 在 {@code range} 格内、
      * 且正在追踪该区域的玩家，因此带宽随近场玩家数自然受限。
      * </p>
      *
@@ -101,7 +101,7 @@ public final class VisualNetwork {
      */
     public static void sendToNearby(ServerLevel level, double x, double y, double z,
                                     double range, AoeEffectPacket packet) {
-        PacketDistributor.sendToPlayersNear(level, null, x, y, z, range, packet);
+        PayloadSend.toNear(level, x, y, z, range, packet);
     }
 
     /**
@@ -118,6 +118,6 @@ public final class VisualNetwork {
      */
     public static void sendToNearby(ServerLevel level, double x, double y, double z,
                                     double range, CombatArtEffectPacket packet) {
-        PacketDistributor.sendToPlayersNear(level, null, x, y, z, range, packet);
+        PayloadSend.toNear(level, x, y, z, range, packet);
     }
 }

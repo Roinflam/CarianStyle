@@ -6,8 +6,8 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
 import pers.roinflam.carianstyle.network.EnchantmentValuesPacket;
+import pers.roinflam.carianstyle.network.PayloadSend;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
@@ -72,7 +72,7 @@ public final class ValueSyncHandler {
         if (EnchantmentValues.sharedHandles().isEmpty()) {
             return;
         }
-        PacketDistributor.sendToPlayer(player, EnchantmentValuesPacket.ofCurrent());
+        PayloadSend.toPlayer(player, EnchantmentValuesPacket.ofCurrent());
     }
 
     /**
@@ -86,7 +86,7 @@ public final class ValueSyncHandler {
         if (EnchantmentValues.sharedHandles().isEmpty()) {
             return;
         }
-        PacketDistributor.sendToAllPlayers(EnchantmentValuesPacket.ofCurrent());
+        PayloadSend.toAll(EnchantmentValuesPacket.ofCurrent());
         LogUtil.info("卡利亚式附魔 - 已向 %d 名在线玩家重发共享数值",
                 server.getPlayerList().getPlayerCount());
     }
