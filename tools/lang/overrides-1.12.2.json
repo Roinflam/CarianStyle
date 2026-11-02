@@ -31,5 +31,97 @@
   "config.carianstyle.category.levelDecay": {
     "en_us": "High Level Decay",
     "zh_cn": "高等级衰减"
+  },
+  "enchantment.carianstyle.bad_omen.desc": {
+    "en_us": "Fully charged attacks inflict Omen for 10s: damage taken +25%, healing received -50%, attack power and attack speed -20%. On a fully charged hit against an Omen-afflicted target, half of the damage cannot be negated (killing the target outright if that half is lethal). Hits that are not fully charged deal 50% less damage to Omen-afflicted targets. (Damage that can hurt Creative-mode players, such as the void or /kill, is unaffected.)",
+    "zh_cn": "满蓄力攻击时施加10秒噩兆：受到的伤害+25%，恢复效果-50%，攻击力和攻击速度-20%；满蓄力攻击噩兆目标时，50%伤害无法被减免（足以致命时直接击杀）；未满蓄力攻击噩兆目标时伤害-50%（虚空、/kill 这类能伤到创造模式的伤害不受影响）"
+  },
+  "enchantment.carianstyle.broken_star.desc": {
+    "en_us": "At or above 50% HP: damage dealt +50%. Below 50% HP: gain 25% damage negation. (Both effects are doubled at night.) (Damage that can hurt Creative-mode players, such as the void or /kill, is unaffected.)",
+    "zh_cn": "生命值≥50%时：造成伤害+50%；生命值＜50%时：获得25%伤害减免（夜晚时以上两项效果翻倍）（虚空、/kill 这类能伤到创造模式的伤害不受影响）"
+  },
+  "enchantment.carianstyle.full_moon.desc": {
+    "en_us": "At night: healing received +25%. Upon lethal damage, prevents death and restores 10% max HP per second for 10s, with 50% damage negation during that time (180s cooldown, halved at night). (If the main-hand weapon has Dark Moon: the restoration and negation last twice as long.) (Damage that can hurt Creative-mode players, such as the void or /kill, is unaffected.)",
+    "zh_cn": "夜晚时：恢复效果+25%；受到致命伤害时阻止死亡，10秒内每秒回复10%最大生命值，期间获得50%伤害减免（冷却180秒，夜晚减半）（当主手武器拥有「暗月」附魔时：回复与减伤持续时间翻倍）（虚空、/kill 这类能伤到创造模式的伤害不受影响）"
+  },
+  "enchantment.carianstyle.giant_flame.desc": {
+    "en_us": "Gain 0.25% damage negation for every 1% of HP remaining. Immune to fire damage, converting it to healing instead (at most twice per second). While ablaze: melee attackers take fire damage equal to 50% of the damage they deal to you. (Damage that can hurt Creative-mode players, such as the void or /kill, is unaffected.)",
+    "zh_cn": "每拥有1%生命值获得0.25%伤害减免；免疫火焰伤害并将其转为治疗（每秒至多2次）；着火时：受到近战攻击后，对攻击者造成所受伤害50%的火焰伤害（虚空、/kill 这类能伤到创造模式的伤害不受影响）"
+  },
+  "enchantment.carianstyle.golden_law.desc": {
+    "en_us": "Damage dealt +15%, scaling with lost HP up to +60%. Gain 15% damage negation. Immune to any hit dealing 15% or less of your current HP, and fully negate one hit every 5s. (Damage that can hurt Creative-mode players, such as the void or /kill, is unaffected.)",
+    "zh_cn": "造成伤害+15%，基于已损失生命值至多+60%；获得15%伤害减免；免疫不超过15%当前生命值的伤害；每5秒免疫一次伤害（虚空、/kill 这类能伤到创造模式的伤害不受影响）"
+  },
+  "enchantment.carianstyle.epilepsy_fire.desc": {
+    "en_us": "Fully charged attacks burn you for 20% of your max HP over 3s, and burn the target for [Level] x 0.1 times that self-inflicted damage. While burning, healing received -90%. (In Creative mode you don't burn yourself.)",
+    "zh_cn": "满蓄力攻击后3秒内燃烧自身20%最大生命值，同时燃烧目标[附魔等级]×0.1倍的自燃伤害；燃烧期间恢复效果-90%（创造模式下不烧自己）"
+  },
+  "enchantment.carianstyle.empty_epilepsy_fire.desc": {
+    "en_us": "Arrow hits burn you for 10% of your max HP over 3s, and burn the target for [Level] x 0.2 times that self-inflicted damage. While burning, healing received -90%. (In Creative mode you don't burn yourself.)",
+    "zh_cn": "箭矢命中后3秒内燃烧自身10%最大生命值，同时燃烧目标[附魔等级]×0.2倍的自燃伤害；燃烧期间恢复效果-90%（创造模式下不烧自己）"
+  },
+  "enchantment.carianstyle.protection_of_the_erdtree.desc": {
+    "zh_cn": "攻击或被攻击时获得[附魔等级]级黄金树庇护[附魔等级]×2.5秒：非生物伤害减免+[等级]×20%（多件盔甲等级相加，至多5级，减免最高100%；出血、癫火、猩红腐败的伤害不减免）",
+    "en_us": "Attacking or being attacked grants Protection of the Erdtree [Level] for [Level] x 2.5s: negation against non-creature damage +[Level] x 20%. (Levels from multiple armor pieces add up, capped at level 5; negation tops out at 100%. Hemorrhage, Frenzied Flame and Scarlet Rot damage is not negated.)"
+  },
+  "carianstyle.codex.acquire.curse": {
+    "en_us": "Curse: cannot be removed once applied",
+    "zh_cn": "诅咒附魔：附上后无法移除"
+  },
+  "carianstyle.codex.fit.card.blocked.tip": {
+    "en_us": "1.12.2 has no grindstone, so enchantments already on an item can't be stripped; use an item without the conflicting enchantment.",
+    "zh_cn": "1.12.2 没有砂轮，物品上已有的附魔洗不掉；换一件不带冲突附魔的物品。"
+  },
+  "carianstyle.codex.fit.card.blocked.tip_book": {
+    "en_us": "Enchantments on a book can't be stripped either. Use a book without the conflicting enchantment, or combine directly onto the gear.",
+    "zh_cn": "附魔书上的附魔同样洗不掉。换一本不带冲突附魔的书，或者直接合到装备上。"
+  },
+  "carianstyle.codex.itemtype.pumpkin": {
+    "en_us": "Pumpkins",
+    "zh_cn": "南瓜"
+  },
+  "carianstyle.codex.category.all": {
+    "en_us": "Anything enchantable",
+    "zh_cn": "任何可附魔的物品"
+  },
+  "carianstyle.vanilla_desc.sharpness": {
+    "en_us": "Adds 1 melee damage at level I and 0.5 more per extra level against all mobs; excludes Smite and Bane of Arthropods",
+    "zh_cn": "对所有生物增加近战伤害，一级 1 点，之后每级再加 0.5 点；与亡灵杀手、节肢杀手互斥"
+  },
+  "carianstyle.vanilla_desc.power": {
+    "en_us": "Increases bow damage by 25% x (level + 1)",
+    "zh_cn": "增加弓箭伤害，25%×(等级+1)"
+  },
+  "config.carianstyle.category.debug.tooltip": {
+    "en_us": "Logging settings. Client-only HUD / visual settings are in config/carianstyle/client_visual.json and visual_toggle.json; edit them on each client.",
+    "zh_cn": "日志设置。客户端的 HUD / 特效设置在 config/carianstyle/client_visual.json 和 visual_toggle.json 里，每个客户端各自修改。"
+  },
+  "config.carianstyle.category.enchantment.tooltip": {
+    "en_us": "Enchantment system settings.",
+    "zh_cn": "附魔系统设置。"
+  },
+  "config.carianstyle.category.trueDamage.tooltip": {
+    "en_us": "True damage system settings.",
+    "zh_cn": "真伤系统设置。"
+  },
+  "config.carianstyle.category.treasure.tooltip": {
+    "en_us": "Treasure enchantment settings.",
+    "zh_cn": "宝藏附魔设置。"
+  },
+  "config.carianstyle.category.balance.tooltip": {
+    "en_us": "Game balance settings.",
+    "zh_cn": "游戏平衡设置。"
+  },
+  "config.carianstyle.category.levelDecay.tooltip": {
+    "en_us": "High level decay. Only affects CarianStyle enchantments. Levels at or below the threshold are untouched, and one more level never makes an enchantment weaker.",
+    "zh_cn": "高等级衰减。只影响本模组的附魔；不超过阈值的等级不变，多一级永远不会让附魔变弱。"
+  },
+  "config.carianstyle.category.mobTrigger.tooltip": {
+    "en_us": "Mob enchantment trigger settings.",
+    "zh_cn": "怪物附魔触发设置。"
+  },
+  "config.carianstyle.category.stealth.tooltip": {
+    "en_us": "Stealth settings.",
+    "zh_cn": "隐身设置。"
   }
 }
