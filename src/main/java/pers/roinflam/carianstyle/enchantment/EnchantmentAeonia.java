@@ -1,21 +1,43 @@
 package pers.roinflam.carianstyle.enchantment;
 
+import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemStack;
+import net.minecraft.potion.PotionEffect;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.Reference;
+
+import javax.annotation.Nonnull;
 
 /**
- * PORT-STUB(B2a)
- * <p>艾奥尼亚附魔 - 优化: LivingTickEvent -> PlayerTickEvent @version 2.1：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 艾奥尼亚附魔 - 优化: LivingTickEvent -> PlayerTickEvent @version 2.1
+ * <p>
+ * 被动：主手拿着时每秒给自己续上 1 级猩红腐败；攻击：目标身上有猩红腐败、且满蓄力时，回复自身最大生命 × 10%。
+ * 只对玩家、只认主手（怪物拿着不会自己腐败）。
+ * </p>
  */
-@Deprecated
 @AutoRegisterEnchantment(id = "aeonia", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.VERY_RARE, type = EnumEnchantmentType.WEAPON, slots = {EntityEquipmentSlot.MAINHAND}, conflictsWith = {EnchantmentFireGivesPower.class, EnchantmentFireDevoured.class})
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentAeonia extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.aeonia.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "aeonia";
@@ -46,9 +68,41 @@ public class EnchantmentAeonia extends EnchantmentBase {
 
     private static final int RECOLLECT_ENCHANTABILITY = 35;
 
-    public EnchantmentAeonia() { super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}); }
+    public EnchantmentAeonia() {
+        super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
 
-    @Override public int getMinCost(int l) { return (int)(RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty); }
+    @Override
+    protected void onDamageAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+        EntityLivingBase victim = ctx.getVictim();
+        if (victim == null || victim.getActivePotionEffect(CarianStylePotion.SCARLET_ROT.get()) == null) return;
+        if (!isFullyCharged(ctx.getHolder())) return;
+        attacker.heal(attacker.getMaxHealth() * (float) HEAL_RATIO.get());
+    }
 
-    @Override public int getMaxCost(int l) { return getMinCost(l) + 50; }
+    /** 优化：从LivingTickEvent改为PlayerTickEvent */
+    @SubscribeEvent
+    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
+        if (evt.player.world.isRemote || evt.phase != TickEvent.Phase.START) return;
+        if (evt.player.ticksExisted % TICK_INTERVAL.getInt() != 0) return;
+        EntityPlayer holder = evt.player;
+        ItemStack heldItem = holder.getHeldItemMainhand();
+        if (heldItem.isEmpty()) return;
+        Enchantment aeonia = EnchantmentRegistry.getEnchantmentByClass(EnchantmentAeonia.class);
+        if (aeonia == null) return;
+        // v-cache：走中央装备缓存，同一 tick 内与其它监听器共用一次扫描
+        int level = EnchantmentEventHandler.mainHand(holder, aeonia);
+        if (level > 0) holder.addPotionEffect(new PotionEffect(CarianStylePotion.SCARLET_ROT.get(), SELF_ROT_DURATION.getInt(), 0));
+    }
+
+    @Override
+    public int getMinCost(int l) {
+        return (int) (RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty);
+    }
+
+    @Override
+    public int getMaxCost(int l) {
+        return getMinCost(l) + 50;
+    }
 }
