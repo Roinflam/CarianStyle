@@ -23,8 +23,6 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
- * PORT-STUB(E2)
- *
  * 战士附魔
  * <p>
  * 攻击者视角：伤害×1.25
@@ -87,23 +85,174 @@ import net.neoforged.fml.common.EventBusSubscriber;
         baseEnchantability = 35,
         levelMultiplier = 0
 )
-@Deprecated
+@EventBusSubscriber
 public class EnchantmentWarrior extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.warrior.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "warrior";
-    private static final EnchantmentValues.Handle DOT_DURATION = EnchantmentValues.define(VALUE_ID, "dot_duration",
+
+    /**
+     * 持续伤害的总时长（tick）
+     * <p>默认 60，允许范围 1 ~ 1200。</p>
+     */
+    private static final EnchantmentValues.Handle DOT_DURATION =
+            EnchantmentValues.define(VALUE_ID, "dot_duration",
                     60, 1, 1200);
-    private static final EnchantmentValues.Handle DOT_DELAY = EnchantmentValues.define(VALUE_ID, "dot_delay",
+
+    /**
+     * 持续伤害的起始延迟（tick）
+     * <p>默认 5，允许范围 0 ~ 200。</p>
+     */
+    private static final EnchantmentValues.Handle DOT_DELAY =
+            EnchantmentValues.define(VALUE_ID, "dot_delay",
                     5, 0, 200);
-    private static final EnchantmentValues.Handle DAMAGE_MULTIPLIER = EnchantmentValues.define(VALUE_ID, "damage_multiplier",
+
+    /**
+     * 输出伤害的倍率
+     * <p>默认 1.25，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_MULTIPLIER =
+            EnchantmentValues.define(VALUE_ID, "damage_multiplier",
                     1.25D, 0.0D, 10.0D);
-    private static final EnchantmentValues.Handle REDUCTION_MULTIPLIER = EnchantmentValues.define(VALUE_ID, "reduction_multiplier",
+
+    /**
+     * 受到伤害的倍率
+     * <p>默认 0.5，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle REDUCTION_MULTIPLIER =
+            EnchantmentValues.define(VALUE_ID, "reduction_multiplier",
                     0.5D, 0.0D, 2.0D);
-    private static final EnchantmentValues.Handle KILL_HEAL_RATIO = EnchantmentValues.define(VALUE_ID, "kill_heal_ratio",
+
+    /**
+     * 击杀时回复已损失生命的比例
+     * <p>默认 0.25，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle KILL_HEAL_RATIO =
+            EnchantmentValues.define(VALUE_ID, "kill_heal_ratio",
                     0.25D, 0.0D, 2.0D);
+
     private static final int RECOLLECT_ENCHANTABILITY = 35;
+
+    /**
+     * 本附魔在 {@link DamageOverTimeManager} 中的来源标签（v3.3 新增）。
+     * <p>
+     * {@code DamageOverTimeManager} 是<b>七个附魔共用的池子</b>（注定死亡、死亡之刃、
+     * 黑焰刃、癫火、战士、沙布里里嚎叫、空癫火）。HUD 要显示「战士流血剩余」，
+     * 就必须能把本附魔的条目从池子里挑出来——否则一个同时中了癫火的玩家，
+     * 那一行会把癫火的伤害也算进来，数字看着有但意义是错的。
+     * </p>
+     * <p>
+     * <b>public 是刻意的：</b>{@code CarianStyleCombatStateDisplay} 直接引用这个常量，
+     * 而不是自己硬编码一份同样的字符串——两处字符串迟早会因为一次改名而不同步。
+     * </p>
+     */
     public static final String DOT_TAG = "warrior";
+
     public EnchantmentWarrior() {
         super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
-}
 
+    /**
+     * 攻击者视角：伤害×1.25
+     * <p>v3.1：怪物作为攻击者时，由通用开关 allowMobTriggerEnchantments 控制</p>
+     * <p>乘在护甲、抗性、吸收都算完之后的数值上，详见类注释「结算时机」。</p>
+     */
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public static void onLivingDamage_attack(@NotNull LivingDamageEvent evt) {
+        if (evt.getEntity().level().isClientSide) return;
+        if (!(evt.getSource().getDirectEntity() instanceof LivingEntity attacker)) return;
+
+        // v3.1：怪物附魔触发开关（攻击者视角，非死亡触发）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+
+        ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
+        if (heldItem.isEmpty()) return;
+
+        EnchantmentBase warrior = EnchantmentRegistry.getEnchantmentByClass(EnchantmentWarrior.class);
+        if (warrior == null) return;
+
+        int level = EnchantmentLevels.get(warrior, heldItem);
+        level = applyLevelLimit(warrior, level, 10);
+
+        if (level > 0) {
+            evt.setAmount(evt.getAmount() * (float) DAMAGE_MULTIPLIER.get());
+        }
+    }
+
+    /**
+     * 受击者视角：即时伤害降为50%，剩余50%持续60tick扣血
+     * <p>
+     * v3.0优化：SynchronizationTask(5, 1) → DamageOverTimeManager.applyLinear
+     * v3.1：怪物作为受击者时，由通用开关 allowMobTriggerEnchantments 控制
+     * </p>
+     */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingDamage_hurter(@NotNull LivingDamageEvent evt) {
+        if (evt.getEntity().level().isClientSide) return;
+
+        LivingEntity victim = evt.getEntity();
+
+        // v3.1：怪物附魔触发开关（受击者视角，非死亡触发）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
+        ItemStack heldItem = victim.getItemInHand(InteractionHand.MAIN_HAND);
+        if (heldItem.isEmpty()) return;
+
+        EnchantmentBase warrior = EnchantmentRegistry.getEnchantmentByClass(EnchantmentWarrior.class);
+        if (warrior == null) return;
+
+        int level = EnchantmentLevels.get(warrior, heldItem);
+        level = applyLevelLimit(warrior, level, 10);
+        if (level <= 0) return;
+
+        // 即时伤害降为50%
+        evt.setAmount(evt.getAmount() * (float) REDUCTION_MULTIPLIER.get());
+
+        // 剩余50%分60tick持续扣血
+        float damagePerTick = evt.getAmount() / DOT_DURATION.getInt();
+
+        // v3.2：改用带来源标签的重载，使 HUD 能查到「本附魔造成的」剩余流血。
+        // 行为与不带标签的重载完全一致，只是多记一个字符串引用
+        DamageOverTimeManager.applyLinear(
+                victim,
+                damagePerTick,
+                DOT_DURATION.getInt(),
+                DOT_DELAY.getInt(),
+                evt.getSource(),
+                true,
+                DOT_TAG
+        );
+    }
+
+    /**
+     * 击杀时回复25%已损失生命值
+     * <p>v3.1：怪物作为击杀者时，由通用开关 allowMobTriggerEnchantments 控制</p>
+     */
+    @SubscribeEvent
+    public static void onLivingDeath(@NotNull LivingDeathEvent evt) {
+        if (evt.getEntity().level().isClientSide) return;
+        if (!(evt.getSource().getDirectEntity() instanceof LivingEntity killer)) return;
+
+        // v3.1：怪物附魔触发开关（击杀者视角，击杀奖励不属于濒死触发）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(killer, false)) return;
+
+        ItemStack heldItem = killer.getItemInHand(InteractionHand.MAIN_HAND);
+        if (heldItem.isEmpty()) return;
+
+        EnchantmentBase warrior = EnchantmentRegistry.getEnchantmentByClass(EnchantmentWarrior.class);
+        if (warrior == null) return;
+
+        int level = EnchantmentLevels.get(warrior, heldItem);
+        level = applyLevelLimit(warrior, level, 10);
+
+        if (level > 0) {
+            killer.heal((killer.getMaxHealth() - killer.getHealth()) * (float) KILL_HEAL_RATIO.get());
+        }
+    }
+
+}

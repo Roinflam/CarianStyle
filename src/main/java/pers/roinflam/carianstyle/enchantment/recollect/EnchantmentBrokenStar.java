@@ -21,8 +21,6 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
- * PORT-STUB(E2)
- *
  * 碎星附魔
  * <p>v2.2：双向监听器入口接入怪物附魔触发开关</p>
  *
@@ -58,22 +56,109 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @version 2.3
  */
 @AutoRegisterEnchantment(id = "broken_star", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantTarget.WEAPON, slots = {EquipmentSlot.MAINHAND}, baseEnchantability = 35, levelMultiplier = 0)
-@Deprecated
+@EventBusSubscriber
 public class EnchantmentBrokenStar extends EnchantmentBase {
-    private static final String VALUE_ID = "broken_star";
-    private static final EnchantmentValues.Handle HEALTH_THRESHOLD = EnchantmentValues.define(VALUE_ID, "health_threshold",
-                    0.5D, 0.0D, 1.0D);
-    private static final EnchantmentValues.Handle ATTACK_MULTIPLIER_NIGHT = EnchantmentValues.define(VALUE_ID, "attack_multiplier_night",
-                    2.0D, 0.0D, 10.0D);
-    private static final EnchantmentValues.Handle ATTACK_MULTIPLIER_DAY = EnchantmentValues.define(VALUE_ID, "attack_multiplier_day",
-                    1.5D, 0.0D, 10.0D);
-    private static final EnchantmentValues.Handle DEFENSE_MULTIPLIER_NIGHT = EnchantmentValues.define(VALUE_ID, "defense_multiplier_night",
-                    0.5D, 0.0D, 2.0D);
-    private static final EnchantmentValues.Handle DEFENSE_MULTIPLIER_DAY = EnchantmentValues.define(VALUE_ID, "defense_multiplier_day",
-                    0.75D, 0.0D, 2.0D);
-    private static final int RECOLLECT_ENCHANTABILITY = 35;
-    public EnchantmentBrokenStar() {
-        super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
-    }
-}
 
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.broken_star.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
+    private static final String VALUE_ID = "broken_star";
+
+    /**
+     * 触发所需的生命比例阈值
+     * <p>默认 0.5，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle HEALTH_THRESHOLD =
+            EnchantmentValues.define(VALUE_ID, "health_threshold",
+                    0.5D, 0.0D, 1.0D);
+
+    /**
+     * 夜间的攻击倍率
+     * <p>默认 2.0，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle ATTACK_MULTIPLIER_NIGHT =
+            EnchantmentValues.define(VALUE_ID, "attack_multiplier_night",
+                    2.0D, 0.0D, 10.0D);
+
+    /**
+     * 白天的攻击倍率
+     * <p>默认 1.5，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle ATTACK_MULTIPLIER_DAY =
+            EnchantmentValues.define(VALUE_ID, "attack_multiplier_day",
+                    1.5D, 0.0D, 10.0D);
+
+    /**
+     * 夜间受到伤害的倍率
+     * <p>默认 0.5，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle DEFENSE_MULTIPLIER_NIGHT =
+            EnchantmentValues.define(VALUE_ID, "defense_multiplier_night",
+                    0.5D, 0.0D, 2.0D);
+
+    /**
+     * 白天受到伤害的倍率
+     * <p>默认 0.75，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle DEFENSE_MULTIPLIER_DAY =
+            EnchantmentValues.define(VALUE_ID, "defense_multiplier_day",
+                    0.75D, 0.0D, 2.0D);
+
+    private static final int RECOLLECT_ENCHANTABILITY = 35;
+    public EnchantmentBrokenStar() { super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND}); }
+
+    @SubscribeEvent
+    public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
+        if (evt.getEntity().level().isClientSide) return;
+        EnchantmentBase brokenStar = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBrokenStar.class);
+        if (brokenStar == null) return;
+
+        // 攻击者视角
+        if (evt.getSource().getDirectEntity() instanceof LivingEntity attacker) {
+            // v2.2：怪物附魔触发开关（攻击者视角）
+            if (!EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) {
+                ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
+                if (!heldItem.isEmpty()) {
+                    int level = EnchantmentLevels.get(brokenStar, heldItem);
+                    level = applyLevelLimit(brokenStar, level, 10);
+                    if (level > 0 && attacker.getHealth() >= attacker.getMaxHealth() * (float) HEALTH_THRESHOLD.get()) {
+                        evt.setAmount(evt.getAmount() * (float) (!attacker.level().isDay()
+                    ? ATTACK_MULTIPLIER_NIGHT.get() : ATTACK_MULTIPLIER_DAY.get()));
+                    }
+                }
+            }
+        }
+
+        // 受击者视角
+        if (!evt.getSource().isCreativePlayer()) {
+            LivingEntity victim = evt.getEntity();
+
+            // v2.2：怪物附魔触发开关（受击者视角）
+            if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
+            ItemStack heldItem = victim.getItemInHand(InteractionHand.MAIN_HAND);
+            if (!heldItem.isEmpty()) {
+                int level = EnchantmentLevels.get(brokenStar, heldItem);
+                // v2.3 修复 B：补上等级上限，与攻击者分支保持一致。
+                // 当前减伤系数不随等级变化，所以这一行暂时不影响结果，
+                // 但缺了它意味着以后一旦把减伤做成随等级递增，就会绕过 levelLimit
+                level = applyLevelLimit(brokenStar, level, 10);
+                // v2.3 修复 C：改用严格小于，与攻击者分支的 >= 互补。
+                // 原来两边都含等号，生命值恰好半血时攻守两档会同时生效
+                if (level > 0 && victim.getHealth() < victim.getMaxHealth() * (float) HEALTH_THRESHOLD.get()) {
+                    // v2.3 修复 A：昼夜互换。
+                    // 原为 (!isDay ? 0.75f : 0.5f) —— 夜晚只减伤 25%、白天减伤 50%，
+                    // 与语言文件「夜晚翻倍」的描述正好相反，且与攻击者分支
+                    // (!isDay ? 2 : 1.5f) 的昼夜方向自相矛盾。
+                    // 现为白天 ×0.75（减伤 25%）、夜晚 ×0.5（减伤 50%），夜晚确实翻倍
+                    evt.setAmount(evt.getAmount() * (float) (!victim.level().isDay()
+                    ? DEFENSE_MULTIPLIER_NIGHT.get() : DEFENSE_MULTIPLIER_DAY.get()));
+                }
+            }
+        }
+    }
+
+}
