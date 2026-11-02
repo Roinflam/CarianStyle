@@ -1,19 +1,27 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.enchantment.EnumEnchantmentType;
+import javax.annotation.Nonnull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
- * PORT-STUB(E3)
- * <p>红羽枝剑附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 红羽枝剑附魔
+ * <p>
+ * 武器附魔，低血量增伤
+ * 攻击时：
+ * - 如果自身血量 <= 20%，伤害增加 20% × 等级
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "red_feathered_branchsword",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -23,6 +31,11 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         conflictsWith = {EnchantmentCorruptedWingSword.class}
 )
 public class EnchantmentRedFeatheredBranchsword extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.red_feathered_branchsword.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "red_feathered_branchsword";
@@ -45,6 +58,17 @@ public class EnchantmentRedFeatheredBranchsword extends EnchantmentBase {
 
     public EnchantmentRedFeatheredBranchsword() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
+
+    @Override
+    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+
+        // 血量 <= 20% 时增伤
+        if (attacker.getHealth() <= attacker.getMaxHealth() * (float) HEALTH_THRESHOLD.get()) {
+            float bonusDamage = ctx.getDamage() * level * (float) DAMAGE_PER_LEVEL.get();
+            ctx.addDamage(bonusDamage);
+        }
     }
 
     @Override

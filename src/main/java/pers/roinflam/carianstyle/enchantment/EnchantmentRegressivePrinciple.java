@@ -1,19 +1,49 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.EnumEnchantmentType;
+import pers.roinflam.carianstyle.utils.Reference;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.enchantment.Enchantment;
+import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+import javax.annotation.Nonnull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
+
+import java.util.List;
 
 /**
- * PORT-STUB(E3)
- * <p>回归法则附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 回归法则附魔
+ * <p>
+ * 护甲附魔，清除周围实体的药水效果
+ * 每tick有5%概率触发：
+ * - 清除周围（等级×3格）内所有有药水效果的实体的所有药水
+ * </p>
+ *
+ * <h3>性能安全上限（v2.1 新增）</h3>
+ * <ul>
+ *   <li>{@link #MAX_SEARCH_RADIUS}：AOE 搜索半径硬上限，防止高等级附魔（如 100 级）
+ *       直接把等级×3 当半径，导致 300 格搜索扫过数千个实体。</li>
+ *   <li>{@link #MAX_TARGETS}：单次触发最大命中目标数上限，防止密集怪物场景下
+ *       对大量实体执行 removeAllEffects 导致事件风暴。</li>
+ * </ul>
+ *
+ * <p>本附魔触发频率极高（每 tick 5% 概率 = 平均每秒触发 1 次），
+ * 是服务端性能风险最大的附魔之一，必须双重封顶。</p>
+ *
+ * @author RoinFlam
+ * @version 2.1
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "regressive_principle",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -22,7 +52,13 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         slots = {EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET},
         forceTreasure = true
 )
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentRegressivePrinciple extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.regressive_principle.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "regressive_principle";
@@ -66,6 +102,62 @@ public class EnchantmentRegressivePrinciple extends EnchantmentBase {
                 EntityEquipmentSlot.LEGS,
                 EntityEquipmentSlot.FEET
         });
+    }
+
+    @SubscribeEvent
+    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
+        if (evt.player.world.isRemote) {
+            return;
+        }
+
+        if (evt.phase != TickEvent.Phase.START) {
+            return;
+        }
+
+        // 5%概率触发
+        if (!RandomUtil.percentageChance(TRIGGER_CHANCE.get())) {
+            return;
+        }
+
+        EntityPlayer player = evt.player;
+        if (!player.isEntityAlive()) {
+            return;
+        }
+
+        Enchantment regressivePrinciple = EnchantmentRegistry.getEnchantmentByClass(EnchantmentRegressivePrinciple.class);
+        if (regressivePrinciple == null) {
+            return;
+        }
+
+        // 从护甲累加附魔等级（v-cache：走中央装备缓存）
+        int totalLevel = EnchantmentEventHandler.armorTotal(player, regressivePrinciple);
+
+        totalLevel = applyLevelLimit(regressivePrinciple, totalLevel, LEVEL_CAP.getInt());
+
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        // v2.1：搜索半径硬上限，防止等级×3直接当半径
+        // 原：totalLevel * 3（100级 = 300格，扫过整个区块区域）
+        int searchRadius = Math.min(totalLevel * 3, MAX_SEARCH_RADIUS.getInt());
+
+        List<EntityLivingBase> targets = EntityUtil.getNearbyEntities(
+                EntityLivingBase.class,
+                player,
+                searchRadius,
+                entity -> !entity.getActivePotionEffects().isEmpty()
+        );
+
+        // v2.1：命中数量硬上限，防止对上千个实体执行 removeAllEffects
+        int hitCount = 0;
+        for (EntityLivingBase target : targets) {
+            if (hitCount >= MAX_TARGETS.getInt()) {
+                break;
+            }
+            target.clearActivePotions();
+            hitCount++;
+        }
     }
 
     @Override

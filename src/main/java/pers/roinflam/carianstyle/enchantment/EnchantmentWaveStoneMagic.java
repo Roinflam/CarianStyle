@@ -1,20 +1,42 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.world.WorldServer;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.enchantment.EnumEnchantmentType;
+import javax.annotation.Nonnull;
+import pers.roinflam.carianstyle.mc112.damage.DamageTags;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentDoomedDeath;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
+import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 /**
- * PORT-STUB(E3)
- * <p>波石魔法附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 波石魔法附魔
+ * <p>
+ * 武器附魔，魔法伤害增强
+ * 造成魔法伤害时：
+ * - 伤害增加50%
+ * - 移除魔法标签（变为波石魔法）
+ * </p>
+ * <p>
+ * v2.1：接入挥石魔法特效（辉石法阵 + 一块朴素的大石头 + 法阵碎成紫渣）。
+ * 这个附魔改变的是伤害<b>类型</b>，而伤害类型此前完全不可见。
+ * </p>
+ * <p>
+ * 特效画的是这个附魔的梗本身：法师魔力聚了半天，掏出来的是块石头，
+ * 而且比法术好使。所以法阵做得一板一眼，石头做得灰扑扑毫无光效——
+ * 全部效果都建立在这个反差上。
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.1
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "wave_stone_magic",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -24,6 +46,11 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         conflictsWith = {EnchantmentDoomedDeath.class, EnchantmentDeathBlade.class}
 )
 public class EnchantmentWaveStoneMagic extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.wave_stone_magic.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "wave_stone_magic";
@@ -38,6 +65,37 @@ public class EnchantmentWaveStoneMagic extends EnchantmentBase {
 
     public EnchantmentWaveStoneMagic() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
+
+    /**
+     * 挂在 Low：月光剑、黑暗弃子在 Normal 把伤害转成魔法，要排在它们之后才看得到
+     */
+    @Override
+    protected void onHurtAsAttackerLow(@Nonnull EnchantmentContext ctx, int level) {
+        if (ctx.getDamageSource() == null || !DamageSourceUtil.isMagicDamage(ctx.getDamageSource())) {
+            return;
+        }
+
+        EntityLivingBase victim = ctx.getVictim();
+        if (victim == null) {
+            return;
+        }
+
+        // 伤害提升50%
+        ctx.multiplyDamage((float) DAMAGE_MULTIPLIER.get());
+
+        // 移除魔法标签（改为波石魔法，不再是普通魔法）
+        // 1.12.2 版保留：removeTag 在 1.12.2 会连伤害源自带的魔法标记一起清掉（女巫不再按魔法伤害减免），
+        // 1.20.1 只删临时标签、伤害类型自带的魔法标签还在
+        DamageSourceUtil.removeTag(ctx.getDamageSource(), DamageTags.WITCH_RESISTANT_TO);
+
+        // v2.1：挥石魔法特效。
+        // 位置取受击者、朝向取攻击者 —— 碎石是从被砸的那一方身上崩出来的。
+        // 只在魔法伤害判定通过之后播，普通物理攻击不该有这个演出
+        EntityLivingBase attacker = ctx.getHolder();
+        if (attacker != null && attacker.world instanceof WorldServer) {
+            CarianStyleCombatArtEffects.waveStone((WorldServer) attacker.world, attacker, victim);
+        }
     }
 
     @Override

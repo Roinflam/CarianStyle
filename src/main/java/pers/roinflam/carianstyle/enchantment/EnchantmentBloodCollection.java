@@ -1,21 +1,29 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.util.EnumHand;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.item.ItemStack;
+import net.minecraft.enchantment.Enchantment;
+import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.enchantment.EnchantmentHelper;
+import javax.annotation.Nonnull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
-/**
- * PORT-STUB(E3)
- * <p>血的收藏附魔 - 修复: BloodSlash联动检查getUsedItemHand -> InteractionHand.MAIN_HAND @version 2.1：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
- */
-@Deprecated
+/** 血的收藏附魔 - 修复: BloodSlash联动检查getUsedItemHand -> EnumHand.MAIN_HAND @version 2.1 */
 @AutoRegisterEnchantment(id = "blood_collection", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.RARE, type = EnumEnchantmentType.WEAPON, slots = {EntityEquipmentSlot.MAINHAND}, conflictsWith = {EnchantmentScarletCorruption.class, EnchantmentFireGivesPower.class, EnchantmentFireDevoured.class, EnchantmentVicDragonThunder.class, EnchantmentDarkMoon.class})
 public class EnchantmentBloodCollection extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.blood_collection.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "blood_collection";
@@ -46,7 +54,27 @@ public class EnchantmentBloodCollection extends EnchantmentBase {
 
     public EnchantmentBloodCollection() { super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}); }
 
-    @Override public int getMinCost(int l) { return (int)((25 + (l - 1) * 15) * ConfigLoader.enchantingDifficulty); }
+    @Override
+    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+        int effectiveLevel = level;
+        effectiveLevel = capLevel(effectiveLevel, 10);
+        if (!isFullyCharged(ctx.getHolder())) return;
+        float lostHealthRatio = 1 - attacker.getHealth() / attacker.getMaxHealth();
+        float bonusDamage = ctx.getDamage() * lostHealthRatio * effectiveLevel * (float) BONUS_DAMAGE_PER_LEVEL.get();
+        ctx.addDamage(bonusDamage);
+        // 修复：使用主手检查BloodSlash联动
+        float healMultiplier = (float) HEAL_MULTIPLIER.get();
+        Enchantment bloodSlash = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBloodSlash.class);
+        if (bloodSlash != null) {
+            ItemStack mainHand = attacker.getHeldItem(EnumHand.MAIN_HAND);
+            if (!mainHand.isEmpty() && EnchantmentHelper.getEnchantmentLevel(bloodSlash, mainHand) > 0) {
+                healMultiplier = (float) HEAL_MULTIPLIER_WITH_SLASH.get();
+            }
+        }
+        attacker.heal(attacker.getMaxHealth() * lostHealthRatio * effectiveLevel * healMultiplier);
+    }
 
+    @Override public int getMinCost(int l) { return (int)((25 + (l - 1) * 15) * ConfigLoader.enchantingDifficulty); }
     @Override public int getMaxCost(int l) { return getMinCost(l) + 50; }
 }

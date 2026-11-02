@@ -1,19 +1,38 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.enchantment.EnumEnchantmentType;
+import javax.annotation.Nonnull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
+import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
 
 /**
- * PORT-STUB(E3)
- * <p>沙布里里嚎叫附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 沙布里里嚎叫附魔
+ * <p>
+ * 武器附魔，叠层诅咒系统
+ * 攻击时：
+ * - 给目标叠加沙布里里嚎叫效果（持续 = 等级 × 3秒，层数+1，最高5层）
+ * - 目标满5层时，伤害增加 15% × 等级
+ * - 攻击者自身受到癫火伤害（3秒内共5%最大生命值，创造模式免疫）
+ * </p>
+ * <p>
+ * 性能优化 v3.0：自损持续伤害改用 DamageOverTimeManager
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 3.0
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "howl_shabriri",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -22,6 +41,11 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         slots = {EntityEquipmentSlot.MAINHAND}
 )
 public class EnchantmentHowlShabriri extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.howl_shabriri.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "howl_shabriri";
@@ -76,6 +100,50 @@ public class EnchantmentHowlShabriri extends EnchantmentBase {
 
     public EnchantmentHowlShabriri() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
+
+    @Override
+    protected void onDamageAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+        EntityLivingBase victim = ctx.getVictim();
+
+        if (victim == null) {
+            return;
+        }
+
+        if (!isFullyCharged(attacker)) {
+            return;
+        }
+
+        // 获取当前沙布里里嚎叫等级
+        int currentAmplifier = DynamicAttributeManager.getAmplifier(victim, DynamicAttributes.HOWL_SHABRIRI);
+
+        if (currentAmplifier >= MAX_AMPLIFIER.getInt()) {
+            // 满5层，增加伤害
+            float bonusDamage = ctx.getDamage() * level * (float) BONUS_DAMAGE_PER_LEVEL.get();
+            ctx.addDamage(bonusDamage);
+        }
+
+        // 叠加沙布里里嚎叫效果（最高5层）
+        int newAmplifier = currentAmplifier < 0 ? 0 : Math.min(currentAmplifier + 1, MAX_AMPLIFIER.getInt());
+        DynamicAttributeManager.apply(victim,
+                DynamicAttributes.HOWL_SHABRIRI.createInstance(level * STACK_SECONDS_PER_LEVEL.getInt() * 20, newAmplifier));
+
+        // 对攻击者造成癫火伤害（创造模式玩家免疫）
+        if (!(attacker instanceof EntityPlayer) || !((EntityPlayer) attacker).isCreative()) {
+            // 应用火焰燃烧视觉效果
+            DynamicAttributeManager.apply(attacker,
+                    DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(3 * 20 + 5, 0));
+            ClientSyncEffectHelper.onAttributeApplied(attacker, DynamicAttributes.EPILEPSY_FIRE_BURNING);
+
+            // v3.0优化：自损 5%最大生命值 / 60tick
+            // 按自损登记：被反噬耗死时致死一击走原版伤害管线，死亡消息、死因和伤害事件链与原版伤害致死一致
+            float selfDamagePerTick = attacker.getMaxHealth() * (float) SELF_DAMAGE_RATIO.get() / SELF_DOT_DURATION.getInt();
+            DamageOverTimeManager.applySelfLinear(
+                    attacker, selfDamagePerTick, SELF_DOT_DURATION.getInt(), SELF_DOT_DELAY.getInt(),
+                    NewDamageSource.epilepsyFire(attacker.world)
+            );
+        }
     }
 
     @Override

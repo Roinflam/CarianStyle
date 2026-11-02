@@ -1,19 +1,29 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.enchantment.EnumEnchantmentType;
+import javax.annotation.Nonnull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
 /**
- * PORT-STUB(E3)
- * <p>腐败翼剑附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 腐败翼剑附魔
+ * <p>
+ * 武器附魔，连击系统
+ * 每次攻击增加连击数（最多20）
+ * 伤害加成 = 原伤害 × (连击数/4) × 3% × 等级
+ * 15秒后连击数开始逐个衰减
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "corrupted_wing_sword",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
@@ -22,6 +32,11 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         slots = {EntityEquipmentSlot.MAINHAND}
 )
 public class EnchantmentCorruptedWingSword extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.corrupted_wing_sword.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "corrupted_wing_sword";
@@ -58,10 +73,46 @@ public class EnchantmentCorruptedWingSword extends EnchantmentBase {
             EnchantmentValues.define(VALUE_ID, "damage_per_level",
                     0.03D, 0.0D, 2.0D);
 
+
     private static final String COMBO_COUNTER_KEY = "corrupted_wing_sword_combo";
 
     public EnchantmentCorruptedWingSword() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
+
+    @Override
+    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
+        if (ctx.isHolderPlayer() && !isJustSwung(ctx.getHolderAsPlayer())) {
+            return;
+        }
+
+        int currentCombo = EnchantmentDataManager.getCounter(COMBO_COUNTER_KEY, ctx.getHolder().getUniqueID());
+        int maxCombo = MAX_COMBO.getInt();
+
+        int newCombo;
+        if (currentCombo < maxCombo) {
+            newCombo = EnchantmentDataManager.incrementCounter(COMBO_COUNTER_KEY, ctx.getHolder().getUniqueID());
+
+            new SynchronizationTask(DECAY_DELAY.getInt()) {
+                @Override
+                public void run() {
+                    int combo = EnchantmentDataManager.getCounter(COMBO_COUNTER_KEY, ctx.getHolder().getUniqueID());
+                    if (combo > 1) {
+                        EnchantmentDataManager.setCounter(COMBO_COUNTER_KEY, ctx.getHolder().getUniqueID(), combo - 1);
+                    } else {
+                        EnchantmentDataManager.resetCounter(COMBO_COUNTER_KEY, ctx.getHolder().getUniqueID());
+                    }
+                }
+            }.start();
+        } else {
+            // 连击已到上限：不再叠加、也不再追加衰减任务，但增伤按上限计算。
+            // 原来增伤只写在上面的分支里，连击打满（默认 20）后增伤反而消失，要等衰减掉一层才回来
+            newCombo = maxCombo;
+        }
+
+        float damageBonus = ctx.getDamage() * (float) (newCombo / COMBO_DIVISOR.get())
+            * (float) DAMAGE_PER_LEVEL.get() * level;
+        ctx.addDamage(damageBonus);
     }
 
     @Override

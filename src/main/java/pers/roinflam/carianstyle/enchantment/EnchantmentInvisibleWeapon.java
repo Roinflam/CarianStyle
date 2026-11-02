@@ -1,22 +1,56 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.Enchantment;
+import net.minecraft.util.DamageSource;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.projectile.EntityArrow;
+import net.minecraft.enchantment.Enchantment;
 import javax.annotation.Nonnull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
-import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
- * PORT-STUB(E3)
- * <p>隐形武器附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 隐形武器附魔
+ * <p>
+ * 武器/弓箭附魔，攻击后获得隐身
+ * 攻击时：
+ * - 获得隐身效果（持续 = 等级 × 10 tick）
+ * - 箭矢攻击时持续时间 × 3
+ * </p>
+ *
+ * <h3>v2.1 修复：构造函数用的类型与注解声明不一致</h3>
+ * <p>
+ * <b>问题：</b>注解声明的是 {@code customType = "ARMS"}（剑 + 弓），
+ * 而构造函数传的是原版 {@code EnumEnchantmentType.WEAPON}（只有剑）。
+ * </p>
+ * <p>
+ * 由于 {@code EnchantmentRegistry.createEnchantmentInstance} 走无参构造函数分支时
+ * 会丢弃注解解析出来的类型，实际生效的一直是构造函数里的 WEAPON——
+ * 也就是说本附魔<b>从来没能附到弓上</b>，
+ * 但它的核心逻辑 {@link #onDamageAsAttackerHighest} 里专门写了
+ * 「箭矢攻击时隐身时长 × 3」的分支，这段代码在弓上永远跑不到。
+ * </p>
+ * <p>
+ * <b>修复：</b>构造函数改用 {@code "ARMS"} 自定义类型，与注解和实际逻辑对齐。
+ * </p>
+ * <p>
+ * <b>注意：</b>这是一次<b>扩大</b>适用范围的改动——修复后弓也会进入本附魔的
+ * 附魔台候选池。若你的服务器不希望弓能附隐形武器，
+ * 应当反向修改（把注解的 customType 改成 {@code type = EnumEnchantmentType.WEAPON}）
+ * 并同步删掉上面那段箭矢倍率逻辑。
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.1
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "invisible_weapon",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -26,6 +60,11 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         forceTreasure = true
 )
 public class EnchantmentInvisibleWeapon extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.invisible_weapon.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "invisible_weapon";
@@ -50,6 +89,22 @@ public class EnchantmentInvisibleWeapon extends EnchantmentBase {
         // v2.1：EnumEnchantmentType.WEAPON → ARMS 自定义类型（剑+弓），与注解一致
         super(CarianStyleEnchantments.getCustomEnchantmentCategory("ARMS"),
                 new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
+
+    @Override
+    protected void onDamageAsAttackerHighest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+        DamageSource damageSource = ctx.getDamageSource();
+
+        // 计算持续时间倍率
+        int magnification = 1;
+        if (damageSource != null && damageSource.getImmediateSource() instanceof EntityArrow) {
+            magnification += ARROW_BONUS_MAGNIFICATION.getInt();  // 箭矢攻击倍率 = 3
+        }
+
+        // 施加隐身效果
+        DynamicAttributeManager.apply(attacker,
+                DynamicAttributes.STEALTH.createInstance(level * STEALTH_TICKS_PER_LEVEL.getInt() * magnification));
     }
 
     @Override

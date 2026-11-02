@@ -1,19 +1,47 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.potion.PotionEffect;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.enchantment.EnumEnchantmentType;
+import javax.annotation.Nonnull;
+import pers.roinflam.carianstyle.utils.util.DayNightUtil;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * PORT-STUB(E3)
- * <p>阿杜拉月光剑附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 阿杜拉月光剑附魔
+ * <p>
+ * 攻击变为魔法伤害，对目标周围敌人施加冻伤
+ * 白天：叠加+1等级，夜晚：叠加+2等级
+ * </p>
+ *
+ * <h3>性能安全上限（v2.1 新增）</h3>
+ * <ul>
+ *   <li>{@link #MAX_SEARCH_RADIUS}：AOE 搜索半径硬上限，防止高等级附魔（如 100 级）
+ *       直接把等级当半径，导致 100 格搜索扫过大量实体。</li>
+ *   <li>{@link #MAX_TARGETS}：单次触发最大命中目标数上限，防止密集怪物场景下
+ *       对大量实体施加效果导致事件风暴。</li>
+ * </ul>
+ *
+ * <p>本附魔每次攻击触发，触发频率极高，必须严格封顶。</p>
+ *
+ * <h3>v2.2：不冻同类</h3>
+ * <p>被打的目标照常吃冻伤；周围只波及「别人」：同类（玩家不冻别的玩家，怪物不冻同种怪物）、队友和自己养的宠物不冻。
+ * 原来只排除持有者自己，会把队友和宠物一起冻上。</p>
+ *
+ * @author RoinFlam
+ * @version 2.2
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "adura_moonlight_sword",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -29,6 +57,11 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         }
 )
 public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.adura_moonlight_sword.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "adura_moonlight_sword";
@@ -75,6 +108,77 @@ public class EnchantmentAduraMoonlightSword extends EnchantmentBase {
 
     public EnchantmentAduraMoonlightSword() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
+
+    /**
+     * 修复：改用 Normal 优先级
+     */
+    @Override
+    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+        EntityLivingBase victim = ctx.getVictim();
+
+        if (victim == null) {
+            return;
+        }
+
+        // 手动应用等级限制
+        int effectiveLevel = level;
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
+
+        // 玩家需要满蓄力，非玩家直接触发
+        if (!isFullyCharged(ctx.getHolder())) {
+            return;
+        }
+
+        // 伤害变为魔法伤害
+        if (ctx.getDamageSource() != null) {
+            pers.roinflam.carianstyle.utils.util.DamageSourceUtil.setMagicDamage(ctx.getDamageSource());
+        }
+
+        // v2.1：搜索半径硬上限，防止等级直接当半径
+        // 原：effectiveLevel（100级 = 100格）
+        int searchRadius = Math.min(effectiveLevel, MAX_SEARCH_RADIUS.getInt());
+
+        // 获取目标周围的敌人
+        List<EntityLivingBase> nearbyEntities = EntityUtil.getNearbyEntities(
+                EntityLivingBase.class,
+                victim,
+                searchRadius,
+                // 被打的目标一定吃冻伤；周围只波及「别人」：同类（玩家不冻别的玩家）、队友和自己养的宠物不冻
+                entity -> entity.equals(victim) || !isSameKindOrAlly(attacker, entity)
+        );
+
+        // 被打的目标排到最前面：下面有命中数量上限，周围怪多时它不能被挤到上限之外，说好了它一定吃冻伤
+        nearbyEntities = new ArrayList<>(nearbyEntities);
+        if (nearbyEntities.remove(victim)) {
+            nearbyEntities.add(0, victim);
+        }
+
+        // 施加冻伤效果
+        boolean isNight = !DayNightUtil.isDay(attacker.world);
+        int stackIncrease = isNight ? 2 : 1;
+        int initialLevel = isNight ? 1 : 0;
+
+        // v2.1：命中数量硬上限，防止密集怪物场景下事件风暴
+        int hitCount = 0;
+        for (EntityLivingBase entity : nearbyEntities) {
+            if (hitCount >= MAX_TARGETS.getInt()) {
+                break;
+            }
+
+            PotionEffect existingEffect = entity.getActivePotionEffect(CarianStylePotion.FROSTBITE.get());
+
+            int newLevel;
+            if (existingEffect != null) {
+                newLevel = Math.min(existingEffect.getAmplifier() + stackIncrease, FROSTBITE_MAX_AMPLIFIER.getInt());
+            } else {
+                newLevel = initialLevel;
+            }
+
+            entity.addPotionEffect(new PotionEffect(CarianStylePotion.FROSTBITE.get(), FROSTBITE_DURATION.getInt(), newLevel));
+            hitCount++;
+        }
     }
 
     @Override

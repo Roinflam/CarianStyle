@@ -1,22 +1,34 @@
 package pers.roinflam.carianstyle.enchantment;
 
+import net.minecraft.potion.PotionEffect;
+import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnumEnchantmentType;
-import net.minecraft.inventory.EntityEquipmentSlot;
 import javax.annotation.Nonnull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
-import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 
 /**
- * PORT-STUB(E3)
- * <p>催眠烟雾附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 催眠烟雾附魔
+ * <p>
+ * 武器附魔，概率使目标入睡
+ * 攻击时：
+ * - 2% × 等级的概率触发
+ * - 延迟5tick后施加睡眠效果（持续 = 等级 × 3秒，效果等级 = 附魔等级 - 1）
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "hypnotic_smoke",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -25,6 +37,11 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         slots = {EntityEquipmentSlot.MAINHAND}
 )
 public class EnchantmentHypnoticSmoke extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.hypnotic_smoke.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "hypnotic_smoke";
@@ -55,6 +72,34 @@ public class EnchantmentHypnoticSmoke extends EnchantmentBase {
 
     public EnchantmentHypnoticSmoke() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
+
+    @Override
+    protected void onDamageAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase victim = ctx.getVictim();
+        if (victim == null) {
+            return;
+        }
+
+        // 连点等于多掷几次骰子，刷出睡眠后再补一记满蓄力就能吃到加倍伤害，要求满蓄力
+        if (!isFullyCharged(ctx.getHolder())) {
+            return;
+        }
+
+        if (!RandomUtil.percentageChance(level * CHANCE_PER_LEVEL.get())) {
+            return;
+        }
+
+        new SynchronizationTask(APPLY_DELAY.getInt()) {
+            @Override
+            public void run() {
+                victim.addPotionEffect(new PotionEffect(
+                        CarianStylePotion.SLEEP.get(),
+                        level * DURATION_SECONDS_PER_LEVEL.getInt() * 20,
+                        level - 1
+                ));
+            }
+        }.start();
     }
 
     @Override

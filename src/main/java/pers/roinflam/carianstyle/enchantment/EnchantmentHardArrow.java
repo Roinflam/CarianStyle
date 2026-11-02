@@ -1,24 +1,69 @@
 package pers.roinflam.carianstyle.enchantment;
 
+import pers.roinflam.carianstyle.utils.Reference;
+import net.minecraft.world.WorldServer;
+import net.minecraft.util.EnumHand;
+import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.projectile.EntityArrow;
+import net.minecraft.item.ItemStack;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.init.Enchantments;
-import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.util.math.RayTraceResult;
+import net.minecraftforge.event.entity.ProjectileImpactEvent;
+import net.minecraftforge.event.entity.living.LivingKnockBackEvent;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 import javax.annotation.Nonnull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
+import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
+
+import java.util.List;
 
 /**
- * PORT-STUB(E3)
- * <p>硬箭附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 硬箭附魔
+ * <p>v2.2：ProjectileImpact射手+LivingKnockBack受击者入口接入怪物附魔触发开关。
+ * onHurtAsVictimHighest 走中央事件分发器，已被 scanEntity 拦截。</p>
+ *
+ * <h3>v2.3：接入视觉反馈（两半各一个）</h3>
+ * <ul>
+ *     <li><b>加伤那半边</b>：命中实体时播钉入式冲击
+ *         （{@code CombatArtBurstRenderer}）。见下方
+ *         {@link #onProjectileImpact_Arrow}。
+ *         <b>v2.4 起演出尺寸随这一箭的伤害线性缩放</b>——
+ *         打掉目标一半最大生命时用满，轻擦一下只有三分之一大，
+ *         使演出大小本身成为一条无需读数字的伤害反馈。</li>
+ *     <li><b>代价那半边</b>：由客户端的 {@code HardArrowRangeRenderer} 画一个
+ *         <b>只有持有者自己看得见</b>的 12 格范围光环，范围内有生物时由绿转赤。
+ *         <b>那部分完全不需要服务端配合</b>——它只读本地玩家的主手物品，
+ *         零网络包，因此本文件里没有任何与之相关的代码。</li>
+ * </ul>
+ * <p>
+ * 之所以要给代价那半边单独做提示：12 格远超肉眼可靠估距的范围，
+ * 而它带来的是<b>受伤 +80%×等级</b>的巨额惩罚，玩家却只能靠目测。
+ * </p>
+ *
+ * @version 2.4
  */
-@Deprecated
 @AutoRegisterEnchantment(id = "hard_arrow", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.UNCOMMON, type = EnumEnchantmentType.BOW, slots = {EntityEquipmentSlot.MAINHAND})
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentHardArrow extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.hard_arrow.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "hard_arrow";
@@ -57,9 +102,82 @@ public class EnchantmentHardArrow extends EnchantmentBase {
 
     public EnchantmentHardArrow() { super(EnumEnchantmentType.BOW, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}); }
 
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onProjectileImpact_Arrow(@Nonnull ProjectileImpactEvent.Arrow evt) {
+        EntityArrow arrow = evt.getArrow();
+        if (arrow.world.isRemote) return;
+        // 1.12.2 版：箭的主人是 shootingEntity 字段
+        if (!(arrow.shootingEntity instanceof EntityLivingBase)) return;
+        EntityLivingBase attacker = (EntityLivingBase) arrow.shootingEntity;
+
+        // v2.2：怪物附魔触发开关（射手视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+
+        ItemStack heldItem = attacker.getHeldItem(EnumHand.MAIN_HAND);
+        if (heldItem.isEmpty()) return;
+        Enchantment hardArrow = EnchantmentRegistry.getEnchantmentByClass(EnchantmentHardArrow.class);
+        if (hardArrow == null) return;
+        int level = EnchantmentHelper.getEnchantmentLevel(hardArrow, heldItem);
+        level = applyLevelLimit(hardArrow, level, 10);
+        if (level <= 0) return;
+        arrow.setDamage(arrow.getDamage()
+                + arrow.getDamage() * level * ARROW_DAMAGE_PER_LEVEL.get());
+
+        // v2.3：冲击特效。
+        // 本方法对「射中方块」与「射中实体」一视同仁地加伤，但特效需要一个命中实体
+        // 作为锚点（冲击环以它为原点沿箭道后退），故只在实体命中时播。
+        // 射中方块时不播是刻意的：那种情况下加伤没有意义，画出来只会是噪音
+        RayTraceResult hit = evt.getRayTraceResult();
+        if (hit != null && hit.typeOfHit == RayTraceResult.Type.ENTITY && hit.entityHit != null
+                && attacker.world instanceof WorldServer) {
+            WorldServer serverLevel = (WorldServer) attacker.world;
+            // v2.4：演出尺寸随伤害缩放，故把伤害估值一并传过去。
+            //
+            // 这里必须自己估算，不能直接用 getDamage() —— 原版箭矢的实际伤害是
+            //     MathHelper.ceil(速度模长 × damage)
+            // （见 EntityArrow.onHit）。一支强弓满蓄力射出的箭速度模长约 3，
+            // 直接拿 baseDamage 当伤害会低估到三分之一，演出永远缩在最小档。
+            //
+            // 注意这仍然只是估值：真实伤害还会经过暴击、护甲、抗性、以及本模组
+            // 其它附魔的加成。但演出尺寸只需要一个「这一下重不重」的量级判断，
+            // 为了精确而把特效推迟到伤害结算之后，反而会让视觉比音效和击退慢半拍
+            float estimatedDamage = (float) (arrow.getDamage()
+                    * Math.sqrt(arrow.motionX * arrow.motionX + arrow.motionY * arrow.motionY + arrow.motionZ * arrow.motionZ));
+            CarianStyleCombatArtEffects.hardArrow(serverLevel, attacker,
+                    hit.entityHit, estimatedDamage);
+        }
+    }
+
+    @Override
+    protected void onHurtAsVictimHighest(@Nonnull EnchantmentContext ctx, int level) {
+        if (ctx.getAttacker() == null) return;
+        EntityLivingBase victim = ctx.getHolder();
+        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(EntityLivingBase.class, victim, AOE_RADIUS.getInt(), entity -> !entity.equals(victim));
+        if (entities.isEmpty()) return;
+        ctx.addDamage(ctx.getDamage() * level * (float) MELEE_DAMAGE_PER_LEVEL.get());
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onLivingKnockBack(@Nonnull LivingKnockBackEvent evt) {
+        if (evt.getEntityLiving().world.isRemote) return;
+        EntityLivingBase victim = evt.getEntityLiving();
+
+        // v2.2：怪物附魔触发开关（受击者视角，被击退强化）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
+        ItemStack heldItem = victim.getHeldItem(EnumHand.MAIN_HAND);
+        if (heldItem.isEmpty()) return;
+        Enchantment hardArrow = EnchantmentRegistry.getEnchantmentByClass(EnchantmentHardArrow.class);
+        if (hardArrow == null) return;
+        int level = EnchantmentHelper.getEnchantmentLevel(hardArrow, heldItem);
+        level = applyLevelLimit(hardArrow, level, 10);
+        if (level <= 0) return;
+        List<EntityLivingBase> entities = EntityUtil.getNearbyEntities(EntityLivingBase.class, victim, AOE_RADIUS.getInt(), entity -> !entity.equals(victim));
+        if (entities.isEmpty()) return;
+        evt.setStrength(evt.getStrength() + evt.getStrength() * level * (float) KNOCKBACK_PER_LEVEL.get());
+    }
+
     @Override public int getMinCost(int l) { return (int)((5 + (l - 1) * 10) * ConfigLoader.enchantingDifficulty); }
-
     @Override public int getMaxCost(int l) { return getMinCost(l) + 50; }
-
     @Override protected boolean checkCompatibility(@Nonnull Enchantment ench) { return super.checkCompatibility(ench) && !ench.equals(Enchantments.POWER); }
 }

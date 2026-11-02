@@ -1,20 +1,76 @@
 package pers.roinflam.carianstyle.enchantment;
 
-import net.minecraft.enchantment.EnumEnchantmentType;
+import pers.roinflam.carianstyle.mc112.damage.DamageTags;
+import pers.roinflam.carianstyle.utils.Reference;
+import net.minecraft.util.DamageSource;
+import net.minecraft.world.WorldServer;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.item.ItemStack;
+import net.minecraft.enchantment.Enchantment;
+import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+import javax.annotation.Nonnull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.network.AoeEffectPacket;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.AoeHelper;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
+import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
+
+import java.util.List;
 
 /**
- * PORT-STUB(E3)
- * <p>因果律附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 因果律附魔
+ * <p>
+ * 护甲附魔。每累积受击 {@link #TRIGGER_COUNT} 次，对周围敌人发动一次 AOE 反击，
+ * 伤害按本次受击量 × 等级计算。
+ * </p>
+ *
+ * <h3>特效</h3>
+ * <p>
+ * 触发点广播 {@link AoeEffectPacket#TYPE_CAUSALITY}——地面金色六芒星法阵（旋转）
+ * + 内六边形 + 外发光环 + 紫色「因果之线」放射抽射 + 六芒星顶点火花，约 1100ms。
+ * 半径与实际作用半径一致；环分段数由渲染器按半径自算（夹取 36~72），调用方不用管。
+ * </p>
+ *
+ * <h3>为什么这个附魔有两层防护</h3>
+ * <p>
+ * 本附魔曾导致过一次实际崩服，两层防护缺一不可，<b>改动时请勿削减</b>：
+ * </p>
+ * <ul>
+ *   <li>{@link #AOE_GUARD}：线程级重入保护，阻断因果律自身的同步伤害事件级联。</li>
+ *   <li>{@link #COOLDOWN_KEY} + {@link #TRIGGER_COOLDOWN}：触发冷却，1 秒最多触发一次 AOE 反击。</li>
+ * </ul>
+ * <p>
+ * 重入保护使用公共实现 {@link AoeHelper.ReentrancyGuard}（因果律、时间逆转、学者盾
+ * 曾各手写一份完全相同的 ThreadLocal 逻辑）。其 {@code run()} 内部用 try-finally
+ * 复位标记，即使 {@code hurt} 抛异常也不会让标记滞留、导致本附魔永久失效——
+ * 这正是手写版本最容易漏掉的地方。
+ * </p>
+ *
+ * <h3>崩溃链路</h3>
+ * <ol>
+ *   <li>玩家受击 → LivingDamageEvent → 本附魔第 5 次累积触发 AOE 反击</li>
+ *   <li>AOE 对周围实体 hurt → 每个被击中实体再走完整「受击 → 伤害」事件链</li>
+ *   <li>若被击中实体也穿因果律护甲 → 继续累积计数 → 再次触发 AOE，呈指数级放大</li>
+ *   <li>再叠加其它模组的反伤与「每次攻击都 addModifier」的机制，
+ *       单 tick 内伤害事件爆炸式增长，最终卡死在 AttributeInstance 的 HashSet.add</li>
+ * </ol>
+ *
+ * @author RoinFlam
+ * @version 3.0
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "causality_principle",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -22,7 +78,13 @@ import pers.roinflam.carianstyle.utils.util.AoeHelper;
         type = EnumEnchantmentType.ARMOR,
         slots = {EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET}
 )
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentCausalityPrinciple extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.causality_principle.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "causality_principle";
@@ -75,11 +137,14 @@ public class EnchantmentCausalityPrinciple extends EnchantmentBase {
             EnchantmentValues.define(VALUE_ID, "damage_per_level",
                     0.75D, 0.0D, 10.0D);
 
+
     /** 受击累积计数器键 */
     private static final String COUNTER_KEY = "causality_principle";
 
+
     /** AOE 反击触发冷却键 */
     private static final String COOLDOWN_KEY = "causality_principle_cooldown";
+
 
     /**
      * 本附魔专属的线程级重入保护。
@@ -99,6 +164,108 @@ public class EnchantmentCausalityPrinciple extends EnchantmentBase {
         super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
                 EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET
         });
+    }
+
+    /**
+     * 受击事件监听：累积受击次数，每满 {@link #TRIGGER_COUNT} 次对周围敌人造成一次 AOE 反击。
+     *
+     * @param evt 生物受到伤害事件
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
+        if (evt.getEntityLiving().world.isRemote) {
+            return;
+        }
+
+        // 重入保护 —— 若当前线程正在执行因果律 AOE 反击，直接跳过，
+        // 阻断因果律自身的伤害事件级联（核心崩溃修复点，详见类注释）
+        if (AOE_GUARD.isActive()) {
+            return;
+        }
+
+        if (DamageTags.is(evt.getSource(), DamageTags.BYPASSES_INVULNERABILITY)) {
+            return;
+        }
+
+        if (!(evt.getSource().getTrueSource() instanceof EntityLivingBase)) {
+            return;
+        }
+
+        EntityLivingBase victim = evt.getEntityLiving();
+
+        // 怪物附魔触发开关（受击者视角，5 次受击触发 AOE 反击）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
+        Enchantment causalityPrinciple = EnchantmentRegistry.getEnchantmentByClass(EnchantmentCausalityPrinciple.class);
+        if (causalityPrinciple == null) {
+            return;
+        }
+
+        int totalLevel = 0;
+        for (ItemStack armor : victim.getArmorInventoryList()) {
+            if (!armor.isEmpty()) {
+                totalLevel += EnchantmentHelper.getEnchantmentLevel(causalityPrinciple, armor);
+            }
+        }
+
+        totalLevel = applyLevelLimit(causalityPrinciple, totalLevel, LEVEL_CAP.getInt());
+
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        final int effectiveLevel = totalLevel;
+
+        int currentCount = EnchantmentDataManager.incrementCounter(COUNTER_KEY, victim.getUniqueID());
+
+        if (currentCount >= TRIGGER_COUNT.getInt()) {
+            // 触发冷却判断。冷却中保持计数不重置，冷却结束后下次受击立即触发，
+            // 保证 AOE 反击 1 秒最多触发一次
+            if (EnchantmentDataManager.isOnCooldown(COOLDOWN_KEY, victim.getUniqueID())) {
+                return;
+            }
+
+            EnchantmentDataManager.resetCounter(COUNTER_KEY, victim.getUniqueID());
+            EnchantmentDataManager.setCooldown(COOLDOWN_KEY, victim.getUniqueID(), TRIGGER_COOLDOWN.getInt());
+
+            int searchRadius = Math.min(effectiveLevel * 3, MAX_SEARCH_RADIUS.getInt());
+
+            // AOE 触发时播放一发因果律金紫六芒星法阵（约 1100ms）。
+            // 特效半径取实际作用半径 searchRadius，保证「看到多大就打多大」。
+            // 纯服务端发包，不生成实体、不触发任何事件，
+            // 不影响下方伤害逻辑与两层崩服防护。
+            if (victim.world instanceof WorldServer) {
+                WorldServer serverLevel = (WorldServer) victim.world;
+                CarianStyleEffects.causality(
+                        serverLevel,
+                        victim.posX, victim.posY + 0.1, victim.posZ,
+                        searchRadius
+                );
+            }
+
+            List<EntityLivingBase> targets = EntityUtil.getNearbyEntities(
+                    EntityLivingBase.class,
+                    victim,
+                    searchRadius,
+                    entity -> !entity.equals(victim)
+            );
+
+            float damage = evt.getAmount() * effectiveLevel * (float) DAMAGE_PER_LEVEL.get();
+
+            // 在守卫保护下执行 AOE 反击，确保 target.attackEntityFrom 触发的二次伤害事件
+            // 不会再次进入本方法形成级联；ReentrancyGuard 内部用 try-finally 复位标记，
+            // 即使 hurt 抛出异常也不会让标记滞留、导致因果律永久失效
+            AOE_GUARD.run(() -> {
+                int hitCount = 0;
+                for (EntityLivingBase target : targets) {
+                    if (hitCount >= MAX_TARGETS.getInt()) {
+                        break;
+                    }
+                    target.attackEntityFrom(DamageSource.causeMobDamage(victim), damage);
+                    hitCount++;
+                }
+            });
+        }
     }
 
     @Override
