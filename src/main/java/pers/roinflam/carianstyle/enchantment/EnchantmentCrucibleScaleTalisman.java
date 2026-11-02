@@ -7,13 +7,29 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import net.minecraft.enchantment.Enchantment;
+import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.item.ItemStack;
+import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
+import pers.roinflam.carianstyle.utils.Reference;
+import javax.annotation.Nonnull;
 
 /**
- * PORT-STUB(E4)
- * <p>坩埚鳞片护符附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 坩埚鳞片护符附魔
+ * <p>
+ * 受到的伤害不低于自身最大生命时（会被一击打死的伤害），按全身等级减伤：每级 15%，最多算 6 级。
+ * </p>
+ * <p>v2.1：LivingDamage受击者致命减伤入口接入怪物附魔触发开关</p>
+ *
+ * @author RoinFlam
+ * @version 2.1
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "crucible_scale_talisman",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -21,7 +37,13 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         type = EnumEnchantmentType.ARMOR,
         slots = {EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET}
 )
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentCrucibleScaleTalisman extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.crucible_scale_talisman.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "crucible_scale_talisman";
@@ -54,6 +76,43 @@ public class EnchantmentCrucibleScaleTalisman extends EnchantmentBase {
         super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
                 EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET
         });
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
+        if (evt.getEntityLiving().world.isRemote) {
+            return;
+        }
+
+        EntityLivingBase victim = evt.getEntityLiving();
+        if (evt.getAmount() < victim.getMaxHealth()) {
+            return;
+        }
+
+        // v2.1：怪物附魔触发开关（受击者视角，致命伤害减伤）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
+        Enchantment crucibleScaleTalisman = EnchantmentRegistry.getEnchantmentByClass(EnchantmentCrucibleScaleTalisman.class);
+        if (crucibleScaleTalisman == null) {
+            return;
+        }
+
+        int totalLevel = 0;
+        for (ItemStack armor : victim.getArmorInventoryList()) {
+            if (!armor.isEmpty()) {
+                totalLevel += EnchantmentHelper.getEnchantmentLevel(crucibleScaleTalisman, armor);
+            }
+        }
+
+        totalLevel = applyLevelLimit(crucibleScaleTalisman, totalLevel, LEVEL_CAP.getInt());
+
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        float reduction = evt.getAmount() * Math.min(totalLevel, EFFECTIVE_LEVEL_CAP.getInt())
+                * (float) REDUCTION_PER_LEVEL.get();
+        evt.setAmount(evt.getAmount() - reduction);
     }
 
     @Override

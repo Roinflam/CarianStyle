@@ -10,13 +10,28 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.item.ItemStack;
+import net.minecraftforge.event.entity.living.LivingAttackEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
+import pers.roinflam.carianstyle.utils.Reference;
 
 /**
- * PORT-STUB(E4)
- * <p>长尾猫附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 长尾猫附魔
+ * <p>
+ * 摔落伤害低于阈值时整个免掉：阈值 = 最大生命 × (50% + (全身等级 - 1) × 25%)。
+ * </p>
+ * <p>v2.1：LivingAttack摔落减伤入口接入怪物附魔触发开关</p>
+ * <p>1.12.2 版：摔落按伤害类型名 {@code "fall"} 判断（{@code getDamageType()}，1.20.1 是 {@code getMsgId()}）。</p>
+ *
+ * @author RoinFlam
+ * @version 2.1
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "long_tail_cat",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -24,7 +39,13 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         type = EnumEnchantmentType.ARMOR,
         slots = {EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET}
 )
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentLongTailCat extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.long_tail_cat.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "long_tail_cat";
@@ -57,6 +78,46 @@ public class EnchantmentLongTailCat extends EnchantmentBase {
         super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
                 EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET
         });
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
+        if (evt.getEntityLiving().world.isRemote) {
+            return;
+        }
+
+        if (!evt.getSource().getDamageType().equals("fall")) {
+            return;
+        }
+
+        EntityLivingBase victim = evt.getEntityLiving();
+
+        // v2.1：怪物附魔触发开关（受击者视角，摔落保护非濒死触发）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
+        Enchantment longTailCat = EnchantmentRegistry.getEnchantmentByClass(EnchantmentLongTailCat.class);
+        if (longTailCat == null) {
+            return;
+        }
+
+        int totalLevel = 0;
+        for (ItemStack armor : victim.getArmorInventoryList()) {
+            if (!armor.isEmpty()) {
+                totalLevel += EnchantmentHelper.getEnchantmentLevel(longTailCat, armor);
+            }
+        }
+
+        totalLevel = applyLevelLimit(longTailCat, totalLevel, LEVEL_CAP.getInt());
+
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        float threshold = victim.getMaxHealth() * (float) BASE_THRESHOLD.get()
+                + victim.getMaxHealth() * (totalLevel - 1) * (float) THRESHOLD_PER_LEVEL.get();
+        if (evt.getAmount() < threshold) {
+            evt.setCanceled(true);
+        }
     }
 
     @Override

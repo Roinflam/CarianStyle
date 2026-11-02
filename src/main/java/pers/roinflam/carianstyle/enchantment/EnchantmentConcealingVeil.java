@@ -10,13 +10,38 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 
 /**
- * PORT-STUB(E4)
- * <p>隐匿面纱附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 隐匿面纱附魔
+ * <p>
+ * 护甲附魔，潜行时获得隐身效果
+ * 攻击或受到攻击后3秒内无法隐身（战斗冷却）
+ * </p>
+ *
+ * <h3>v2.1：两个战斗冷却常量改为 public（行为零变化）</h3>
+ * <p>
+ * {@code CarianStyleConditionDisplay} 需要读这条冷却来显示 HUD 倒计时。
+ * 冷却记录在 {@link EnchantmentDataManager} 里是<b>按字符串键存的</b>，
+ * 读取方必须拿到与写入方完全相同的键。
+ * </p>
+ * <p>
+ * 与其在 HUD 那边复制一份 {@code "concealing_veil_battle"} 字面量，
+ * 不如把这里的常量公开——<b>复制字面量的问题在于它不会跟着改</b>：
+ * 哪天这里改了键名而那边没跟上，HUD 会安静地永远显示「无冷却」，
+ * 既不报错也不会被测试发现。改成 public 之后，键名只有一处定义，
+ * 改动会由编译器强制同步。
+ * </p>
+ * <p>
+ * 1.12.2 版：潜行判断用 {@code isSneaking()}（1.20.1 是 {@code isShiftKeyDown()}）。
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.1
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "concealing_veil",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -25,6 +50,9 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         slots = {EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET}
 )
 public class EnchantmentConcealingVeil extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.concealing_veil.desc。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "concealing_veil";
@@ -63,6 +91,54 @@ public class EnchantmentConcealingVeil extends EnchantmentBase {
                 EntityEquipmentSlot.LEGS,
                 EntityEquipmentSlot.FEET
         });
+    }
+
+    /**
+     * 攻击时标记战斗状态
+     */
+    @Override
+    protected void onAttackLowest(@Nonnull EnchantmentContext ctx, int level) {
+        if (ctx.isHolderPlayer()) {
+            EnchantmentDataManager.setCooldown(
+                    BATTLE_COOLDOWN_KEY,
+                    ctx.getHolder().getUniqueID(),
+                    BATTLE_DURATION.getInt()
+            );
+        }
+    }
+
+    /**
+     * 受到攻击时也标记战斗状态（修复受击后立刻隐身的bug）
+     */
+    @Override
+    protected void onHurtAsVictimLowest(@Nonnull EnchantmentContext ctx, int level) {
+        if (ctx.isHolderPlayer()) {
+            EnchantmentDataManager.setCooldown(
+                    BATTLE_COOLDOWN_KEY,
+                    ctx.getHolder().getUniqueID(),
+                    BATTLE_DURATION.getInt()
+            );
+        }
+    }
+
+    /**
+     * 每tick检查潜行状态
+     */
+    @Override
+    protected void onPlayerTick(@Nonnull EnchantmentContext ctx, int level) {
+        // 检查是否在潜行
+        if (!ctx.getHolderAsPlayer().isSneaking()) {
+            return;
+        }
+
+        // 检查是否在战斗冷却中
+        if (EnchantmentDataManager.isOnCooldown(BATTLE_COOLDOWN_KEY, ctx.getHolder().getUniqueID())) {
+            return;
+        }
+
+        // 应用隐身效果（持续2 tick）
+        DynamicAttributeManager.apply(ctx.getHolder(),
+                DynamicAttributes.STEALTH.createInstance(STEALTH_REFRESH_TICKS.getInt(), 0));
     }
 
     @Override

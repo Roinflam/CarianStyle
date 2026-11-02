@@ -10,13 +10,37 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.DamageSource;
+import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
+import pers.roinflam.carianstyle.mc112.damage.DamageTags;
+import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 /**
- * PORT-STUB(E4)
- * <p>龙徽大盾附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 龙徽大盾附魔
+ * <p>
+ * 每次受到物理伤害叠一层护盾（隐藏的动态属性 {@code DRAGONCREST_GREATSHIELD}，30 秒内不受击就清空），
+ * 叠满 20 层后，之后的物理伤害只受 75%。魔法伤害和无视护甲的伤害不叠层、不减伤。
+ * </p>
+ * <p>
+ * 1.12.2 版：「无视护甲」按 {@code DamageTags.BYPASSES_ARMOR} 判断（1.20.1 是伤害类型标签），
+ * 原版的 {@code isUnblockable()} 也算在里面。
+ * </p>
+ * <p>v2.1：LivingDamage受击者叠盾入口接入怪物附魔触发开关</p>
+ *
+ * @author RoinFlam
+ * @version 2.1
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "dragoncrest_greatshield",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -24,7 +48,13 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         type = EnumEnchantmentType.ARMOR,
         slots = {EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET}
 )
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentDragoncrestGreatshield extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.dragoncrest_greatshield.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "dragoncrest_greatshield";
@@ -57,6 +87,53 @@ public class EnchantmentDragoncrestGreatshield extends EnchantmentBase {
         super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
                 EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET
         });
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
+        if (evt.getEntityLiving().world.isRemote) {
+            return;
+        }
+
+        DamageSource damageSource = evt.getSource();
+        if (DamageSourceUtil.isMagicDamage(damageSource) ||
+                DamageTags.is(damageSource, DamageTags.BYPASSES_ARMOR)) {
+            return;
+        }
+
+        EntityLivingBase victim = evt.getEntityLiving();
+
+        // v2.1：怪物附魔触发开关（受击者视角，物理叠层护盾）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
+        Enchantment dragoncrest = EnchantmentRegistry.getEnchantmentByClass(EnchantmentDragoncrestGreatshield.class);
+        if (dragoncrest == null) {
+            return;
+        }
+
+        int totalLevel = 0;
+        for (ItemStack armor : victim.getArmorInventoryList()) {
+            if (!armor.isEmpty()) {
+                totalLevel += EnchantmentHelper.getEnchantmentLevel(dragoncrest, armor);
+            }
+        }
+
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        int currentAmplifier = DynamicAttributeManager.getAmplifier(victim, DynamicAttributes.DRAGONCREST_GREATSHIELD);
+        if (currentAmplifier < 0) {
+            DynamicAttributeManager.apply(victim,
+                    DynamicAttributes.DRAGONCREST_GREATSHIELD.createInstance(SHIELD_DURATION.getInt(), 0));
+        } else if (currentAmplifier < MAX_SHIELD_LEVEL.getInt()) {
+            DynamicAttributeManager.apply(victim,
+                    DynamicAttributes.DRAGONCREST_GREATSHIELD.createInstance(SHIELD_DURATION.getInt(), currentAmplifier + 1));
+        } else {
+            DynamicAttributeManager.apply(victim,
+                    DynamicAttributes.DRAGONCREST_GREATSHIELD.createInstance(SHIELD_DURATION.getInt(), MAX_SHIELD_LEVEL.getInt()));
+            evt.setAmount(evt.getAmount() * (float) DAMAGE_MULTIPLIER.get());
+        }
     }
 
     @Override

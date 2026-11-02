@@ -7,13 +7,39 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.item.ItemShield;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.DamageSource;
+import net.minecraftforge.event.entity.living.LivingAttackEvent;
+import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
+import pers.roinflam.carianstyle.utils.Reference;
+import net.minecraft.enchantment.Enchantment;
+import javax.annotation.Nonnull;
 
 /**
- * PORT-STUB(E4)
- * <p>学者盾附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 学者盾附魔
+ * <p>
+ * 举着盾牌时：近身打来的攻击按伤害 × 10% × 等级反弹给攻击者，自己受到的伤害降低 7.5% × 等级。
+ * </p>
+ * <p>v2.2：受击反伤+受击减伤双向入口接入怪物附魔触发开关</p>
+ * <p>v2.3：onLivingAttack 反伤入口新增 ThreadLocal 重入保护，
+ * 阻断双方同时举学者盾对攻时反伤伤害互相触发对方反伤、形成来回反弹的事件级联。
+ * 单次反伤与减伤逻辑（含被反伤者举盾减免反伤）完全保留，仅阻断连锁二次反伤。</p>
+ * <p>
+ * 1.12.2 版：「正在用」是 {@code isHandActive()} / {@code getActiveItemStack()}，
+ * 反伤用 {@code DamageSource.causeMobDamage}（1.20.1 是 {@code damageSources().mobAttack}）。
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.3
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "scholar_shield",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -21,7 +47,13 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         customType = "SHIELD",
         slots = {EntityEquipmentSlot.MAINHAND, EntityEquipmentSlot.OFFHAND}
 )
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentScholarShield extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.scholar_shield.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "scholar_shield";
@@ -59,6 +91,92 @@ public class EnchantmentScholarShield extends EnchantmentBase {
         super(CarianStyleEnchantments.getCustomEnchantmentCategory("SHIELD"), new EntityEquipmentSlot[]{
                 EntityEquipmentSlot.MAINHAND, EntityEquipmentSlot.OFFHAND
         });
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
+        if (evt.getEntityLiving().world.isRemote) {
+            return;
+        }
+
+        // v2.3：重入保护 —— 若当前线程正在执行学者盾反伤，直接跳过，
+        // 阻断双方举盾对攻时的连锁二次反伤
+        if (PROCESSING_RETALIATION.get()) {
+            return;
+        }
+
+        if (!(evt.getSource().getImmediateSource() instanceof EntityLivingBase)) {
+            return;
+        }
+        EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+
+        EntityLivingBase victim = evt.getEntityLiving();
+
+        // v2.2：怪物附魔触发开关（受击者视角，反伤）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
+        if (!victim.isHandActive()) {
+            return;
+        }
+
+        ItemStack activeItem = victim.getActiveItemStack();
+        if (activeItem.isEmpty() || !(activeItem.getItem() instanceof ItemShield)) {
+            return;
+        }
+
+        Enchantment scholarShield = EnchantmentRegistry.getEnchantmentByClass(EnchantmentScholarShield.class);
+        if (scholarShield == null) {
+            return;
+        }
+
+        int level = EnchantmentHelper.getEnchantmentLevel(scholarShield, activeItem);
+        level = applyLevelLimit(scholarShield, level, 10);
+        if (level <= 0) return;
+
+        // v2.3：反伤期间置位重入标记，确保反伤伤害不会再次触发反伤；
+        // try-finally 保证标记可靠复位，避免标记滞留导致学者盾反伤永久失效
+        PROCESSING_RETALIATION.set(Boolean.TRUE);
+        try {
+            attacker.attackEntityFrom(DamageSource.causeMobDamage(victim), evt.getAmount() * level * (float) REFLECT_PER_LEVEL.get());
+        } finally {
+            PROCESSING_RETALIATION.set(Boolean.FALSE);
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
+        if (evt.getEntityLiving().world.isRemote) {
+            return;
+        }
+
+        if (evt.getSource().getImmediateSource() == null) {
+            return;
+        }
+
+        EntityLivingBase victim = evt.getEntityLiving();
+
+        // v2.2：怪物附魔触发开关（受击者视角，减伤）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
+        if (!victim.isHandActive()) {
+            return;
+        }
+
+        ItemStack activeItem = victim.getActiveItemStack();
+        if (activeItem.isEmpty() || !(activeItem.getItem() instanceof ItemShield)) {
+            return;
+        }
+
+        Enchantment scholarShield = EnchantmentRegistry.getEnchantmentByClass(EnchantmentScholarShield.class);
+        if (scholarShield == null) {
+            return;
+        }
+
+        int level = EnchantmentHelper.getEnchantmentLevel(scholarShield, activeItem);
+        level = applyLevelLimit(scholarShield, level, 10);
+        if (level <= 0) return;
+
+        evt.setAmount(evt.getAmount() - evt.getAmount() * level * (float) REDUCTION_PER_LEVEL.get());
     }
 
     @Override

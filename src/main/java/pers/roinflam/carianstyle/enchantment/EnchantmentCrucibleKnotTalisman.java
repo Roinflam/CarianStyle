@@ -7,13 +7,19 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import net.minecraft.entity.EntityLivingBase;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import javax.annotation.Nonnull;
 
 /**
- * PORT-STUB(E4)
- * <p>熔炉瘤附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 熔炉瘤附魔
+ * <p>
+ * 当攻击来源的高度大于自身高度时，受到的伤害降低 25% × 等级
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "crucible_knot_talisman",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -22,6 +28,11 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         slots = {EntityEquipmentSlot.CHEST}
 )
 public class EnchantmentCrucibleKnotTalisman extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.crucible_knot_talisman.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "crucible_knot_talisman";
@@ -44,6 +55,24 @@ public class EnchantmentCrucibleKnotTalisman extends EnchantmentBase {
 
     public EnchantmentCrucibleKnotTalisman() {
         super(EnumEnchantmentType.ARMOR_CHEST, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+    }
+
+    @Override
+    protected void onHurtAsVictim(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase victim = ctx.getHolder();
+        EntityLivingBase attacker = ctx.getAttacker();
+
+        if (attacker == null) {
+            return;
+        }
+
+        int effectiveLevel = level;
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
+
+        if (attacker.posY > victim.posY) {
+            float damageReduction = 1 - effectiveLevel * (float) REDUCTION_PER_LEVEL.get();
+            ctx.multiplyDamage(damageReduction);
+        }
     }
 
     @Override

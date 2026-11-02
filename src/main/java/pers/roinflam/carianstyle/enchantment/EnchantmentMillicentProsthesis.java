@@ -7,13 +7,28 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
+import javax.annotation.Nonnull;
 
 /**
- * PORT-STUB(E4)
- * <p>米莉森义肢附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 米莉森义肢附魔
+ * <p>
+ * 武器附魔，连续攻击增强
+ * 攻击时：
+ * - 叠加攻击增益效果（最多叠到等级×7层）
+ * - 满层后刷新为等级×16层，持续60tick
+ * 伤害加成：
+ * - 满层时增伤10%×等级
+ * - 未满层时增伤5%×等级
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "millicent_prosthesis",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -31,6 +46,11 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         }
 )
 public class EnchantmentMillicentProsthesis extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.millicent_prosthesis.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "millicent_prosthesis";
@@ -53,6 +73,51 @@ public class EnchantmentMillicentProsthesis extends EnchantmentBase {
 
     public EnchantmentMillicentProsthesis() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
+
+    @Override
+    protected void onAttackLowest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+
+        // 玩家必须是刚挥动武器
+        if (attacker instanceof EntityPlayer) {
+            if (!isJustSwung((EntityPlayer) attacker)) {
+                return;
+            }
+        }
+
+        // 获取当前攻击提升等级
+        int currentAmplifier = DynamicAttributeManager.getAmplifier(attacker, DynamicAttributes.ATTACK_BOOST);
+
+        if (currentAmplifier < 0) {
+            // 没有效果，初始化
+            DynamicAttributeManager.apply(attacker,
+                    DynamicAttributes.ATTACK_BOOST.createInstance(30, level - 1));
+        } else if (currentAmplifier < level * 7 - 1) {
+            // 未满层，叠加
+            DynamicAttributeManager.apply(attacker,
+                    DynamicAttributes.ATTACK_BOOST.createInstance(30, currentAmplifier + level));
+        } else {
+            // 满层，刷新为更高层
+            DynamicAttributeManager.apply(attacker,
+                    DynamicAttributes.ATTACK_BOOST.createInstance(60, level * 16 - 1));
+        }
+    }
+
+    @Override
+    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+
+        // 获取当前攻击提升等级
+        int currentAmplifier = DynamicAttributeManager.getAmplifier(attacker, DynamicAttributes.ATTACK_BOOST);
+
+        if (currentAmplifier >= level * 7 - 1) {
+            // 满层：增伤10%×等级
+            ctx.addDamage(ctx.getDamage() * level * (float) DAMAGE_PER_LEVEL_FULL.get());
+        } else if (currentAmplifier >= 0) {
+            // 未满层：增伤5%×等级
+            ctx.addDamage(ctx.getDamage() * level * (float) DAMAGE_PER_LEVEL_PARTIAL.get());
+        }
     }
 
     @Override

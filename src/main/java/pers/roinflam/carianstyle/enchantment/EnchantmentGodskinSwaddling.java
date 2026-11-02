@@ -7,13 +7,23 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import net.minecraft.entity.EntityLivingBase;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
+import javax.annotation.Nonnull;
 
 /**
- * PORT-STUB(E4)
- * <p>神皮襁褓附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 神皮襁褓附魔
+ * <p>
+ * 武器附魔，连续攻击回血
+ * 每攻击4次触发一次治疗：
+ * - 治疗量 = 最大生命值 × (3% + (等级 - 1) × 1%)
+ * - 等级1: 3%，等级2: 4%，等级3: 5%...
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "godskin_swaddling",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -22,6 +32,11 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         slots = {EntityEquipmentSlot.MAINHAND}
 )
 public class EnchantmentGodskinSwaddling extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.godskin_swaddling.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "godskin_swaddling";
@@ -62,6 +77,27 @@ public class EnchantmentGodskinSwaddling extends EnchantmentBase {
 
     public EnchantmentGodskinSwaddling() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
+
+    @Override
+    protected void onDamageAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+
+        // 计数与这一下打多少无关，连点（尤其打一群时）能成倍刷出回血，要求满蓄力，未满蓄力不计数
+        if (!isFullyCharged(attacker)) {
+            return;
+        }
+
+        int currentCount = EnchantmentDataManager.getCounter(ATTACK_COUNTER, attacker.getUniqueID());
+
+        if (currentCount == TRIGGER_COUNT.getInt()) {
+            EnchantmentDataManager.resetCounter(ATTACK_COUNTER, attacker.getUniqueID());
+            float healAmount = attacker.getMaxHealth() * (float) BASE_HEAL_RATIO.get()
+                + attacker.getMaxHealth() * (level - 1) * (float) HEAL_PER_EXTRA_LEVEL.get();
+            attacker.heal(healAmount);
+        } else {
+            EnchantmentDataManager.incrementCounter(ATTACK_COUNTER, attacker.getUniqueID(), COUNTER_EXPIRY.getInt());
+        }
     }
 
     @Override

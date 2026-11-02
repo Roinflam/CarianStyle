@@ -7,15 +7,59 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import net.minecraft.enchantment.Enchantment;
+import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.init.MobEffects;
+import net.minecraft.item.ItemStack;
+import net.minecraft.potion.PotionEffect;
+import net.minecraft.util.EnumHand;
+import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.event.entity.living.LivingHealEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
+import pers.roinflam.carianstyle.utils.Reference;
+import javax.annotation.Nonnull;
 
 /**
- * PORT-STUB(E4)
- * <p>吃屎附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 吃屎附魔
+ * <p>
+ * 满蓄力命中时：目标反胃 4 秒 × 等级，期间受到的治疗只剩 25%；自己也反胃 1.5 秒 × 等级。
+ * </p>
+ * <p>v2.2：攻击者+治疗事件入口接入怪物附魔触发开关</p>
+ *
+ * <h3>v2.3：{@link #DEBUFF_KEY} 改为 public（行为零变化）</h3>
+ * <p>
+ * {@code CarianStyleConditionDisplay} 需要读这条记录来显示「治疗被削减，还剩几秒」。
+ * 这个 debuff <b>不是原版药水效果</b>，屏幕右侧不会出现任何图标——
+ * 中招的玩家只会觉得「我怎么喝了药还是不回血」，完全无从判断。
+ * </p>
+ * <p>
+ * 与其在 HUD 那边复制一份 {@code "eat_shit_debuff"} 字面量，不如把常量公开：
+ * 复制的字面量不会跟着改，哪天这里改了键名而那边没跟上，
+ * HUD 会安静地永远显示「无」，既不报错也不会被测试发现。
+ * </p>
+ *
+ * <h3>v2.4：施加 debuff 要求满蓄力</h3>
+ * <p>
+ * 玩家必须满蓄力挥击才会给目标上反胃与治疗削减（自己吃反胃的代价也一起跳过）；
+ * 怪物持有者不受影响。{@link #onLivingHeal} 的治疗削减结算不变。
+ * </p>
+ *
+ * @version 2.4
  */
-@Deprecated
 @AutoRegisterEnchantment(id = "eat_shit", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.UNCOMMON, type = EnumEnchantmentType.WEAPON, slots = {EntityEquipmentSlot.MAINHAND})
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentEatShit extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.eat_shit.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "eat_shit";
@@ -52,6 +96,39 @@ public class EnchantmentEatShit extends EnchantmentBase {
     public static final String DEBUFF_KEY = "eat_shit_debuff";
 
     public EnchantmentEatShit() { super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}); }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
+        if (evt.getEntityLiving().world.isRemote) return;
+        if (!(evt.getSource().getImmediateSource() instanceof EntityLivingBase)) return;
+        EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+        // v2.2：怪物附魔触发开关（攻击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+        EntityLivingBase victim = evt.getEntityLiving();
+        Enchantment eatShit = EnchantmentRegistry.getEnchantmentByClass(EnchantmentEatShit.class);
+        if (eatShit == null) return;
+        ItemStack heldItem = attacker.getHeldItem(EnumHand.MAIN_HAND);
+        if (heldItem.isEmpty()) return;
+        int level = EnchantmentHelper.getEnchantmentLevel(eatShit, heldItem);
+        level = applyLevelLimit(eatShit, level, 10);
+        if (level <= 0) return;
+        // v2.4：连点会让每一下都挂上反胃和治疗削减，要求满蓄力
+        if (!EnchantmentBase.isFullyCharged(attacker)) return;
+        int victimDuration = level * VICTIM_TICKS_PER_LEVEL.getInt();
+        victim.addPotionEffect(new PotionEffect(MobEffects.NAUSEA, victimDuration));
+        attacker.addPotionEffect(new PotionEffect(MobEffects.NAUSEA, level * SELF_TICKS_PER_LEVEL.getInt()));
+        EnchantmentDataManager.setCooldown(DEBUFF_KEY, victim.getUniqueID(), victimDuration);
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
+        if (evt.getEntityLiving().world.isRemote) return;
+        // v2.2：怪物附魔触发开关（受治疗者视角，被附加的debuff效果）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(evt.getEntityLiving(), false)) return;
+        if (EnchantmentDataManager.isOnCooldown(DEBUFF_KEY, evt.getEntityLiving().getUniqueID())) {
+            evt.setAmount(evt.getAmount() * (float) DAMAGE_MULTIPLIER.get());
+        }
+    }
 
     @Override public int getMinCost(int l) { return (int)((25 + (l - 1) * 2) * ConfigLoader.enchantingDifficulty); }
 

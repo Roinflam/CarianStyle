@@ -7,13 +7,25 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.util.DamageSource;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
+import javax.annotation.Nonnull;
 
 /**
- * PORT-STUB(E4)
- * <p>魔力蝎符附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 魔力蝎符附魔
+ * <p>
+ * 效果：
+ * - 造成的魔法伤害增加 10% × 等级
+ * - 造成魔法伤害时恢复自身已损失生命值 1% × 等级
+ * - 受到物理伤害时伤害增加 10% × 等级
+ * - 最大等级：5
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "magic_scorpion_charm",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -22,6 +34,11 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         slots = {EntityEquipmentSlot.CHEST}
 )
 public class EnchantmentMagicScorpionCharm extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.magic_scorpion_charm.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "magic_scorpion_charm";
@@ -52,6 +69,51 @@ public class EnchantmentMagicScorpionCharm extends EnchantmentBase {
 
     public EnchantmentMagicScorpionCharm() {
         super(EnumEnchantmentType.ARMOR_CHEST, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+    }
+
+    @Override
+    protected void onDamageAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+        DamageSource source = ctx.getDamageSource();
+
+        // 必须是魔法伤害
+        if (!DamageSourceUtil.isMagicDamage(source)) {
+            return;
+        }
+
+        // 手动应用等级限制
+        int effectiveLevel = level;
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
+
+        // 增加魔法伤害 10% × 等级
+        ctx.multiplyDamage(1 + effectiveLevel * (float) DAMAGE_PER_LEVEL.get());
+
+        // 恢复已损失生命值 1% × 等级
+        float maxHealth = attacker.getMaxHealth();
+        float currentHealth = attacker.getHealth();
+        float lostHealth = maxHealth - currentHealth;
+
+        if (lostHealth > 0) {
+            float healAmount = lostHealth * effectiveLevel * (float) HEAL_PER_LEVEL.get();
+            attacker.heal(healAmount);
+        }
+    }
+
+    @Override
+    protected void onHurtAsVictimHighest(@Nonnull EnchantmentContext ctx, int level) {
+        DamageSource source = ctx.getDamageSource();
+
+        // 必须是物理伤害
+        if (!DamageSourceUtil.isPhysicalDamage(source)) {
+            return;
+        }
+
+        // 手动应用等级限制
+        int effectiveLevel = level;
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
+
+        // 受到的物理伤害增加 10% × 等级
+        ctx.multiplyDamage(1 + effectiveLevel * (float) DAMAGE_PER_LEVEL.get());
     }
 
     @Override

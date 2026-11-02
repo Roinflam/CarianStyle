@@ -10,13 +10,31 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.item.ItemStack;
+import net.minecraft.potion.PotionEffect;
+import net.minecraft.util.DamageSource;
+import net.minecraftforge.event.entity.living.LivingAttackEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
+import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.utils.Reference;
 
 /**
- * PORT-STUB(E4)
- * <p>黄金树的庇佑附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 黄金树的庇佑附魔
+ * <p>
+ * 受击或攻击时给自己挂上黄金树庇护（减伤的状态效果，逻辑在 {@code MobEffectProtectionOfTheErdtree}）：
+ * 持续 = 每级 2.5 秒 × 全身等级，效果等级 = 全身等级 - 1；双方都最高 5 级。
+ * </p>
+ * <p>v2.2：LivingAttack双向监听器入口接入怪物附魔触发开关</p>
+ *
+ * @author RoinFlam
+ * @version 2.2
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "protection_of_the_erdtree",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -25,7 +43,13 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         slots = {EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET},
         forceTreasure = true
 )
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentProtectionOfTheErdtree extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.protection_of_the_erdtree.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "protection_of_the_erdtree";
@@ -74,6 +98,67 @@ public class EnchantmentProtectionOfTheErdtree extends EnchantmentBase {
         super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
                 EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET
         });
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
+        if (evt.getEntityLiving().world.isRemote) {
+            return;
+        }
+
+        DamageSource damageSource = evt.getSource();
+        if (!(damageSource.getTrueSource() instanceof EntityLivingBase)) {
+            return;
+        }
+
+        EntityLivingBase victim = evt.getEntityLiving();
+        EntityLivingBase attacker = (EntityLivingBase) damageSource.getTrueSource();
+
+        Enchantment protection = EnchantmentRegistry.getEnchantmentByClass(EnchantmentProtectionOfTheErdtree.class);
+        if (protection == null) {
+            return;
+        }
+
+        // 受击者视角
+        // v2.2：怪物附魔触发开关（受击者视角）
+        if (!EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) {
+            int victimLevel = 0;
+            for (ItemStack armor : victim.getArmorInventoryList()) {
+                if (!armor.isEmpty()) {
+                    victimLevel += EnchantmentHelper.getEnchantmentLevel(protection, armor);
+                }
+            }
+            victimLevel = applyLevelLimit(protection, victimLevel, VICTIM_LEVEL_CAP.getInt());
+            if (victimLevel > 0) {
+                victimLevel = Math.min(victimLevel, VICTIM_AMPLIFIER_CAP.getInt());
+                int duration = (int) (DURATION_SECONDS_PER_LEVEL.get() * victimLevel * 20);
+                victim.addPotionEffect(new PotionEffect(
+                        CarianStylePotion.PROTECTION_OF_THE_ERDTREE.get(),
+                        duration,
+                        victimLevel - 1
+                ));
+            }
+        }
+
+        // 攻击者视角
+        // v2.2：怪物附魔触发开关（攻击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+        int attackerLevel = 0;
+        for (ItemStack armor : attacker.getArmorInventoryList()) {
+            if (!armor.isEmpty()) {
+                attackerLevel += EnchantmentHelper.getEnchantmentLevel(protection, armor);
+            }
+        }
+        attackerLevel = applyLevelLimit(protection, attackerLevel, ATTACKER_LEVEL_CAP.getInt());
+        if (attackerLevel > 0) {
+            attackerLevel = Math.min(attackerLevel, ATTACKER_AMPLIFIER_CAP.getInt());
+            int duration = (int) (DURATION_SECONDS_PER_LEVEL.get() * attackerLevel * 20);
+            attacker.addPotionEffect(new PotionEffect(
+                    CarianStylePotion.PROTECTION_OF_THE_ERDTREE.get(),
+                    duration,
+                    attackerLevel - 1
+            ));
+        }
     }
 
     @Override

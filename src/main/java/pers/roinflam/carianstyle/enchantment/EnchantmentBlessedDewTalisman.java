@@ -10,13 +10,25 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
+import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
+import pers.roinflam.carianstyle.utils.Reference;
 
 /**
- * PORT-STUB(E4)
- * <p>祝福露水护符附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 祝福露水护符附魔
+ * <p>
+ * 玩家饱食度满时持续回血
+ * 回血量 = 最大血量 × 等级 × 0.002 每秒(原版每tick,已优化为每秒)
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.1 - 性能优化版
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "blessed_dew_talisman",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -24,7 +36,13 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         type = EnumEnchantmentType.ARMOR_CHEST,
         slots = {EntityEquipmentSlot.CHEST}
 )
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.blessed_dew_talisman.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "blessed_dew_talisman";
@@ -68,6 +86,58 @@ public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
             return false;
         }
         return super.checkCompatibility(ench);
+    }
+
+    @SubscribeEvent
+    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
+        // 只在服务端执行
+        if (evt.player.world.isRemote) {
+            return;
+        }
+
+        // 只在START阶段执行
+        if (evt.phase != TickEvent.Phase.START) {
+            return;
+        }
+
+        EntityPlayer player = evt.player;
+
+        // 优化1: 使用计数器控制执行频率,每20tick(1秒)执行一次
+        int tickCounter = EnchantmentDataManager.incrementCounter(COUNTER_ID, player.getUniqueID());
+        if (tickCounter % HEAL_INTERVAL.getInt() != 0) {
+            return;
+        }
+
+        // 优化2: 提前检查是否满血,满血直接跳过
+        if (player.getHealth() >= player.getMaxHealth()) {
+            return;
+        }
+
+        // 优化3: 提前检查饱食度,不满时直接跳过（1.12.2 版：getFoodStats().needFood()）
+        if (player.getFoodStats().needFood()) {
+            return;
+        }
+
+        // 获取附魔实例
+        Enchantment blessedDewTalisman = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBlessedDewTalisman.class);
+        if (blessedDewTalisman == null) {
+            return;
+        }
+
+        // 计算总附魔等级（v-cache：走中央装备缓存）
+        int totalLevel = EnchantmentEventHandler.armorTotal(player, blessedDewTalisman);
+
+        // 应用等级上限
+        totalLevel = applyLevelLimit(blessedDewTalisman, totalLevel, LEVEL_CAP.getInt());
+
+        // 执行治疗
+        if (totalLevel > 0) {
+            // 优化4: 因为改为每秒执行一次,所以不再除以20
+            // 原公式: 最大血量 * 等级 * 0.002 / 20 每tick
+            // 新公式: 最大血量 * 等级 * 0.002 每秒
+            float healAmount = player.getMaxHealth() * totalLevel * (float) HEAL_PER_LEVEL.get();
+            player.heal(healAmount);
+        }
     }
 
     @Override
