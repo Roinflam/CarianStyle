@@ -1,0 +1,48 @@
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
+license="${mod_license}"
+
+[[mods]]
+modId="${mod_id}"
+version="${version}"
+displayName="${mod_name}"
+displayURL="https://www.curseforge.com/minecraft/mc-mods/carianstyle"
+logoFile="logo.png"
+credits="Cloth Config API by shedaniel (GNU LGPLv3) is bundled unmodified as a separate jar-in-jar for the config screen. / 内嵌 shedaniel 的 Cloth Config API（GNU LGPLv3），未作修改，以独立 jar-in-jar 形式提供配置界面。 ELDEN RING is a trademark of FromSoftware / BANDAI NAMCO; this is an unofficial fan-made mod and is not affiliated with them. / 《艾尔登法环》相关名称与美术素材版权归 FromSoftware / BANDAI NAMCO 所有，本模组为非官方同人作品，与其无关联。"
+authors="${mod_author}"
+description='''
+Carian Style!
+'''
+
+# NeoForge 1.20.5 起 mixin 配置在这里登记，不再写进 jar 的 MANIFEST
+[[mixins]]
+config="${mod_id}.mixins.json"
+
+[[dependencies.${mod_id}]]
+modId="neoforge"
+type="required"
+versionRange="${neo_version_range}"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
+modId="minecraft"
+type="required"
+versionRange="${minecraft_version_range}"
+ordering="NONE"
+side="BOTH"
+
+# ==================== Cloth Config 加载顺序 ====================
+# Cloth Config 以 jar-in-jar 内嵌进本模组，不存在缺失风险，玩家不装也能正常玩。
+#
+# 仍然需要这条声明，原因是【加载顺序】：本模组构造时就会注册 Cloth 配置界面，
+# ordering="AFTER" 明确要求 Cloth Config 先加载完毕。
+#
+# type 刻意设为 optional：万一某个整合包环境下 jar-in-jar 被剥离或被更高版本顶替，
+# 也只是配置界面不可用，而不会直接卡在「缺少前置」界面进不去游戏。
+[[dependencies.${mod_id}]]
+modId="cloth_config"
+type="optional"
+versionRange="[${cloth_version},)"
+ordering="AFTER"
+side="BOTH"

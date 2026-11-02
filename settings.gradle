@@ -1,16 +1,9 @@
 pluginManagement {
     repositories {
-        maven { url "https://maven.fabricmc.net/" }      // Fabric 相关
-        maven { url "https://maven.architectury.dev/" }  // Architectury
-        maven { url "https://maven.minecraftforge.net/" } // Forge
-        gradlePluginPortal()                              // Gradle 官方插件
+        gradlePluginPortal()                                   // Gradle 官方插件
+        maven { url 'https://maven.neoforged.net/releases' }   // NeoForge 与 ModDevGradle
     }
 }
 
-// 项目名称：自动从 gradle.properties 读取 mod_id
+// 项目名称：自动从 gradle.properties 读取 mod_name
 rootProject.name = providers.gradleProperty('mod_name').get()
-
-// 包含的子项目
-include 'common'
-include 'forge'
-include 'fabric'
