@@ -160,6 +160,7 @@ public class GlintbladesRender extends Render<EntityGlintblades> {
     private static final Vec3d FALLBACK_DIRECTION = new Vec3d(0.0, 1.0, 0.0);
 
     protected final Item item;
+    private final RenderItem itemRenderer;
 
     /**
      * 渲染用物品堆栈。
@@ -170,8 +171,8 @@ public class GlintbladesRender extends Render<EntityGlintblades> {
 
     /**
      * 构造函数。
-     * <p>1.12.2 版：1.20.1 从渲染器上下文里拿物品渲染器并存成字段；这边实体渲染器建得比
-     * {@code RenderItem} 早，构造时拿不到，所以画的时候从 {@link Minecraft#getRenderItem()} 取。</p>
+     * <p>1.12.2 版：1.20.1 从渲染器上下文里拿物品渲染器；这边没有上下文，从 {@link Minecraft#getRenderItem()} 取
+     * （实体渲染器在 {@code RenderManager} 构造时建，那时物品渲染器已经建好了）。</p>
      *
      * @param renderManager 实体渲染管理器
      * @param item          用于渲染的物品（魔法辉剑）
@@ -179,6 +180,7 @@ public class GlintbladesRender extends Render<EntityGlintblades> {
     public GlintbladesRender(@Nonnull RenderManager renderManager, @Nonnull Item item) {
         super(renderManager);
         this.item = item;
+        this.itemRenderer = Minecraft.getMinecraft().getRenderItem();
         this.renderStack = new ItemStack(item);
     }
 
@@ -283,8 +285,7 @@ public class GlintbladesRender extends Render<EntityGlintblades> {
         // rotation/translation（那是给手持姿势准备的），与这里自算的姿态叠加会完全错乱。
         // NONE 不套任何 display 变换，模型以原点为中心、平铺在 XY 平面，正是上面数学的前提。
         // renderItem 自己会开法线重归一化、绑图集、设混合，画完再关掉
-        RenderItem itemRenderer = Minecraft.getMinecraft().getRenderItem();
-        itemRenderer.renderItem(this.renderStack, ItemCameraTransforms.TransformType.NONE);
+        this.itemRenderer.renderItem(this.renderStack, ItemCameraTransforms.TransformType.NONE);
 
         if (this.renderOutlines) {
             GlStateManager.disableOutlineMode();
