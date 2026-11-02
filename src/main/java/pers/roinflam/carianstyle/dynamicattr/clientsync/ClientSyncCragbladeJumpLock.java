@@ -1,16 +1,16 @@
 package pers.roinflam.carianstyle.dynamicattr.clientsync;
 
 import net.minecraft.client.Minecraft;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.bus.api.SubscribeEvent;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /**
  * 岩石剑的「无法跳跃」在客户端的那一半
@@ -20,7 +20,7 @@ import javax.annotation.Nonnull;
  * </p>
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
 public final class ClientSyncCragbladeJumpLock {
 
     public static final int CRAGBLADE_SERIAL = 20;
@@ -29,12 +29,12 @@ public final class ClientSyncCragbladeJumpLock {
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent event) {
-        if (event.phase != TickEvent.Phase.START || event.player != Minecraft.getInstance().player) {
+    public static void onPlayerTick(@Nonnull PlayerTickEvent.Pre event) {
+        if (event.getEntity() != Minecraft.getInstance().player) {
             return;
         }
-        if (ClientSyncEffectManager.shouldRenderEffect(CRAGBLADE_SERIAL, event.player.getId())) {
-            EntityLivingUtil.setJumped(event.player);
+        if (ClientSyncEffectManager.shouldRenderEffect(CRAGBLADE_SERIAL, event.getEntity().getId())) {
+            EntityLivingUtil.setJumped(event.getEntity());
         }
     }
 }

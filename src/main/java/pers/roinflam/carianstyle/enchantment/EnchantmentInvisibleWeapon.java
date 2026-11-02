@@ -18,6 +18,8 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
+ * PORT-STUB(E4)
+ *
  * 隐形武器附魔
  * <p>
  * 武器/弓箭附魔，攻击后获得隐身
@@ -51,76 +53,23 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * @author RoinFlam
  * @version 2.1
  */
-@AutoRegisterEnchantment(
-        id = "invisible_weapon",
-        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.RARE,
-        customType = "ARMS",
-        slots = {EquipmentSlot.MAINHAND},
-        forceTreasure = true
-)
+@Deprecated
 public class EnchantmentInvisibleWeapon extends EnchantmentBase {
-
-    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
-    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.invisible_weapon.desc，
-    //   否则玩家看到的描述会与实际效果不符。
-
-    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "invisible_weapon";
-
-    /**
-     * 箭矢命中时额外增加的倍率（基础为 1）
-     * <p>默认 2，允许范围 0 ~ 20。</p>
-     */
-    private static final EnchantmentValues.Handle ARROW_BONUS_MAGNIFICATION =
-            EnchantmentValues.define(VALUE_ID, "arrow_bonus_magnification",
+    private static final EnchantmentValues.Handle ARROW_BONUS_MAGNIFICATION = EnchantmentValues.define(VALUE_ID, "arrow_bonus_magnification",
                     2, 0, 20);
-
-    /**
-     * 每级提供的潜行时长（tick）
-     * <p>默认 20，允许范围 1 ~ 400。</p>
-     */
-    private static final EnchantmentValues.Handle STEALTH_TICKS_PER_LEVEL =
-            EnchantmentValues.define(VALUE_ID, "stealth_ticks_per_level",
+    private static final EnchantmentValues.Handle STEALTH_TICKS_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "stealth_ticks_per_level",
                     20, 1, 400);
-
-    public EnchantmentInvisibleWeapon() {
-        // v2.1：EnchantmentCategory.WEAPON → ARMS 自定义类型（剑+弓），与注解一致
-        super(CarianStyleEnchantments.getCustomEnchantmentCategory("ARMS"),
-                new EquipmentSlot[]{EquipmentSlot.MAINHAND});
-    }
-
-    @Override
     protected void onDamageAsAttackerHighest(@NotNull EnchantmentContext ctx, int level) {
-        LivingEntity attacker = ctx.getHolder();
-        DamageSource damageSource = ctx.getDamageSource();
-
-        // 计算持续时间倍率
-        int magnification = 1;
-        if (damageSource != null && damageSource.getDirectEntity() instanceof AbstractArrow) {
-            magnification += ARROW_BONUS_MAGNIFICATION.getInt();  // 箭矢攻击倍率 = 3
-        }
-
-        // 施加隐身效果
-        DynamicAttributeManager.apply(attacker,
-                DynamicAttributes.STEALTH.createInstance(level * STEALTH_TICKS_PER_LEVEL.getInt() * magnification));
     }
-
-    @Override
     public int getMinCost(int enchantmentLevel) {
-        return (int) ((20 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
+        return 0;
     }
-
-    @Override
     public int getMaxCost(int enchantmentLevel) {
-        return getMinCost(enchantmentLevel) + 50;
+        return 0;
     }
-
-    @Override
     protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        return super.checkCompatibility(ench)
-                && !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentEmptyEpilepsyFire.class))
-                && !ench.equals(EnchantmentRegistry.getEnchantmentByClass(EnchantmentHypnoticArrow.class));
+        return false;
     }
 }
+

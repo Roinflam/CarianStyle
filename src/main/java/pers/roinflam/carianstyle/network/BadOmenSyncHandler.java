@@ -1,15 +1,16 @@
 package pers.roinflam.carianstyle.network;
 
+import net.minecraft.core.Holder;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraftforge.event.entity.living.MobEffectEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.neoforge.event.entity.living.MobEffectEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 噩兆「客户端可见性」同步处理器（服务端逻辑，双端加载安全）。
@@ -28,7 +29,7 @@ import javax.annotation.Nonnull;
  *
  * @author RoinFlam
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
+@EventBusSubscriber(modid = Reference.MOD_ID)
 public final class BadOmenSyncHandler {
 
     /**
@@ -47,8 +48,8 @@ public final class BadOmenSyncHandler {
      * @param effect 待判断的效果（可为 null）
      * @return 是噩兆返回 true
      */
-    private static boolean isBadOmen(MobEffect effect) {
-        return effect != null && effect == CarianStylePotion.BAD_OMEN.get();
+    private static boolean isBadOmen(Holder<MobEffect> effect) {
+        return effect != null && effect.is(CarianStylePotion.BAD_OMEN);
     }
 
     /**

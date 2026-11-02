@@ -1,7 +1,7 @@
 package pers.roinflam.carianstyle.codex;
 
 import net.minecraft.network.chat.Component;
-import net.minecraftforge.fml.ModList;
+import net.neoforged.fml.ModList;
 
 import javax.annotation.Nonnull;
 import java.util.HashMap;

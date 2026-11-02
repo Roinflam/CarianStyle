@@ -3,7 +3,6 @@ package pers.roinflam.carianstyle.enchantment;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -16,6 +15,8 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 /**
+ * PORT-STUB(E4)
+ *
  * 波石魔法附魔
  * <p>
  * 武器附魔，魔法伤害增强
@@ -36,72 +37,18 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
  * @author RoinFlam
  * @version 2.1
  */
-@AutoRegisterEnchantment(
-        id = "wave_stone_magic",
-        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.VERY_RARE,
-        type = EnchantmentCategory.WEAPON,
-        slots = {EquipmentSlot.MAINHAND},
-        conflictsWith = {EnchantmentDoomedDeath.class, EnchantmentDeathBlade.class}
-)
+@Deprecated
 public class EnchantmentWaveStoneMagic extends EnchantmentBase {
-
-    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
-    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.wave_stone_magic.desc，
-    //   否则玩家看到的描述会与实际效果不符。
-
-    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "wave_stone_magic";
-
-    /**
-     * 触发时的伤害倍率
-     * <p>默认 1.5，允许范围 0.0 ~ 10.0。</p>
-     */
-    private static final EnchantmentValues.Handle DAMAGE_MULTIPLIER =
-            EnchantmentValues.define(VALUE_ID, "damage_multiplier",
+    private static final EnchantmentValues.Handle DAMAGE_MULTIPLIER = EnchantmentValues.define(VALUE_ID, "damage_multiplier",
                     1.5D, 0.0D, 10.0D);
-
-    public EnchantmentWaveStoneMagic() {
-        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
-    }
-
-    /**
-     * 挂在 Low：月光剑、黑暗弃子在 Normal 把伤害转成魔法，要排在它们之后才看得到
-     */
-    @Override
     protected void onHurtAsAttackerLow(@NotNull EnchantmentContext ctx, int level) {
-        if (ctx.getDamageSource() == null || !DamageSourceUtil.isMagicDamage(ctx.getDamageSource())) {
-            return;
-        }
-
-        LivingEntity victim = ctx.getVictim();
-        if (victim == null) {
-            return;
-        }
-
-        // 伤害提升50%
-        ctx.multiplyDamage((float) DAMAGE_MULTIPLIER.get());
-
-        // 移除魔法标签（改为波石魔法，不再是普通魔法）
-        DamageSourceUtil.removeTag(ctx.getDamageSource(), net.minecraft.tags.DamageTypeTags.WITCH_RESISTANT_TO);
-
-        // v2.1：挥石魔法特效。
-        // 位置取受击者、朝向取攻击者 —— 碎石是从被砸的那一方身上崩出来的。
-        // 只在魔法伤害判定通过之后播，普通物理攻击不该有这个演出
-        LivingEntity attacker = ctx.getHolder();
-        if (attacker != null && attacker.level() instanceof ServerLevel serverLevel) {
-            CarianStyleCombatArtEffects.waveStone(serverLevel, attacker, victim);
-        }
     }
-
-    @Override
     public int getMinCost(int enchantmentLevel) {
-        return (int) (35 * ConfigLoader.enchantingDifficulty);
+        return 0;
     }
-
-    @Override
     public int getMaxCost(int enchantmentLevel) {
-        return getMinCost(enchantmentLevel) + 50;
+        return 0;
     }
 }
+

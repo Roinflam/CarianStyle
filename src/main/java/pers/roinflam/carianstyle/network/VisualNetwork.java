@@ -1,15 +1,10 @@
 package pers.roinflam.carianstyle.network;
 
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkDirection;
-import net.minecraftforge.network.NetworkRegistry;
-import net.minecraftforge.network.PacketDistributor;
-import net.minecraftforge.network.simple.SimpleChannel;
-import pers.roinflam.carianstyle.utils.Reference;
-
-import java.util.Optional;
+import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 /**
  * 可视化系统专用网络通道（与现有 {@code NetworkHandler} 完全独立）。
@@ -18,8 +13,8 @@ import java.util.Optional;
  * 因而不会影响已经在工作的火焰/隐身同步逻辑。本通道承载：叠层显示包、定点 AOE 自绘特效包、
  * 战技自绘特效包。
  * <p>
- * 注意：{@link #register()} 必须在 mod 加载阶段（如主类构造或 FMLCommonSetupEvent）
- * 于双端各调用一次——客户端需要注册解码/处理器才能接收 S2C 包。
+ * 注意：{@link #register} 挂在 MOD 总线的包登记事件上（主类构造器里 addListener），
+ * 双端各触发一次——客户端需要登记解码/处理器才能接收 S2C 包。
  * <p>
  * <b>v2 新增：</b>{@link CombatArtEffectPacket}（战技特效，带朝向 yaw）。
  * 包 ID 追加在既有两个包之后，<b>不改动既有包的注册顺序</b>——SimpleChannel 的包 ID 由
@@ -28,7 +23,7 @@ import java.util.Optional;
  *
  * <h3>v3：三个包全部补上方向声明</h3>
  * <p>
- * 本通道的三个包<b>都是纯 S2C</b>，但此前用的是不带 {@link NetworkDirection} 的
+ * 本通道的三个包<b>都是纯 S2C</b>，但此前用的是不带 {@code NetworkDirection} 的
  * 五参 {@code registerMessage} 重载，Forge 因此会放行两个方向。
  * 结果是任意客户端都能反向发包给服务端，让服务端去执行
  * {@code StackHudManager} / {@code AoeEffectManager} / {@code CombatArtEffectManager}
@@ -45,72 +40,39 @@ import java.util.Optional;
  * <b>不改变任何正常链路的行为</b>：服务端发、客户端收，方向与声明一致。
  * </p>
  *
+ * <h3>1.21.1（NeoForge）</h3>
+ * <p>
+ * {@code SimpleChannel} 换成 MOD 总线的 {@link RegisterPayloadHandlersEvent}，三个包各有自己的 id
+ * （{@code carianstyle:stack_display}、{@code aoe_effect}、{@code combat_art_effect}），版本号照旧是
+ * {@link #PROTOCOL_VERSION}（按包记，和主通道的 "4" 互不影响），都不是可选包。
+ * 都用 {@code playToClient} 登记，方向由 NeoForge 校验，客户端反向发来的包在入口就被拒，
+ * 与上面 v3 的方向声明等价。发送改用 {@link PacketDistributor} 的静态方法。
+ * </p>
+ *
  * @author RoinFlam
- * @version 3
+ * @version 4
  */
 public final class VisualNetwork {
 
     /** 协议版本（双端一致即可） */
     private static final String PROTOCOL_VERSION = "1";
 
-    /** 专用通道（命名空间用 mod id，路径 "visual"） */
-    public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
-            new ResourceLocation(Reference.MOD_ID, "visual"),
-            () -> PROTOCOL_VERSION,
-            PROTOCOL_VERSION::equals,
-            PROTOCOL_VERSION::equals
-    );
-
-    /**
-     * 本通道全部包共用的方向：服务端 -> 客户端。
-     * <p>抽成常量而非每处写一遍，是为了让「本通道只有 S2C 包」这条约束一眼可见；
-     * 将来若真要加 C2S 包，改动会集中暴露在这里而不是散落在三处注册调用里。</p>
-     */
-    private static final Optional<NetworkDirection> S2C = Optional.of(NetworkDirection.PLAY_TO_CLIENT);
-
-    /** 包 ID 自增计数 */
-    private static int packetId = 0;
-
-    private static boolean registered = false;
-
     private VisualNetwork() {
     }
 
     /**
-     * 注册全部包。双端各调用一次，重复调用安全。
-     * <p><b>注册顺序即包 ID，新增包务必追加在末尾</b>（详见类注释）。</p>
+     * 登记全部包（MOD 总线 {@link RegisterPayloadHandlersEvent}，双端都会触发）。
      */
-    public static void register() {
-        if (registered) {
-            return;
-        }
-        registered = true;
-        CHANNEL.registerMessage(
-                packetId++,
-                StackDisplayPacket.class,
-                StackDisplayPacket::encode,
-                StackDisplayPacket::decode,
-                StackDisplayPacket::handle,
-                S2C
-        );
+    public static void register(RegisterPayloadHandlersEvent event) {
+        PayloadRegistrar registrar = event.registrar(PROTOCOL_VERSION);
+        registrar.playToClient(StackDisplayPacket.TYPE, StackDisplayPacket.STREAM_CODEC,
+                StackDisplayPacket::handle);
         // 定点 AOE 自绘特效包（S2C）
-        CHANNEL.registerMessage(
-                packetId++,
-                AoeEffectPacket.class,
-                AoeEffectPacket::encode,
-                AoeEffectPacket::decode,
-                AoeEffectPacket::handle,
-                S2C
-        );
+        registrar.playToClient(AoeEffectPacket.TYPE, AoeEffectPacket.STREAM_CODEC,
+                AoeEffectPacket::handle);
         // v2：战技自绘特效包（S2C，带朝向）
-        CHANNEL.registerMessage(
-                packetId++,
-                CombatArtEffectPacket.class,
-                CombatArtEffectPacket::encode,
-                CombatArtEffectPacket::decode,
-                CombatArtEffectPacket::handle,
-                S2C
-        );
+        registrar.playToClient(CombatArtEffectPacket.TYPE, CombatArtEffectPacket.STREAM_CODEC,
+                CombatArtEffectPacket::handle);
     }
 
     /**
@@ -120,13 +82,13 @@ public final class VisualNetwork {
      * @param packet 叠层显示包
      */
     public static void sendToPlayer(ServerPlayer player, StackDisplayPacket packet) {
-        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
+        PacketDistributor.sendToPlayer(player, packet);
     }
 
     /**
      * 把包广播给某点附近一定范围内的玩家（用于定点 AOE 自绘特效）。
      * <p>
-     * 使用 {@link PacketDistributor#NEAR}，原版只会发给该维度内距 (x,y,z) 在 {@code range} 格内、
+     * 使用 {@link PacketDistributor#sendToPlayersNear}，原版只会发给该维度内距 (x,y,z) 在 {@code range} 格内、
      * 且正在追踪该区域的玩家，因此带宽随近场玩家数自然受限。
      * </p>
      *
@@ -139,8 +101,7 @@ public final class VisualNetwork {
      */
     public static void sendToNearby(ServerLevel level, double x, double y, double z,
                                     double range, AoeEffectPacket packet) {
-        CHANNEL.send(PacketDistributor.NEAR.with(
-                () -> new PacketDistributor.TargetPoint(x, y, z, range, level.dimension())), packet);
+        PacketDistributor.sendToPlayersNear(level, null, x, y, z, range, packet);
     }
 
     /**
@@ -157,7 +118,6 @@ public final class VisualNetwork {
      */
     public static void sendToNearby(ServerLevel level, double x, double y, double z,
                                     double range, CombatArtEffectPacket packet) {
-        CHANNEL.send(PacketDistributor.NEAR.with(
-                () -> new PacketDistributor.TargetPoint(x, y, z, range, level.dimension())), packet);
+        PacketDistributor.sendToPlayersNear(level, null, x, y, z, range, packet);
     }
 }

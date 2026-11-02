@@ -3,11 +3,10 @@ package pers.roinflam.carianstyle.visual.client;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.network.CombatArtEffectPacket;
 import pers.roinflam.carianstyle.utils.Reference;
@@ -15,6 +14,7 @@ import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
 import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 
 import java.util.List;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 六个新增战技演出的独立渲染器（纯客户端自绘）。
@@ -118,7 +118,7 @@ import java.util.List;
  * @version 2.0
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
 public final class CombatArtExtraRenderer {
 
     /** 距离裁剪（格） */
@@ -1183,13 +1183,13 @@ public final class CombatArtExtraRenderer {
         float by2 = cy + wy * (float) b2u + uy * (float) b2w;
         float bz2 = cz + wz * (float) b2u + uz * (float) b2w;
 
-        b.vertex(m, ax1, ay1, az1).color(r, g, bl, a1).endVertex();
-        b.vertex(m, bx1, by1, bz1).color(r, g, bl, a2).endVertex();
-        b.vertex(m, bx2, by2, bz2).color(r, g, bl, a2).endVertex();
+        b.addVertex(m, ax1, ay1, az1).setColor(r, g, bl, a1);
+        b.addVertex(m, bx1, by1, bz1).setColor(r, g, bl, a2);
+        b.addVertex(m, bx2, by2, bz2).setColor(r, g, bl, a2);
 
-        b.vertex(m, ax1, ay1, az1).color(r, g, bl, a1).endVertex();
-        b.vertex(m, bx2, by2, bz2).color(r, g, bl, a2).endVertex();
-        b.vertex(m, ax2, ay2, az2).color(r, g, bl, a1).endVertex();
+        b.addVertex(m, ax1, ay1, az1).setColor(r, g, bl, a1);
+        b.addVertex(m, bx2, by2, bz2).setColor(r, g, bl, a2);
+        b.addVertex(m, ax2, ay2, az2).setColor(r, g, bl, a1);
     }
 
     /**
@@ -1237,13 +1237,13 @@ public final class CombatArtExtraRenderer {
             float iy1 = cy + (wy * ca + uy * sa) * ri;
             float iz1 = cz + (wz * ca + uz * sa) * ri;
 
-            b.vertex(m, ox0, oy0, oz0).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ox1, oy1, oz1).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ix1, iy1, iz1).color(r, g, bl, alphaInner).endVertex();
+            b.addVertex(m, ox0, oy0, oz0).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ox1, oy1, oz1).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ix1, iy1, iz1).setColor(r, g, bl, alphaInner);
 
-            b.vertex(m, ox0, oy0, oz0).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ix1, iy1, iz1).color(r, g, bl, alphaInner).endVertex();
-            b.vertex(m, ix0, iy0, iz0).color(r, g, bl, alphaInner).endVertex();
+            b.addVertex(m, ox0, oy0, oz0).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ix1, iy1, iz1).setColor(r, g, bl, alphaInner);
+            b.addVertex(m, ix0, iy0, iz0).setColor(r, g, bl, alphaInner);
 
             // 推进到下一段：本段末端即下一段起点（漏掉这两行会让整环塌成一个扇形）
             prevCos = ca;
@@ -1311,13 +1311,13 @@ public final class CombatArtExtraRenderer {
             float e0 = 0.35f + 0.65f * edge0;
             float e1 = 0.35f + 0.65f * edge1;
 
-            b.vertex(m, x0, yBottom, z0).color(r, g, bl, alphaBottom * e0).endVertex();
-            b.vertex(m, x1, yBottom, z1).color(r, g, bl, alphaBottom * e1).endVertex();
-            b.vertex(m, x1, yTop, z1).color(r, g, bl, alphaTop * e1).endVertex();
+            b.addVertex(m, x0, yBottom, z0).setColor(r, g, bl, alphaBottom * e0);
+            b.addVertex(m, x1, yBottom, z1).setColor(r, g, bl, alphaBottom * e1);
+            b.addVertex(m, x1, yTop, z1).setColor(r, g, bl, alphaTop * e1);
 
-            b.vertex(m, x0, yBottom, z0).color(r, g, bl, alphaBottom * e0).endVertex();
-            b.vertex(m, x1, yTop, z1).color(r, g, bl, alphaTop * e1).endVertex();
-            b.vertex(m, x0, yTop, z0).color(r, g, bl, alphaTop * e0).endVertex();
+            b.addVertex(m, x0, yBottom, z0).setColor(r, g, bl, alphaBottom * e0);
+            b.addVertex(m, x1, yTop, z1).setColor(r, g, bl, alphaTop * e1);
+            b.addVertex(m, x0, yTop, z0).setColor(r, g, bl, alphaTop * e0);
         }
     }
 
@@ -1347,13 +1347,13 @@ public final class CombatArtExtraRenderer {
             float ix1 = cx + rInner * (float) Math.cos(a1);
             float iz1 = cz + rInner * (float) Math.sin(a1);
 
-            b.vertex(m, ox0, cy, oz0).color(r, g, bl, alpha).endVertex();
-            b.vertex(m, ox1, cy, oz1).color(r, g, bl, alpha).endVertex();
-            b.vertex(m, ix1, cy, iz1).color(r, g, bl, alpha).endVertex();
+            b.addVertex(m, ox0, cy, oz0).setColor(r, g, bl, alpha);
+            b.addVertex(m, ox1, cy, oz1).setColor(r, g, bl, alpha);
+            b.addVertex(m, ix1, cy, iz1).setColor(r, g, bl, alpha);
 
-            b.vertex(m, ox0, cy, oz0).color(r, g, bl, alpha).endVertex();
-            b.vertex(m, ix1, cy, iz1).color(r, g, bl, alpha).endVertex();
-            b.vertex(m, ix0, cy, iz0).color(r, g, bl, alpha).endVertex();
+            b.addVertex(m, ox0, cy, oz0).setColor(r, g, bl, alpha);
+            b.addVertex(m, ix1, cy, iz1).setColor(r, g, bl, alpha);
+            b.addVertex(m, ix0, cy, iz0).setColor(r, g, bl, alpha);
         }
     }
 
@@ -1385,13 +1385,13 @@ public final class CombatArtExtraRenderer {
             float ix0 = (float) (cx + rInner * cos0), iz0 = (float) (cz + rInner * sin0);
             float ix1 = (float) (cx + rInner * cos1), iz1 = (float) (cz + rInner * sin1);
 
-            b.vertex(m, ox0, cy, oz0).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ox1, cy, oz1).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ix1, cy, iz1).color(r, g, bl, alphaInner).endVertex();
+            b.addVertex(m, ox0, cy, oz0).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ox1, cy, oz1).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ix1, cy, iz1).setColor(r, g, bl, alphaInner);
 
-            b.vertex(m, ox0, cy, oz0).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ix1, cy, iz1).color(r, g, bl, alphaInner).endVertex();
-            b.vertex(m, ix0, cy, iz0).color(r, g, bl, alphaInner).endVertex();
+            b.addVertex(m, ox0, cy, oz0).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ix1, cy, iz1).setColor(r, g, bl, alphaInner);
+            b.addVertex(m, ix0, cy, iz0).setColor(r, g, bl, alphaInner);
         }
     }
 
@@ -1419,13 +1419,13 @@ public final class CombatArtExtraRenderer {
         float bx1 = (float) (x2 + nx), bz1 = (float) (z2 + nz);
         float bx2 = (float) (x2 - nx), bz2 = (float) (z2 - nz);
 
-        b.vertex(m, ax1, y, az1).color(r, g, bl, a1).endVertex();
-        b.vertex(m, bx1, y, bz1).color(r, g, bl, a2).endVertex();
-        b.vertex(m, bx2, y, bz2).color(r, g, bl, a2).endVertex();
+        b.addVertex(m, ax1, y, az1).setColor(r, g, bl, a1);
+        b.addVertex(m, bx1, y, bz1).setColor(r, g, bl, a2);
+        b.addVertex(m, bx2, y, bz2).setColor(r, g, bl, a2);
 
-        b.vertex(m, ax1, y, az1).color(r, g, bl, a1).endVertex();
-        b.vertex(m, bx2, y, bz2).color(r, g, bl, a2).endVertex();
-        b.vertex(m, ax2, y, az2).color(r, g, bl, a1).endVertex();
+        b.addVertex(m, ax1, y, az1).setColor(r, g, bl, a1);
+        b.addVertex(m, bx2, y, bz2).setColor(r, g, bl, a2);
+        b.addVertex(m, ax2, y, az2).setColor(r, g, bl, a1);
     }
 
     // ==================== 世界空间几何基元 ====================
@@ -1463,13 +1463,13 @@ public final class CombatArtExtraRenderer {
                                   float ax, float ay, float az, float bx, float by, float bz,
                                   float cx, float cy, float cz, float dx, float dy, float dz,
                                   float r, float g, float bl, float aAB, float aCD) {
-        b.vertex(m, ax, ay, az).color(r, g, bl, aAB).endVertex();
-        b.vertex(m, bx, by, bz).color(r, g, bl, aAB).endVertex();
-        b.vertex(m, cx, cy, cz).color(r, g, bl, aCD).endVertex();
+        b.addVertex(m, ax, ay, az).setColor(r, g, bl, aAB);
+        b.addVertex(m, bx, by, bz).setColor(r, g, bl, aAB);
+        b.addVertex(m, cx, cy, cz).setColor(r, g, bl, aCD);
 
-        b.vertex(m, ax, ay, az).color(r, g, bl, aAB).endVertex();
-        b.vertex(m, cx, cy, cz).color(r, g, bl, aCD).endVertex();
-        b.vertex(m, dx, dy, dz).color(r, g, bl, aCD).endVertex();
+        b.addVertex(m, ax, ay, az).setColor(r, g, bl, aAB);
+        b.addVertex(m, cx, cy, cz).setColor(r, g, bl, aCD);
+        b.addVertex(m, dx, dy, dz).setColor(r, g, bl, aCD);
     }
 
     /**
@@ -1511,9 +1511,9 @@ public final class CombatArtExtraRenderer {
                                    float ax, float ay, float az,
                                    float bx, float by, float bz,
                                    float r, float g, float bl, float alpha) {
-        b.vertex(m, cx, cy, cz).color(r, g, bl, alpha).endVertex();
-        b.vertex(m, ax, ay, az).color(r, g, bl, 0f).endVertex();
-        b.vertex(m, bx, by, bz).color(r, g, bl, 0f).endVertex();
+        b.addVertex(m, cx, cy, cz).setColor(r, g, bl, alpha);
+        b.addVertex(m, ax, ay, az).setColor(r, g, bl, 0f);
+        b.addVertex(m, bx, by, bz).setColor(r, g, bl, 0f);
     }
 
     // ==================== 数学辅助 ====================

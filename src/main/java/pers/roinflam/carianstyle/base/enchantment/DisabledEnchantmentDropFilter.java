@@ -9,17 +9,17 @@ import net.minecraft.world.item.EnchantedBookItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraftforge.event.entity.EntityJoinLevelEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.utils.Reference;
-
 import javax.annotation.Nonnull;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
+ * PORT-STUB(B1a)
+ *
  * 被禁用附魔的掉落物兜底清洗
  *
  * <h3>问题</h3>
@@ -63,101 +63,14 @@ import javax.annotation.Nonnull;
  *
  * @author RoinFlam
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@Deprecated
 public final class DisabledEnchantmentDropFilter {
-
     private static final String TAG_ENCHANTMENTS = "Enchantments";
     private static final String ENCHANTMENT_PREFIX = Reference.MOD_ID + ":";
-
     private DisabledEnchantmentDropFilter() {
     }
-
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onItemEntityJoinLevel(@Nonnull EntityJoinLevelEvent evt) {
-        String[] blacklist = ConfigLoader.uninstallEnchantment;
-        if (blacklist == null || blacklist.length == 0) {
-            return;
-        }
-        if (!(evt.getEntity() instanceof ItemEntity itemEntity) || evt.loadedFromDisk() || evt.getLevel().isClientSide()) {
-            return;
-        }
-
-        ItemStack stack = itemEntity.getItem();
-        if (!stack.hasTag()) {
-            return;
-        }
-
-        ItemStack cleaned = withoutDisabledEnchantments(stack);
-        if (cleaned != stack) {
-            itemEntity.setItem(cleaned);
-        }
-    }
-
-    /**
-     * 返回剔除了被禁用附魔的物品。没有需要剔除的条目时原样返回同一个对象，否则返回新的物品，不改动传入的物品。
-     * 附魔书剔完一条不剩时返回同数量的普通书。
-     */
-    @Nonnull
-    public static ItemStack withoutDisabledEnchantments(@Nonnull ItemStack stack) {
-        CompoundTag tag = stack.getTag();
-        if (tag == null
-                || (!containsDisabled(tag, TAG_ENCHANTMENTS) && !containsDisabled(tag, EnchantedBookItem.TAG_STORED_ENCHANTMENTS))) {
-            return stack;
-        }
-
-        ItemStack copy = stack.copy();
-        CompoundTag copyTag = copy.getOrCreateTag();
-        removeDisabled(copyTag, TAG_ENCHANTMENTS);
-        removeDisabled(copyTag, EnchantedBookItem.TAG_STORED_ENCHANTMENTS);
-
-        if (copy.is(Items.ENCHANTED_BOOK) && !copyTag.contains(EnchantedBookItem.TAG_STORED_ENCHANTMENTS)) {
-            return new ItemStack(Items.BOOK, copy.getCount());
-        }
-        if (copyTag.isEmpty()) {
-            copy.setTag(null);
-        }
-        return copy;
-    }
-
-    private static boolean containsDisabled(CompoundTag tag, String key) {
-        if (!tag.contains(key, Tag.TAG_LIST)) {
-            return false;
-        }
-        ListTag list = tag.getList(key, Tag.TAG_COMPOUND);
-        for (int i = 0; i < list.size(); i++) {
-            if (isDisabledEntry(list.getCompound(i))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static void removeDisabled(CompoundTag tag, String key) {
-        if (!tag.contains(key, Tag.TAG_LIST)) {
-            return;
-        }
-        ListTag list = tag.getList(key, Tag.TAG_COMPOUND);
-        list.removeIf(entry -> entry instanceof CompoundTag compound && isDisabledEntry(compound));
-        // 不留空列表：空的 Enchantments 会让物品和同种无附魔物品叠不到一起
-        if (list.isEmpty()) {
-            tag.remove(key);
-        }
-    }
-
-    /**
-     * 与原版 {@code EnchantmentHelper.getEnchantmentId(CompoundTag)} 用同样的方式解析 id，
-     * 原版认不出的条目（大小写不对、缺命名空间）本来也不会生效，不用管。
-     */
-    private static boolean isDisabledEntry(CompoundTag entry) {
-        String id = entry.getString("id");
-        if (!id.startsWith(ENCHANTMENT_PREFIX)) {
-            return false;
-        }
-        ResourceLocation key = ResourceLocation.tryParse(id);
-        if (key == null) {
-            return false;
-        }
-        Enchantment enchantment = ForgeRegistries.ENCHANTMENTS.getValue(key);
-        return enchantment instanceof EnchantmentBase base && base.isDisabled();
+    @Nonnull public static ItemStack withoutDisabledEnchantments(@Nonnull ItemStack stack) {
+        return stack;
     }
 }
+

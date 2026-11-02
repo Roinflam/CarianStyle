@@ -20,8 +20,7 @@ public class ItemGlintblades extends SwordItem {
      * @param properties 物品属性
      */
     public ItemGlintblades(@Nonnull Tier tier, @Nonnull Properties properties) {
-        // 1.20.1: SwordItem 构造函数参数变化
-        // (Tier, int attackDamage, float attackSpeed, Properties)
-        super(tier, 3, -2.4F, properties);
+        // 1.21.1：攻击伤害 / 攻速不再是构造参数，改由物品属性的属性修饰符组件提供，数值同 1.20.1（+3、-2.4）
+        super(tier, properties.attributes(SwordItem.createAttributes(tier, 3, -2.4F)));
     }
 }

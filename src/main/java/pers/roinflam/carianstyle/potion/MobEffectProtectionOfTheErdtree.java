@@ -4,16 +4,16 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 黄金树庇护药水效果
@@ -23,7 +23,7 @@ import javax.annotation.Nonnull;
  * - 不对绝对伤害生效
  * </p>
  */
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class MobEffectProtectionOfTheErdtree extends IconBase {
 
     public MobEffectProtectionOfTheErdtree(boolean isBadEffectIn, int liquidColorIn) {
@@ -54,8 +54,8 @@ public class MobEffectProtectionOfTheErdtree extends IconBase {
         }
 
         LivingEntity victim = evt.getEntity();
-        if (victim.hasEffect(pers.roinflam.carianstyle.init.CarianStylePotion.PROTECTION_OF_THE_ERDTREE.get())) {
-            int amplifier = victim.getEffect(pers.roinflam.carianstyle.init.CarianStylePotion.PROTECTION_OF_THE_ERDTREE.get()).getAmplifier();
+        if (victim.hasEffect(pers.roinflam.carianstyle.init.CarianStylePotion.PROTECTION_OF_THE_ERDTREE)) {
+            int amplifier = victim.getEffect(pers.roinflam.carianstyle.init.CarianStylePotion.PROTECTION_OF_THE_ERDTREE).getAmplifier();
             // 倍率不能小于 0：效果等级还可能被野兽健壮这类附魔抬高，负的伤害量会变成回血
             evt.setAmount(evt.getAmount() * Math.max(0.0f, 1 - (amplifier + 1) * 0.2f));
         }
@@ -70,6 +70,6 @@ public class MobEffectProtectionOfTheErdtree extends IconBase {
     @Override
     @OnlyIn(Dist.CLIENT)
     protected ResourceLocation getIconTexture() {
-        return new ResourceLocation(Reference.MOD_ID, "textures/mob_effect/protection_of_the_erdtree.png");
+        return ResourceLocation.fromNamespaceAndPath(Reference.MOD_ID, "textures/mob_effect/protection_of_the_erdtree.png");
     }
 }

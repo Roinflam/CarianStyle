@@ -9,11 +9,10 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
@@ -22,11 +21,13 @@ import pers.roinflam.carianstyle.potion.MobEffectIncision;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
 import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
-
 import javax.annotation.Nullable;
 import java.util.List;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
+ * PORT-STUB(V2)
+ *
  * 切腹「狂化」客户端渲染器（纯客户端自绘）。
  * <p>
  * 对应 {@link MobEffectIncision}：消耗 50% 最大生命进入 10 秒状态，期间每秒流失 12.5% 最大生命、
@@ -34,7 +35,7 @@ import java.util.List;
  * 击杀延长持续时间。机制上是「自残换爆发」的血战状态。
  * </p>
  * <p>
- * <b>判定采用双重冗余：</b>{@code entity.hasEffect(CarianStylePotion.INCISION.get())}
+ * <b>判定采用双重冗余：</b>{@code entity.hasEffect(CarianStylePotion.INCISION)}
  * <b>或</b> {@code ClientSyncEffectManager.shouldRenderEffect(IncisionSyncHandler.INCISION_SERIAL, id)}。
  * 与出血 / 冻伤不同的是，切腹是<b>自身增益</b>——玩家自己进入切腹时原版同步完整可靠，
  * 单靠前者即可正确显示；后者只负责补上「观察其它实体的切腹状态」这一档
@@ -168,799 +169,56 @@ import java.util.List;
  * @version 4
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@Deprecated
 public final class IncisionRenderer {
-
-    /** 距离裁剪（格）。必须 ≤ {@link SharedEntityQuery#QUERY_RANGE}，否则会漏掉实体。 */
     private static final double CULL = 48.0;
     private static final double CULL_SQR = CULL * CULL;
     private static final float TAU = (float) (Math.PI * 2.0);
-    /** 离地高度偏移，避免地面图形与地形 z-fighting */
     private static final float Y_OFFSET = 0.02f;
-    /**
-     * 渲染器起始墙钟毫秒（类加载时固定）。动画时间必须用「当前毫秒 - 此起始值」的差值再转 float，
-     * 直接用 currentTimeMillis()/1000f 数值过大会导致 float 精度不足、动画卡死。
-     */
     private static final long START_MILLIS = System.currentTimeMillis();
-
-    /**
-     * 血刃碎片的轮廓顶点数（固定 4 点菱形，不参与 LOD 缩放）。
-     * <p>同时也是 {@link #SHARD_WX} / {@link #SHARD_WY} / {@link #SHARD_WZ}
-     * 三个复用缓冲的长度依据。改动此值必须同步改三个缓冲的长度与
-     * {@link #emitShard} 内的展开代码。</p>
-     */
     private static final int SHARD_POINTS = 4;
-
-    // ===== v2 LOD 下限与保留阈值 =====
-    /** 刀痕沿长度的最少细分段数：4 段轮廓略方，但两端收尖的形态仍然成立 */
     private static final int GASH_SEGMENTS_MIN = 4;
-    /** 涟漪环的最少分段数 */
     private static final int RIPPLE_SEGMENTS_MIN = 8;
-    /** 雾团柔光块的最少分段数 */
     private static final int HAZE_SEGMENTS_MIN = 4;
-    /** 躯干血气层的保留阈值：纯体积氛围层，远处完全糊成一片 */
     private static final float HAZE_KEEP_THRESHOLD = 0.5f;
-
-    // ===== 配色（0xRRGGBB）=====
-    /** 刀痕核心：亮血红，全渲染器唯一的高亮色，确保标志物在任何背景下都能读出 */
     private static final int INCISION_GASH = 0xFF4A55;
-    /** 主血色：氧化暗红（刻意比出血的 0xE0202F 暗，避免撞色） */
     private static final int INCISION_BLOOD = 0xA01824;
-    /** 近黑红：雾团外缘、地面涟漪的深色端 */
     private static final int INCISION_DARK = 0x2A0408;
-
-    // ===== v3：预解包的固定配色（只读，切勿作为写入目标）=====
-    // C_ 前缀是本模组约定，表示「类加载时解包一次、此后永久复用的常量颜色数组」。
-    // Java 没有不可变数组，一旦被误当作 VisualColor.*Into 的 dst 传入，
-    // 会永久污染该配色且之后每帧都是错的——改动这几行时务必留意。
-    /** 刀痕高亮色（刀痕中段、血刃初生） */
     private static final float[] C_INCISION_GASH = VisualColor.constant(INCISION_GASH);
-    /** 氧化暗红（刀痕两端、血刃中期、涟漪起点、雾团亮部） */
     private static final float[] C_INCISION_BLOOD = VisualColor.constant(INCISION_BLOOD);
-    /** 近黑红（血刃末期、涟漪终点、雾团暗部） */
     private static final float[] C_INCISION_DARK = VisualColor.constant(INCISION_DARK);
-
-    /**
-     * v3：动态插值色的复用缓冲 A（写入后必须立即消费，不可跨调用留存）。
-     * <p>
-     * 用于：刀痕的滚动双缓冲之一、血刃碎片色、涟漪色、雾团色。这几处不会同时活跃
-     * （四个 draw 方法顺序调用、互不嵌套），故可共用。
-     * </p>
-     * <p>仅渲染线程访问，无并发问题。</p>
-     */
     private static final float[] SCRATCH_A = new float[VisualColor.RGB];
-
-    /**
-     * v3：动态插值色的复用缓冲 B（同上）。
-     * <p>
-     * <b>专供 {@link #drawGash} 与 {@link #SCRATCH_A} 配对使用</b>——
-     * {@link #emitBillboardQuad} 需要同时持有带状四边形两端的颜色，一个缓冲不够
-     * （详见类注释「刀痕为什么需要两个缓冲」）。
-     * </p>
-     */
     private static final float[] SCRATCH_B = new float[VisualColor.RGB];
-
-    /**
-     * v4：血刃碎片世界坐标的复用缓冲 X（仅供 {@link #emitShard} 内部使用）。
-     * <p>
-     * 旧实现每片碎片 {@code new float[4]} 三次 + 局部轮廓点数组五个，
-     * 满配 20 片即 <b>160 个临时数组 / 实体 / 帧</b>——比 v3 清掉的颜色分配高出近三倍
-     * （详见类注释的「v4」小节）。
-     * </p>
-     * <p>
-     * {@link #emitShard} 不可重入（同一线程内不会嵌套调用自己），且只在渲染线程访问，
-     * 故提为静态定长缓冲复用，分配归零。
-     * </p>
-     * <p>
-     * <b>约束：</b>只能在 {@link #emitShard} 内部使用，且必须
-     * 「写满 → 立刻画完 → 不再引用」。
-     * </p>
-     */
     private static final float[] SHARD_WX = new float[SHARD_POINTS];
-
-    /** v4：血刃碎片世界坐标的复用缓冲 Y（同上，与 {@link #SHARD_WX} 配对）。 */
     private static final float[] SHARD_WY = new float[SHARD_POINTS];
-
-    /** v4：血刃碎片世界坐标的复用缓冲 Z（同上，与 {@link #SHARD_WX} 配对）。 */
     private static final float[] SHARD_WZ = new float[SHARD_POINTS];
-
-    // ===== 腹部横向刀痕（核心标志）=====
-    /** 刀痕高度系数（× 实体高度）。取腹部而非胸口，贴合「切腹」意象 */
     private static final float GASH_HEIGHT_FACTOR = 0.45f;
-    /** 刀痕半长系数（× 实体宽度） */
     private static final float GASH_HALF_LENGTH_FACTOR = 0.85f;
-    /** 刀痕半厚系数（× 实体高度） */
     private static final float GASH_HALF_THICK_FACTOR = 0.055f;
-    /** 刀痕沿长度方向的细分段数（越大轮廓越平滑） */
     private static final int GASH_SEGMENTS = 10;
-    /** 刀痕心跳脉动速度 */
     private static final float GASH_PULSE_SPEED = 4.5f;
     private static final float GASH_BASE_ALPHA = 0.9f;
-
-    // ===== 上升血刃碎片 =====
-    /** 同时存在的碎片数量 */
     private static final int SHARD_COUNT = 20;
-    /** 单片碎片从生成到消散的循环速度（每秒推进的归一化进度） */
     private static final float SHARD_RISE_SPEED = 0.5f;
-    /** 碎片上升高度系数（× 实体高度），升到头顶以上 */
     private static final float SHARD_RISE_HEIGHT_FACTOR = 1.15f;
-    /** 碎片水平外散半径系数（× 实体宽度） */
     private static final float SHARD_SPREAD_FACTOR = 0.75f;
-    /** 碎片基准尺寸（格） */
     private static final float SHARD_SIZE = 0.10f;
-    /** 碎片自旋速度 */
     private static final float SHARD_SPIN_SPEED = 3.2f;
     private static final float SHARD_BASE_ALPHA = 0.85f;
-
-    // ===== 疾走涟漪（与移速修正器联动）=====
-    /** 同时存在的涟漪环数 */
     private static final int RIPPLE_COUNT = 3;
-    /** 涟漪扩散循环速度 */
     private static final float RIPPLE_RATE = 0.9f;
-    /** 涟漪最大半径系数（× 实体宽度） */
     private static final float RIPPLE_MAX_RADIUS_FACTOR = 2.3f;
     private static final int RIPPLE_SEGMENTS = 28;
     private static final float RIPPLE_HALF_WIDTH = 0.055f;
     private static final float RIPPLE_BASE_ALPHA = 0.55f;
-    /**
-     * 读不到移速修正器时的回退强度。
-     * <p>取中值，保证即便属性未同步（理论上不应发生）视觉也不会整个消失。</p>
-     */
     private static final float SPEED_INTENSITY_FALLBACK = 0.5f;
-
-    // ===== 躯干血气笼罩 =====
-    /** 雾团数量 */
     private static final int HAZE_COUNT = 8;
-    /** 雾团半径系数（× 实体宽度） */
     private static final float HAZE_SIZE_FACTOR = 0.38f;
-    /** 雾团覆盖的躯干高度系数（× 实体高度） */
     private static final float HAZE_HEIGHT_FACTOR = 0.7f;
     private static final float HAZE_BASE_ALPHA = 0.34f;
-    /** 雾团缓慢漂移速度 */
     private static final float HAZE_DRIFT_SPEED = 0.45f;
-    /** 雾团 billboard 圆的分段数 */
     private static final int HAZE_SEGMENTS = 10;
-
     private IncisionRenderer() {
     }
-
-    /**
-     * 世界渲染回调：在半透明方块之后，绘制相机附近所有处于切腹状态生物的狂化视觉。
-     *
-     * @param event 渲染阶段事件
-     */
-    @SubscribeEvent
-    public static void onRenderLevel(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
-            return;
-        }
-
-        // 特效开关（v-toggle）：玩家在附魔百科的「特效开关」页关掉本项时整段跳过。
-        // 位置刻意放在阶段判断之后、任何实体查询与几何计算之前——若放进循环里，
-        // 就只省掉了绘制，SharedEntityQuery 与遍历的开销照付。
-        // VisualToggle.isEnabled 编译后是一次数组下标读取，放在这里的成本可忽略。
-        if (!VisualToggle.isEnabled(VisualEffectType.INCISION)) {
-            return;
-        }
-        // 共享批次未开启（世界未加载等）：直接跳过
-        BufferBuilder builder = VisualBatch.builder();
-        if (builder == null) {
-            return;
-        }
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null) {
-            return;
-        }
-
-        Vec3 cam = VisualBatch.cameraPosition();
-        if (cam == null) {
-            return;
-        }
-        List<LivingEntity> candidates = SharedEntityQuery.livingEntitiesNearCamera(mc, cam);
-        if (candidates.isEmpty()) {
-            return;
-        }
-
-        MobEffect incision = CarianStylePotion.INCISION.get();
-
-        Matrix4f matrix = VisualBatch.matrix();
-        float rightX = VisualBatch.rightX();
-        float rightY = VisualBatch.rightY();
-        float rightZ = VisualBatch.rightZ();
-        float upX = VisualBatch.upX();
-        float upY = VisualBatch.upY();
-        float upZ = VisualBatch.upZ();
-
-        float partial = VisualBatch.partialTick();
-        float time = (System.currentTimeMillis() - START_MILLIS) / 1000f;
-
-        for (LivingEntity entity : candidates) {
-            // 共享列表已保证 isAlive，此处只做效果判定
-            if (!hasIncision(entity, incision)) {
-                continue;
-            }
-
-            double ex = Mth.lerp((double) partial, entity.xo, entity.getX());
-            double ey = Mth.lerp((double) partial, entity.yo, entity.getY());
-            double ez = Mth.lerp((double) partial, entity.zo, entity.getZ());
-
-            double dx = ex - cam.x;
-            double dy = ey - cam.y;
-            double dz = ez - cam.z;
-            double distSqr = dx * dx + dy * dy + dz * dz;
-            if (distSqr > CULL_SQR) {
-                continue;
-            }
-
-            // v2：本实体的细节系数（距离 × 同屏拥挤度）。12 格内恒为 1.0，视觉与优化前一致
-            float detail = VisualLod.detail(distSqr);
-            // 登记实例，供下一帧估算拥挤度（不影响本帧绘制）
-            VisualLod.countInstance();
-
-            float width = entity.getBbWidth();
-            float height = entity.getBbHeight();
-
-            float rx = (float) dx;
-            float ryFoot = (float) dy;
-            float rz = (float) dz;
-
-            // 爆发强度：由移速修正器实时读出（1.0=刚触发，0.0=已衰减到底）
-            float burst = speedIntensity(entity);
-
-            drawSprintRipples(builder, matrix, rx, ryFoot + Y_OFFSET, rz, width, time,
-                    entity.getId(), burst, detail);
-            // 血气雾团是纯体积氛围层，远处完全糊成一片，低细节时整层跳过（省约 240 顶点）
-            if (VisualLod.keepLayer(detail, HAZE_KEEP_THRESHOLD)) {
-                drawBodyHaze(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId(),
-                        rightX, rightY, rightZ, upX, upY, upZ, detail);
-            }
-            drawRisingShards(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId(),
-                    burst, rightX, rightY, rightZ, upX, upY, upZ, detail);
-            drawGash(builder, matrix, rx, ryFoot, rz, width, height, time, entity.getId(),
-                    rightX, rightY, rightZ, upX, upY, upZ, detail);
-        }
-    }
-
-    /**
-     * 判断实体是否处于切腹状态（双重冗余判定）。
-     * <p>玩家自己进入切腹时 {@code hasEffect} 即可命中；同步集合只负责补上观察其它实体的场景。</p>
-     *
-     * @param entity   待判定实体
-     * @param incision 切腹效果对象（可能为 null）
-     * @return 处于切腹状态返回 true
-     */
-    private static boolean hasIncision(LivingEntity entity, @Nullable MobEffect incision) {
-        if (incision != null && entity.hasEffect(incision)) {
-            return true;
-        }
-        return ClientSyncEffectManager.shouldRenderEffect(
-                IncisionSyncHandler.INCISION_SERIAL, entity.getId());
-    }
-
-    /**
-     * 读取切腹的「爆发强度」：直接取 {@code MOVEMENT_SPEED} 属性上切腹修正器的实时数值。
-     * <p>
-     * {@link MobEffectIncision} 在施加时把移速修正器设为 +1.2（+120%），随后每 tick 递减
-     * 直到下限 +0.3（+30%）。属性修正器会随实体同步到客户端，因此客户端可以直接读出当前值，
-     * 换算成 0~1 的强度：刚触发为 1.0，衰减到底为 0.0。
-     * </p>
-     *
-     * @param entity 目标实体
-     * @return 爆发强度（0~1）
-     */
-    private static float speedIntensity(LivingEntity entity) {
-        AttributeInstance attribute = entity.getAttribute(Attributes.MOVEMENT_SPEED);
-        if (attribute == null) {
-            return SPEED_INTENSITY_FALLBACK;
-        }
-        AttributeModifier modifier = attribute.getModifier(MobEffectIncision.ID);
-        if (modifier == null) {
-            return SPEED_INTENSITY_FALLBACK;
-        }
-        // 1.2（刚触发）→ 0.3（衰减到底）映射为 1.0 → 0.0
-        double amount = modifier.getAmount();
-        return clamp01((float) ((amount - 0.3) / 0.9));
-    }
-
-    // ==================== 腹部横向刀痕（核心标志）====================
-
-    /**
-     * 绘制腹部横向发光刀痕：面向相机的水平长条，厚度沿长度按正弦包络收束（两端收尖、中段最厚），
-     * 中心用高亮的 {@link #INCISION_GASH}、向两端过渡到暗红并淡出为 0。整体随心跳脉动明灭。
-     * <p>这是本渲染器唯一的高亮元素，也是「切腹」意象的核心符号。</p>
-     * <p>
-     * <b>v2：只削分段、不削存在。</b>刀痕仅 60 顶点却承担全部辨识度，因此无论细节多低都完整绘制，
-     * 只把沿长度的细分从 {@link #GASH_SEGMENTS} 降到下限 {@link #GASH_SEGMENTS_MIN}
-     * （轮廓略方，但「两端收尖的横痕」这一形态完全成立）。
-     * </p>
-     * <p>
-     * <b>v3：颜色改用滚动双缓冲，每段只插值一次。</b>由于「本段末端色 == 下一段起点色」，
-     * 算完一段后把 {@link #SCRATCH_A} / {@link #SCRATCH_B} 的引用对调即可复用。
-     * <b>两个缓冲缺一不可</b>——{@link #emitBillboardQuad} 要同时读两端颜色，
-     * 共用一个会让整条刀痕退化成纯色。
-     * </p>
-     */
-    private static void drawGash(BufferBuilder b, Matrix4f m,
-                                 float cx, float cyFoot, float cz, float width, float height,
-                                 float time, int seedId,
-                                 float rightX, float rightY, float rightZ,
-                                 float upX, float upY, float upZ, float detail) {
-        float gashY = cyFoot + height * GASH_HEIGHT_FACTOR;
-        // 心跳脉动：短促强跳 + 常驻底亮，模拟血脉搏动
-        float beat = Mth.sin(time * GASH_PULSE_SPEED + seedId * 0.7f);
-        float pulse = 0.72f + 0.28f * beat * beat * beat * beat; // 四次方 → 尖峰窄、底部平
-        float halfLen = width * GASH_HALF_LENGTH_FACTOR * (1f + 0.05f * pulse);
-        float halfThick = height * GASH_HALF_THICK_FACTOR * (0.85f + 0.3f * pulse);
-        float alpha = GASH_BASE_ALPHA * pulse;
-
-        int segments = VisualLod.scaleSegments(GASH_SEGMENTS, GASH_SEGMENTS_MIN, detail);
-
-        // v3 滚动双缓冲：prevCol 持有上一段末端色，curCol 持有本段末端色。
-        // 循环外先算出 u=0（左端点）的颜色，作为第一段的起点色。
-        float[] prevCol = SCRATCH_A;
-        float[] curCol = SCRATCH_B;
-        gashColorInto(prevCol, 0f);
-
-        float prevOffset = -halfLen;
-        float prevThick = 0f;
-        for (int i = 0; i <= segments; i++) {
-            float u = (float) i / segments;               // 0~1 沿长度
-            float offset = -halfLen + u * 2f * halfLen;   // 长度方向偏移
-            float thick = halfThick * (float) Math.sin(Math.PI * u); // 两端收尖
-
-            if (i > 0) {
-                // 颜色：中段热、两端暗；alpha：中段实、两端 0
-                float uPrev = (float) (i - 1) / segments;
-                gashColorInto(curCol, u);
-                float aPrev = alpha * gashAlpha(uPrev);
-                float aCur = alpha * gashAlpha(u);
-
-                emitBillboardQuad(b, m, cx, gashY, cz,
-                        prevOffset, prevThick, offset, thick,
-                        prevCol, aPrev, curCol, aCur,
-                        rightX, rightY, rightZ, upX, upY, upZ);
-
-                // 交换缓冲：本段末端色成为下一段的起点色，省掉一次插值
-                float[] tmp = prevCol;
-                prevCol = curCol;
-                curCol = tmp;
-            }
-            prevOffset = offset;
-            prevThick = thick;
-        }
-    }
-
-    /**
-     * 刀痕颜色包络：中段取高亮 {@link #C_INCISION_GASH}，向两端过渡到暗红
-     * {@link #C_INCISION_BLOOD}，结果写入调用方提供的缓冲。
-     * <p>v3：由「返回新数组」改为「写入缓冲」，消除刀痕循环里每段两次的堆分配。</p>
-     *
-     * @param dst 目标缓冲（不可传入 {@code C_} 常量数组）
-     * @param u   沿长度的归一化位置（0~1）
-     */
-    private static void gashColorInto(float[] dst, float u) {
-        // 距离中心的归一化距离（0=中心，1=端点）
-        float d = Math.abs(u - 0.5f) * 2f;
-        VisualColor.mixInto(dst, C_INCISION_GASH, C_INCISION_BLOOD, d * d);
-    }
-
-    /**
-     * 刀痕不透明度包络：中段最实、两端渐隐为 0。
-     *
-     * @param u 沿长度的归一化位置（0~1）
-     * @return 该位置的 alpha 系数（0~1）
-     */
-    private static float gashAlpha(float u) {
-        return (float) Math.sin(Math.PI * u);
-    }
-
-    /**
-     * 在 billboard 平面内绘制一段「带状四边形」：沿相机右向量偏移 {@code offset}、
-     * 沿相机上向量正负各扩 {@code thick}，两端可分别指定颜色与 alpha。
-     * <p>用于把刀痕拼成一条厚度渐变的发光横条。</p>
-     * <p><b>注意：</b>本方法会<b>同时读取</b> {@code col0} 与 {@code col1}，
-     * 因此调用方必须保证这两个数组不是同一个缓冲——这正是
-     * {@link #drawGash} 使用双缓冲的原因。</p>
-     */
-    private static void emitBillboardQuad(BufferBuilder b, Matrix4f m,
-                                          float cx, float cy, float cz,
-                                          float off0, float thick0, float off1, float thick1,
-                                          float[] col0, float a0, float[] col1, float a1,
-                                          float rightX, float rightY, float rightZ,
-                                          float upX, float upY, float upZ) {
-        float x0t = cx + rightX * off0 + upX * thick0;
-        float y0t = cy + rightY * off0 + upY * thick0;
-        float z0t = cz + rightZ * off0 + upZ * thick0;
-        float x0b = cx + rightX * off0 - upX * thick0;
-        float y0b = cy + rightY * off0 - upY * thick0;
-        float z0b = cz + rightZ * off0 - upZ * thick0;
-
-        float x1t = cx + rightX * off1 + upX * thick1;
-        float y1t = cy + rightY * off1 + upY * thick1;
-        float z1t = cz + rightZ * off1 + upZ * thick1;
-        float x1b = cx + rightX * off1 - upX * thick1;
-        float y1b = cy + rightY * off1 - upY * thick1;
-        float z1b = cz + rightZ * off1 - upZ * thick1;
-
-        b.vertex(m, x0t, y0t, z0t).color(col0[0], col0[1], col0[2], a0).endVertex();
-        b.vertex(m, x0b, y0b, z0b).color(col0[0], col0[1], col0[2], a0).endVertex();
-        b.vertex(m, x1b, y1b, z1b).color(col1[0], col1[1], col1[2], a1).endVertex();
-
-        b.vertex(m, x0t, y0t, z0t).color(col0[0], col0[1], col0[2], a0).endVertex();
-        b.vertex(m, x1b, y1b, z1b).color(col1[0], col1[1], col1[2], a1).endVertex();
-        b.vertex(m, x1t, y1t, z1t).color(col1[0], col1[1], col1[2], a1).endVertex();
-    }
-
-    // ==================== 上升血刃碎片 ====================
-
-    /**
-     * 自刀痕处向上飘散的细长菱形血刃碎片：带自旋、随高度外散、上升过程中由亮转暗并淡出。
-     * <p>刻意使用<b>尖锐的细长菱形</b>而非圆形柔光点——出血渲染器的血滴已经占用了圆形语言，
-     * 用菱形碎片才能在两者同时挂载时区分开，也更贴合「血刃」而非「血滴」的语义。</p>
-     * <p>数量随 {@code burst}（爆发强度）增减：刚触发时最密，衰减到底时约剩一半。</p>
-     * <p>
-     * <b>v2：数量再乘细节系数。</b>碎片位置由 {@code seedFor(entityId, i + 100)} 决定，
-     * 截断尾部时保留元素的种子与轨迹完全不变，靠近时是「逐渐多出几片碎片」而非重新洗牌。
-     * </p>
-     * <p>
-     * <b>v3：颜色写入 {@link #SCRATCH_A} 后立即被 {@link #emitShard} 消费，零分配。</b>
-     * </p>
-     * <p>
-     * <b>v4：{@link #emitShard} 内部亦已零分配</b>，本循环整体不再产生任何临时数组。
-     * </p>
-     */
-    private static void drawRisingShards(BufferBuilder b, Matrix4f m,
-                                         float cx, float cyFoot, float cz, float width, float height,
-                                         float time, int seedId, float burst,
-                                         float rightX, float rightY, float rightZ,
-                                         float upX, float upY, float upZ, float detail) {
-        int burstCount = Math.max(1, Math.round(SHARD_COUNT * (0.5f + 0.5f * burst)));
-        int count = VisualLod.scale(burstCount, detail);
-        float startY = cyFoot + height * GASH_HEIGHT_FACTOR;
-        float riseHeight = height * SHARD_RISE_HEIGHT_FACTOR;
-        float spread = width * SHARD_SPREAD_FACTOR;
-
-        for (int i = 0; i < count; i++) {
-            long s = seedFor(seedId, i + 100);
-            float phase = rngFloat(s);
-            s = rngNext(s);
-            float ang = rngFloat(s) * TAU;
-            s = rngNext(s);
-            float radFactor = 0.25f + 0.75f * rngFloat(s);
-            s = rngNext(s);
-            float sizeRand = 0.65f + 0.7f * rngFloat(s);
-            s = rngNext(s);
-            float spinPhase = rngFloat(s) * TAU;
-            s = rngNext(s);
-            float spinDir = (rngFloat(s) < 0.5f) ? -1f : 1f;
-
-            float t = frac(time * SHARD_RISE_SPEED + phase);
-
-            // 包络：快速淡入、后段淡出
-            float env;
-            if (t < 0.1f) {
-                env = t / 0.1f;
-            } else if (t > 0.5f) {
-                env = 1f - (t - 0.5f) / 0.5f;
-            } else {
-                env = 1f;
-            }
-            if (env <= 0f) {
-                continue;
-            }
-
-            float alpha = SHARD_BASE_ALPHA * env * (0.55f + 0.45f * burst);
-            if (alpha <= 0.01f) {
-                continue;
-            }
-
-            // 上升带加速感（t 的平方使后段拉开），水平随高度外散
-            float rise = t * t * 0.4f + t * 0.6f;
-            float curRad = spread * radFactor * (0.35f + 0.65f * t);
-            float px = cx + (float) Math.cos(ang) * curRad;
-            float pz = cz + (float) Math.sin(ang) * curRad;
-            float py = startY + rise * riseHeight;
-
-            // 颜色：初生偏亮（贴近刀痕），上升过程转暗红再转近黑红。
-            // v3：无分配插值，写入复用缓冲后立即消费
-            if (t < 0.4f) {
-                VisualColor.mixInto(SCRATCH_A, C_INCISION_GASH, C_INCISION_BLOOD, t / 0.4f);
-            } else {
-                VisualColor.mixInto(SCRATCH_A, C_INCISION_BLOOD, C_INCISION_DARK, (t - 0.4f) / 0.6f);
-            }
-            float size = SHARD_SIZE * sizeRand * (1f - 0.35f * t);
-            float rot = time * SHARD_SPIN_SPEED * spinDir + spinPhase;
-
-            emitShard(b, m, px, py, pz, size, rot,
-                    SCRATCH_A[0], SCRATCH_A[1], SCRATCH_A[2], alpha,
-                    rightX, rightY, rightZ, upX, upY, upZ);
-        }
-    }
-
-    /**
-     * 绘制一片面向相机的细长菱形「血刃碎片」：长轴为短轴的约 3 倍，可绕视线方向旋转。
-     * 中心不透明、四个顶点渐隐为 0。
-     * <p><b>轮廓固定 4 点，不参与 LOD 缩放</b>——菱形已是最简形状，
-     * 碎片的削减完全通过「减少片数」实现。</p>
-     * <p>
-     * <b>v4：本方法此前是本渲染器最大的堆分配点。</b>旧实现每次调用要分配 8 个数组
-     * （1 个 {@code float[][]} 外层 + 4 个 {@code float[2]} 轮廓点 + 3 个 {@code float[4]}
-     * 世界坐标），满配 20 片即约 <b>160 个临时数组 / 实体 / 帧</b>
-     * （详见类注释的「v4」小节）。
-     * </p>
-     * <p>
-     * 现改为：轮廓点内联为 8 个标量、世界坐标写入静态复用缓冲
-     * {@link #SHARD_WX} / {@link #SHARD_WY} / {@link #SHARD_WZ}。
-     * 本方法不可重入（同一线程内不会嵌套调用自己，且只在渲染线程访问），复用安全。
-     * </p>
-     * <p>
-     * <b>视觉逐位一致：</b>轮廓点数值、旋转公式、顶点写入顺序全部照搬原实现，
-     * 输出的每个顶点坐标与 v3 完全相同。
-     * </p>
-     *
-     * @param size 短轴半长（长轴为其 3 倍）
-     * @param rot  在 billboard 平面内的旋转角（弧度）
-     */
-    private static void emitShard(BufferBuilder b, Matrix4f m,
-                                  float cx, float cy, float cz, float size, float rot,
-                                  float r, float g, float bl, float alpha,
-                                  float rightX, float rightY, float rightZ,
-                                  float upX, float upY, float upZ) {
-        final float longAxis = size * 3f;
-
-        // v4：菱形的 4 个局部顶点内联为标量。
-        // 数值与原 local 字面量逐位相同：
-        //   {0, +longAxis}, {+size, 0}, {0, -longAxis}, {-size, 0}
-        // 上下为长轴尖端、左右为短轴，即细长菱形（血刃）的轮廓
-        final float l0u = 0f, l0v = longAxis;
-        final float l1u = size, l1v = 0f;
-        final float l2u = 0f, l2v = -longAxis;
-        final float l3u = -size, l3v = 0f;
-
-        final float cosR = (float) Math.cos(rot);
-        final float sinR = (float) Math.sin(rot);
-
-        // v4：世界坐标写入静态复用缓冲，不再每片 new float[4] 三次
-        final float[] wx = SHARD_WX;
-        final float[] wy = SHARD_WY;
-        final float[] wz = SHARD_WZ;
-
-        // 逐点：局部二维坐标 → 绕视线旋转 → 沿相机右 / 上向量展开为世界坐标
-        wx[0] = cx + rightX * (l0u * cosR - l0v * sinR) + upX * (l0u * sinR + l0v * cosR);
-        wy[0] = cy + rightY * (l0u * cosR - l0v * sinR) + upY * (l0u * sinR + l0v * cosR);
-        wz[0] = cz + rightZ * (l0u * cosR - l0v * sinR) + upZ * (l0u * sinR + l0v * cosR);
-
-        wx[1] = cx + rightX * (l1u * cosR - l1v * sinR) + upX * (l1u * sinR + l1v * cosR);
-        wy[1] = cy + rightY * (l1u * cosR - l1v * sinR) + upY * (l1u * sinR + l1v * cosR);
-        wz[1] = cz + rightZ * (l1u * cosR - l1v * sinR) + upZ * (l1u * sinR + l1v * cosR);
-
-        wx[2] = cx + rightX * (l2u * cosR - l2v * sinR) + upX * (l2u * sinR + l2v * cosR);
-        wy[2] = cy + rightY * (l2u * cosR - l2v * sinR) + upY * (l2u * sinR + l2v * cosR);
-        wz[2] = cz + rightZ * (l2u * cosR - l2v * sinR) + upZ * (l2u * sinR + l2v * cosR);
-
-        wx[3] = cx + rightX * (l3u * cosR - l3v * sinR) + upX * (l3u * sinR + l3v * cosR);
-        wy[3] = cy + rightY * (l3u * cosR - l3v * sinR) + upY * (l3u * sinR + l3v * cosR);
-        wz[3] = cz + rightZ * (l3u * cosR - l3v * sinR) + upZ * (l3u * sinR + l3v * cosR);
-
-        // 三角扇：中心不透明 + 相邻两轮廓点渐隐为 0（顺序与原实现完全一致）
-        for (int i = 0; i < SHARD_POINTS; i++) {
-            int j = (i + 1) % SHARD_POINTS;
-            b.vertex(m, cx, cy, cz).color(r, g, bl, alpha).endVertex();
-            b.vertex(m, wx[i], wy[i], wz[i]).color(r, g, bl, 0f).endVertex();
-            b.vertex(m, wx[j], wy[j], wz[j]).color(r, g, bl, 0f).endVertex();
-        }
-    }
-
-    // ==================== 疾走涟漪（与移速修正器联动）====================
-
-    /**
-     * 脚下向外扩散的扁平涟漪环。
-     * <p><b>本渲染器唯一与机制直接联动的元素</b>：环数、亮度、扩散速度全部由 {@code burst}
-     * （{@link #speedIntensity} 读出的移速修正器实时值）驱动。切腹刚触发时移速 +120%，
-     * 涟漪密集明亮、扩散快；随着修正器衰减到 +30%，涟漪逐渐稀疏黯淡，玩家能直接从脚下看出
-     * 「爆发期快过去了」，而不必去盯 buff 栏的读秒。</p>
-     * <p>
-     * <b>v2：环数与分段数再乘细节系数。</b>涟漪的相位是 {@code i / count} 均布的，
-     * 减少 count 会改变相位间隔——但涟漪本身是「一圈接一圈往外推」的循环动画、没有固定方位，
-     * 减圈只表现为「波与波之间隔得更开」，观感自然，无需按步长抽取。
-     * </p>
-     * <p>
-     * <b>v3：颜色写入 {@link #SCRATCH_A} 后立即被 {@link #ring} 消费，零分配。</b>
-     * </p>
-     */
-    private static void drawSprintRipples(BufferBuilder b, Matrix4f m,
-                                          float cx, float cy, float cz, float width,
-                                          float time, int seedId, float burst, float detail) {
-        if (burst <= 0.02f) {
-            return;
-        }
-        int burstCount = Math.max(1, Math.round(RIPPLE_COUNT * (0.4f + 0.6f * burst)));
-        int count = VisualLod.scale(burstCount, detail);
-        int segments = VisualLod.scaleSegments(RIPPLE_SEGMENTS, RIPPLE_SEGMENTS_MIN, detail);
-        float maxRadius = width * RIPPLE_MAX_RADIUS_FACTOR * (0.6f + 0.4f * burst);
-        // 扩散速度随爆发强度提升，强化「疾走」的观感
-        float rate = RIPPLE_RATE * (0.7f + 0.6f * burst);
-
-        for (int i = 0; i < count; i++) {
-            float phase = (float) i / count;
-            float t = frac(time * rate + phase + seedId * 0.11f);
-            float radius = maxRadius * easeOutCubic(t);
-            if (radius <= 0.08f) {
-                continue;
-            }
-            // 起步快速淡入、随扩散淡出
-            float alpha = RIPPLE_BASE_ALPHA * (1f - t) * smoothstep(0f, 0.12f, t) * burst;
-            if (alpha <= 0.01f) {
-                continue;
-            }
-            // v3：无分配插值，写入复用缓冲后立即消费
-            VisualColor.mixInto(SCRATCH_A, C_INCISION_BLOOD, C_INCISION_DARK, t);
-            ring(b, m, cx, cy, cz, radius, segments, RIPPLE_HALF_WIDTH, SCRATCH_A, alpha);
-        }
-    }
-
-    // ==================== 躯干血气笼罩 ====================
-
-    /**
-     * 贴身的大号暗红雾团：缓慢漂移、彼此叠加，覆盖躯干中上段。
-     * <p>与出血血雾的区别在于色调更暗更闷（{@link #INCISION_DARK} 参与混合）、位置更贴身，
-     * 读作「被自己蒸腾的血气包裹」而不是「伤口在往外喷」。作用是给整体补足体积感。</p>
-     * <p>
-     * <b>v2：数量与分段数再乘细节系数；整层由调用方按 {@link #HAZE_KEEP_THRESHOLD} 决定是否绘制。</b>
-     * 雾团位置由 {@code seedFor(entityId, i + 700)} 决定，截断尾部安全。
-     * </p>
-     * <p>
-     * <b>v3：颜色写入 {@link #SCRATCH_A} 后立即被 {@link #emitSoftMote} 消费，零分配。</b>
-     * </p>
-     */
-    private static void drawBodyHaze(BufferBuilder b, Matrix4f m,
-                                     float cx, float cyFoot, float cz, float width, float height,
-                                     float time, int seedId,
-                                     float rightX, float rightY, float rightZ,
-                                     float upX, float upY, float upZ, float detail) {
-        int count = VisualLod.scale(HAZE_COUNT, detail);
-        int segments = VisualLod.scaleSegments(HAZE_SEGMENTS, HAZE_SEGMENTS_MIN, detail);
-
-        for (int i = 0; i < count; i++) {
-            long s = seedFor(seedId, i + 700);
-            float baseAngle = rngFloat(s) * TAU;
-            s = rngNext(s);
-            float radFactor = rngFloat(s);
-            s = rngNext(s);
-            float heightFrac = rngFloat(s);
-            s = rngNext(s);
-            float sizeRand = 0.75f + 0.5f * rngFloat(s);
-            s = rngNext(s);
-            float driftPhase = rngFloat(s) * TAU;
-            s = rngNext(s);
-            float pulsePhase = rngFloat(s) * TAU;
-
-            float driftAngle = baseAngle + Mth.sin(time * HAZE_DRIFT_SPEED + driftPhase) * 0.55f;
-            float radius = width * 0.3f * radFactor;
-            float px = cx + (float) Math.cos(driftAngle) * radius;
-            float pz = cz + (float) Math.sin(driftAngle) * radius;
-            float py = cyFoot + height * (0.25f + heightFrac * HAZE_HEIGHT_FACTOR);
-
-            float pulse = 0.72f + 0.28f * Mth.sin(time * 0.85f + pulsePhase);
-            float alpha = HAZE_BASE_ALPHA * pulse;
-            float size = width * HAZE_SIZE_FACTOR * sizeRand;
-
-            // v3：无分配插值，写入复用缓冲后立即消费
-            VisualColor.mixInto(SCRATCH_A, C_INCISION_DARK, C_INCISION_BLOOD, 0.35f + 0.4f * pulse);
-
-            emitSoftMote(b, m, px, py, pz, size,
-                    SCRATCH_A[0], SCRATCH_A[1], SCRATCH_A[2], alpha,
-                    rightX, rightY, rightZ, upX, upY, upZ, segments);
-        }
-    }
-
-    // ==================== 通用几何基元 ====================
-
-    /** 画一圈水平圆环（内外两侧为同一 alpha 的窄带）。 */
-    private static void ring(BufferBuilder b, Matrix4f m,
-                             float cx, float cy, float cz, float radius, int segments,
-                             float halfWidth, float[] col, float alpha) {
-        float rInner = Math.max(0f, radius - halfWidth);
-        float rOuter = radius + halfWidth;
-        for (int i = 0; i < segments; i++) {
-            double a0 = (TAU * i) / segments;
-            double a1 = (TAU * (i + 1)) / segments;
-            float ox0 = cx + rOuter * (float) Math.cos(a0);
-            float oz0 = cz + rOuter * (float) Math.sin(a0);
-            float ox1 = cx + rOuter * (float) Math.cos(a1);
-            float oz1 = cz + rOuter * (float) Math.sin(a1);
-            float ix0 = cx + rInner * (float) Math.cos(a0);
-            float iz0 = cz + rInner * (float) Math.sin(a0);
-            float ix1 = cx + rInner * (float) Math.cos(a1);
-            float iz1 = cz + rInner * (float) Math.sin(a1);
-
-            b.vertex(m, ox0, cy, oz0).color(col[0], col[1], col[2], alpha).endVertex();
-            b.vertex(m, ox1, cy, oz1).color(col[0], col[1], col[2], alpha).endVertex();
-            b.vertex(m, ix1, cy, iz1).color(col[0], col[1], col[2], alpha).endVertex();
-
-            b.vertex(m, ox0, cy, oz0).color(col[0], col[1], col[2], alpha).endVertex();
-            b.vertex(m, ix1, cy, iz1).color(col[0], col[1], col[2], alpha).endVertex();
-            b.vertex(m, ix0, cy, iz0).color(col[0], col[1], col[2], alpha).endVertex();
-        }
-    }
-
-    /**
-     * 绘制一颗面向相机的柔和圆形光点（径向渐变：中心 alpha、边缘 0）。
-     *
-     * @param segments 分段数。v2 起由调用方按细节系数传入，下限 {@link #HAZE_SEGMENTS_MIN}；
-     *                 全细节时即 {@link #HAZE_SEGMENTS}。
-     */
-    private static void emitSoftMote(BufferBuilder b, Matrix4f m,
-                                     float cx, float cy, float cz, float size,
-                                     float r, float g, float bl, float alpha,
-                                     float rightX, float rightY, float rightZ,
-                                     float upX, float upY, float upZ, int segments) {
-        float pex = 0f, pey = 0f, pez = 0f;
-        for (int i = 0; i <= segments; i++) {
-            float ang = TAU * i / segments;
-            float ca = (float) Math.cos(ang) * size;
-            float sa = (float) Math.sin(ang) * size;
-            float ex = cx + rightX * ca + upX * sa;
-            float ey = cy + rightY * ca + upY * sa;
-            float ez = cz + rightZ * ca + upZ * sa;
-            if (i > 0) {
-                b.vertex(m, cx, cy, cz).color(r, g, bl, alpha).endVertex();
-                b.vertex(m, pex, pey, pez).color(r, g, bl, 0f).endVertex();
-                b.vertex(m, ex, ey, ez).color(r, g, bl, 0f).endVertex();
-            }
-            pex = ex;
-            pey = ey;
-            pez = ez;
-        }
-    }
-
-    // ==================== 无分配伪随机（xorshift64） ====================
-
-    private static long seedFor(int entityId, int index) {
-        long s = (entityId * 0x9E3779B97F4A7C15L) ^ ((index + 1L) * 0x85EBCA6BL);
-        s ^= (s >>> 29);
-        return s == 0L ? 0x9E3779B97F4A7C15L : s;
-    }
-
-    private static long rngNext(long s) {
-        s ^= s << 13;
-        s ^= s >>> 7;
-        s ^= s << 17;
-        return s;
-    }
-
-    private static float rngFloat(long s) {
-        return ((s >>> 40) & 0xFFFFFFL) / (float) 0x1000000;
-    }
-
-    // ==================== 数学辅助 ====================
-
-    private static float frac(float x) {
-        return x - (float) Math.floor(x);
-    }
-
-    private static float easeOutCubic(float t) {
-        float inv = 1f - t;
-        return 1f - inv * inv * inv;
-    }
-
-    private static float smoothstep(float e0, float e1, float x) {
-        if (e1 <= e0) {
-            return x < e0 ? 0f : 1f;
-        }
-        float t = (x - e0) / (e1 - e0);
-        if (t < 0f) {
-            t = 0f;
-        } else if (t > 1f) {
-            t = 1f;
-        }
-        return t * t * (3f - 2f * t);
-    }
-
-    private static float clamp01(float v) {
-        if (v < 0f) {
-            return 0f;
-        }
-        return Math.min(v, 1f);
-    }
 }
+

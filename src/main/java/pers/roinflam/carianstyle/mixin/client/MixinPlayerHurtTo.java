@@ -10,6 +10,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 
 /**
+ * PORT-STUB(B2b)
+ *
  * 客户端专用 Mixin：抑制「本模组每 tick 持续掉血效果」引发的受伤镜头倾斜与本地无敌帧重置。
  *
  * <h3>补丁的对象与原因</h3>
@@ -90,62 +92,7 @@ import pers.roinflam.carianstyle.init.CarianStylePotion;
  * @version 1.1
  */
 @Mixin(LocalPlayer.class)
+@Deprecated
 public class MixinPlayerHurtTo {
-
-    /**
-     * 注入 {@code LocalPlayer.hurtTo(float)} 的 HEAD：
-     * 命中本模组持续掉血效果时，用纯 {@code setHealth} 替代原版的「同步 + 播放受伤动画」。
-     *
-     * @param targetHealth 服务端下发的目标生命值
-     * @param ci           回调信息（用于取消原版方法）
-     */
-    @Inject(method = "hurtTo(F)V", at = @At("HEAD"), cancellable = true)
-    private void carianstyle$suppressDrainHurtAnimation(float targetHealth, CallbackInfo ci) {
-        LocalPlayer self = (LocalPlayer) (Object) this;
-
-        // 只处理「生命值下降」的同步；治疗 / 持平走原版逻辑，避免影响任何其它行为
-        if (targetHealth >= self.getHealth()) {
-            return;
-        }
-
-        // 未处于本模组的持续掉血状态：完全不干预，保持原版受击表现
-        if (!carianstyle$hasContinuousDrainEffect(self)) {
-            return;
-        }
-
-        // 仅同步生命值本身，跳过 hurtTime / hurtDuration / invulnerableTime 的赋值，
-        // 从而不触发 GameRenderer.bobHurt 的镜头倾斜，也不顶掉本地无敌帧
-        self.setHealth(targetHealth);
-        ci.cancel();
-    }
-
-    /**
-     * 判断玩家是否处于本模组「每 tick 自我掉血」的状态。
-     * <p>
-     * 目前包含两个：切腹（{@code MobEffectIncision}，每 tick 扣最大生命 12.5%/20）与
-     * 出血（{@code MobEffectHemorrhage}，每 tick 扣最大生命 (7%+等级 1%)/30）。
-     * 两者的 {@code isDurationEffectTick} 均恒为 true，是同一个问题的两个副本。
-     * <b>将来若新增同类「每 tick 直扣血量」的效果，在此追加即可。</b>
-     * </p>
-     *
-     * @param player 本地玩家
-     * @return 处于任一持续掉血状态返回 true
-     */
-    @Unique
-    private static boolean carianstyle$hasContinuousDrainEffect(LocalPlayer player) {
-        return carianstyle$hasEffect(player, CarianStylePotion.INCISION.get())
-                || carianstyle$hasEffect(player, CarianStylePotion.HEMORRHAGE.get());
-    }
-
-    /**
-     * 空安全的效果判定（效果可能因配置被禁用而解析为 null）。
-     *
-     * @param player 目标玩家
-     * @param effect 待判定效果，可为 null
-     * @return 拥有该效果返回 true
-     */
-    @Unique
-    private static boolean carianstyle$hasEffect(LocalPlayer player, MobEffect effect) {
-        return effect != null && player.hasEffect(effect);
-    }
 }
+

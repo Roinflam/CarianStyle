@@ -2,9 +2,8 @@ package pers.roinflam.carianstyle.visual;
 
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.enchantment.EnchantmentFireDevoured;
@@ -13,6 +12,7 @@ import pers.roinflam.carianstyle.enchantment.EnchantmentHealingByFire;
 import pers.roinflam.carianstyle.enchantment.EnchantmentShelterOfFire;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentGiantFlame;
 import pers.roinflam.carianstyle.utils.Reference;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 火焰流派「联动徽标」的 HUD 叠层注册（双端通用）。
@@ -123,7 +123,7 @@ import pers.roinflam.carianstyle.utils.Reference;
  * @author RoinFlam
  * @version 1.1
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
 public final class CarianStyleFireStyleDisplay {
 
     /**

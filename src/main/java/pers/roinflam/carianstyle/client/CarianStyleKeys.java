@@ -3,17 +3,17 @@ package pers.roinflam.carianstyle.client;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
-import net.minecraftforge.client.settings.KeyConflictContext;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.client.settings.KeyConflictContext;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.lwjgl.glfw.GLFW;
 import pers.roinflam.carianstyle.client.gui.CodexScreen;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 
 /**
  * 客户端按键绑定：打开附魔百科 / 特效开关界面。
@@ -40,7 +40,7 @@ import javax.annotation.Nonnull;
  * @author RoinFlam
  * @version 1.0
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public final class CarianStyleKeys {
 
     /** 按键分类名（显示在原版按键设置里的分组标题） */
@@ -71,7 +71,7 @@ public final class CarianStyleKeys {
     /**
      * 运行时按键处理（FORGE 总线）。
      */
-    @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
+    @EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
     public static final class Handler {
 
         private Handler() {
@@ -88,10 +88,7 @@ public final class CarianStyleKeys {
          * @param event 客户端 tick 事件
          */
         @SubscribeEvent
-        public static void onClientTick(@Nonnull TickEvent.ClientTickEvent event) {
-            if (event.phase != TickEvent.Phase.END) {
-                return;
-            }
+        public static void onClientTick(@Nonnull ClientTickEvent.Post event) {
 
             Minecraft minecraft = Minecraft.getInstance();
             // 已有界面打开时不响应，避免在聊天框里按 K 就弹出百科

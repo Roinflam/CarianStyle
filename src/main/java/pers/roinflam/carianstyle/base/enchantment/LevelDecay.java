@@ -2,13 +2,14 @@ package pers.roinflam.carianstyle.base.enchantment;
 
 import net.minecraft.world.item.enchantment.Enchantment;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
-
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 /**
+ * PORT-STUB(B1a)
+ *
  * 高等级衰减：附魔等级超过阈值后，按配置的曲线折算成「实际生效等级」。
  *
  * <h3>为什么要有</h3>
@@ -53,170 +54,28 @@ import java.util.Locale;
  * 整合包分发时客户端和服务端用同一份配置即可。
  * </p>
  */
+@Deprecated
 public final class LevelDecay {
-
-    /** 配置界面、配置文件的默认曲线（倍数:百分比） */
     public static final List<String> DEFAULT_CURVE = List.of(
             "2:90", "4:75", "6:65", "10:50", "15:40", "20:33", "40:20");
-
-    private static volatile boolean enabled = false;
-    private static volatile boolean byMultiple = true;
-    private static volatile boolean showInName = true;
-    private static volatile int fixedThreshold = 0;
-    private static volatile int maxLevel = 0;
-    /** 升序排好的曲线点，[i][0] 倍数或等级、[i][1] 百分比（0~1） */
-    private static volatile double[][] points = new double[0][];
-
     private LevelDecay() {
     }
-
-    /**
-     * 配置重新加载时由 {@code ConfigLoader.bake()} 调用。
-     */
-    public static void bake(boolean enable, int threshold, boolean multiple, int cap,
-                            @Nonnull List<? extends String> curve, boolean showName) {
-        List<double[]> parsed = new ArrayList<>();
-        for (String raw : curve) {
-            double[] point = parsePoint(raw);
-            if (point == null) {
-                LogUtil.warn("卡利亚式附魔 - 高等级衰减曲线里有一项看不懂，已跳过：\"%s\"（写法：倍数或等级:百分比，例如 10:50）", raw);
-                continue;
-            }
-            parsed.add(point);
-        }
-        parsed.sort((a, b) -> Double.compare(a[0], b[0]));
-
-        // 同一等级写了多次只留最后一个
-        List<double[]> dedup = new ArrayList<>();
-        for (double[] p : parsed) {
-            if (!dedup.isEmpty() && dedup.get(dedup.size() - 1)[0] == p[0]) {
-                dedup.set(dedup.size() - 1, p);
-            } else {
-                dedup.add(p);
-            }
-        }
-
-        // 只在配置层面检查一次「后一个点的生效等级比前一个点低」，阈值不同的附魔在 compute 里还会再抬平
-        double prev = 0;
-        for (double[] p : dedup) {
-            double eff = p[0] * p[1];
-            if (eff < prev) {
-                LogUtil.warn("卡利亚式附魔 - 高等级衰减曲线 %s 那一点折算后（%.1f）比前一个点（%.1f）低，"
-                        + "已按前一个点处理，否则多一级反而变弱", trim(p[0]), eff, prev);
-            }
-            prev = Math.max(prev, eff);
-        }
-
-        points = dedup.toArray(new double[0][]);
-        fixedThreshold = Math.max(0, threshold);
-        byMultiple = multiple;
-        maxLevel = Math.max(0, cap);
-        showInName = showName;
-        enabled = enable;
+    public static void bake(boolean enable, int threshold, boolean multiple, int cap, @Nonnull List<? extends String> curve, boolean showName) {
     }
-
-    private static String trim(double v) {
-        return v == Math.rint(v) ? String.valueOf((long) v) : String.valueOf(v);
-    }
-
-    /**
-     * 解析「倍数或等级:百分比」。容忍 {@code =}、全角冒号、末尾的 %、倍数后面的 x / 倍、两边的空格；倍数可以是小数（1.5）。
-     *
-     * @return {倍数或等级, 比例(0~1)}；写错返回 null
-     */
-    private static double[] parsePoint(String raw) {
-        if (raw == null) {
-            return null;
-        }
-        String s = raw.trim().replace('：', ':').replace('=', ':').replace("%", "")
-                .replace("倍", "").replace("x", "").replace("X", "");
-        int sep = s.indexOf(':');
-        if (sep <= 0) {
-            return null;
-        }
-        try {
-            double level = Double.parseDouble(s.substring(0, sep).trim());
-            double percent = Double.parseDouble(s.substring(sep + 1).trim().toLowerCase(Locale.ROOT));
-            if (!(level > 0) || Double.isInfinite(level) || !(percent > 0) || percent > 100) {
-                return null;
-            }
-            return new double[]{level, percent / 100.0};
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
     public static boolean isEnabled() {
-        return enabled;
+        return false;
     }
-
-    /**
-     * 附魔名后面要不要补「（生效 N 级）」。
-     */
     public static boolean showInName() {
-        return enabled && showInName;
+        return false;
     }
-
-    /**
-     * 这个附魔从哪一级开始衰减。
-     */
     public static int threshold(Enchantment enchantment) {
-        return fixedThreshold > 0 ? fixedThreshold : Math.max(1, enchantment.getMaxLevel());
+        return 0;
     }
-
-    /**
-     * 本模组附魔的实际生效等级。衰减没开、不是本模组的附魔、等级没超过阈值时原样返回。
-     *
-     * @param enchantment 附魔
-     * @param level       原始等级（护甲类是几件加起来的总和）
-     */
     public static int apply(Enchantment enchantment, int level) {
-        if (!enabled || !(enchantment instanceof EnchantmentBase)) {
-            return level;
-        }
-        int threshold = threshold(enchantment);
-        return compute(level, threshold, byMultiple ? threshold : 1, points, maxLevel);
+        return 0;
     }
-
-    /**
-     * 纯计算，便于单独验证曲线。
-     *
-     * @param scale 曲线点的横坐标乘上它才是实际等级：按倍数写时是阈值，按等级写时是 1
-     */
     static int compute(int level, int threshold, double scale, double[][] curve, int cap) {
-        if (level <= threshold) {
-            return level;
-        }
-        double prevLevel = threshold;
-        double prevEff = threshold;
-        double slope = -1;
-        for (double[] p : curve) {
-            double at = p[0] * scale;
-            if (at <= threshold) {
-                continue;
-            }
-            double eff = Math.max(prevEff, at * p[1]);
-            if (level <= at) {
-                double v = prevEff + (eff - prevEff) * (level - prevLevel) / (at - prevLevel);
-                return clamp(v, threshold, level, cap);
-            }
-            slope = (eff - prevEff) / (at - prevLevel);
-            prevLevel = at;
-            prevEff = eff;
-        }
-        if (slope < 0) {
-            // 曲线里没有比阈值更高的点：没得衰减
-            return clamp(level, threshold, level, cap);
-        }
-        return clamp(prevEff + slope * (level - prevLevel), threshold, level, cap);
-    }
-
-    private static int clamp(double v, int threshold, int level, int cap) {
-        int r = (int) Math.min(Math.round(v), level);
-        r = Math.max(r, threshold);
-        if (cap > 0) {
-            r = Math.min(r, Math.max(cap, 1));
-        }
-        return r;
+        return 0;
     }
 }
+

@@ -4,11 +4,10 @@ import com.mojang.blaze3d.vertex.BufferBuilder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.network.CombatArtEffectPacket;
 import pers.roinflam.carianstyle.utils.Reference;
@@ -16,6 +15,7 @@ import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
 import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 
 import java.util.List;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 五个「数值型附魔」打击反馈的独立渲染器（纯客户端自绘）。
@@ -136,7 +136,7 @@ import java.util.List;
  * @version 2.2
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
 public final class CombatArtBurstRenderer {
 
     /** 距离裁剪（格） */
@@ -1427,13 +1427,13 @@ public final class CombatArtBurstRenderer {
         float by2 = cy + wy * (float) (px2 - n2x) + uy * (float) (py2 - n2y);
         float bz2 = cz + wz * (float) (px2 - n2x) + uz * (float) (py2 - n2y);
 
-        b.vertex(m, ax1, ay1, az1).color(r, g, bl, a1).endVertex();
-        b.vertex(m, bx1, by1, bz1).color(r, g, bl, a2).endVertex();
-        b.vertex(m, bx2, by2, bz2).color(r, g, bl, a2).endVertex();
+        b.addVertex(m, ax1, ay1, az1).setColor(r, g, bl, a1);
+        b.addVertex(m, bx1, by1, bz1).setColor(r, g, bl, a2);
+        b.addVertex(m, bx2, by2, bz2).setColor(r, g, bl, a2);
 
-        b.vertex(m, ax1, ay1, az1).color(r, g, bl, a1).endVertex();
-        b.vertex(m, bx2, by2, bz2).color(r, g, bl, a2).endVertex();
-        b.vertex(m, ax2, ay2, az2).color(r, g, bl, a1).endVertex();
+        b.addVertex(m, ax1, ay1, az1).setColor(r, g, bl, a1);
+        b.addVertex(m, bx2, by2, bz2).setColor(r, g, bl, a2);
+        b.addVertex(m, ax2, ay2, az2).setColor(r, g, bl, a1);
     }
 
     /**
@@ -1478,13 +1478,13 @@ public final class CombatArtBurstRenderer {
             float iy1 = cy + (wy * ca + uy * sa) * ri;
             float iz1 = cz + (wz * ca + uz * sa) * ri;
 
-            b.vertex(m, ox0, oy0, oz0).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ox1, oy1, oz1).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ix1, iy1, iz1).color(r, g, bl, alphaInner).endVertex();
+            b.addVertex(m, ox0, oy0, oz0).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ox1, oy1, oz1).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ix1, iy1, iz1).setColor(r, g, bl, alphaInner);
 
-            b.vertex(m, ox0, oy0, oz0).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ix1, iy1, iz1).color(r, g, bl, alphaInner).endVertex();
-            b.vertex(m, ix0, iy0, iz0).color(r, g, bl, alphaInner).endVertex();
+            b.addVertex(m, ox0, oy0, oz0).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ix1, iy1, iz1).setColor(r, g, bl, alphaInner);
+            b.addVertex(m, ix0, iy0, iz0).setColor(r, g, bl, alphaInner);
 
             // 推进到下一段：本段末端即下一段起点（漏掉这两行会让整环塌成一个扇形）
             prevCos = ca;
@@ -1531,13 +1531,13 @@ public final class CombatArtBurstRenderer {
             prevCos = cos1;
             prevSin = sin1;
 
-            b.vertex(m, ox0, cy, oz0).color(r, g, bl, alpha).endVertex();
-            b.vertex(m, ox1, cy, oz1).color(r, g, bl, alpha).endVertex();
-            b.vertex(m, ix1, cy, iz1).color(r, g, bl, alpha).endVertex();
+            b.addVertex(m, ox0, cy, oz0).setColor(r, g, bl, alpha);
+            b.addVertex(m, ox1, cy, oz1).setColor(r, g, bl, alpha);
+            b.addVertex(m, ix1, cy, iz1).setColor(r, g, bl, alpha);
 
-            b.vertex(m, ox0, cy, oz0).color(r, g, bl, alpha).endVertex();
-            b.vertex(m, ix1, cy, iz1).color(r, g, bl, alpha).endVertex();
-            b.vertex(m, ix0, cy, iz0).color(r, g, bl, alpha).endVertex();
+            b.addVertex(m, ox0, cy, oz0).setColor(r, g, bl, alpha);
+            b.addVertex(m, ix1, cy, iz1).setColor(r, g, bl, alpha);
+            b.addVertex(m, ix0, cy, iz0).setColor(r, g, bl, alpha);
         }
     }
 
@@ -1585,13 +1585,13 @@ public final class CombatArtBurstRenderer {
             cos0 = cos1;
             sin0 = sin1;
 
-            b.vertex(m, ox0, cy, oz0).color(r, g, bl, alpha0).endVertex();
-            b.vertex(m, ox1, cy, oz1).color(r, g, bl, alpha1).endVertex();
-            b.vertex(m, ix1, cy, iz1).color(r, g, bl, alpha1).endVertex();
+            b.addVertex(m, ox0, cy, oz0).setColor(r, g, bl, alpha0);
+            b.addVertex(m, ox1, cy, oz1).setColor(r, g, bl, alpha1);
+            b.addVertex(m, ix1, cy, iz1).setColor(r, g, bl, alpha1);
 
-            b.vertex(m, ox0, cy, oz0).color(r, g, bl, alpha0).endVertex();
-            b.vertex(m, ix1, cy, iz1).color(r, g, bl, alpha1).endVertex();
-            b.vertex(m, ix0, cy, iz0).color(r, g, bl, alpha0).endVertex();
+            b.addVertex(m, ox0, cy, oz0).setColor(r, g, bl, alpha0);
+            b.addVertex(m, ix1, cy, iz1).setColor(r, g, bl, alpha1);
+            b.addVertex(m, ix0, cy, iz0).setColor(r, g, bl, alpha0);
         }
     }
 
@@ -1619,13 +1619,13 @@ public final class CombatArtBurstRenderer {
         float bx1 = (float) (x2 + nx), bz1 = (float) (z2 + nz);
         float bx2 = (float) (x2 - nx), bz2 = (float) (z2 - nz);
 
-        b.vertex(m, ax1, y, az1).color(r, g, bl, a1).endVertex();
-        b.vertex(m, bx1, y, bz1).color(r, g, bl, a2).endVertex();
-        b.vertex(m, bx2, y, bz2).color(r, g, bl, a2).endVertex();
+        b.addVertex(m, ax1, y, az1).setColor(r, g, bl, a1);
+        b.addVertex(m, bx1, y, bz1).setColor(r, g, bl, a2);
+        b.addVertex(m, bx2, y, bz2).setColor(r, g, bl, a2);
 
-        b.vertex(m, ax1, y, az1).color(r, g, bl, a1).endVertex();
-        b.vertex(m, bx2, y, bz2).color(r, g, bl, a2).endVertex();
-        b.vertex(m, ax2, y, az2).color(r, g, bl, a1).endVertex();
+        b.addVertex(m, ax1, y, az1).setColor(r, g, bl, a1);
+        b.addVertex(m, bx2, y, bz2).setColor(r, g, bl, a2);
+        b.addVertex(m, ax2, y, az2).setColor(r, g, bl, a1);
     }
 
     // ==================== 世界空间几何基元 ====================
@@ -1661,13 +1661,13 @@ public final class CombatArtBurstRenderer {
                                   float ax, float ay, float az, float bx, float by, float bz,
                                   float cx, float cy, float cz, float dx, float dy, float dz,
                                   float r, float g, float bl, float aAB, float aCD) {
-        b.vertex(m, ax, ay, az).color(r, g, bl, aAB).endVertex();
-        b.vertex(m, bx, by, bz).color(r, g, bl, aAB).endVertex();
-        b.vertex(m, cx, cy, cz).color(r, g, bl, aCD).endVertex();
+        b.addVertex(m, ax, ay, az).setColor(r, g, bl, aAB);
+        b.addVertex(m, bx, by, bz).setColor(r, g, bl, aAB);
+        b.addVertex(m, cx, cy, cz).setColor(r, g, bl, aCD);
 
-        b.vertex(m, ax, ay, az).color(r, g, bl, aAB).endVertex();
-        b.vertex(m, cx, cy, cz).color(r, g, bl, aCD).endVertex();
-        b.vertex(m, dx, dy, dz).color(r, g, bl, aCD).endVertex();
+        b.addVertex(m, ax, ay, az).setColor(r, g, bl, aAB);
+        b.addVertex(m, cx, cy, cz).setColor(r, g, bl, aCD);
+        b.addVertex(m, dx, dy, dz).setColor(r, g, bl, aCD);
     }
 
     /**
@@ -1707,9 +1707,9 @@ public final class CombatArtBurstRenderer {
                                    float ax, float ay, float az,
                                    float bx, float by, float bz,
                                    float r, float g, float bl, float alpha) {
-        b.vertex(m, cx, cy, cz).color(r, g, bl, alpha).endVertex();
-        b.vertex(m, ax, ay, az).color(r, g, bl, 0f).endVertex();
-        b.vertex(m, bx, by, bz).color(r, g, bl, 0f).endVertex();
+        b.addVertex(m, cx, cy, cz).setColor(r, g, bl, alpha);
+        b.addVertex(m, ax, ay, az).setColor(r, g, bl, 0f);
+        b.addVertex(m, bx, by, bz).setColor(r, g, bl, 0f);
     }
 
     /**
@@ -1747,13 +1747,13 @@ public final class CombatArtBurstRenderer {
         float x3 = cx - rgX * aU - upX * aV, y3 = cy - rgY * aU - upY * aV, z3 = cz - rgZ * aU - upZ * aV;
         float x4 = cx - rgX * bU - upX * bV, y4 = cy - rgY * bU - upY * bV, z4 = cz - rgZ * bU - upZ * bV;
 
-        b.vertex(m, x1, y1, z1).color(r, g, bl, alpha).endVertex();
-        b.vertex(m, x2, y2, z2).color(r, g, bl, alpha).endVertex();
-        b.vertex(m, x3, y3, z3).color(r, g, bl, alpha).endVertex();
+        b.addVertex(m, x1, y1, z1).setColor(r, g, bl, alpha);
+        b.addVertex(m, x2, y2, z2).setColor(r, g, bl, alpha);
+        b.addVertex(m, x3, y3, z3).setColor(r, g, bl, alpha);
 
-        b.vertex(m, x1, y1, z1).color(r, g, bl, alpha).endVertex();
-        b.vertex(m, x3, y3, z3).color(r, g, bl, alpha).endVertex();
-        b.vertex(m, x4, y4, z4).color(r, g, bl, alpha).endVertex();
+        b.addVertex(m, x1, y1, z1).setColor(r, g, bl, alpha);
+        b.addVertex(m, x3, y3, z3).setColor(r, g, bl, alpha);
+        b.addVertex(m, x4, y4, z4).setColor(r, g, bl, alpha);
     }
 
     // ==================== 无分配伪随机（xorshift64） ====================

@@ -222,12 +222,13 @@ public class EntityGlintblades extends ThrowableProjectile {
     }
 
     @Override
-    protected void defineSynchedData() {
-        this.entityData.define(SHOOTED, false);
-        this.entityData.define(DEAD_TICK, 0);
-        this.entityData.define(SIZE, 1f);
-        this.entityData.define(TARGET_ID, NO_TARGET);
-        this.entityData.define(HOVER_OFFSET, new Vector3f());
+    protected void defineSynchedData(@Nonnull SynchedEntityData.Builder builder) {
+        // 1.21.1：同步数据改由父类传进来的构建器登记，键和默认值与 1.20.1 相同
+        builder.define(SHOOTED, false);
+        builder.define(DEAD_TICK, 0);
+        builder.define(SIZE, 1f);
+        builder.define(TARGET_ID, NO_TARGET);
+        builder.define(HOVER_OFFSET, new Vector3f());
     }
 
     // ==================== Getter/Setter ====================
@@ -680,7 +681,7 @@ public class EntityGlintblades extends ThrowableProjectile {
         Entity hitEntity = result.getEntity();
         // 多部位生物（末影龙、一些模组的 BOSS 等）被撞到的是部位实体，它不是 LivingEntity，
         // 伤害要转给本体，否则这一剑什么也不做
-        if (hitEntity instanceof net.minecraftforge.entity.PartEntity<?> part && part.getParent() != null) {
+        if (hitEntity instanceof net.neoforged.neoforge.entity.PartEntity<?> part && part.getParent() != null) {
             hitEntity = part.getParent();
         }
 

@@ -4,7 +4,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
 
 /**
  * 碎岩连带挖相连方块之前，以玩家身份问「这一格能不能动」的破坏事件。<b>只用来问，方块不会因为它被破坏</b>，被取消就跳过这一格。

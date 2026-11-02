@@ -1,8 +1,7 @@
 package pers.roinflam.carianstyle.utils.helper.task;
 
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.common.MinecraftForge;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.common.NeoForge;
 
 import javax.annotation.Nonnull;
 import java.util.Iterator;
@@ -11,6 +10,7 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
  * 同步任务调度器
@@ -318,7 +318,7 @@ public abstract class SynchronizationTask implements Runnable {
         private synchronized void ensureRegistered() {
             if (!registered) {
                 registered = true;
-                MinecraftForge.EVENT_BUS.register(this);
+                NeoForge.EVENT_BUS.register(this);
             }
         }
 
@@ -330,10 +330,7 @@ public abstract class SynchronizationTask implements Runnable {
          * </p>
          */
         @SubscribeEvent
-        public void onServerTick(@Nonnull TickEvent.ServerTickEvent evt) {
-            if (evt.phase != TickEvent.Phase.START) {
-                return;
-            }
+        public void onServerTick(@Nonnull ServerTickEvent.Pre evt) {
 
             // ========== 阶段1：处理 nextTickQueue 快速通道 ==========
             int nextTickCount = 0;

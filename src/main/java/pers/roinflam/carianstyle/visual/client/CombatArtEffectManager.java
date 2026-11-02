@@ -1,16 +1,16 @@
 package pers.roinflam.carianstyle.visual.client;
 
 import net.minecraft.client.Minecraft;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
 import pers.roinflam.carianstyle.network.CombatArtEffectPacket;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 
 /**
  * 战技自绘特效管理器（纯客户端）。
@@ -107,7 +107,7 @@ import java.util.List;
  *
  * @version 1.4
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
 public final class CombatArtEffectManager {
 
     /**
@@ -393,10 +393,7 @@ public final class CombatArtEffectManager {
      * @param event tick 事件
      */
     @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) {
-            return;
-        }
+    public static void onClientTick(ClientTickEvent.Post event) {
         if (Minecraft.getInstance().level == null) {
             ACTIVE.clear();
             return;

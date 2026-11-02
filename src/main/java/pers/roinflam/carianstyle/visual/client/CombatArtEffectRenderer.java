@@ -2,11 +2,10 @@ package pers.roinflam.carianstyle.visual.client;
 
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.network.CombatArtEffectPacket;
 import pers.roinflam.carianstyle.utils.Reference;
@@ -14,6 +13,7 @@ import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
 import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 
 import java.util.List;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 战技自绘特效渲染器（纯客户端）。
@@ -135,7 +135,7 @@ import java.util.List;
  * @version 2.0
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
 public final class CombatArtEffectRenderer {
 
     /** 离地高度偏移，避免地面图形与地形 z-fighting */
@@ -753,13 +753,13 @@ public final class CombatArtEffectRenderer {
             float ix0 = cx + rInner * cos0, iz0 = cz + rInner * sin0;
             float ix1 = cx + rInner * cos1, iz1 = cz + rInner * sin1;
 
-            b.vertex(m, ox0, cy, oz0).color(col[0], col[1], col[2], alpha0).endVertex();
-            b.vertex(m, ox1, cy, oz1).color(col[0], col[1], col[2], alpha1).endVertex();
-            b.vertex(m, ix1, cy, iz1).color(col[0], col[1], col[2], alpha1).endVertex();
+            b.addVertex(m, ox0, cy, oz0).setColor(col[0], col[1], col[2], alpha0);
+            b.addVertex(m, ox1, cy, oz1).setColor(col[0], col[1], col[2], alpha1);
+            b.addVertex(m, ix1, cy, iz1).setColor(col[0], col[1], col[2], alpha1);
 
-            b.vertex(m, ox0, cy, oz0).color(col[0], col[1], col[2], alpha0).endVertex();
-            b.vertex(m, ix1, cy, iz1).color(col[0], col[1], col[2], alpha1).endVertex();
-            b.vertex(m, ix0, cy, iz0).color(col[0], col[1], col[2], alpha0).endVertex();
+            b.addVertex(m, ox0, cy, oz0).setColor(col[0], col[1], col[2], alpha0);
+            b.addVertex(m, ix1, cy, iz1).setColor(col[0], col[1], col[2], alpha1);
+            b.addVertex(m, ix0, cy, iz0).setColor(col[0], col[1], col[2], alpha0);
         }
     }
 
@@ -789,13 +789,13 @@ public final class CombatArtEffectRenderer {
             float ix0 = (float) (cx + rInner * cos0), iz0 = (float) (cz + rInner * sin0);
             float ix1 = (float) (cx + rInner * cos1), iz1 = (float) (cz + rInner * sin1);
 
-            b.vertex(m, ox0, cy, oz0).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ox1, cy, oz1).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ix1, cy, iz1).color(r, g, bl, alphaInner).endVertex();
+            b.addVertex(m, ox0, cy, oz0).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ox1, cy, oz1).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ix1, cy, iz1).setColor(r, g, bl, alphaInner);
 
-            b.vertex(m, ox0, cy, oz0).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ix1, cy, iz1).color(r, g, bl, alphaInner).endVertex();
-            b.vertex(m, ix0, cy, iz0).color(r, g, bl, alphaInner).endVertex();
+            b.addVertex(m, ox0, cy, oz0).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ix1, cy, iz1).setColor(r, g, bl, alphaInner);
+            b.addVertex(m, ix0, cy, iz0).setColor(r, g, bl, alphaInner);
         }
     }
 
@@ -840,13 +840,13 @@ public final class CombatArtEffectRenderer {
         float bx1 = (float) (x2 + nx), bz1 = (float) (z2 + nz);
         float bx2 = (float) (x2 - nx), bz2 = (float) (z2 - nz);
 
-        b.vertex(m, ax1, y, az1).color(col[0], col[1], col[2], a1).endVertex();
-        b.vertex(m, bx1, y, bz1).color(col[0], col[1], col[2], a2).endVertex();
-        b.vertex(m, bx2, y, bz2).color(col[0], col[1], col[2], a2).endVertex();
+        b.addVertex(m, ax1, y, az1).setColor(col[0], col[1], col[2], a1);
+        b.addVertex(m, bx1, y, bz1).setColor(col[0], col[1], col[2], a2);
+        b.addVertex(m, bx2, y, bz2).setColor(col[0], col[1], col[2], a2);
 
-        b.vertex(m, ax1, y, az1).color(col[0], col[1], col[2], a1).endVertex();
-        b.vertex(m, bx2, y, bz2).color(col[0], col[1], col[2], a2).endVertex();
-        b.vertex(m, ax2, y, az2).color(col[0], col[1], col[2], a1).endVertex();
+        b.addVertex(m, ax1, y, az1).setColor(col[0], col[1], col[2], a1);
+        b.addVertex(m, bx2, y, bz2).setColor(col[0], col[1], col[2], a2);
+        b.addVertex(m, ax2, y, az2).setColor(col[0], col[1], col[2], a1);
     }
 
     /**
@@ -893,9 +893,9 @@ public final class CombatArtEffectRenderer {
                                  float cx, float y, float cz,
                                  float ax, float az, float bx, float bz,
                                  float r, float g, float bl, float alpha) {
-        b.vertex(m, cx, y, cz).color(r, g, bl, alpha).endVertex();
-        b.vertex(m, ax, y, az).color(r, g, bl, 0f).endVertex();
-        b.vertex(m, bx, y, bz).color(r, g, bl, 0f).endVertex();
+        b.addVertex(m, cx, y, cz).setColor(r, g, bl, alpha);
+        b.addVertex(m, ax, y, az).setColor(r, g, bl, 0f);
+        b.addVertex(m, bx, y, bz).setColor(r, g, bl, 0f);
     }
 
     /**
@@ -928,13 +928,13 @@ public final class CombatArtEffectRenderer {
                              float ax, float ay, float az, float bx, float by, float bz,
                              float cxp, float cyp, float czp, float dx, float dy, float dz,
                              float r, float g, float bb, float aAB, float aCD) {
-        b.vertex(m, ax, ay, az).color(r, g, bb, aAB).endVertex();
-        b.vertex(m, bx, by, bz).color(r, g, bb, aAB).endVertex();
-        b.vertex(m, cxp, cyp, czp).color(r, g, bb, aCD).endVertex();
+        b.addVertex(m, ax, ay, az).setColor(r, g, bb, aAB);
+        b.addVertex(m, bx, by, bz).setColor(r, g, bb, aAB);
+        b.addVertex(m, cxp, cyp, czp).setColor(r, g, bb, aCD);
 
-        b.vertex(m, ax, ay, az).color(r, g, bb, aAB).endVertex();
-        b.vertex(m, cxp, cyp, czp).color(r, g, bb, aCD).endVertex();
-        b.vertex(m, dx, dy, dz).color(r, g, bb, aCD).endVertex();
+        b.addVertex(m, ax, ay, az).setColor(r, g, bb, aAB);
+        b.addVertex(m, cxp, cyp, czp).setColor(r, g, bb, aCD);
+        b.addVertex(m, dx, dy, dz).setColor(r, g, bb, aCD);
     }
 
     // ============================== 数学 / 颜色辅助 ==============================

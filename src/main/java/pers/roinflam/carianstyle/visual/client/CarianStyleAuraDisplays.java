@@ -1,7 +1,7 @@
 package pers.roinflam.carianstyle.visual.client;
 
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 
 /**
  * 光环显示注册入口（纯客户端，需在客户端初始化阶段调用一次 {@link #init()}）。

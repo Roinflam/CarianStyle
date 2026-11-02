@@ -5,11 +5,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.network.AoeEffectPacket;
 import pers.roinflam.carianstyle.utils.Reference;
@@ -17,6 +16,7 @@ import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
 import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 
 import java.util.List;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 定点 AOE 自绘渲染器（纯客户端）。
@@ -244,7 +244,7 @@ import java.util.List;
  * @version 11.0
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
 public final class AoeEffectRenderer {
 
     /** 离地高度偏移，避免与地面 z-fighting */
@@ -1331,13 +1331,13 @@ public final class AoeEffectRenderer {
                 float aIn = alpha;
                 float aOut = (i == rings - 1) ? alpha * 0.82f : alpha;
 
-                b.vertex(m, x00, y00, z00).color(r * sh00, g * sh00, bl * sh00, aIn).endVertex();
-                b.vertex(m, x01, y01, z01).color(r * sh01, g * sh01, bl * sh01, aIn).endVertex();
-                b.vertex(m, x11, y11, z11).color(r * sh11, g * sh11, bl * sh11, aOut).endVertex();
+                b.addVertex(m, x00, y00, z00).setColor(r * sh00, g * sh00, bl * sh00, aIn);
+                b.addVertex(m, x01, y01, z01).setColor(r * sh01, g * sh01, bl * sh01, aIn);
+                b.addVertex(m, x11, y11, z11).setColor(r * sh11, g * sh11, bl * sh11, aOut);
 
-                b.vertex(m, x00, y00, z00).color(r * sh00, g * sh00, bl * sh00, aIn).endVertex();
-                b.vertex(m, x11, y11, z11).color(r * sh11, g * sh11, bl * sh11, aOut).endVertex();
-                b.vertex(m, x10, y10, z10).color(r * sh10, g * sh10, bl * sh10, aOut).endVertex();
+                b.addVertex(m, x00, y00, z00).setColor(r * sh00, g * sh00, bl * sh00, aIn);
+                b.addVertex(m, x11, y11, z11).setColor(r * sh11, g * sh11, bl * sh11, aOut);
+                b.addVertex(m, x10, y10, z10).setColor(r * sh10, g * sh10, bl * sh10, aOut);
             }
         }
     }
@@ -1402,9 +1402,9 @@ public final class AoeEffectRenderer {
             float ey = cyf + rgY * ca + upY * sa;
             float ez = czf + rgZ * ca + upZ * sa;
             if (i > 0) {
-                b.vertex(m, cxf, cyf, czf).color(r, g, bl, centerAlpha).endVertex();
-                b.vertex(m, pex, pey, pez).color(r, g, bl, edgeAlpha).endVertex();
-                b.vertex(m, ex, ey, ez).color(r, g, bl, edgeAlpha).endVertex();
+                b.addVertex(m, cxf, cyf, czf).setColor(r, g, bl, centerAlpha);
+                b.addVertex(m, pex, pey, pez).setColor(r, g, bl, edgeAlpha);
+                b.addVertex(m, ex, ey, ez).setColor(r, g, bl, edgeAlpha);
             }
             pex = ex;
             pey = ey;
@@ -1454,13 +1454,13 @@ public final class AoeEffectRenderer {
             float iy1 = cyf + (rgY * ca + upY * sa) * ri;
             float iz1 = czf + (rgZ * ca + upZ * sa) * ri;
 
-            b.vertex(m, ox0, oy0, oz0).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ox1, oy1, oz1).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ix1, iy1, iz1).color(r, g, bl, alphaInner).endVertex();
+            b.addVertex(m, ox0, oy0, oz0).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ox1, oy1, oz1).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ix1, iy1, iz1).setColor(r, g, bl, alphaInner);
 
-            b.vertex(m, ox0, oy0, oz0).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ix1, iy1, iz1).color(r, g, bl, alphaInner).endVertex();
-            b.vertex(m, ix0, iy0, iz0).color(r, g, bl, alphaInner).endVertex();
+            b.addVertex(m, ox0, oy0, oz0).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ix1, iy1, iz1).setColor(r, g, bl, alphaInner);
+            b.addVertex(m, ix0, iy0, iz0).setColor(r, g, bl, alphaInner);
 
             // 推进到下一段：本段末端即下一段起点（漏掉这两行会让整环塌成一个扇形）
             prevCos = ca;
@@ -1516,13 +1516,13 @@ public final class AoeEffectRenderer {
         float by2 = cyf + rgY * b2u + upY * b2w;
         float bz2 = czf + rgZ * b2u + upZ * b2w;
 
-        b.vertex(m, ax1, ay1, az1).color(r, g, bl, a1).endVertex();
-        b.vertex(m, bx1, by1, bz1).color(r, g, bl, a2).endVertex();
-        b.vertex(m, bx2, by2, bz2).color(r, g, bl, a2).endVertex();
+        b.addVertex(m, ax1, ay1, az1).setColor(r, g, bl, a1);
+        b.addVertex(m, bx1, by1, bz1).setColor(r, g, bl, a2);
+        b.addVertex(m, bx2, by2, bz2).setColor(r, g, bl, a2);
 
-        b.vertex(m, ax1, ay1, az1).color(r, g, bl, a1).endVertex();
-        b.vertex(m, bx2, by2, bz2).color(r, g, bl, a2).endVertex();
-        b.vertex(m, ax2, ay2, az2).color(r, g, bl, a1).endVertex();
+        b.addVertex(m, ax1, ay1, az1).setColor(r, g, bl, a1);
+        b.addVertex(m, bx2, by2, bz2).setColor(r, g, bl, a2);
+        b.addVertex(m, ax2, ay2, az2).setColor(r, g, bl, a1);
     }
 
     // ============================== v9 神圣净化 ==============================
@@ -1906,13 +1906,13 @@ public final class AoeEffectRenderer {
             float a0 = petalAlpha(u0) * alphaMul;
             float a1 = petalAlpha(u1) * alphaMul;
 
-            b.vertex(m, l0x, l0y, l0z).color(colPrev[0], colPrev[1], colPrev[2], a0).endVertex();
-            b.vertex(m, r0x, r0y, r0z).color(colPrev[0], colPrev[1], colPrev[2], a0).endVertex();
-            b.vertex(m, r1x, r1y, r1z).color(colCur[0], colCur[1], colCur[2], a1).endVertex();
+            b.addVertex(m, l0x, l0y, l0z).setColor(colPrev[0], colPrev[1], colPrev[2], a0);
+            b.addVertex(m, r0x, r0y, r0z).setColor(colPrev[0], colPrev[1], colPrev[2], a0);
+            b.addVertex(m, r1x, r1y, r1z).setColor(colCur[0], colCur[1], colCur[2], a1);
 
-            b.vertex(m, l0x, l0y, l0z).color(colPrev[0], colPrev[1], colPrev[2], a0).endVertex();
-            b.vertex(m, r1x, r1y, r1z).color(colCur[0], colCur[1], colCur[2], a1).endVertex();
-            b.vertex(m, l1x, l1y, l1z).color(colCur[0], colCur[1], colCur[2], a1).endVertex();
+            b.addVertex(m, l0x, l0y, l0z).setColor(colPrev[0], colPrev[1], colPrev[2], a0);
+            b.addVertex(m, r1x, r1y, r1z).setColor(colCur[0], colCur[1], colCur[2], a1);
+            b.addVertex(m, l1x, l1y, l1z).setColor(colCur[0], colCur[1], colCur[2], a1);
 
             // 交换缓冲：本段尖侧色成为下一段的根侧色，省掉一次插值
             float[] tmp = colPrev;
@@ -1962,12 +1962,12 @@ public final class AoeEffectRenderer {
                                  float ax, float az, float dx, float dz,
                                  float r, float g, float bb, float alpha) {
         float edge = alpha * 0.55f;
-        b.vertex(m, cxf, cyf + s, czf).color(r, g, bb, alpha).endVertex();
-        b.vertex(m, ax, cyf, az).color(r, g, bb, edge).endVertex();
-        b.vertex(m, dx, cyf, dz).color(r, g, bb, edge).endVertex();
-        b.vertex(m, cxf, cyf - s, czf).color(r, g, bb, alpha).endVertex();
-        b.vertex(m, dx, cyf, dz).color(r, g, bb, edge).endVertex();
-        b.vertex(m, ax, cyf, az).color(r, g, bb, edge).endVertex();
+        b.addVertex(m, cxf, cyf + s, czf).setColor(r, g, bb, alpha);
+        b.addVertex(m, ax, cyf, az).setColor(r, g, bb, edge);
+        b.addVertex(m, dx, cyf, dz).setColor(r, g, bb, edge);
+        b.addVertex(m, cxf, cyf - s, czf).setColor(r, g, bb, alpha);
+        b.addVertex(m, dx, cyf, dz).setColor(r, g, bb, edge);
+        b.addVertex(m, ax, cyf, az).setColor(r, g, bb, edge);
     }
 
     /** 花瓣宽度轮廓（根窄、中宽、尖收的叶形）。 */
@@ -2364,13 +2364,13 @@ public final class AoeEffectRenderer {
                              double ax, double ay, double az, double bx, double by, double bz,
                              double cxp, double cyp, double czp, double dx, double dy, double dz,
                              float r, float g, float bb, float aAB, float aCD) {
-        b.vertex(m, (float) ax, (float) ay, (float) az).color(r, g, bb, aAB).endVertex();
-        b.vertex(m, (float) bx, (float) by, (float) bz).color(r, g, bb, aAB).endVertex();
-        b.vertex(m, (float) cxp, (float) cyp, (float) czp).color(r, g, bb, aCD).endVertex();
+        b.addVertex(m, (float) ax, (float) ay, (float) az).setColor(r, g, bb, aAB);
+        b.addVertex(m, (float) bx, (float) by, (float) bz).setColor(r, g, bb, aAB);
+        b.addVertex(m, (float) cxp, (float) cyp, (float) czp).setColor(r, g, bb, aCD);
 
-        b.vertex(m, (float) ax, (float) ay, (float) az).color(r, g, bb, aAB).endVertex();
-        b.vertex(m, (float) cxp, (float) cyp, (float) czp).color(r, g, bb, aCD).endVertex();
-        b.vertex(m, (float) dx, (float) dy, (float) dz).color(r, g, bb, aCD).endVertex();
+        b.addVertex(m, (float) ax, (float) ay, (float) az).setColor(r, g, bb, aAB);
+        b.addVertex(m, (float) cxp, (float) cyp, (float) czp).setColor(r, g, bb, aCD);
+        b.addVertex(m, (float) dx, (float) dy, (float) dz).setColor(r, g, bb, aCD);
     }
 
     /**
@@ -2441,13 +2441,13 @@ public final class AoeEffectRenderer {
             float ix0 = (float) (cx + rInner * cos0), iz0 = (float) (cz + rInner * sin0);
             float ix1 = (float) (cx + rInner * cos1), iz1 = (float) (cz + rInner * sin1);
 
-            builder.vertex(m, ox0, y, oz0).color(r, g, b, alphaOuter).endVertex();
-            builder.vertex(m, ox1, y, oz1).color(r, g, b, alphaOuter).endVertex();
-            builder.vertex(m, ix1, y, iz1).color(r, g, b, alphaInner).endVertex();
+            builder.addVertex(m, ox0, y, oz0).setColor(r, g, b, alphaOuter);
+            builder.addVertex(m, ox1, y, oz1).setColor(r, g, b, alphaOuter);
+            builder.addVertex(m, ix1, y, iz1).setColor(r, g, b, alphaInner);
 
-            builder.vertex(m, ox0, y, oz0).color(r, g, b, alphaOuter).endVertex();
-            builder.vertex(m, ix1, y, iz1).color(r, g, b, alphaInner).endVertex();
-            builder.vertex(m, ix0, y, iz0).color(r, g, b, alphaInner).endVertex();
+            builder.addVertex(m, ox0, y, oz0).setColor(r, g, b, alphaOuter);
+            builder.addVertex(m, ix1, y, iz1).setColor(r, g, b, alphaInner);
+            builder.addVertex(m, ix0, y, iz0).setColor(r, g, b, alphaInner);
         }
     }
 
@@ -2470,13 +2470,13 @@ public final class AoeEffectRenderer {
         float bx1 = (float) (x2 + nx), bz1 = (float) (z2 + nz);
         float bx2 = (float) (x2 - nx), bz2 = (float) (z2 - nz);
 
-        builder.vertex(m, ax1, yf, az1).color(r, g, b, a1).endVertex();
-        builder.vertex(m, bx1, yf, bz1).color(r, g, b, a2).endVertex();
-        builder.vertex(m, bx2, yf, bz2).color(r, g, b, a2).endVertex();
+        builder.addVertex(m, ax1, yf, az1).setColor(r, g, b, a1);
+        builder.addVertex(m, bx1, yf, bz1).setColor(r, g, b, a2);
+        builder.addVertex(m, bx2, yf, bz2).setColor(r, g, b, a2);
 
-        builder.vertex(m, ax1, yf, az1).color(r, g, b, a1).endVertex();
-        builder.vertex(m, bx2, yf, bz2).color(r, g, b, a2).endVertex();
-        builder.vertex(m, ax2, yf, az2).color(r, g, b, a1).endVertex();
+        builder.addVertex(m, ax1, yf, az1).setColor(r, g, b, a1);
+        builder.addVertex(m, bx2, yf, bz2).setColor(r, g, b, a2);
+        builder.addVertex(m, ax2, yf, az2).setColor(r, g, b, a1);
     }
 
     /**
@@ -2523,9 +2523,9 @@ public final class AoeEffectRenderer {
                                  float cx, float y, float cz,
                                  float ax, float az, float bx, float bz,
                                  float r, float g, float b, float alpha) {
-        builder.vertex(m, cx, y, cz).color(r, g, b, alpha).endVertex();
-        builder.vertex(m, ax, y, az).color(r, g, b, 0f).endVertex();
-        builder.vertex(m, bx, y, bz).color(r, g, b, 0f).endVertex();
+        builder.addVertex(m, cx, y, cz).setColor(r, g, b, alpha);
+        builder.addVertex(m, ax, y, az).setColor(r, g, b, 0f);
+        builder.addVertex(m, bx, y, bz).setColor(r, g, b, 0f);
     }
 
     /**

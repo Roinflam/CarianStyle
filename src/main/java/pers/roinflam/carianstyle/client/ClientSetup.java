@@ -2,15 +2,16 @@ package pers.roinflam.carianstyle.client;
 
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import pers.roinflam.carianstyle.init.CarianStyleBlocks;
 import pers.roinflam.carianstyle.utils.Reference;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 客户端渲染设置
  * <p>
- * v2.1修复：移除 @Mod.EventBusSubscriber 注解。
+ * v2.1修复：移除 @EventBusSubscriber 注解。
  * ClientSetupHandler 已经在 CarianStyle.clientSetup() 中处理了所有客户端设置
  * （包括实体渲染器注册和火焰方块渲染层设置），
  * 此类的注解会导致火焰方块的 setRenderLayer 被执行两次。

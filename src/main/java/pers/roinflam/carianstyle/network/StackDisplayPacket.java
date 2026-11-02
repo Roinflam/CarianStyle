@@ -1,13 +1,16 @@
 package pers.roinflam.carianstyle.network;
 
-import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.network.NetworkEvent;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
+import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.StackDisplayRegistry;
 import pers.roinflam.carianstyle.visual.StackHudManager;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Supplier;
 
 /**
  * 叠层显示同步包（S2C，服务端 -> 客户端）。
@@ -52,7 +55,16 @@ import java.util.function.Supplier;
  * @author RoinFlam
  * @version 1.1
  */
-public class StackDisplayPacket {
+public class StackDisplayPacket implements CustomPacketPayload {
+
+    /** 包 id（1.21.1 每种包一个 id，不再按注册顺序编号） */
+    public static final CustomPacketPayload.Type<StackDisplayPacket> TYPE =
+            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(Reference.MOD_ID, "stack_display"));
+
+    /** 编解码沿用下面的 {@link #encode} / {@link #decode}，字段和顺序与 1.20.1 一致 */
+    public static final StreamCodec<RegistryFriendlyByteBuf, StackDisplayPacket> STREAM_CODEC =
+            StreamCodec.of((buf, packet) -> encode(packet, buf), StackDisplayPacket::decode);
+
 
     /**
      * 单个包允许携带的最大叠层项数。
@@ -83,7 +95,7 @@ public class StackDisplayPacket {
      * @param packet 待编码包
      * @param buf    目标缓冲
      */
-    public static void encode(StackDisplayPacket packet, FriendlyByteBuf buf) {
+    public static void encode(StackDisplayPacket packet, RegistryFriendlyByteBuf buf) {
         buf.writeVarInt(packet.stacks.size());
         for (Map.Entry<Integer, StackDisplayRegistry.Stacks> e : packet.stacks.entrySet()) {
             StackDisplayRegistry.Stacks s = e.getValue();
@@ -101,7 +113,7 @@ public class StackDisplayPacket {
      * @param buf 源缓冲
      * @return 解码出的包
      */
-    public static StackDisplayPacket decode(FriendlyByteBuf buf) {
+    public static StackDisplayPacket decode(RegistryFriendlyByteBuf buf) {
         int size = PacketGuard.readBoundedVarIntSize(buf, MAX_ENTRIES, MIN_BYTES_PER_ENTRY,
                 "StackDisplayPacket");
         // size 已被限制在 [0, MAX_ENTRIES]，此处的 *2 不可能溢出；
@@ -128,8 +140,12 @@ public class StackDisplayPacket {
      * @param packet 收到的包
      * @param ctx    网络上下文
      */
-    public static void handle(StackDisplayPacket packet, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> StackHudManager.accept(packet.stacks));
-        ctx.get().setPacketHandled(true);
+    public static void handle(StackDisplayPacket packet, IPayloadContext ctx) {
+        StackHudManager.accept(packet.stacks);
+    }
+
+    @Override
+    public CustomPacketPayload.Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 }

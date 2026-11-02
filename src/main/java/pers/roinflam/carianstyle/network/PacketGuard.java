@@ -28,7 +28,7 @@ import javax.annotation.Nonnull;
  *
  * <h3>校验失败为什么直接抛异常</h3>
  * <p>
- * Forge 的 {@code SimpleChannel} 会捕获解码异常并断开该连接，这正是我们想要的：
+ * 网络层（1.21.1 是 NeoForge 的包处理，1.20.1 是 Forge 的 {@code SimpleChannel}）会捕获解码异常并断开该连接，这正是我们想要的：
  * 坏包来自哪一端就断哪一端，不会污染其余玩家。返回一个「安全的空包」反而更糟——
  * 问题被静默吞掉，日后排查时毫无线索。
  * </p>

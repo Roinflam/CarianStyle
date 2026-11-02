@@ -4,6 +4,13 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "MixinEffectModifier",
+    "MixinEnchantRandomly",
+    "MixinEnchantmentFullname",
+    "MixinLivingEntityTick",
+    "accessor.LivingEntityAccessor",
+    "accessor.SynchedEntityDataAccessor",
+    "damage.MixinLivingEntityDamageStages",
+    "damage.MixinPlayerDamageStages",
     "helper.DamageSourceMixin"
   ],
   "client": [

@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.block.light;
 
+import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
@@ -36,6 +37,9 @@ public class HideLight extends AirBlock implements EntityBlock {
     /** 光照等级，方块属性里用 {@code lightLevel} 读它 */
     public static final IntegerProperty LEVEL = BlockStateProperties.LEVEL;
 
+    /** 按属性重建本方块的编解码器（见 {@link #codec()}） */
+    private static final MapCodec<HideLight> CODEC = simpleCodec(HideLight::new);
+
     /**
      * 构造函数
      *
@@ -44,6 +48,17 @@ public class HideLight extends AirBlock implements EntityBlock {
     public HideLight(BlockBehaviour.Properties properties) {
         super(properties);
         registerDefaultState(stateDefinition.any().setValue(LEVEL, 15));
+    }
+
+    /**
+     * 1.21.1 的方块都要提供编解码器。父类 {@link AirBlock#codec()} 声明的返回类型是 {@code MapCodec<AirBlock>}，
+     * 泛型不协变，覆写只能保持这个返回类型；不覆写的话按父类的编解码器重建出来的是普通空气方块，丢了本类。
+     * 所以返回本类的编解码器，做一次未检查转换（{@code MapCodec} 只用来按属性重建方块，类型擦除后是同一个对象）。
+     */
+    @Override
+    @SuppressWarnings("unchecked")
+    public MapCodec<AirBlock> codec() {
+        return (MapCodec<AirBlock>) (MapCodec<?>) CODEC;
     }
 
     @Override

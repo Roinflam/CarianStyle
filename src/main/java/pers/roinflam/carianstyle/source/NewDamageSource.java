@@ -90,7 +90,7 @@ public class NewDamageSource {
     private static ResourceKey<DamageType> create(String name) {
         return ResourceKey.create(
                 Registries.DAMAGE_TYPE,
-                new ResourceLocation(Reference.MOD_ID, name)
+                ResourceLocation.fromNamespaceAndPath(Reference.MOD_ID, name)
         );
     }
 

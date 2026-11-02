@@ -5,10 +5,10 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.AABB;
-import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
-import net.minecraftforge.event.entity.living.LivingHealEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
+import net.neoforged.neoforge.event.entity.living.LivingHealEvent;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
 import pers.roinflam.carianstyle.dynamicattr.ClientSyncAttribute;
 import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttribute;
@@ -17,12 +17,14 @@ import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.network.HowlShabririSyncHelper;
 import pers.roinflam.carianstyle.network.StealthHitboxSyncHelper;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
-
 import javax.annotation.Nullable;
 import java.util.List;
 import java.util.UUID;
+import pers.roinflam.carianstyle.event.LivingTickEvent;
 
 /**
+ * PORT-STUB(B2a)
+ *
  * 卡利亚风格模组 - 动态属性注册
  * 完全独立的效果系统，不依赖任何药水
  *
@@ -30,8 +32,8 @@ import java.util.UUID;
  * <p>
  * <b>问题：per-entity 事件处理器挂在全局事件总线上，却监听高频事件。</b>
  * {@code DynamicAttributeInstance.setEventHandler} 会把每个实体的处理器
- * 单独 {@code MinecraftForge.EVENT_BUS.register}。若处理器里监听的是
- * {@code LivingEvent.LivingTickEvent}，就意味着：
+ * 单独 {@code NeoForge.EVENT_BUS.register}。若处理器里监听的是
+ * {@code LivingTickEvent}，就意味着：
  * </p>
  * <pre>
  * 回调次数 = 持有该效果的实体数 × 区块内全部活体数 × 每 tick
@@ -105,360 +107,35 @@ import java.util.UUID;
  * @author RoinFlam
  * @version 2.2
  */
+@Deprecated
 public class DynamicAttributes {
-
-    /**
-     * 隐身状态下清除周边仇恨的间隔（tick）。
-     * <p>10 tick = 0.5 秒。取值理由见类注释「关于隐身清仇恨频率的行为差异」。
-     * 调小更灵敏但更耗，调大更省；由于目标锁定本身已被事件拦截，该值不影响实际隐身效果。</p>
-     */
     private static final int STEALTH_AGGRO_CLEAR_INTERVAL = 10;
-
-    /** 隐身状态下清除仇恨的搜索半径（格） */
     private static final double STEALTH_CLEAR_AGGRO_RANGE = 32.0;
-
-    // ========== 基础增益效果 ==========
-
-    /**
-     * 攻击提升效果
-     * - 攻击伤害+1%×等级
-     * - 攻击速度+2%×等级
-     */
-    public static final DynamicAttribute ATTACK_BOOST = new DynamicAttribute("carianstyle_attack_boost")
-            .addModifier(Attributes.ATTACK_DAMAGE, 0.01, AttributeModifier.Operation.MULTIPLY_TOTAL)
-            .addModifier(Attributes.ATTACK_SPEED, 0.02, AttributeModifier.Operation.MULTIPLY_TOTAL);
-
-    /**
-     * 速度提升效果
-     * - 移动速度+1%×等级
-     */
-    public static final DynamicAttribute SPEED_BOOST = new DynamicAttribute("carianstyle_speed_boost")
-            .addModifier(Attributes.MOVEMENT_SPEED, 0.01, AttributeModifier.Operation.MULTIPLY_TOTAL);
-
-    /**
-     * 碎步的速度提升
-     * - 移动速度+1%×等级
-     * <p>
-     * 和 {@link #SPEED_BOOST} 分开：碎步的等级要跟着血量往下降，得把旧等级摘掉，
-     * 共用一个属性会把群星律法的那份一起摘掉。
-     * </p>
-     */
-    public static final DynamicAttribute QUICKSTEP_SPEED = new DynamicAttribute("carianstyle_quickstep_speed")
-            .addModifier(Attributes.MOVEMENT_SPEED, 0.01, AttributeModifier.Operation.MULTIPLY_TOTAL);
-
-    // ========== 防御效果 ==========
-
-    /**
-     * 龙徽大盾效果
-     * - 护甲+7.5%×等级
-     * - 韧性+7.5%×等级
-     * - 移动速度-1%×等级
-     * - 飞行速度-1%×等级
-     */
-    public static final DynamicAttribute DRAGONCREST_GREATSHIELD = new DynamicAttribute("carianstyle_dragoncrest_greatshield")
-            .addModifier(Attributes.ARMOR, 0.075, AttributeModifier.Operation.MULTIPLY_TOTAL)
-            .addModifier(Attributes.ARMOR_TOUGHNESS, 0.075, AttributeModifier.Operation.MULTIPLY_TOTAL)
-            .addModifier(Attributes.MOVEMENT_SPEED, -0.01, AttributeModifier.Operation.MULTIPLY_TOTAL)
-            .addModifier(Attributes.FLYING_SPEED, -0.01, AttributeModifier.Operation.MULTIPLY_TOTAL);
-
-    // ========== 特殊武器效果 ==========
-
-    /**
-     * 岩石剑效果
-     * - 攻击力+10%×等级
-     * - 击退抗性+0.1×等级（加法：玩家默认是 0，按比例乘等于没有）
-     * - 护甲+10%×等级
-     * - 韧性+10%×等级
-     * - 无法跳跃（跳跃在客户端发起，序列号 20 同步给客户端，由 ClientSyncCragbladeJumpLock 处理）
-     * - 无法跳跃
-     * <p>
-     * v2.1：跳跃压制由原来的 per-entity {@code LivingTickEvent} 处理器
-     * 改为框架自带的 onTick 回调（每 tick 触发），只对持有该效果的实体执行。
-     * </p>
-     */
-    public static final DynamicAttribute CRAGBLADE = new DynamicAttribute("carianstyle_cragblade")
-            .addModifier(Attributes.ATTACK_DAMAGE, 0.1, AttributeModifier.Operation.MULTIPLY_TOTAL)
-            .addModifier(Attributes.KNOCKBACK_RESISTANCE, 0.1, AttributeModifier.Operation.ADDITION)
-            .addModifier(Attributes.ARMOR, 0.1, AttributeModifier.Operation.MULTIPLY_TOTAL)
-            .addModifier(Attributes.ARMOR_TOUGHNESS, 0.1, AttributeModifier.Operation.MULTIPLY_TOTAL)
-            .onTick(context -> EntityLivingUtil.setJumped(context.getEntity()))
-            .setTickInterval(1);
-
-    // ========== 负面效果 ==========
-
-    /**
-     * 注定死亡效果
-     * - 最大生命值降低（等级 n 表示降低千分之 n+1）
-     * <p>
-     * 降低多少由施加方按自己的数值算好，再用 {@link #doomedDeath} 换成等级。
-     * 命定之死、死亡之刃共用这一个效果：同一目标同一时间只挂一份，比例大的顶掉比例小的，
-     * 比例相同只刷新时长（{@code DynamicAttributeManager.apply} 的覆盖规则），两者不会叠成双倍。
-     * 以前固定是 -25%，满血目标挨第一下会被原版压血直接削掉四分之一，现在默认 -10%（BOSS 也一样）。
-     * </p>
-     */
-    public static final DynamicAttribute DOOMED_DEATH = new DynamicAttribute("carianstyle_doomed_death")
-            .addModifier(Attributes.MAX_HEALTH, AttributeModifier.Operation.MULTIPLY_TOTAL,
-                    amplifier -> -(amplifier + 1) / 1000.0D);
-
-    /**
-     * 按「最大生命降低比例」创建一份注定死亡效果
-     *
-     * @param durationTicks 持续 tick
-     * @param reduction     降低比例（0.1 = -10%），按千分之一取整，夹在 [0.001, 0.9]
-     * @return 效果实例；比例不到千分之一时返回 null（不挂）
-     */
-    @Nullable
-    public static DynamicAttributeInstance doomedDeath(int durationTicks, double reduction) {
-        int permille = (int) Math.round(Math.min(reduction, 0.9D) * 1000.0D);
-        if (permille <= 0) {
-            return null;
-        }
-        return DOOMED_DEATH.createInstance(durationTicks, permille - 1);
+    public static final DynamicAttribute SPEED_BOOST = null; // PORT-STUB
+    public static final DynamicAttribute QUICKSTEP_SPEED = null; // PORT-STUB
+    public static final DynamicAttribute DOOMED_DEATH = null; // PORT-STUB
+    @Nullable public static DynamicAttributeInstance doomedDeath(int durationTicks, double reduction) {
+        return null;
     }
-
-    /**
-     * 沙布里里的嚎叫效果
-     * - 护甲-15%×等级
-     * - 韧性-15%×等级
-     * - 治疗量-10%×(等级+1)
-     * <p>
-     * v2.2：新增层数的客户端同步（见静态块），使观察者能看出目标叠了几层发狂。
-     * 同步只做网络广播，不影响本效果的任何数值与判定。
-     * </p>
-     */
-    public static final DynamicAttribute HOWL_SHABRIRI = new DynamicAttribute("carianstyle_howl_shabriri")
-            .addModifier(Attributes.ARMOR, -0.15, AttributeModifier.Operation.MULTIPLY_TOTAL)
-            .addModifier(Attributes.ARMOR_TOUGHNESS, -0.15, AttributeModifier.Operation.MULTIPLY_TOTAL)
-            .withEventHandler(HowlShabririEventHandler::new);
-
-    // ========== 隐身效果 ==========
-
-    /**
-     * 隐身效果
-     * - 玩家模型不渲染（隐形）
-     * - 生物无法将此实体设为攻击目标
-     * - 周期性清除周围32格所有生物的仇恨
-     * - 客户端同步渲染：序列号4
-     * <p>
-     * v2.1：清仇恨由原来的 per-entity {@code LivingTickEvent} 处理器
-     * 改为框架自带的 onTick 回调（每 {@value #STEALTH_AGGRO_CLEAR_INTERVAL} tick 触发）。
-     * 事件处理器保留，仍负责拦截目标锁定。
-     * </p>
-     * <p>
-     * 2.2.0：
-     * </p>
-     * <ul>
-     *     <li>隐藏模型改由客户端静态订阅 {@code ClientSyncStealthRenderer} 查序列号 4。
-     *         此前它挂在事件处理器上，独立服务器的客户端根本没注册过，模型对其他玩家始终可见；</li>
-     *     <li>新增碰撞箱屏蔽——隐身玩家在 F3+B 中也不显示碰撞箱（服务端配置
-     *         {@code hideStealthHitbox}，默认开）。同一个 onTick 顺带做开关的周期对账，
-     *         使热重载配置对正在隐身的玩家也生效。详见 {@link StealthHitboxSyncHelper}。</li>
-     * </ul>
-     */
-    public static final DynamicAttribute STEALTH = new DynamicAttribute("carianstyle_stealth")
-            .onTick(context -> {
-                clearNearbyAggroTowards(context.getEntity());
-                StealthHitboxSyncHelper.sync(context.getEntity());
-            })
-            .setTickInterval(STEALTH_AGGRO_CLEAR_INTERVAL)
-            .withEventHandler(StealthEventHandler::new);
-
-    // ========== 火焰燃烧效果 ==========
-
-    /**
-     * 注定死亡燃烧效果
-     * - 火焰渲染：猩红色火焰（序列号1）
-     */
+    public static final DynamicAttribute STEALTH = null; // PORT-STUB
     public static final DynamicAttribute DOOMED_DEATH_BURNING = new DynamicAttribute("carianstyle_doomed_death_burning");
-
-    /**
-     * 毁灭火焰燃烧效果
-     * - 火焰渲染：白色火焰（序列号2）
-     */
     public static final DynamicAttribute DESTRUCTION_FIRE_BURNING = new DynamicAttribute("carianstyle_destruction_fire_burning");
-
-    /**
-     * 癫痫火焰燃烧效果
-     * - 治疗量减少90%
-     * - 火焰渲染：黄色火焰（序列号3）
-     */
     public static final DynamicAttribute EPILEPSY_FIRE_BURNING = new DynamicAttribute("carianstyle_epilepsy_fire_burning")
             .withEventHandler(EpilepsyFireEventHandler::new);
 
-    // ========== 静态初始化：注册需要客户端同步的属性 ==========
-
-    static {
-        // 注册火焰属性与序列号的映射
-        ClientSyncAttribute.register(DOOMED_DEATH_BURNING, 1);
-        ClientSyncAttribute.register(DESTRUCTION_FIRE_BURNING, 2);
-        ClientSyncAttribute.register(EPILEPSY_FIRE_BURNING, 3);
-
-        // 注册隐身效果与序列号的映射
-        ClientSyncAttribute.register(STEALTH, 4);
-
-        // 岩石剑：客户端要知道自己跳不了
-        ClientSyncAttribute.register(CRAGBLADE, 20);
-
-        // 为火焰属性添加生命周期回调
-        DOOMED_DEATH_BURNING
-                .onApplied(ClientSyncEffectHelper::onAttributeApplied)
-                .onRemoved(ClientSyncEffectHelper::onAttributeRemoved);
-
-        DESTRUCTION_FIRE_BURNING
-                .onApplied(ClientSyncEffectHelper::onAttributeApplied)
-                .onRemoved(ClientSyncEffectHelper::onAttributeRemoved);
-
-        EPILEPSY_FIRE_BURNING
-                .onApplied(ClientSyncEffectHelper::onAttributeApplied)
-                .onRemoved(ClientSyncEffectHelper::onAttributeRemoved);
-
-        CRAGBLADE
-                .onApplied(ClientSyncEffectHelper::onAttributeApplied)
-                .onRemoved(ClientSyncEffectHelper::onAttributeRemoved);
-
-        // 为隐身效果添加生命周期回调
-        // 2.2.0：回调是单槽的（后设覆盖先设），碰撞箱屏蔽只能和序列号 4 的同步写在同一个回调里
-        STEALTH
-                .onApplied((entity, attribute) -> {
-                    ClientSyncEffectHelper.onAttributeApplied(entity, attribute);
-                    StealthHitboxSyncHelper.sync(entity);
-                })
-                .onRemoved((entity, attribute) -> {
-                    ClientSyncEffectHelper.onAttributeRemoved(entity, attribute);
-                    StealthHitboxSyncHelper.clear(entity);
-                });
-
-        // v2.2：嘶吼的层数同步。
-        // 刻意不走 ClientSyncAttribute + ClientSyncEffectHelper 那套——
-        // 那套是「一个属性对应一个固定序列号」，只能表达「有 / 没有」，
-        // 而嘶吼需要表达「第几层」，故用 HowlShabririSyncHelper 的
-        // 「一层一个序列号」方案（序列号 13~18，详见该类注释）。
-        HOWL_SHABRIRI
-                .onApplied(HowlShabririSyncHelper::onApplied)
-                .onRemoved(HowlShabririSyncHelper::onRemoved);
-    }
-
-    // ========== 共享工具方法 ==========
-
-    /**
-     * 清除周围生物对指定实体的仇恨。
-     * <p>
-     * v2.1：由 {@code StealthEventHandler} 的实例方法提为静态方法，
-     * 供 {@link #STEALTH} 的 onTick 回调直接调用。逻辑与原实现一字未改。
-     * </p>
-     *
-     * @param target 需要被“遗忘”的目标实体
-     */
-    private static void clearNearbyAggroTowards(LivingEntity target) {
-        if (target.level().isClientSide()) {
-            return;
-        }
-
-        AABB searchBox = new AABB(
-                target.getX() - STEALTH_CLEAR_AGGRO_RANGE,
-                target.getY() - STEALTH_CLEAR_AGGRO_RANGE,
-                target.getZ() - STEALTH_CLEAR_AGGRO_RANGE,
-                target.getX() + STEALTH_CLEAR_AGGRO_RANGE,
-                target.getY() + STEALTH_CLEAR_AGGRO_RANGE,
-                target.getZ() + STEALTH_CLEAR_AGGRO_RANGE
-        );
-
-        List<Mob> nearbyMobs = target.level().getEntitiesOfClass(
-                Mob.class,
-                searchBox,
-                mob -> mob.getTarget() != null && mob.getTarget().equals(target)
-        );
-
-        for (Mob mob : nearbyMobs) {
-            mob.setTarget(null);
-        }
-    }
-
-    // ========== 命名内部类：事件处理器 ==========
-
-    /**
-     * 沙布里里的嚎叫效果的事件处理器
-     * 减少治疗量
-     * <p>只监听低频的 {@code LivingHealEvent}，无需改造。</p>
-     */
     private static class HowlShabririEventHandler {
-        private final UUID boundEntityId;
-
         public HowlShabririEventHandler(LivingEntity entity) {
-            this.boundEntityId = entity.getUUID();
-        }
-
-        @SubscribeEvent(priority = EventPriority.LOW)
-        public void onHeal(LivingHealEvent event) {
-            if (!event.getEntity().getUUID().equals(boundEntityId)) return;
-            if (event.getEntity().level().isClientSide()) return;
-
-            int level = DynamicAttributeManager.getAmplifier((LivingEntity) event.getEntity(),
-                    DynamicAttributes.HOWL_SHABRIRI);
-            if (level < 0) return;
-
-            float reduction = (level + 1) * 0.1f;
-            event.setAmount(event.getAmount() * (1 - reduction));
         }
     }
 
-    /**
-     * 癫痫火焰燃烧效果的事件处理器
-     * 大幅减少治疗量(90%)
-     * <p>只监听低频的 {@code LivingHealEvent}，无需改造。</p>
-     */
     private static class EpilepsyFireEventHandler {
-        private final UUID boundEntityId;
-
         public EpilepsyFireEventHandler(LivingEntity entity) {
-            this.boundEntityId = entity.getUUID();
-        }
-
-        @SubscribeEvent(priority = EventPriority.LOW)
-        public void onHeal(LivingHealEvent event) {
-            if (!event.getEntity().getUUID().equals(boundEntityId)) return;
-            if (event.getEntity().level().isClientSide()) return;
-
-            if (DynamicAttributeManager.has((LivingEntity) event.getEntity(),
-                    DynamicAttributes.EPILEPSY_FIRE_BURNING)) {
-                event.setAmount(event.getAmount() * 0.1f);
-            }
         }
     }
 
-    /**
-     * 隐身效果的事件处理器
-     * <p>
-     * v2.1：原先的 {@code LivingTickEvent} 监听（首次 tick 清仇恨）已移除，
-     * 改由 {@link #STEALTH} 的 onTick 回调周期执行——详见类注释。
-     * </p>
-     * <p>
-     * 2.2.0：原先这里还有一个 {@code RenderPlayerEvent.Pre} 监听负责隐藏玩家模型，已移到
-     * {@code ClientSyncStealthRenderer}。本处理器只在 {@code DynamicAttributeManager.apply}
-     * 里注册到事件总线，而 apply 只在服务端执行——单人游戏里服务端和客户端共用一条总线，
-     * 所以一直看起来正常；<b>独立服务器上客户端从来没注册过它，隐身者的模型对其他玩家始终可见</b>。
-     * 现在本处理器只剩拦截生物锁定目标一项（纯服务端逻辑）。
-     * </p>
-     */
     private static class StealthEventHandler {
-        private final UUID boundEntityId;
-
         public StealthEventHandler(LivingEntity entity) {
-            this.boundEntityId = entity.getUUID();
-        }
-
-        /**
-         * 阻止生物将隐身实体设为目标
-         */
-        @SubscribeEvent(priority = EventPriority.HIGHEST)
-        public void onLivingChangeTarget(LivingChangeTargetEvent event) {
-            if (event.getEntity().level().isClientSide()) return;
-            if (event.getNewTarget() == null) return;
-            if (!event.getNewTarget().getUUID().equals(boundEntityId)) return;
-
-            if (DynamicAttributeManager.has(event.getNewTarget(), DynamicAttributes.STEALTH)) {
-                event.setCanceled(true);
-            }
         }
     }
 }
+

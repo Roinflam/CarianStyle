@@ -19,11 +19,15 @@ neoForge {
     version = project.neo_version
 
     runs {
+        // 客户端、服务端各用自己的游戏目录：测试客户端要往 mods 里放只给客户端用的开发 jar，
+        // 和专用服共用一个 run/ 时专用服会因为加载到客户端类起不来
         client {
             client()
+            gameDirectory = file('run/client')
         }
         server {
             server()
+            gameDirectory = file('run/server')
             programArgument '--nogui'
         }
         gameTestServer {

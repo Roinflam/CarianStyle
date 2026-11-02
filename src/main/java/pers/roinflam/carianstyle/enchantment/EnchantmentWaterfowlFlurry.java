@@ -5,7 +5,6 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -19,6 +18,8 @@ import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 /**
+ * PORT-STUB(E4)
+ *
  * 水鸟乱舞附魔
  * <p>
  * 武器附魔，连击系统
@@ -71,143 +72,23 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
  * @author RoinFlam
  * @version 2.2
  */
-@AutoRegisterEnchantment(
-        id = "waterfowl_flurry",
-        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.RARE,
-        type = EnchantmentCategory.WEAPON,
-        slots = {EquipmentSlot.MAINHAND},
-        forceTreasure = true
-)
+@Deprecated
 public class EnchantmentWaterfowlFlurry extends EnchantmentBase {
-
-    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
-    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.waterfowl_flurry.desc，
-    //   否则玩家看到的描述会与实际效果不符。
-
-    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "waterfowl_flurry";
-
-    /**
-     * 「水鸟乱舞伤害」标记的保持时长（tick，需覆盖全部段数）
-     * <p>默认 100，允许范围 20 ~ 1200。</p>
-     */
-    private static final EnchantmentValues.Handle MARKER_DURATION =
-            EnchantmentValues.define(VALUE_ID, "marker_duration",
+    private static final EnchantmentValues.Handle MARKER_DURATION = EnchantmentValues.define(VALUE_ID, "marker_duration",
                     100, 20, 1200);
-
-    /**
-     * 两段攻击之间的间隔（tick）
-     * <p>默认 2，允许范围 1 ~ 40。</p>
-     */
-    private static final EnchantmentValues.Handle HIT_INTERVAL =
-            EnchantmentValues.define(VALUE_ID, "hit_interval",
+    private static final EnchantmentValues.Handle HIT_INTERVAL = EnchantmentValues.define(VALUE_ID, "hit_interval",
                     2, 1, 40);
-
-    /**
-     * 每段命中后目标的无敌帧（tick）
-     * <p>默认 10，允许范围 0 ~ 40。</p>
-     */
-    private static final EnchantmentValues.Handle HIT_INVULNERABLE_TIME =
-            EnchantmentValues.define(VALUE_ID, "hit_invulnerable_time",
+    private static final EnchantmentValues.Handle HIT_INVULNERABLE_TIME = EnchantmentValues.define(VALUE_ID, "hit_invulnerable_time",
                     10, 0, 40);
-
-
     private static final String DAMAGE_TYPE_MARKER = "waterfowl_dance_marker";
-
-    public EnchantmentWaterfowlFlurry() {
-        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
-    }
-
-    @Override
     protected void onHurtAsAttackerHighest(@NotNull EnchantmentContext ctx, int level) {
-        LivingEntity attacker = ctx.getHolder();
-        LivingEntity victim = ctx.getVictim();
-        DamageSource damageSource = ctx.getDamageSource();
-
-        if (victim == null || damageSource == null) {
-            return;
-        }
-
-        if (attacker instanceof Player) {
-            if (!isJustSwung((Player) attacker)) {
-                return;
-            }
-            // v2.2：延后到下一 tick 开头清零（见类注释），不在本次事件链中途清零
-            AttackCooldownHelper.resetNextTick((Player) attacker);
-        }
-
-        // 防止递归：使用DataManager检查
-        if (EnchantmentDataManager.getData(DAMAGE_TYPE_MARKER, attacker.getUUID()) != null) {
-            return;
-        }
-
-        // 防止与死亡之刃冲突
-        if ("deathBlade".equals(damageSource.getMsgId()) || "noDeathBlade".equals(damageSource.getMsgId())) {
-            return;
-        }
-
-        float damagePerHit = ctx.getDamage() / (level + 1);
-        ctx.setDamage(damagePerHit);
-
-        // 标记为水鸟乱舞伤害
-        EnchantmentDataManager.setData(DAMAGE_TYPE_MARKER, attacker.getUUID(), true, MARKER_DURATION.getInt());
-
-        // v2.1：首段刀光。放在这里而非任务里，是为了与本段伤害同帧——
-        // 本方法运行时这一下伤害已经在结算中，刀光晚一帧出现就会与打击感脱节
-        spawnSlash(attacker, 0);
-
-        new SynchronizationTask(1, HIT_INTERVAL.getInt()) {
-            private int time = 0;
-
-            @Override
-            public void run() {
-                if (++time > level || !victim.isAlive()) {
-                    EnchantmentDataManager.removeData(DAMAGE_TYPE_MARKER, attacker.getUUID());
-                    this.cancel();
-                    return;
-                }
-
-                // v2.1：后续各段的刀光。刻意放在上面的存活判断之后、hurt 之前——
-                // 目标已死时不再补刀光，避免「对着空气继续劈」
-                spawnSlash(attacker, time);
-
-                victim.invulnerableTime = HIT_INVULNERABLE_TIME.getInt();
-                victim.hurt(damageSource, damagePerHit);
-            }
-        }.start();
     }
-
-    /**
-     * 为某一段攻击广播一道刀光（v2.1 新增，纯视觉）。
-     * <p>
-     * 取<b>攻击者当前</b>的位置与朝向，而不是首段那一刻的快照——
-     * 乱舞持续 {@code 2 × level} tick，期间玩家可能在移动 / 转身，
-     * 用实时姿态才能让刀光跟着人走，读起来像「他在连续挥砍」而不是「原地放了个特效」。
-     * </p>
-     * <p>
-     * {@code segmentIndex} 交给
-     * {@link CarianStyleCombatArtEffects#waterfowlFlurry(ServerLevel, LivingEntity, int)}
-     * 派生交叉方向，使相邻两段一左一右。
-     * </p>
-     *
-     * @param attacker     攻击者
-     * @param segmentIndex 段序号（首段 0，此后递增）
-     */
-    private static void spawnSlash(@NotNull LivingEntity attacker, int segmentIndex) {
-        if (attacker.level() instanceof ServerLevel serverLevel) {
-            CarianStyleCombatArtEffects.waterfowlFlurry(serverLevel, attacker, segmentIndex);
-        }
-    }
-
-    @Override
     public int getMinCost(int enchantmentLevel) {
-        return (int) ((30 + (enchantmentLevel - 1) * 30) * ConfigLoader.enchantingDifficulty);
+        return 0;
     }
-
-    @Override
     public int getMaxCost(int enchantmentLevel) {
-        return getMinCost(enchantmentLevel) + 50;
+        return 0;
     }
 }
+

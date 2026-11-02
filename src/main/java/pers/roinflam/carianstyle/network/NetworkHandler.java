@@ -1,19 +1,14 @@
 package pers.roinflam.carianstyle.network;
 
-import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.network.NetworkDirection;
-import net.minecraftforge.network.NetworkRegistry;
-import net.minecraftforge.network.simple.SimpleChannel;
-import pers.roinflam.carianstyle.utils.Reference;
-
-import java.util.Optional;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 /**
  * 网络处理器
  *
  * <h3>v1.1：补充包方向声明</h3>
  * <p>
- * 此前 {@code registerMessage} 用的是五参重载，没有传 {@link NetworkDirection}。
+ * 此前 {@code registerMessage} 用的是五参重载，没有传 {@code NetworkDirection}。
  * 不声明方向的后果是 Forge <b>两个方向都放行</b>——本包是纯 S2C，
  * 但任何客户端都可以反过来往服务端发一个 {@link ClientSyncEffectPacket}，
  * 服务端会照单全收并把它交给 {@code ClientSyncEffectManager}（一个客户端侧的管理器）处理。
@@ -28,7 +23,17 @@ import java.util.Optional;
  * <b>不影响正常游戏</b>：服务端发、客户端收的既有链路方向完全一致，行为不变。
  * </p>
  *
- * @version 1.3
+ * <h3>1.21.1（NeoForge）</h3>
+ * <p>
+ * {@code SimpleChannel} 换成 MOD 总线的 {@link RegisterPayloadHandlersEvent}：每种包有自己的 id
+ * （{@code carianstyle:client_sync_effect}、{@code carianstyle:enchantment_values}），不再靠注册顺序编号，
+ * 也就没有「插在中间会错位」的问题。每种包都用 {@code playToClient} 登记，方向由 NeoForge 校验，
+ * 等同于上面 v1.1 补的方向声明。版本号照旧是 {@link #PROTOCOL_VERSION}，NeoForge 按包逐个精确比较，
+ * 不同就在握手时拒绝；两种包都不是可选的，任何一边缺包同样拒绝（和 1.20.1 的 {@code PROTOCOL_VERSION::equals} 同义）。
+ * 处理器默认在主线程执行，不用再 {@code enqueueWork}。
+ * </p>
+ *
+ * @version 1.4
  */
 public class NetworkHandler {
 
@@ -64,39 +69,18 @@ public class NetworkHandler {
      */
     private static final String PROTOCOL_VERSION = "4";
 
-    public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
-            new ResourceLocation(Reference.MOD_ID, "main"),
-            () -> PROTOCOL_VERSION,
-            PROTOCOL_VERSION::equals,
-            PROTOCOL_VERSION::equals
-    );
-
-    private static int packetId = 0;
+    private NetworkHandler() {
+    }
 
     /**
-     * 注册所有数据包
-     * <p>
-     * 注册顺序即包 ID，双端必须一致，新增包务必追加在末尾。
-     * </p>
+     * 登记本通道的全部包（MOD 总线 {@link RegisterPayloadHandlersEvent}，双端都会触发）。
      */
-    public static void register() {
-        CHANNEL.registerMessage(
-                packetId++,
-                ClientSyncEffectPacket.class,
-                ClientSyncEffectPacket::encode,
-                ClientSyncEffectPacket::decode,
-                ClientSyncEffectPacket::handle,
-                Optional.of(NetworkDirection.PLAY_TO_CLIENT)
-        );
-        // v1.2：共享数值下发包。追加在末尾——包 ID 由注册顺序隐式决定，
-        // 插在中间会让新旧端之间所有包 ID 错位
-        CHANNEL.registerMessage(
-                packetId++,
-                EnchantmentValuesPacket.class,
-                EnchantmentValuesPacket::encode,
-                EnchantmentValuesPacket::decode,
-                EnchantmentValuesPacket::handle,
-                Optional.of(NetworkDirection.PLAY_TO_CLIENT)
-        );
+    public static void register(RegisterPayloadHandlersEvent event) {
+        PayloadRegistrar registrar = event.registrar(PROTOCOL_VERSION);
+        registrar.playToClient(ClientSyncEffectPacket.TYPE, ClientSyncEffectPacket.STREAM_CODEC,
+                ClientSyncEffectPacket::handle);
+        // v1.2：共享数值下发包
+        registrar.playToClient(EnchantmentValuesPacket.TYPE, EnchantmentValuesPacket.STREAM_CODEC,
+                EnchantmentValuesPacket::handle);
     }
 }

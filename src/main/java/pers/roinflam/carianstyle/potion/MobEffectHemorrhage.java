@@ -3,16 +3,17 @@ package pers.roinflam.carianstyle.potion;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
-
 import javax.annotation.Nonnull;
 
 /**
+ * PORT-STUB(B2a)
+ *
  * 出血药水效果
  * <p>
  * 效果：
@@ -75,75 +76,17 @@ import javax.annotation.Nonnull;
  * @author RoinFlam
  * @version 3.1
  */
+@Deprecated
 public class MobEffectHemorrhage extends IconBase {
-
-    /**
-     * 致死伤害倍率（× 最大生命）。
-     * <p>取足够大的值确保穿透护甲与各类减伤后仍然致命，同时避免使用
-     * {@code Float.MAX_VALUE} 在后续伤害计算中产生溢出 / NaN。</p>
-     */
     private static final float LETHAL_DAMAGE_MULTIPLIER = 10.0f;
-
-    /**
-     * 构造函数
-     *
-     * @param isBadEffectIn 是否为负面效果
-     * @param liquidColorIn 液体颜色
-     */
     public MobEffectHemorrhage(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
     }
-
-    /**
-     * 每tick应用出血伤害（直接扣血，不再创建延迟任务）
-     * <p>
-     * <b>v3.1：仅在逻辑服务端执行。</b>原版会在双端各调用一次本方法，
-     * 若不加守卫，客户端会自行走致死逻辑并因 {@code getServer()} 为 null 而崩溃
-     * （详见类注释的「v3.1 修复」小节）。
-     * </p>
-     *
-     * @param entityLivingBaseIn 受影响的实体
-     * @param amplifier          效果等级
-     */
-    @Override
-    public void applyEffectTick(@Nonnull LivingEntity entityLivingBaseIn, int amplifier) {
-        // v3.1 客户端守卫：扣血与致死判定只在逻辑服务端执行一次。
-        // 缺少此判断会导致客户端自行走死亡逻辑 -> getServer() 为 null -> 崩溃。
-        if (entityLivingBaseIn.level().isClientSide) {
-            return;
-        }
-
-        // 回溯无敌期间不掉血：直扣血量拦不到，致死那一击的 10 倍最大生命还会被算进储存伤害
-        if (EnchantmentTimeReversal.isReversing(entityLivingBaseIn)) {
-            return;
-        }
-
-        float damage = entityLivingBaseIn.getMaxHealth() * (0.07f + 0.01f * amplifier) / 30;
-
-        if (entityLivingBaseIn.getHealth() - damage * 2 > 0) {
-            // 常规掉血：直扣血量，不走伤害管线。
-            // 每秒 20 次走 hurt() 会让全部受击类附魔各触发 20 次，
-            // 既是性能灾难也会让机制行为跑偏；持续失血语义上不是「受到攻击」。
-            entityLivingBaseIn.setHealth(entityLivingBaseIn.getHealth() - damage);
-        } else {
-            // v3.1 致死路径：改走原版伤害管线，不再用 EntityLivingUtil.kill 强制处决。
-            // 原实现会绕过 hurt()，导致不死图腾与各类免死机制全部失效。
-            entityLivingBaseIn.hurt(
-                    NewDamageSource.hemorrhage(entityLivingBaseIn.level()),
-                    entityLivingBaseIn.getMaxHealth() * LETHAL_DAMAGE_MULTIPLIER
-            );
-        }
-    }
-
-    @Override
     public boolean isDurationEffectTick(int duration, int amplifier) {
-        return true;
+        return false;
     }
-
-    @Nonnull
-    @Override
-    @OnlyIn(Dist.CLIENT)
-    protected ResourceLocation getIconTexture() {
-        return new ResourceLocation(Reference.MOD_ID, "textures/mob_effect/hemorrhage.png");
+    @Nonnull @OnlyIn(Dist.CLIENT) protected ResourceLocation getIconTexture() {
+        return null;
     }
 }
+

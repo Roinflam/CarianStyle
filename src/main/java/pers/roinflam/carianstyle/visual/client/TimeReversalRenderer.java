@@ -6,11 +6,10 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
@@ -22,6 +21,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 普拉顿桑克斯的回溯「时之凝滞」客户端渲染器（纯客户端自绘）。
@@ -113,7 +113,7 @@ import java.util.Map;
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
 public final class TimeReversalRenderer {
 
     /** 距离裁剪（格）。必须 ≤ {@link SharedEntityQuery#QUERY_RANGE}，否则会漏掉实体。 */
@@ -567,9 +567,9 @@ public final class TimeReversalRenderer {
             float z0 = cz + radius * (float) Math.sin(a0);
             float x1 = cx + radius * (float) Math.cos(a1);
             float z1 = cz + radius * (float) Math.sin(a1);
-            b.vertex(m, cx, cy, cz).color(r, g, bl, centerAlpha).endVertex();
-            b.vertex(m, x0, cy, z0).color(r, g, bl, 0f).endVertex();
-            b.vertex(m, x1, cy, z1).color(r, g, bl, 0f).endVertex();
+            b.addVertex(m, cx, cy, cz).setColor(r, g, bl, centerAlpha);
+            b.addVertex(m, x0, cy, z0).setColor(r, g, bl, 0f);
+            b.addVertex(m, x1, cy, z1).setColor(r, g, bl, 0f);
         }
     }
 
@@ -599,13 +599,13 @@ public final class TimeReversalRenderer {
             float ix1 = cx + rInner * (float) Math.cos(a1);
             float iz1 = cz + rInner * (float) Math.sin(a1);
 
-            b.vertex(m, ox0, cy, oz0).color(r, g, bl, alpha).endVertex();
-            b.vertex(m, ox1, cy, oz1).color(r, g, bl, alpha).endVertex();
-            b.vertex(m, ix1, cy, iz1).color(r, g, bl, alpha).endVertex();
+            b.addVertex(m, ox0, cy, oz0).setColor(r, g, bl, alpha);
+            b.addVertex(m, ox1, cy, oz1).setColor(r, g, bl, alpha);
+            b.addVertex(m, ix1, cy, iz1).setColor(r, g, bl, alpha);
 
-            b.vertex(m, ox0, cy, oz0).color(r, g, bl, alpha).endVertex();
-            b.vertex(m, ix1, cy, iz1).color(r, g, bl, alpha).endVertex();
-            b.vertex(m, ix0, cy, iz0).color(r, g, bl, alpha).endVertex();
+            b.addVertex(m, ox0, cy, oz0).setColor(r, g, bl, alpha);
+            b.addVertex(m, ix1, cy, iz1).setColor(r, g, bl, alpha);
+            b.addVertex(m, ix0, cy, iz0).setColor(r, g, bl, alpha);
         }
     }
 
@@ -633,13 +633,13 @@ public final class TimeReversalRenderer {
         float bx1 = (float) (x2 + nx), bz1 = (float) (z2 + nz);
         float bx2 = (float) (x2 - nx), bz2 = (float) (z2 - nz);
 
-        b.vertex(m, ax1, y, az1).color(r, g, bl, a1).endVertex();
-        b.vertex(m, bx1, y, bz1).color(r, g, bl, a2).endVertex();
-        b.vertex(m, bx2, y, bz2).color(r, g, bl, a2).endVertex();
+        b.addVertex(m, ax1, y, az1).setColor(r, g, bl, a1);
+        b.addVertex(m, bx1, y, bz1).setColor(r, g, bl, a2);
+        b.addVertex(m, bx2, y, bz2).setColor(r, g, bl, a2);
 
-        b.vertex(m, ax1, y, az1).color(r, g, bl, a1).endVertex();
-        b.vertex(m, bx2, y, bz2).color(r, g, bl, a2).endVertex();
-        b.vertex(m, ax2, y, az2).color(r, g, bl, a1).endVertex();
+        b.addVertex(m, ax1, y, az1).setColor(r, g, bl, a1);
+        b.addVertex(m, bx2, y, bz2).setColor(r, g, bl, a2);
+        b.addVertex(m, ax2, y, az2).setColor(r, g, bl, a1);
     }
 
     /**
@@ -670,9 +670,9 @@ public final class TimeReversalRenderer {
                                  float cx, float y, float cz,
                                  float ax, float az, float bx, float bz,
                                  float r, float g, float bl, float alpha) {
-        b.vertex(m, cx, y, cz).color(r, g, bl, alpha).endVertex();
-        b.vertex(m, ax, y, az).color(r, g, bl, 0f).endVertex();
-        b.vertex(m, bx, y, bz).color(r, g, bl, 0f).endVertex();
+        b.addVertex(m, cx, y, cz).setColor(r, g, bl, alpha);
+        b.addVertex(m, ax, y, az).setColor(r, g, bl, 0f);
+        b.addVertex(m, bx, y, bz).setColor(r, g, bl, 0f);
     }
 
     /**
@@ -712,9 +712,9 @@ public final class TimeReversalRenderer {
                                    float ax, float ay, float az,
                                    float bx, float by, float bz,
                                    float r, float g, float bl, float alpha) {
-        b.vertex(m, cx, cy, cz).color(r, g, bl, alpha).endVertex();
-        b.vertex(m, ax, ay, az).color(r, g, bl, 0f).endVertex();
-        b.vertex(m, bx, by, bz).color(r, g, bl, 0f).endVertex();
+        b.addVertex(m, cx, cy, cz).setColor(r, g, bl, alpha);
+        b.addVertex(m, ax, ay, az).setColor(r, g, bl, 0f);
+        b.addVertex(m, bx, by, bz).setColor(r, g, bl, 0f);
     }
 
     // ==================== 无分配伪随机（xorshift64） ====================

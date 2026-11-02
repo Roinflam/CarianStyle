@@ -3,11 +3,10 @@ package pers.roinflam.carianstyle.visual.client;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.network.CombatArtEffectPacket;
 import pers.roinflam.carianstyle.utils.Reference;
@@ -15,6 +14,7 @@ import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
 import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 
 import java.util.List;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 水鸟乱舞「连斩」客户端渲染器（纯客户端自绘）。
@@ -113,7 +113,7 @@ import java.util.List;
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
 public final class WaterfowlFlurryRenderer {
 
     /** 距离裁剪（格） */
@@ -378,13 +378,13 @@ public final class WaterfowlFlurryRenderer {
             float ix0 = cx + rInner * cos0, iz0 = cz + rInner * sin0;
             float ix1 = cx + rInner * cos1, iz1 = cz + rInner * sin1;
 
-            b.vertex(m, ox0, cy, oz0).color(r, g, bl, alpha0).endVertex();
-            b.vertex(m, ox1, cy, oz1).color(r, g, bl, alpha1).endVertex();
-            b.vertex(m, ix1, cy, iz1).color(r, g, bl, alpha1).endVertex();
+            b.addVertex(m, ox0, cy, oz0).setColor(r, g, bl, alpha0);
+            b.addVertex(m, ox1, cy, oz1).setColor(r, g, bl, alpha1);
+            b.addVertex(m, ix1, cy, iz1).setColor(r, g, bl, alpha1);
 
-            b.vertex(m, ox0, cy, oz0).color(r, g, bl, alpha0).endVertex();
-            b.vertex(m, ix1, cy, iz1).color(r, g, bl, alpha1).endVertex();
-            b.vertex(m, ix0, cy, iz0).color(r, g, bl, alpha0).endVertex();
+            b.addVertex(m, ox0, cy, oz0).setColor(r, g, bl, alpha0);
+            b.addVertex(m, ix1, cy, iz1).setColor(r, g, bl, alpha1);
+            b.addVertex(m, ix0, cy, iz0).setColor(r, g, bl, alpha0);
         }
     }
 
@@ -416,9 +416,9 @@ public final class WaterfowlFlurryRenderer {
                                  float cx, float y, float cz,
                                  float ax, float az, float bx, float bz,
                                  float r, float g, float bl, float alpha) {
-        b.vertex(m, cx, y, cz).color(r, g, bl, alpha).endVertex();
-        b.vertex(m, ax, y, az).color(r, g, bl, 0f).endVertex();
-        b.vertex(m, bx, y, bz).color(r, g, bl, 0f).endVertex();
+        b.addVertex(m, cx, y, cz).setColor(r, g, bl, alpha);
+        b.addVertex(m, ax, y, az).setColor(r, g, bl, 0f);
+        b.addVertex(m, bx, y, bz).setColor(r, g, bl, 0f);
     }
 
     // ==================== 数学辅助 ====================

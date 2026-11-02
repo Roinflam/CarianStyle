@@ -1,6 +1,6 @@
 package pers.roinflam.carianstyle.dynamicattr;
 
-import net.minecraftforge.common.MinecraftForge;
+import net.neoforged.neoforge.common.NeoForge;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -102,7 +102,7 @@ public class DynamicAttributeInstance {
     public void setEventHandler(@Nullable Object handler) {
         if (handler != null) {
             this.eventHandler = handler;
-            MinecraftForge.EVENT_BUS.register(handler);
+            NeoForge.EVENT_BUS.register(handler);
         }
     }
 
@@ -111,7 +111,7 @@ public class DynamicAttributeInstance {
      */
     public void unregisterEventHandler() {
         if (eventHandler != null) {
-            MinecraftForge.EVENT_BUS.unregister(eventHandler);
+            NeoForge.EVENT_BUS.unregister(eventHandler);
             eventHandler = null;
         }
     }

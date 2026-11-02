@@ -1,15 +1,16 @@
 package pers.roinflam.carianstyle.network;
 
+import net.minecraft.core.Holder;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraftforge.event.entity.living.MobEffectEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.neoforge.event.entity.living.MobEffectEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 猩红腐败「客户端可见性」同步处理器（服务端逻辑，双端加载安全）。
@@ -44,7 +45,7 @@ import javax.annotation.Nonnull;
  *
  * @author RoinFlam
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
+@EventBusSubscriber(modid = Reference.MOD_ID)
 public final class ScarletRotSyncHandler {
 
     /**
@@ -63,8 +64,8 @@ public final class ScarletRotSyncHandler {
      * @param effect 待判断的效果（可为 null）
      * @return 是猩红腐败返回 true
      */
-    private static boolean isScarletRot(MobEffect effect) {
-        return effect != null && effect == CarianStylePotion.SCARLET_ROT.get();
+    private static boolean isScarletRot(Holder<MobEffect> effect) {
+        return effect != null && effect.is(CarianStylePotion.SCARLET_ROT);
     }
 
     /**

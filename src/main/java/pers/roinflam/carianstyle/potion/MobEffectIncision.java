@@ -7,22 +7,23 @@ import net.minecraft.world.entity.ai.attributes.AttributeMap;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
-import net.minecraftforge.event.entity.living.LivingHealEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.event.entity.living.LivingHealEvent;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
-
 import javax.annotation.Nonnull;
 import java.util.UUID;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
+ * PORT-STUB(B2a)
+ *
  * 切割药水效果
  * <p>
  * 效果：
@@ -138,188 +139,27 @@ import java.util.UUID;
  * @author RoinFlam
  * @version 3.2
  */
-@Mod.EventBusSubscriber
+@Deprecated
 public class MobEffectIncision extends IconBase {
-
-    /** 移动速度修改器UUID */
-    public static final UUID ID = UUID.fromString("0a6b62ca-ead9-3641-c4dd-a4d33daf5cc1");
-
-    /** 移动速度修改器名称 */
     public static final String NAME = "potion.incision";
-
-    /** 速度衰减下限 */
     private static final double SPEED_DECAY_FLOOR = 0.3;
-
-    /**
-     * 速度衰减的执行间隔（tick）。
-     * <p>v3.2：由每 tick 改为每 5 tick 执行一次，以削减 {@code MOVEMENT_SPEED}
-     * 的脏属性同步包（详见类注释「v3.2 性能」小节）。</p>
-     */
     private static final int SPEED_DECAY_INTERVAL_TICKS = 5;
-
-    /**
-     * 单次衰减量（每 {@link #SPEED_DECAY_INTERVAL_TICKS} tick 扣减的加成值）。
-     * <p>{@code 0.15 / 4.0 = 0.0375}，即每秒衰减 0.15 —— 与 v3.1 的「每 tick 衰减
-     * {@code 0.15/20}」<b>速率完全相同</b>，机制时长不变（1.20 → 0.30 耗时 6 秒）。</p>
-     */
     private static final double SPEED_DECAY_PER_STEP = 0.15 / 4.0;
-
-    /**
-     * 致死伤害倍率（× 最大生命）。
-     * <p>取足够大的值确保穿透护甲与各类减伤后仍然致命，同时避免使用
-     * {@code Float.MAX_VALUE} 在后续伤害计算中产生溢出 / NaN。</p>
-     */
     private static final float LETHAL_DAMAGE_MULTIPLIER = 10.0f;
-
     public MobEffectIncision(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
-
-        this.addAttributeModifier(
-                Attributes.ATTACK_DAMAGE,
-                "0788fd21-aade-d9dc-0daa-faee0f26e5ee",
-                0.4,
-                AttributeModifier.Operation.MULTIPLY_TOTAL
-        );
-        this.addAttributeModifier(
-                Attributes.ATTACK_SPEED,
-                "07a1b38c-e245-d4c0-1e0e-6529582fbb6d",
-                0.8,
-                AttributeModifier.Operation.MULTIPLY_TOTAL
-        );
-        this.addAttributeModifier(
-                Attributes.ARMOR,
-                "53c9ebac-b292-2d82-993a-cb183e208411",
-                -0.75,
-                AttributeModifier.Operation.MULTIPLY_TOTAL
-        );
-        this.addAttributeModifier(
-                Attributes.ARMOR_TOUGHNESS,
-                "68d0f463-1a46-6e25-2ed1-c0aec31b641e",
-                -0.75,
-                AttributeModifier.Operation.MULTIPLY_TOTAL
-        );
     }
-
-    @Override
-    public void removeAttributeModifiers(@Nonnull LivingEntity entityLivingBaseIn,
-                                         @Nonnull AttributeMap attributeMapIn,
-                                         int amplifier) {
-        AttributeInstance speedAttr = entityLivingBaseIn.getAttribute(Attributes.MOVEMENT_SPEED);
-        if (speedAttr != null) {
-            speedAttr.removeModifier(ID);
-        }
-        super.removeAttributeModifiers(entityLivingBaseIn, attributeMapIn, amplifier);
+    public void removeAttributeModifiers(@Nonnull LivingEntity entityLivingBaseIn, @Nonnull AttributeMap attributeMapIn, int amplifier) {
     }
-
-    @Override
-    public void addAttributeModifiers(@Nonnull LivingEntity entityLivingBaseIn,
-                                      @Nonnull AttributeMap attributeMapIn,
-                                      int amplifier) {
-        // 初始移动速度+120%
-        // 注意：此处刻意不加客户端守卫——客户端需要这份修正器做移动预测，
-        // 若客户端没有加速会与服务端产生更严重的不同步（详见类注释）
-        AttributeInstance speedAttr = entityLivingBaseIn.getAttribute(Attributes.MOVEMENT_SPEED);
-        if (speedAttr != null) {
-            speedAttr.addTransientModifier(
-                    new AttributeModifier(ID, NAME, 1.2, AttributeModifier.Operation.MULTIPLY_TOTAL));
-        }
-        super.addAttributeModifiers(entityLivingBaseIn, attributeMapIn, amplifier);
+    public void addAttributeModifiers(@Nonnull LivingEntity entityLivingBaseIn, @Nonnull AttributeMap attributeMapIn, int amplifier) {
     }
-
-    /**
-     * 治疗量+60%
-     */
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
-        if (evt.getEntity().level().isClientSide) {
-            return;
-        }
-
-        LivingEntity healer = evt.getEntity();
-        if (healer.hasEffect(CarianStylePotion.INCISION.get())) {
-            evt.setAmount(evt.getAmount() * 1.6f);
-        }
-    }
-
-    /**
-     * 每tick扣血 + 速度衰减（直接执行，不再创建延迟任务）
-     * <p>
-     * <b>v3.1：仅在逻辑服务端执行。</b>原版会在双端各调用一次本方法，
-     * 若不加守卫，客户端会自行走死亡逻辑并因 {@code getServer()} 为 null 而崩溃
-     * （详见类注释的「v3.1 修复」小节）。
-     * </p>
-     * <p>
-     * <b>v3.2：速度衰减改为每 {@link #SPEED_DECAY_INTERVAL_TICKS} tick 执行一次</b>，
-     * 每秒总衰减速率不变，仅削减属性同步包数量（详见类注释的「v3.2 性能」小节）。
-     * 扣血仍保持每 tick，以维持原有的掉血手感与致死时机。
-     * </p>
-     *
-     * @param entityLivingBaseIn 受影响的实体
-     * @param amplifier          效果等级
-     */
-    @Override
-    public void applyEffectTick(@Nonnull LivingEntity entityLivingBaseIn, int amplifier) {
-        // v3.1 客户端守卫：扣血与速度衰减只在逻辑服务端执行一次。
-        // 缺少此判断会导致客户端自行走死亡逻辑 -> getServer() 为 null -> 崩溃。
-        if (entityLivingBaseIn.level().isClientSide) {
-            return;
-        }
-
-        // ========== 扣血 ==========
-        // 回溯无敌期间不掉血：直扣血量拦不到，致死那一击的 10 倍最大生命还会被算进储存伤害
-        if (!EnchantmentTimeReversal.isReversing(entityLivingBaseIn)) {
-            float damage = entityLivingBaseIn.getMaxHealth() * 0.125f / 20;
-
-            if (entityLivingBaseIn.getHealth() - damage * 2 > 0) {
-                // 常规掉血：直扣血量，不走伤害管线。
-                // 每秒 20 次走 hurt() 会让全部受击类附魔各触发 20 次，
-                // 既是性能灾难也会让机制行为跑偏；持续掉血语义上是「自我消耗」而非「受到攻击」。
-                entityLivingBaseIn.setHealth(entityLivingBaseIn.getHealth() - damage);
-            } else {
-                // v3.1 致死路径：改走原版伤害管线，不再用 EntityLivingUtil.kill 强制处决。
-                // 原实现会绕过 hurt()，导致不死图腾与各类免死机制全部失效。
-                entityLivingBaseIn.hurt(
-                        NewDamageSource.hemorrhage(entityLivingBaseIn.level()),
-                        entityLivingBaseIn.getMaxHealth() * LETHAL_DAMAGE_MULTIPLIER
-                );
-                return;
-            }
-        }
-
-        // ========== 速度衰减 ==========
-        // v3.2 降频：每 SPEED_DECAY_INTERVAL_TICKS tick 才衰减一次。
-        // 用世界游戏刻取模而非各实体独立计数，无需额外状态；不同实体的衰减时机同相，
-        // 但衰减是纯数值变化、无视觉节奏可言，同相不会产生任何观感问题。
-        if (entityLivingBaseIn.level().getGameTime() % SPEED_DECAY_INTERVAL_TICKS != 0) {
-            return;
-        }
-
-        AttributeInstance attributeInstance = entityLivingBaseIn.getAttribute(Attributes.MOVEMENT_SPEED);
-        if (attributeInstance == null) {
-            return;
-        }
-
-        AttributeModifier modifier = attributeInstance.getModifier(ID);
-        if (modifier != null) {
-            double currentBonus = modifier.getAmount();
-            if (currentBonus > SPEED_DECAY_FLOOR) {
-                attributeInstance.removeModifier(ID);
-                double newBonus = Math.max(currentBonus - SPEED_DECAY_PER_STEP, SPEED_DECAY_FLOOR);
-                attributeInstance.addTransientModifier(
-                        new AttributeModifier(ID, NAME, newBonus, AttributeModifier.Operation.MULTIPLY_TOTAL));
-            }
-        }
-    }
-
-    @Override
     public boolean isDurationEffectTick(int duration, int amplifier) {
-        return true;
+        return false;
     }
-
-    @Nonnull
-    @Override
-    @OnlyIn(Dist.CLIENT)
-    protected ResourceLocation getIconTexture() {
-        return new ResourceLocation(Reference.MOD_ID, "textures/mob_effect/incision.png");
+    @Nonnull @OnlyIn(Dist.CLIENT) protected ResourceLocation getIconTexture() {
+        return null;
     }
+    /** 切腹瞬时移速修饰符的 id（G.2） */
+    public static final net.minecraft.resources.ResourceLocation ID = net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(pers.roinflam.carianstyle.utils.Reference.MOD_ID, "effect/incision/speed_transient"); // PORT-STUB
 }
+

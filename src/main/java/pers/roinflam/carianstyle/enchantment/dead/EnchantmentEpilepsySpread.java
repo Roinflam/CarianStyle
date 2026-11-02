@@ -8,11 +8,9 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.enchantment.EnchantmentCategory;
-import net.minecraftforge.event.entity.living.LivingEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.neoforge.event.entity.living.LivingEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -30,11 +28,14 @@ import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
-
 import java.util.ArrayList;
 import java.util.List;
+import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.LivingTickEvent;
 
 /**
+ * PORT-STUB(E2)
+ *
  * 癫火蔓延附魔
  * <p>
  * 受到致命伤害时触发：
@@ -101,364 +102,47 @@ import java.util.List;
  * @author RoinFlam
  * @version 3.1
  */
-@AutoRegisterEnchantment(
-        id = "epilepsy_spread",
-        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.DEAD,
-        rarity = EnchantmentRarity.RARE,
-        type = EnchantmentCategory.ARMOR,
-        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}
-)
+@Deprecated
 public class EnchantmentEpilepsySpread extends EnchantmentBase {
-
-    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
-    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.epilepsy_spread.desc，
-    //   否则玩家看到的描述会与实际效果不符。
-
-    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "epilepsy_spread";
-
-    /**
-     * AOE 搜索半径上限（格）
-     * <p>默认 16，允许范围 1 ~ 64。</p>
-     */
-    private static final EnchantmentValues.Handle MAX_SEARCH_RADIUS =
-            EnchantmentValues.define(VALUE_ID, "max_search_radius",
+    private static final EnchantmentValues.Handle MAX_SEARCH_RADIUS = EnchantmentValues.define(VALUE_ID, "max_search_radius",
                     16, 1, 64);
-
-    /**
-     * 单次触发最大命中目标数
-     * <p>默认 24，允许范围 1 ~ 200。</p>
-     */
-    private static final EnchantmentValues.Handle MAX_TARGETS =
-            EnchantmentValues.define(VALUE_ID, "max_targets",
+    private static final EnchantmentValues.Handle MAX_TARGETS = EnchantmentValues.define(VALUE_ID, "max_targets",
                     24, 1, 200);
-
-    /**
-     * 濒死标记的过期时长（tick）
-     * <p>默认 72000，允许范围 20 ~ 432000。</p>
-     */
-    private static final EnchantmentValues.Handle PENDING_DEATH_EXPIRY =
-            EnchantmentValues.define(VALUE_ID, "pending_death_expiry",
+    private static final EnchantmentValues.Handle PENDING_DEATH_EXPIRY = EnchantmentValues.define(VALUE_ID, "pending_death_expiry",
                     72000, 20, 432000);
-
-    /**
-     * 濒死判定的延迟（tick）
-     * <p>默认 20，允许范围 1 ~ 1200。</p>
-     */
-    private static final EnchantmentValues.Handle PENDING_DEATH_DELAY =
-            EnchantmentValues.define(VALUE_ID, "pending_death_delay",
+    private static final EnchantmentValues.Handle PENDING_DEATH_DELAY = EnchantmentValues.define(VALUE_ID, "pending_death_delay",
                     20, 1, 1200);
-
-    /**
-     * 触发所需的剩余生命比例阈值
-     * <p>默认 0.3，允许范围 0.0 ~ 1.0。</p>
-     */
-    private static final EnchantmentValues.Handle TRIGGER_HEALTH_RATIO =
-            EnchantmentValues.define(VALUE_ID, "trigger_health_ratio",
+    private static final EnchantmentValues.Handle TRIGGER_HEALTH_RATIO = EnchantmentValues.define(VALUE_ID, "trigger_health_ratio",
                     0.3D, 0.0D, 1.0D);
-
-    /**
-     * 触发后自身保留的生命比例
-     * <p>默认 0.3，允许范围 0.0 ~ 1.0。</p>
-     */
-    private static final EnchantmentValues.Handle REVIVE_HEALTH_RATIO =
-            EnchantmentValues.define(VALUE_ID, "revive_health_ratio",
+    private static final EnchantmentValues.Handle REVIVE_HEALTH_RATIO = EnchantmentValues.define(VALUE_ID, "revive_health_ratio",
                     0.3D, 0.0D, 1.0D);
-
-    /**
-     * 触发冷却时间（tick）
-     * <p>默认 1800，允许范围 20 ~ 144000。</p>
-     */
-    private static final EnchantmentValues.Handle COOLDOWN =
-            EnchantmentValues.define(VALUE_ID, "cooldown",
+    private static final EnchantmentValues.Handle COOLDOWN = EnchantmentValues.define(VALUE_ID, "cooldown",
                     1800, 20, 144000);
-
-    /**
-     * 每级增加的搜索半径（格，受上限截断）
-     * <p>默认 4，允许范围 1 ~ 32。</p>
-     */
-    private static final EnchantmentValues.Handle RADIUS_PER_LEVEL =
-            EnchantmentValues.define(VALUE_ID, "radius_per_level",
+    private static final EnchantmentValues.Handle RADIUS_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "radius_per_level",
                     4, 1, 32);
-
-    /**
-     * 每级的击退强度系数
-     * <p>默认 0.7，允许范围 0.0 ~ 5.0。</p>
-     */
-    private static final EnchantmentValues.Handle KNOCKBACK_PER_LEVEL =
-            EnchantmentValues.define(VALUE_ID, "knockback_per_level",
+    private static final EnchantmentValues.Handle KNOCKBACK_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "knockback_per_level",
                     0.7D, 0.0D, 5.0D);
-
-    /**
-     * 自身持续伤害的最大生命占比总量
-     * <p>默认 0.3，允许范围 0.0 ~ 1.0。</p>
-     */
-    private static final EnchantmentValues.Handle SELF_DOT_RATIO =
-            EnchantmentValues.define(VALUE_ID, "self_dot_ratio",
+    private static final EnchantmentValues.Handle SELF_DOT_RATIO = EnchantmentValues.define(VALUE_ID, "self_dot_ratio",
                     0.3D, 0.0D, 1.0D);
-
-    /**
-     * 每级施加给目标的持续伤害占比总量
-     * <p>默认 0.3，允许范围 0.0 ~ 2.0。</p>
-     */
-    private static final EnchantmentValues.Handle TARGET_DOT_PER_LEVEL =
-            EnchantmentValues.define(VALUE_ID, "target_dot_per_level",
+    private static final EnchantmentValues.Handle TARGET_DOT_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "target_dot_per_level",
                     0.3D, 0.0D, 2.0D);
-
-
-    /**
-     * 「待补刀」标记键。
-     * <p>演出结束时若持有者已离线（补刀空转），登记此标记；
-     * 玩家重新登录后由 {@link ServerEventHandler} 补上死亡，详见类注释「v3.1 修复」小节。</p>
-     */
     private static final String PENDING_DEATH_KEY = "epilepsy_spread_pending_death";
-
-    /**
-     * 「待补刀」标记的存活时长（tick）。
-     * <p>72000 tick = 1 小时。纯内存存储，服务器重启即失效（见类注释「已知局限」）。</p>
-     */
-
-    /**
-     * 重登补刀的延迟（tick）。
-     * <p>1 秒。等客户端完成进入世界的初始化再执行死亡，避免死亡画面在加载过程中弹出。</p>
-     */
-
-    public EnchantmentEpilepsySpread() {
-        super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
-                EquipmentSlot.HEAD,
-                EquipmentSlot.CHEST,
-                EquipmentSlot.LEGS,
-                EquipmentSlot.FEET
-        });
-    }
-
-    /**
-     * 濒死触发：保留 30% 生命 → 拉取无敌 1.5 秒 → 群体灼烧 → 自身死亡。
-     *
-     * @param ctx        附魔上下文
-     * @param pieceLevel 这一件的等级（实际按全身最高等级算）
-     */
-    @Override
     protected void onDamageAsVictimLowest(@NotNull EnchantmentContext ctx, int pieceLevel) {
-        if (ctx.canHarmInCreative()) {
-            return;
-        }
-
-        LivingEntity hurter = ctx.getHolder();
-        int level = highestLevel(hurter);
-
-        if (EnchantmentDataManager.isOnCooldown("epilepsy_spread_cooldown", hurter.getUUID())) {
-            return;
-        }
-
-        if (hurter.getHealth() - ctx.getDamage() <= hurter.getMaxHealth() * TRIGGER_HEALTH_RATIO.get()) {
-            EnchantmentDataManager.setData("epilepsy_spread_active", hurter.getUUID(), true);
-            EnchantmentDataManager.setCooldown("epilepsy_spread_cooldown", hurter.getUUID(), COOLDOWN.getInt());
-
-            ctx.cancelEvent();
-            hurter.setHealth(hurter.getMaxHealth() * (float) REVIVE_HEALTH_RATIO.get());
-            hurter.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 100, 6));
-
-            // 触发瞬间在脚底地面生成癫火狂乱演出，并绑定持有者跟随。
-            // 时序关键：客户端演出的爆发主点（p≈0.42）恰好对齐下方延迟 30tick 的灼烧阶段，
-            // 因此必须在这里调用，不能挪进延迟任务里（详见类注释）。
-            // 纯服务端广播，不触发任何事件，不影响下方并发灼烧任务 / 上限 / 清理逻辑。
-            if (hurter.level() instanceof ServerLevel serverLevel) {
-                CarianStyleEffects.frenziedFlame(serverLevel, hurter);
-            }
-
-            // 搜索半径硬上限（原式 level * 4，100 级 = 400 格）
-            int searchRadius = Math.min(level * RADIUS_PER_LEVEL.getInt(), MAX_SEARCH_RADIUS.getInt());
-
-            List<LivingEntity> rawEntities = EntityUtil.getNearbyEntities(
-                    LivingEntity.class,
-                    hurter,
-                    searchRadius
-            );
-
-            // 命中数量硬上限，防止并发 SynchronizationTask 过载
-            // 使用单独的列表存储被处理的实体，供延迟任务复用
-            List<LivingEntity> entities = new ArrayList<>();
-            int hitCount = 0;
-            for (LivingEntity entityLivingBase : rawEntities) {
-                if (hitCount >= MAX_TARGETS.getInt()) {
-                    break;
-                }
-                entities.add(entityLivingBase);
-
-                entityLivingBase.playSound(SoundEvents.GHAST_HURT, 1, 1);
-                if (!entityLivingBase.equals(hurter)) {
-                    // 方向须为 hurter - entity（从 entity 指向 hurter），
-                    // knockback 内部取反后才能把 entity 推离 hurter
-                    double x = hurter.getX() - entityLivingBase.getX();
-                    double z = hurter.getZ() - entityLivingBase.getZ();
-                    float stronge = (float) (level * KNOCKBACK_PER_LEVEL.get()
-                            * Math.max(Math.abs(x), Math.abs(z)) / 14);
-                    entityLivingBase.knockback(stronge, x, z);
-                }
-                hitCount++;
-            }
-
-            int finalLevel = level;
-            new SynchronizationTask(30) {
-                @Override
-                public void run() {
-                    // 注意：爆发阶段的特效调用在触发入口（见上方），不在这里。
-                    // 此处只有并发灼烧伤害 / 自身死亡逻辑。
-
-                    if (!entities.isEmpty()) {
-                        for (Entity entity : entities) {
-                            LivingEntity entityLivingBase = (LivingEntity) entity;
-                            entityLivingBase.playSound(SoundEvents.GHAST_HURT, 1, 1);
-
-                            // 应用火焰燃烧效果（需要同步网络）
-                            DynamicAttributeManager.apply(entityLivingBase,
-                                    DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(3 * 20 + 5, 0));
-                            ClientSyncEffectHelper.onAttributeApplied(
-                                    entityLivingBase, DynamicAttributes.EPILEPSY_FIRE_BURNING);
-
-                            new SynchronizationTask(5, 1) {
-                                private int tick = 0;
-
-                                @Override
-                                public void run() {
-                                    if (++tick > 60 || !entityLivingBase.isAlive()) {
-                                        this.cancel();
-                                        return;
-                                    }
-
-                                    if (entityLivingBase.equals(hurter)) {
-                                        float damage = hurter.getMaxHealth() * (float) SELF_DOT_RATIO.get() / 60;
-                                        if (hurter.getHealth() - damage * 2 > 0) {
-                                            EntityLivingUtil.damageHealthDirectly(hurter, damage);
-                                        } else {
-                                            EnchantmentDataManager.removeData(
-                                                    "epilepsy_spread_active", hurter.getUUID());
-                                            EntityLivingUtil.kill(hurter,
-                                                    NewDamageSource.epilepsyFire(hurter.level()));
-                                            this.cancel();
-                                        }
-                                    } else if (!EnchantmentTimeReversal.isReversing(entityLivingBase)) {
-                                        float damage = hurter.getMaxHealth() * finalLevel * (float) TARGET_DOT_PER_LEVEL.get() * 2 / 60;
-                                        if (entityLivingBase.getHealth() - damage * 2 > 0) {
-                                            EntityLivingUtil.damageHealthDirectly(entityLivingBase, damage);
-                                        } else {
-                                            EntityLivingUtil.kill(entityLivingBase,
-                                                    NewDamageSource.epilepsyFire(entityLivingBase.level()));
-                                            this.cancel();
-                                        }
-                                    }
-                                }
-                            }.start();
-                        }
-                    }
-
-                    new SynchronizationTask(66) {
-                        @Override
-                        public void run() {
-                            // v3.1：持有者若已离线，kill 会因 isAlive() 为 false 空转，
-                            // 这次死亡就被白嫖掉了。此处登记待补刀标记，重登时补上（详见类注释）。
-                            if (hurter.isAlive()) {
-                                EntityLivingUtil.kill(hurter, NewDamageSource.epilepsyFire(hurter.level()));
-                            } else if (hurter instanceof Player) {
-                                EnchantmentDataManager.setData(
-                                        PENDING_DEATH_KEY, hurter.getUUID(), true, PENDING_DEATH_EXPIRY.getInt());
-                            }
-                            EnchantmentDataManager.removeData("epilepsy_spread_active", hurter.getUUID());
-                        }
-                    }.start();
-                }
-            }.start();
-        }
     }
-
-    /**
-     * 拉取无敌期间免疫一切伤害。
-     *
-     * @param ctx   附魔上下文
-     * @param level 附魔等级
-     */
-    @Override
     protected void onDefendHighest(@NotNull EnchantmentContext ctx, int level) {
-        LivingEntity hurter = ctx.getHolder();
-        Boolean isActive = EnchantmentDataManager.getData("epilepsy_spread_active", hurter.getUUID());
-
-        if (isActive != null && isActive) {
-            ctx.cancelEvent();
-        }
     }
 
-    /**
-     * 客户端：拉取无敌期间压制跳跃，避免本地预测导致的抖动。
-     */
-    @Mod.EventBusSubscriber
     public static class ClientEventHandler {
-
-        /**
-         * 每 tick 检查是否处于拉取无敌状态，是则压制跳跃。
-         *
-         * @param evt 生物 tick 事件
-         */
-        @SubscribeEvent
-        public static void onLivingUpdate(@NotNull LivingEvent.LivingTickEvent evt) {
-            if (evt.getEntity().level().isClientSide) {
-                LivingEntity entityLiving = evt.getEntity();
-                Boolean isActive = EnchantmentDataManager.getData(
-                        "epilepsy_spread_active", entityLiving.getUUID());
-
-                if (isActive != null && isActive) {
-                    EntityLivingUtil.setJumped(entityLiving);
-                }
-            }
-        }
     }
 
-    /**
-     * 服务端：处理「演出期间登出逃掉死亡」的补刀（v3.1 新增）。
-     * <p>详见类注释「v3.1 修复」小节。</p>
-     */
-    @Mod.EventBusSubscriber
     public static class ServerEventHandler {
-
-        /**
-         * 玩家重新登录时，若存在待补刀标记则延迟补上死亡。
-         *
-         * @param evt 玩家登录事件
-         */
-        @SubscribeEvent
-        public static void onPlayerLoggedIn(@NotNull PlayerEvent.PlayerLoggedInEvent evt) {
-            Player player = evt.getEntity();
-            if (player.level().isClientSide) {
-                return;
-            }
-
-            Boolean pending = EnchantmentDataManager.getData(PENDING_DEATH_KEY, player.getUUID());
-            if (pending == null || !pending) {
-                return;
-            }
-
-            // 先清标记再补刀：即使补刀因任何原因失败也不会陷入「每次登录都被杀」的死循环
-            EnchantmentDataManager.removeData(PENDING_DEATH_KEY, player.getUUID());
-
-            new SynchronizationTask(PENDING_DEATH_DELAY.getInt()) {
-                @Override
-                public void run() {
-                    if (player.isAlive()) {
-                        EntityLivingUtil.kill(player, NewDamageSource.epilepsyFire(player.level()));
-                    }
-                }
-            }.start();
-        }
     }
-
-    @Override
     public int getMinCost(int enchantmentLevel) {
-        return (int) ((36 + (enchantmentLevel - 1) * 20) * ConfigLoader.enchantingDifficulty);
+        return 0;
     }
-
-    @Override
     public int getMaxCost(int enchantmentLevel) {
-        return getMinCost(enchantmentLevel) + 50;
+        return 0;
     }
 }
+

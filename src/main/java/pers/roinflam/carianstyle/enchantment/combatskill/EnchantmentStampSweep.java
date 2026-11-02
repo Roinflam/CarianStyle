@@ -5,7 +5,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -16,10 +15,11 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
-
 import java.util.List;
 
 /**
+ * PORT-STUB(E1)
+ *
  * 箭步回旋斩附魔
  * <p>
  * 冲刺攻击时，玩家快速转一圈（360度旋转）
@@ -75,209 +75,25 @@ import java.util.List;
  * @author RoinFlam
  * @version 2.4
  */
-@AutoRegisterEnchantment(
-        id = "stamp_sweep",
-        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
-        rarity = EnchantmentRarity.RARE,
-        type = EnchantmentCategory.WEAPON,
-        slots = {EquipmentSlot.MAINHAND}
-)
+@Deprecated
 public class EnchantmentStampSweep extends EnchantmentBase {
-
-    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
-    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.stamp_sweep.desc，
-    //   否则玩家看到的描述会与实际效果不符。
-
-    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "stamp_sweep";
-
-    /**
-     * 单次横扫的最大命中目标数
-     * <p>默认 20，允许范围 1 ~ 200。</p>
-     */
-    private static final EnchantmentValues.Handle MAX_TARGETS =
-            EnchantmentValues.define(VALUE_ID, "max_targets",
+    private static final EnchantmentValues.Handle MAX_TARGETS = EnchantmentValues.define(VALUE_ID, "max_targets",
                     20, 1, 200);
-
-    /**
-     * 横扫半径（格）
-     * <p>默认 3.0，允许范围 1.0 ~ 32.0。</p>
-     */
-    private static final EnchantmentValues.Handle SWEEP_RADIUS =
-            EnchantmentValues.define(VALUE_ID, "sweep_radius",
+    private static final EnchantmentValues.Handle SWEEP_RADIUS = EnchantmentValues.define(VALUE_ID, "sweep_radius",
                     3.0D, 1.0D, 32.0D);
-
-    /**
-     * 参与计算的等级上限
-     * <p>默认 10，允许范围 1 ~ 100。</p>
-     */
-    private static final EnchantmentValues.Handle LEVEL_CAP =
-            EnchantmentValues.define(VALUE_ID, "level_cap",
+    private static final EnchantmentValues.Handle LEVEL_CAP = EnchantmentValues.define(VALUE_ID, "level_cap",
                     10, 1, 100);
-
-    /**
-     * 每级的横扫额外伤害倍率
-     * <p>默认 0.1，允许范围 0.0 ~ 5.0。</p>
-     */
-    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL =
-            EnchantmentValues.define(VALUE_ID, "damage_per_level",
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "damage_per_level",
                     0.1D, 0.0D, 5.0D);
-
-
-    /**
-     * AOE 作用半径（格）。
-     * <p>v2.3：抽为常量，供伤害判定与视觉特效共用，避免两处各自写死导致以后改动漏改一处
-     * （视觉与判定不一致会让玩家误判走位）。</p>
-     */
-
-    /**
-     * 正在结算 AOE 时置位（v2.4）。
-     * <p>AOE 循环里的 {@code target.hurt} 会同步触发新的 LivingDamageEvent 并回到本附魔，
-     * 置位期间直接放行，保证一次冲刺斩只放一圈。只在服务端线程读写，用 ThreadLocal 是为了不和别的线程互相干扰。</p>
-     */
     private static final ThreadLocal<Boolean> IN_SWEEP = ThreadLocal.withInitial(() -> Boolean.FALSE);
-
-    public EnchantmentStampSweep() {
-        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
-    }
-
-    /**
-     * 攻击时触发：冲刺状态下对周围敌人造成范围伤害并旋转视角
-     */
-    @Override
     protected void onDamageAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
-        // v2.4：AOE 自己打出的伤害会再次进入这里，正在结算 AOE 时直接放行（详见类注释）
-        if (IN_SWEEP.get()) {
-            return;
-        }
-
-        LivingEntity attacker = ctx.getHolder();
-        LivingEntity directTarget = ctx.getVictim();
-
-        if (directTarget == null) {
-            return;
-        }
-
-        // 必须在冲刺状态
-        if (!attacker.isSprinting()) {
-            return;
-        }
-
-        // v2.4：武器不带击退附魔时，原版低蓄力命中不会打断疾跑，疾跑中连点每下都放一圈 AOE，要求满蓄力
-        if (!isFullyCharged(attacker)) {
-            return;
-        }
-
-        // 手动应用等级限制
-        int effectiveLevel = level;
-        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
-
-        // 如果是玩家，执行旋转动画
-        if (attacker instanceof ServerPlayer) {
-            performSpinAnimation((ServerPlayer) attacker);
-        }
-
-        // v2.3 视觉：绕自身扫过一圈的银白刀光 + 扬尘环（纯服务端广播，不影响任何机制）
-        // 半径与下方 AOE 判定共用 SWEEP_RADIUS，保证「扫到哪里就打到哪里」
-        if (attacker.level() instanceof ServerLevel serverLevel) {
-            CarianStyleCombatArtEffects.spinSlash(
-                    serverLevel,
-                    attacker.getX(), attacker.getY(), attacker.getZ(),
-                    attacker.getYRot(), (float) SWEEP_RADIUS.get()
-            );
-        }
-
-        // 计算额外伤害：原始伤害 × 10% × 等级
-        float baseDamage = ctx.getDamage();
-        float bonusDamage = baseDamage * effectiveLevel * (float) DAMAGE_PER_LEVEL.get();
-
-        // 直接目标：增加额外伤害
-        ctx.addDamage(bonusDamage);
-
-        // 获取周围3格内的所有生物（排除自己、直接目标、队友）
-        List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
-                LivingEntity.class,
-                attacker,
-                SWEEP_RADIUS.get(),
-                entity -> {
-                    // 排除自己
-                    if (entity.equals(attacker)) {
-                        return false;
-                    }
-                    // 排除直接目标（已通过ctx增伤）
-                    if (entity.equals(directTarget)) {
-                        return false;
-                    }
-                    // 排除队友
-                    if (entity.isAlliedTo(attacker)) {
-                        return false;
-                    }
-                    return true;
-                }
-        );
-
-        // 对周围其他敌人造成伤害
-        // v2.2：命中数量硬上限，防止密集怪物场景下无上限 hurt 触发事件链风暴
-        int hitCount = 0;
-        IN_SWEEP.set(Boolean.TRUE);
-        try {
-            for (LivingEntity target : nearbyEntities) {
-                if (hitCount >= MAX_TARGETS.getInt()) {
-                    break;
-                }
-                DamageSource damageSource = attacker.damageSources().mobAttack(attacker);
-                target.hurt(damageSource, baseDamage + bonusDamage);
-                hitCount++;
-            }
-        } finally {
-            IN_SWEEP.set(Boolean.FALSE);
-        }
     }
-
-    /**
-     * 执行旋转动画：玩家快速转一圈（360度）
-     *
-     * @param player 服务端玩家
-     */
-    private void performSpinAnimation(@NotNull ServerPlayer player) {
-        final double initialX = player.getX();
-        final double initialY = player.getY();
-        final double initialZ = player.getZ();
-        final float initialYaw = player.getYRot();
-        final float initialPitch = player.getXRot();
-
-        // 旋转持续时间：12 tick（0.6秒）
-        final int duration = 12;
-        final float degreePerTick = 360.0f / duration;
-
-        new SynchronizationTask(0, 1) {
-            private int tick = 0;
-
-            @Override
-            public void run() {
-                if (++tick > duration || !player.isAlive()) {
-                    player.connection.teleport(initialX, initialY, initialZ, initialYaw, initialPitch);
-                    this.cancel();
-                    return;
-                }
-
-                float currentYaw = initialYaw + (degreePerTick * tick);
-                while (currentYaw >= 360.0f) currentYaw -= 360.0f;
-                while (currentYaw < 0.0f) currentYaw += 360.0f;
-
-                player.connection.teleport(initialX, initialY, initialZ, currentYaw, initialPitch);
-            }
-        }.start();
-    }
-
-    @Override
     public int getMinCost(int enchantmentLevel) {
-        return (int) ((10 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
+        return 0;
     }
-
-    @Override
     public int getMaxCost(int enchantmentLevel) {
-        return getMinCost(enchantmentLevel) + 50;
+        return 0;
     }
 }
+

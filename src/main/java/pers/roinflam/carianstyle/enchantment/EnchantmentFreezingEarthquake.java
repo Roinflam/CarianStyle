@@ -6,12 +6,10 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -24,10 +22,12 @@ import pers.roinflam.carianstyle.network.AoeEffectPacket;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
-
 import java.util.List;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
+ * PORT-STUB(E3)
+ *
  * 冻结地震附魔
  * <p>
  * 护甲附魔。单次受击达到 25% 最大生命值时，将周围站在地面的敌人击飞并施加冻伤。
@@ -63,178 +63,28 @@ import java.util.List;
  * @author RoinFlam
  * @version 3.0
  */
-@AutoRegisterEnchantment(
-        id = "freezing_earthquake",
-        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.RARE,
-        type = EnchantmentCategory.ARMOR,
-        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}
-)
-@Mod.EventBusSubscriber
+@Deprecated
 public class EnchantmentFreezingEarthquake extends EnchantmentBase {
-
-    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
-    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.freezing_earthquake.desc，
-    //   否则玩家看到的描述会与实际效果不符。
-
-    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "freezing_earthquake";
-
-    /**
-     * AOE 搜索半径上限（格）
-     * <p>默认 10，允许范围 1 ~ 64。</p>
-     */
-    private static final EnchantmentValues.Handle MAX_SEARCH_RADIUS =
-            EnchantmentValues.define(VALUE_ID, "max_search_radius",
+    private static final EnchantmentValues.Handle MAX_SEARCH_RADIUS = EnchantmentValues.define(VALUE_ID, "max_search_radius",
                     10, 1, 64);
-
-    /**
-     * 单次触发最大命中目标数
-     * <p>默认 20，允许范围 1 ~ 200。</p>
-     */
-    private static final EnchantmentValues.Handle MAX_TARGETS =
-            EnchantmentValues.define(VALUE_ID, "max_targets",
+    private static final EnchantmentValues.Handle MAX_TARGETS = EnchantmentValues.define(VALUE_ID, "max_targets",
                     20, 1, 200);
-
-    /**
-     * 触发所需的单次伤害占最大生命的比例
-     * <p>默认 0.25，允许范围 0.0 ~ 1.0。</p>
-     */
-    private static final EnchantmentValues.Handle TRIGGER_HEALTH_RATIO =
-            EnchantmentValues.define(VALUE_ID, "trigger_health_ratio",
+    private static final EnchantmentValues.Handle TRIGGER_HEALTH_RATIO = EnchantmentValues.define(VALUE_ID, "trigger_health_ratio",
                     0.25D, 0.0D, 1.0D);
-
-    /**
-     * 参与计算的等级上限
-     * <p>默认 10，允许范围 1 ~ 100。</p>
-     */
-    private static final EnchantmentValues.Handle LEVEL_CAP =
-            EnchantmentValues.define(VALUE_ID, "level_cap",
+    private static final EnchantmentValues.Handle LEVEL_CAP = EnchantmentValues.define(VALUE_ID, "level_cap",
                     10, 1, 100);
-
-    /**
-     * 基础作用半径（格）
-     * <p>默认 3，允许范围 1 ~ 64。</p>
-     */
-    private static final EnchantmentValues.Handle BASE_RANGE =
-            EnchantmentValues.define(VALUE_ID, "base_range",
+    private static final EnchantmentValues.Handle BASE_RANGE = EnchantmentValues.define(VALUE_ID, "base_range",
                     3, 1, 64);
-
-    /**
-     * 每超过一级增加的作用半径（格）
-     * <p>默认 2，允许范围 0 ~ 16。</p>
-     */
-    private static final EnchantmentValues.Handle RANGE_PER_LEVEL =
-            EnchantmentValues.define(VALUE_ID, "range_per_level",
+    private static final EnchantmentValues.Handle RANGE_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "range_per_level",
                     2, 0, 16);
-
-    /**
-     * 每级冻结效果的持续秒数
-     * <p>默认 5，允许范围 1 ~ 120。</p>
-     */
-    private static final EnchantmentValues.Handle SLOW_SECONDS_PER_LEVEL =
-            EnchantmentValues.define(VALUE_ID, "slow_seconds_per_level",
+    private static final EnchantmentValues.Handle SLOW_SECONDS_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "slow_seconds_per_level",
                     5, 1, 120);
-
-    public EnchantmentFreezingEarthquake() {
-        super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
-                EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
-        });
-    }
-
-    /**
-     * 受击事件监听：单次受击达到 25% 最大生命值时，触发范围击飞 + 冻伤。
-     *
-     * @param evt 生物受到伤害事件
-     */
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
-        if (evt.getEntity().level().isClientSide) {
-            return;
-        }
-
-        if (!(evt.getSource().getEntity() instanceof LivingEntity)) {
-            return;
-        }
-
-        LivingEntity victim = evt.getEntity();
-
-        // 怪物附魔触发开关（受击者视角，重击范围冻结）
-        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
-
-        if (evt.getAmount() < victim.getMaxHealth() * (float) TRIGGER_HEALTH_RATIO.get()) {
-            return;
-        }
-
-        Enchantment freezingEarthquake = EnchantmentRegistry.getEnchantmentByClass(EnchantmentFreezingEarthquake.class);
-        if (freezingEarthquake == null) {
-            return;
-        }
-
-        int totalLevel = 0;
-        for (ItemStack armor : victim.getArmorSlots()) {
-            if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(freezingEarthquake, armor);
-            }
-        }
-
-        totalLevel = applyLevelLimit(freezingEarthquake, totalLevel, LEVEL_CAP.getInt());
-
-        if (totalLevel <= 0) {
-            return;
-        }
-
-        int range = BASE_RANGE.getInt() + (totalLevel - 1) * RANGE_PER_LEVEL.getInt();
-        int searchRadius = Math.min(range, MAX_SEARCH_RADIUS.getInt());
-
-        // 唯一的一发特效广播（早期曾误写成两发，导致冰爆重叠播放，详见类注释）。
-        // 特效半径取实际作用半径 searchRadius，保证「看到多大就打多大」；
-        // 广播范围由 CarianStyleEffects.BROADCAST_RANGE(64 格) 统一决定。
-        // 纯服务端发包，不生成实体、不触发任何事件，不影响下方范围冻结逻辑。
-        if (victim.level() instanceof ServerLevel serverLevel) {
-            CarianStyleEffects.frostQuake(serverLevel, victim, searchRadius);
-        }
-
-        List<LivingEntity> targets = EntityUtil.getNearbyEntities(
-                LivingEntity.class,
-                victim,
-                searchRadius,
-                entity -> entity.onGround() && !entity.equals(victim)
-        );
-
-        final int effectiveLevel = totalLevel;
-
-        int hitCount = 0;
-        for (LivingEntity target : targets) {
-            if (hitCount >= MAX_TARGETS.getInt()) {
-                break;
-            }
-
-            if (target.onGround()) {
-                target.setDeltaMovement(
-                        target.getDeltaMovement().x,
-                        effectiveLevel * 0.35f,
-                        target.getDeltaMovement().z
-                );
-
-                target.addEffect(new MobEffectInstance(
-                        CarianStylePotion.FROSTBITE.get(),
-                        effectiveLevel * SLOW_SECONDS_PER_LEVEL.getInt() * 20,
-                        effectiveLevel - 1
-                ));
-                hitCount++;
-            }
-        }
-    }
-
-    @Override
     public int getMinCost(int enchantmentLevel) {
-        return (int) ((15 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
+        return 0;
     }
-
-    @Override
     public int getMaxCost(int enchantmentLevel) {
-        return getMinCost(enchantmentLevel) + 50;
+        return 0;
     }
 }
+

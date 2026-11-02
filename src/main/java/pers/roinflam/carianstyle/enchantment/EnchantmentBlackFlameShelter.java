@@ -6,14 +6,12 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.event.entity.living.LivingHealEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingHealEvent;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -23,8 +21,11 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
+ * PORT-STUB(E3)
+ *
  * 黑焰庇护附魔
  * <p>v2.1：LivingDamage受击+LivingHeal受治疗入口接入怪物附魔触发开关</p>
  *
@@ -95,156 +96,24 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
  * @author RoinFlam
  * @version 2.2
  */
-@AutoRegisterEnchantment(
-        id = "black_flame_shelter",
-        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.RARE,
-        type = EnchantmentCategory.ARMOR_CHEST,
-        slots = {EquipmentSlot.CHEST},
-        conflictsWith = {
-                EnchantmentShelterOfFire.class,
-                EnchantmentHealingByFire.class
-        }
-)
-@Mod.EventBusSubscriber
+@Deprecated
 public class EnchantmentBlackFlameShelter extends EnchantmentBase {
-
-    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
-    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.black_flame_shelter.desc，
-    //   否则玩家看到的描述会与实际效果不符。
-
-    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "black_flame_shelter";
-
-    /**
-     * 参与计算的等级上限
-     * <p>默认 10，允许范围 1 ~ 100。</p>
-     */
-    private static final EnchantmentValues.Handle LEVEL_CAP =
-            EnchantmentValues.define(VALUE_ID, "level_cap",
+    private static final EnchantmentValues.Handle LEVEL_CAP = EnchantmentValues.define(VALUE_ID, "level_cap",
                     10, 1, 100);
-
-    /**
-     * 每级对物理伤害的减免比例（魔法伤害和无视护甲的伤害不减；键名沿用旧的 melee，改了老配置就对不上）
-     * <p>默认 0.125，允许范围 0.0 ~ 0.5。</p>
-     */
-    private static final EnchantmentValues.Handle MELEE_REDUCTION_PER_LEVEL =
-            EnchantmentValues.define(VALUE_ID, "melee_reduction_per_level",
+    private static final EnchantmentValues.Handle MELEE_REDUCTION_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "melee_reduction_per_level",
                     0.125D, 0.0D, 0.5D);
-
-    /**
-     * 每级的治疗削减比例（代价；键名沿用旧的 projectile，改了老配置就对不上）
-     * <p>默认 0.25，允许范围 0.0 ~ 0.5。</p>
-     */
-    private static final EnchantmentValues.Handle PROJECTILE_REDUCTION_PER_LEVEL =
-            EnchantmentValues.define(VALUE_ID, "projectile_reduction_per_level",
+    private static final EnchantmentValues.Handle PROJECTILE_REDUCTION_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "projectile_reduction_per_level",
                     0.25D, 0.0D, 0.5D);
-
-
-    /**
-     * 参与计算的累加等级硬上限。
-     * <p>
-     * 减伤为每级 12.5%，8 级系数归零、9 级起为负并导致<b>伤害反向变成治疗</b>
-     * （详见类注释）。卡在 {@value} 级 = 减伤 87.5%，是符号翻转前的最后一级。
-     * </p>
-     * <p>
-     * <b>无条件生效</b>，不受 {@code ConfigLoader.levelLimit} 影响——
-     * 这是正确性约束，不是平衡开关。
-     * </p>
-     * <p>
-     * <b>public 的原因：</b>{@code CarianStyleConditionDisplay} 的 HUD 要显示当前减伤百分比，
-     * 必须用与这里完全相同的上限，否则会出现「HUD 显示 125%、实际只有 87.5%」。
-     * 在那边复制一份 {@code 7} 的字面量是不安全的——改了这里而那边没跟上，
-     * HUD 会安静地开始说谎。
-     * </p>
-     */
     public static final int MAX_EFFECTIVE_LEVEL = 7;
-
-    public EnchantmentBlackFlameShelter() {
-        super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
-    }
-
-    private static int getTotalLevel(LivingEntity entity) {
-        Enchantment blackFlameShelter = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBlackFlameShelter.class);
-        if (blackFlameShelter == null) {
-            return 0;
-        }
-
-        int totalLevel = 0;
-        for (ItemStack armor : entity.getArmorSlots()) {
-            if (!armor.isEmpty()) {
-                totalLevel += EnchantmentHelper.getItemEnchantmentLevel(blackFlameShelter, armor);
-            }
-        }
-        totalLevel = applyLevelLimit(blackFlameShelter, totalLevel, LEVEL_CAP.getInt());
-        // v2.2：无条件硬上限，防止减伤系数归零（8级）乃至变负（9级+）。
-        // 与上面的 levelLimit 是两回事：那个是可关闭的平衡开关，这个是正确性约束。
-        // 详见 MAX_EFFECTIVE_LEVEL 与类注释。
-        totalLevel = Math.min(totalLevel, MAX_EFFECTIVE_LEVEL);
-        return totalLevel;
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
-        if (evt.getEntity().level().isClientSide) {
-            return;
-        }
-
-        DamageSource damageSource = evt.getSource();
-
-        if (DamageSourceUtil.isMagicDamage(damageSource) ||
-                damageSource.is(DamageTypeTags.BYPASSES_ARMOR)) {
-            return;
-        }
-
-        LivingEntity holder = evt.getEntity();
-
-        // v2.1：怪物附魔触发开关（受击者视角，物理减伤）
-        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
-
-        int totalLevel = getTotalLevel(holder);
-        if (totalLevel <= 0) {
-            return;
-        }
-
-        evt.setAmount(evt.getAmount() * (1 - totalLevel * (float) MELEE_REDUCTION_PER_LEVEL.get()));
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHeal(@NotNull LivingHealEvent evt) {
-        if (evt.getEntity().level().isClientSide) {
-            return;
-        }
-
-        LivingEntity holder = evt.getEntity();
-
-        // v2.1：怪物附魔触发开关（受治疗者视角，治疗削减）
-        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
-
-        int totalLevel = getTotalLevel(holder);
-        if (totalLevel <= 0) {
-            return;
-        }
-
-        evt.setAmount(evt.getAmount() * (1 - totalLevel * (float) PROJECTILE_REDUCTION_PER_LEVEL.get()));
-    }
-
-    @Override
     protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        if (ench == Enchantments.ALL_DAMAGE_PROTECTION) {
-            return false;
-        }
-        return super.checkCompatibility(ench);
+        return false;
     }
-
-    @Override
     public int getMinCost(int enchantmentLevel) {
-        return (int) ((20 + (enchantmentLevel - 1) * 15) * ConfigLoader.enchantingDifficulty);
+        return 0;
     }
-
-    @Override
     public int getMaxCost(int enchantmentLevel) {
-        return getMinCost(enchantmentLevel) + 50;
+        return 0;
     }
 }
+

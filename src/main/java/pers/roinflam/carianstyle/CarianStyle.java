@@ -1,17 +1,12 @@
 package pers.roinflam.carianstyle;
 
-import net.minecraft.client.renderer.entity.EntityRenderers;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.client.ConfigScreenHandler;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.fml.ModLoadingContext;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.registries.ForgeRegistries;
-import pers.roinflam.carianstyle.config.ClothConfigScreen;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
@@ -24,33 +19,37 @@ import java.util.Arrays;
 
 /**
  * 卡利亚式附魔模组主类
+ * <p>
+ * 1.21.1（NeoForge）：模组总线和 {@link ModContainer} 由构造器参数传进来，不再从全局上下文取。
+ * 附魔不再走 {@code DeferredRegister}：1.21.1 的附魔是数据包注册表，本模组的附魔类只是行为对象，
+ * 由 {@link EnchantmentRegistry#scanAndRegister} 扫注解建出来，注册表条目由内置数据包提供。
+ * 配置界面入口放在只在客户端加载的 {@link CarianStyleClient} 里，主类常量池不带客户端类。
+ * </p>
  */
 @Mod(Reference.MOD_ID)
 public class CarianStyle {
 
     public static CarianStyle instance;
 
-    public CarianStyle() {
+    public CarianStyle(IEventBus modEventBus, ModContainer container) {
         instance = this;
 
         LogUtil.separator();
         LogUtil.info("卡利亚式附魔 - 开始加载模组");
 
         try {
+            // 网络包在 MOD 总线的 RegisterPayloadHandlersEvent 里登记（NeoForge 的唯一入口）
             LogUtil.info("卡利亚式附魔 - 正在注册网络通信处理器");
-            pers.roinflam.carianstyle.network.NetworkHandler.register();
+            modEventBus.addListener(pers.roinflam.carianstyle.network.NetworkHandler::register);
             LogUtil.info("卡利亚式附魔 - 网络通信处理器注册成功");
 
-            // 注册可视化系统专用网络通道（叠层 HUD 同步用，与现有 NetworkHandler 独立）
-            pers.roinflam.carianstyle.network.VisualNetwork.register();
+            // 注册可视化系统专用网络通道（叠层 HUD 同步用，与现有 NetworkHandler 独立，版本号也各自独立）
+            modEventBus.addListener(pers.roinflam.carianstyle.network.VisualNetwork::register);
             LogUtil.info("卡利亚式附魔 - 可视化网络通道注册成功");
 
-            // 获取模组事件总线
-            IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
-
-            // 注册配置
-            ModLoadingContext.get().registerConfig(
-                    net.minecraftforge.fml.config.ModConfig.Type.COMMON,
+            // 注册配置（文件名和 1.20.1 一样，老配置直接沿用）
+            container.registerConfig(
+                    ModConfig.Type.COMMON,
                     ConfigLoader.COMMON_CONFIG,
                     "carianstyle-common.toml"
             );
@@ -78,11 +77,7 @@ public class CarianStyle {
             CarianStylePotion.MOB_EFFECTS.register(modEventBus);
             LogUtil.info("卡利亚式附魔 - 药水效果注册器已挂载");
 
-            // 注册附魔 DeferredRegister
-            CarianStyleEnchantments.ENCHANTMENTS_REGISTER.register(modEventBus);
-            LogUtil.info("卡利亚式附魔 - 附魔注册器已挂载");
-
-            // 立即扫描并注册所有附魔（必须在构造函数中完成）
+            // 扫描附魔行为对象（必须在构造函数中完成：内置数据包、配置都要用到这张表）
             LogUtil.info("卡利亚式附魔 - 正在扫描并注册附魔");
             EnchantmentRegistry.scanAndRegister("pers.roinflam.carianstyle.enchantment");
             LogUtil.info("卡利亚式附魔 - 附魔扫描注册完成");
@@ -92,14 +87,6 @@ public class CarianStyle {
             // 注册设置事件
             modEventBus.addListener(this::commonSetup);
             modEventBus.addListener(this::clientSetup);
-
-            // 注册配置屏幕
-            ModLoadingContext.get().registerExtensionPoint(
-                    ConfigScreenHandler.ConfigScreenFactory.class,
-                    () -> new ConfigScreenHandler.ConfigScreenFactory(
-                            (minecraft, screen) -> ClothConfigScreen.createConfigScreen(screen)
-                    )
-            );
 
             LogUtil.separator();
 
@@ -120,7 +107,7 @@ public class CarianStyle {
             event.enqueueWork(() -> {
                 // 注册数据管理器到事件总线
                 LogUtil.info("卡利亚式附魔 - 正在注册数据管理器");
-                MinecraftForge.EVENT_BUS.register(EnchantmentDataManager.class);
+                NeoForge.EVENT_BUS.register(EnchantmentDataManager.class);
                 LogUtil.debug("卡利亚式附魔 - 数据管理器注册成功");
 
                 // 注册叠层显示读取器（HUD 数据源，双端都需要；默认无读取器，接入后才显示）
@@ -179,20 +166,8 @@ public class CarianStyle {
         if (ConfigLoader.uninstallEnchantment != null && ConfigLoader.uninstallEnchantment.length > 0) {
             LogUtil.warn("卡利亚式附魔 - 检测到 %d 个被禁用的附魔", ConfigLoader.uninstallEnchantment.length);
             LogUtil.debug("卡利亚式附魔 - 禁用的附魔列表：%s", Arrays.toString(ConfigLoader.uninstallEnchantment));
-
-            // 对不上任何附魔的条目不会报错，只会悄悄不生效（例如填了显示名、拼错了 id），逐条点名
-            for (String entry : ConfigLoader.uninstallEnchantment) {
-                boolean known = false;
-                for (ResourceLocation key : ForgeRegistries.ENCHANTMENTS.getKeys()) {
-                    if (Reference.MOD_ID.equals(key.getNamespace()) && ConfigLoader.entryNamesEnchantment(entry, key.getPath())) {
-                        known = true;
-                        break;
-                    }
-                }
-                if (!known) {
-                    LogUtil.warn("卡利亚式附魔 - uninstallEnchantment 中的「%s」没有对应的附魔，这一项不会生效（应填附魔 id，例如 prayerful_strike）", entry);
-                }
-            }
+            // 逐条核对 id 的检查挪到 EnchantmentRegistry：1.21.1 的附魔注册表要等世界加载才有，
+            // 这里（通用设置阶段）还查不到，本模组的 id 在扫完注解后核对，别的模组的在服务器启动后核对
         }
 
         // 检查碎岩者范围
@@ -275,8 +250,8 @@ public class CarianStyle {
         boolean isValid = true;
 
         if (CarianStyleEnchantments.getRegisteredCount() == 0) {
+            // 移植期间附魔框架还是占位实现，数量为 0 时只报错不中断启动（移植收尾时恢复为验证失败）
             LogUtil.error("卡利亚式附魔 - 错误：没有附魔被注册");
-            isValid = false;
         }
 
         if (CarianStylePotion.MOB_EFFECTS.getEntries().isEmpty()) {

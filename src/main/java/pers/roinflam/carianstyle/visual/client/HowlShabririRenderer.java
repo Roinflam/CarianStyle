@@ -5,11 +5,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
 import pers.roinflam.carianstyle.network.HowlShabririSyncHelper;
@@ -18,6 +17,7 @@ import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
 import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 
 import java.util.List;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 夏玻利利的嘶吼「发狂层数」客户端渲染器（纯客户端自绘）。
@@ -103,7 +103,7 @@ import java.util.List;
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
 public final class HowlShabririRenderer {
 
     /** 距离裁剪（格）。必须 ≤ {@link SharedEntityQuery#QUERY_RANGE}，否则会漏掉实体。 */
@@ -585,13 +585,13 @@ public final class HowlShabririRenderer {
         float x3 = cx + rgX * u3 + upX * v3, y3 = cy + rgY * u3 + upY * v3, z3 = cz + rgZ * u3 + upZ * v3;
         float x4 = cx + rgX * u4 + upX * v4, y4 = cy + rgY * u4 + upY * v4, z4 = cz + rgZ * u4 + upZ * v4;
 
-        b.vertex(m, x1, y1, z1).color(r, g, bl, alpha).endVertex();
-        b.vertex(m, x2, y2, z2).color(r, g, bl, alpha).endVertex();
-        b.vertex(m, x3, y3, z3).color(r, g, bl, alpha).endVertex();
+        b.addVertex(m, x1, y1, z1).setColor(r, g, bl, alpha);
+        b.addVertex(m, x2, y2, z2).setColor(r, g, bl, alpha);
+        b.addVertex(m, x3, y3, z3).setColor(r, g, bl, alpha);
 
-        b.vertex(m, x1, y1, z1).color(r, g, bl, alpha).endVertex();
-        b.vertex(m, x3, y3, z3).color(r, g, bl, alpha).endVertex();
-        b.vertex(m, x4, y4, z4).color(r, g, bl, alpha).endVertex();
+        b.addVertex(m, x1, y1, z1).setColor(r, g, bl, alpha);
+        b.addVertex(m, x3, y3, z3).setColor(r, g, bl, alpha);
+        b.addVertex(m, x4, y4, z4).setColor(r, g, bl, alpha);
     }
 
     /**
@@ -629,13 +629,13 @@ public final class HowlShabririRenderer {
         float bx1 = cx + rgX * bu1 + upX * bv1, by1 = cy + rgY * bu1 + upY * bv1, bz1 = cz + rgZ * bu1 + upZ * bv1;
         float bx2 = cx + rgX * bu2 + upX * bv2, by2 = cy + rgY * bu2 + upY * bv2, bz2 = cz + rgZ * bu2 + upZ * bv2;
 
-        b.vertex(m, ax1, ay1, az1).color(r, g, bl, a1).endVertex();
-        b.vertex(m, bx1, by1, bz1).color(r, g, bl, a2).endVertex();
-        b.vertex(m, bx2, by2, bz2).color(r, g, bl, a2).endVertex();
+        b.addVertex(m, ax1, ay1, az1).setColor(r, g, bl, a1);
+        b.addVertex(m, bx1, by1, bz1).setColor(r, g, bl, a2);
+        b.addVertex(m, bx2, by2, bz2).setColor(r, g, bl, a2);
 
-        b.vertex(m, ax1, ay1, az1).color(r, g, bl, a1).endVertex();
-        b.vertex(m, bx2, by2, bz2).color(r, g, bl, a2).endVertex();
-        b.vertex(m, ax2, ay2, az2).color(r, g, bl, a1).endVertex();
+        b.addVertex(m, ax1, ay1, az1).setColor(r, g, bl, a1);
+        b.addVertex(m, bx2, by2, bz2).setColor(r, g, bl, a2);
+        b.addVertex(m, ax2, ay2, az2).setColor(r, g, bl, a1);
     }
 
     /**
@@ -669,9 +669,9 @@ public final class HowlShabririRenderer {
             float ey = oy + rgY * eu + upY * ev;
             float ez = oz + rgZ * eu + upZ * ev;
             if (i > 0) {
-                b.vertex(m, ox, oy, oz).color(r, g, bl, centerAlpha).endVertex();
-                b.vertex(m, pex, pey, pez).color(r, g, bl, edgeAlpha).endVertex();
-                b.vertex(m, ex, ey, ez).color(r, g, bl, edgeAlpha).endVertex();
+                b.addVertex(m, ox, oy, oz).setColor(r, g, bl, centerAlpha);
+                b.addVertex(m, pex, pey, pez).setColor(r, g, bl, edgeAlpha);
+                b.addVertex(m, ex, ey, ez).setColor(r, g, bl, edgeAlpha);
             }
             pex = ex;
             pey = ey;
@@ -719,13 +719,13 @@ public final class HowlShabririRenderer {
             float iy1 = cy + (rgY * ca + upY * sa) * rInner;
             float iz1 = cz + (rgZ * ca + upZ * sa) * rInner;
 
-            b.vertex(m, ox0, oy0, oz0).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ox1, oy1, oz1).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ix1, iy1, iz1).color(r, g, bl, alphaInner).endVertex();
+            b.addVertex(m, ox0, oy0, oz0).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ox1, oy1, oz1).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ix1, iy1, iz1).setColor(r, g, bl, alphaInner);
 
-            b.vertex(m, ox0, oy0, oz0).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ix1, iy1, iz1).color(r, g, bl, alphaInner).endVertex();
-            b.vertex(m, ix0, iy0, iz0).color(r, g, bl, alphaInner).endVertex();
+            b.addVertex(m, ox0, oy0, oz0).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ix1, iy1, iz1).setColor(r, g, bl, alphaInner);
+            b.addVertex(m, ix0, iy0, iz0).setColor(r, g, bl, alphaInner);
 
             // 推进到下一段：本段末端即下一段起点（漏掉这两行会让整环塌成一个扇形）
             prevCos = ca;
@@ -762,13 +762,13 @@ public final class HowlShabririRenderer {
                                   float ax, float ay, float az, float bx, float by, float bz,
                                   float cx, float cy, float cz, float dx, float dy, float dz,
                                   float r, float g, float bl, float aAB, float aCD) {
-        b.vertex(m, ax, ay, az).color(r, g, bl, aAB).endVertex();
-        b.vertex(m, bx, by, bz).color(r, g, bl, aAB).endVertex();
-        b.vertex(m, cx, cy, cz).color(r, g, bl, aCD).endVertex();
+        b.addVertex(m, ax, ay, az).setColor(r, g, bl, aAB);
+        b.addVertex(m, bx, by, bz).setColor(r, g, bl, aAB);
+        b.addVertex(m, cx, cy, cz).setColor(r, g, bl, aCD);
 
-        b.vertex(m, ax, ay, az).color(r, g, bl, aAB).endVertex();
-        b.vertex(m, cx, cy, cz).color(r, g, bl, aCD).endVertex();
-        b.vertex(m, dx, dy, dz).color(r, g, bl, aCD).endVertex();
+        b.addVertex(m, ax, ay, az).setColor(r, g, bl, aAB);
+        b.addVertex(m, cx, cy, cz).setColor(r, g, bl, aCD);
+        b.addVertex(m, dx, dy, dz).setColor(r, g, bl, aCD);
     }
 
     // ==================== 无分配伪随机（xorshift64） ====================

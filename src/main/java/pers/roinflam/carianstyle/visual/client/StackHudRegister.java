@@ -1,31 +1,22 @@
 package pers.roinflam.carianstyle.visual.client;
 
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RegisterGuiOverlaysEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.bus.api.SubscribeEvent;
 import pers.roinflam.carianstyle.utils.Reference;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
+ * PORT-STUB(B2b)
+ *
  * 叠层 HUD 覆盖层注册（客户端，MOD 总线）。
  *
  * @author RoinFlam
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+@Deprecated
 public final class StackHudRegister {
-
     private StackHudRegister() {
     }
-
-    /**
-     * 注册覆盖层。
-     *
-     * @param event 注册事件
-     */
-    @SubscribeEvent
-    public static void onRegisterOverlays(RegisterGuiOverlaysEvent event) {
-        event.registerAboveAll("carianstyle_stack_hud", StackHudOverlay.INSTANCE);
-    }
 }
+

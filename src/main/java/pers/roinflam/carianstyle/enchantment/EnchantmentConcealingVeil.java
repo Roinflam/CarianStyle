@@ -2,7 +2,6 @@ package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.Enchantments;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
@@ -16,6 +15,8 @@ import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
+ * PORT-STUB(E3)
+ *
  * 隐匿面纱附魔
  * <p>
  * 护甲附魔，潜行时获得隐身效果
@@ -42,122 +43,26 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * @author RoinFlam
  * @version 2.1
  */
-@AutoRegisterEnchantment(
-        id = "concealing_veil",
-        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
-        rarity = EnchantmentRarity.VERY_RARE,
-        type = EnchantmentCategory.ARMOR,
-        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}
-)
+@Deprecated
 public class EnchantmentConcealingVeil extends EnchantmentBase {
-
-    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
-    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.concealing_veil.desc。
-
-    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "concealing_veil";
-
-
-    /**
-     * 战斗冷却在 {@link EnchantmentDataManager} 中的键。
-     * <p><b>v2.1 由 private 改为 public</b>：HUD 需要用同一个键读取剩余时间，
-     * 公开出去比在两处各写一遍字面量安全（详见类注释）。</p>
-     */
     public static final String BATTLE_COOLDOWN_KEY = "concealing_veil_battle";
-
-    /**
-     * 战斗冷却时长（tick）：3 秒。
-     * <p><b>v2.1 由 private 改为 public</b>：HUD 用它作为充能进度条的总长度。</p>
-     */
-    /**
-     * 进入战斗状态后的计时时长（tick，默认 60 = 3 秒）。
-     * <p>
-     * 用 {@link EnchantmentValues#defineShared} 而非 {@code define}：本值同时被客户端的
-     * {@code CarianStyleConditionDisplay} 用来画倒计时进度条。配置文件是各端各一份的，
-     * 若不下发，服主改了时长之后玩家看到的进度条会与实际状态对不上——
-     * 条走完了人还在战斗中，或者反过来。详见 {@link EnchantmentValues} 类注释。
-     * </p>
-     */
-    public static final EnchantmentValues.Handle BATTLE_DURATION =
-            EnchantmentValues.defineShared(VALUE_ID, "battle_duration", 60, 1, 12000);
-
-    /**
-     * 潜行状态每次续期的时长（tick）。
-     * <p>这是个实现细节：每 tick 续 2 tick，靠不断续期维持状态。
-     * 不建议改，调大只会让脱离战斗后的潜行多拖几 tick。</p>
-     */
-    private static final EnchantmentValues.Handle STEALTH_REFRESH_TICKS =
-            EnchantmentValues.define(VALUE_ID, "stealth_refresh_ticks", 2, 1, 100);
-
-    public EnchantmentConcealingVeil() {
-        super(EnchantmentCategory.ARMOR, new EquipmentSlot[]{
-                EquipmentSlot.HEAD,
-                EquipmentSlot.CHEST,
-                EquipmentSlot.LEGS,
-                EquipmentSlot.FEET
-        });
-    }
-
-    /**
-     * 攻击时标记战斗状态
-     */
-    @Override
+    public static final EnchantmentValues.Handle BATTLE_DURATION = EnchantmentValues.defineShared(VALUE_ID, "battle_duration", 60, 1, 12000);
+    private static final EnchantmentValues.Handle STEALTH_REFRESH_TICKS = EnchantmentValues.define(VALUE_ID, "stealth_refresh_ticks", 2, 1, 100);
     protected void onAttackLowest(@NotNull EnchantmentContext ctx, int level) {
-        if (ctx.isHolderPlayer()) {
-            EnchantmentDataManager.setCooldown(
-                    BATTLE_COOLDOWN_KEY,
-                    ctx.getHolder().getUUID(),
-                    BATTLE_DURATION.getInt()
-            );
-        }
     }
-
-    /**
-     * 受到攻击时也标记战斗状态（修复受击后立刻隐身的bug）
-     */
-    @Override
     protected void onHurtAsVictimLowest(@NotNull EnchantmentContext ctx, int level) {
-        if (ctx.isHolderPlayer()) {
-            EnchantmentDataManager.setCooldown(
-                    BATTLE_COOLDOWN_KEY,
-                    ctx.getHolder().getUUID(),
-                    BATTLE_DURATION.getInt()
-            );
-        }
     }
-
-    /**
-     * 每tick检查潜行状态
-     */
-    @Override
     protected void onPlayerTick(@NotNull EnchantmentContext ctx, int level) {
-        // 检查是否在潜行
-        if (!ctx.getHolderAsPlayer().isShiftKeyDown()) {
-            return;
-        }
-
-        // 检查是否在战斗冷却中
-        if (EnchantmentDataManager.isOnCooldown(BATTLE_COOLDOWN_KEY, ctx.getHolder().getUUID())) {
-            return;
-        }
-
-        // 应用隐身效果（持续2 tick）
-        DynamicAttributeManager.apply(ctx.getHolder(),
-                DynamicAttributes.STEALTH.createInstance(STEALTH_REFRESH_TICKS.getInt(), 0));
     }
-
-    @Override
     public int getMinCost(int enchantmentLevel) {
-        return (int) (30 * ConfigLoader.enchantingDifficulty);
+        return 0;
     }
-
-    @Override
     public int getMaxCost(int enchantmentLevel) {
-        return getMinCost(enchantmentLevel) + 50;
+        return 0;
     }
-
-    @Override
     protected boolean checkCompatibility(@NotNull Enchantment ench) {
-        return super.checkCompatibility(ench) && !ench.equals(Enchantments.ALL_DAMAGE_PROTECTION);
+        return false;
     }
 }
+

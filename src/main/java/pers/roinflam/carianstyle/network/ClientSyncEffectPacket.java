@@ -1,11 +1,14 @@
 package pers.roinflam.carianstyle.network;
 
-import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.network.NetworkEvent;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
+import pers.roinflam.carianstyle.utils.Reference;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Supplier;
 
 /**
  * 客户端同步效果数据包
@@ -52,7 +55,16 @@ import java.util.function.Supplier;
  *
  * @version 2.2
  */
-public class ClientSyncEffectPacket {
+public class ClientSyncEffectPacket implements CustomPacketPayload {
+
+    /** 包 id（1.21.1 每种包一个 id，不再按注册顺序编号） */
+    public static final CustomPacketPayload.Type<ClientSyncEffectPacket> TYPE =
+            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(Reference.MOD_ID, "client_sync_effect"));
+
+    /** 编解码沿用下面的 {@link #encode} / {@link #decode}，字段和顺序与 1.20.1 一致 */
+    public static final StreamCodec<RegistryFriendlyByteBuf, ClientSyncEffectPacket> STREAM_CODEC =
+            StreamCodec.of((buf, packet) -> encode(packet, buf), ClientSyncEffectPacket::decode);
+
 
     /**
      * 全量同步允许携带的最大实体数。
@@ -106,7 +118,7 @@ public class ClientSyncEffectPacket {
     }
 
     /** 编码数据包 */
-    public static void encode(ClientSyncEffectPacket packet, FriendlyByteBuf buf) {
+    public static void encode(ClientSyncEffectPacket packet, RegistryFriendlyByteBuf buf) {
         buf.writeInt(packet.serialNumber);
         buf.writeByte(packet.action.id);
         buf.writeInt(packet.entityIds.size());
@@ -125,7 +137,7 @@ public class ClientSyncEffectPacket {
      * @param buf 源缓冲
      * @return 解码出的包
      */
-    public static ClientSyncEffectPacket decode(FriendlyByteBuf buf) {
+    public static ClientSyncEffectPacket decode(RegistryFriendlyByteBuf buf) {
         int serialNumber = buf.readInt();
         Action action = Action.fromId(buf.readByte());
         int size = PacketGuard.readBoundedSize(buf, MAX_ENTITY_IDS, BYTES_PER_ID,
@@ -148,10 +160,12 @@ public class ClientSyncEffectPacket {
      * @param packet 收到的包
      * @param ctx    网络上下文
      */
-    public static void handle(ClientSyncEffectPacket packet, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            ClientSyncEffectManager.handlePacket(packet.serialNumber, packet.action, packet.entityIds);
-        });
-        ctx.get().setPacketHandled(true);
+    public static void handle(ClientSyncEffectPacket packet, IPayloadContext ctx) {
+        ClientSyncEffectManager.handlePacket(packet.serialNumber, packet.action, packet.entityIds);
+    }
+
+    @Override
+    public CustomPacketPayload.Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 }

@@ -1,9 +1,8 @@
 package pers.roinflam.carianstyle.config;
 
-import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.config.ModConfigEvent;
+import net.neoforged.neoforge.common.ModConfigSpec;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.event.config.ModConfigEvent;
 import org.apache.commons.lang3.tuple.Pair;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.LevelDecay;
@@ -14,6 +13,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 卡利亚风格模组配置类
@@ -58,18 +58,32 @@ import java.util.concurrent.atomic.AtomicInteger;
  * </ul>
  * </p>
  *
+ * <p>
+ * 1.21.1（NeoForge）：附魔改成了数据包注册表，本模组的附魔条目和获取途径标签由内置数据包
+ * {@code carianstyle:generated} 按这里的配置现场生成。所以配置项的生效时机分三种：
+ * <ul>
+ *   <li>花费、权重、铁砧花费（{@code enchantingDifficulty}、{@code useVanillaRarityWeight}）：
+ *       写在附魔条目里，注册表只在加载世界时读一次，要<b>重进世界 / 重启服务器</b>；</li>
+ *   <li>获取途径（{@code isTreasure*Enchantment}、{@code allowVillagerBookTrade}、{@code uninstallEnchantment}）：
+ *       写在附魔标签里，<b>{@code /reload}</b> 或重进世界生效；</li>
+ *   <li>其余（禁用后附魔不再起作用、高等级衰减、等级上限、怪物触发开关等）：立即生效。</li>
+ * </ul>
+ * 内置数据包是必选包，{@code /datapack disable} 会提示成功但关不掉；要改某个附魔请改这里的配置，
+ * 或在世界数据包里放同名 JSON 覆盖。
+ * </p>
+ *
  * @author RoinFlam
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
 public final class ConfigLoader {
 
     // ==================== 配置规范 ====================
 
-    public static final ForgeConfigSpec COMMON_CONFIG;
+    public static final ModConfigSpec COMMON_CONFIG;
     public static final Common COMMON;
 
     static {
-        ForgeConfigSpec.Builder COMMON_BUILDER = new ForgeConfigSpec.Builder();
+        ModConfigSpec.Builder COMMON_BUILDER = new ModConfigSpec.Builder();
 
         COMMON = new Common(COMMON_BUILDER);
 
@@ -83,59 +97,59 @@ public final class ConfigLoader {
 
         // ==================== 日志系统配置 ====================
 
-        public final ForgeConfigSpec.BooleanValue enableDetailedLogging;
+        public final ModConfigSpec.BooleanValue enableDetailedLogging;
 
         // ==================== 附魔系统配置 ====================
 
-        public final ForgeConfigSpec.ConfigValue<List<? extends String>> uninstallEnchantment;
-        public final ForgeConfigSpec.IntValue rockBlasterMaxRange;
-        public final ForgeConfigSpec.BooleanValue rockBlasterSuppressCommonDrops;
-        public final ForgeConfigSpec.IntValue prayerfulStrikeMaxHealth;
+        public final ModConfigSpec.ConfigValue<List<? extends String>> uninstallEnchantment;
+        public final ModConfigSpec.IntValue rockBlasterMaxRange;
+        public final ModConfigSpec.BooleanValue rockBlasterSuppressCommonDrops;
+        public final ModConfigSpec.IntValue prayerfulStrikeMaxHealth;
 
         // ==================== 真伤系统配置 ====================
 
-        public final ForgeConfigSpec.BooleanValue enableTrueDamage;
+        public final ModConfigSpec.BooleanValue enableTrueDamage;
 
         // ==================== 宝藏附魔配置 ====================
 
-        public final ForgeConfigSpec.BooleanValue isTreasureVeryRareEnchantment;
-        public final ForgeConfigSpec.BooleanValue isTreasureRareEnchantment;
-        public final ForgeConfigSpec.BooleanValue isTreasureUncommonEnchantment;
+        public final ModConfigSpec.BooleanValue isTreasureVeryRareEnchantment;
+        public final ModConfigSpec.BooleanValue isTreasureRareEnchantment;
+        public final ModConfigSpec.BooleanValue isTreasureUncommonEnchantment;
 
         // ==================== 游戏平衡配置 ====================
 
-        public final ForgeConfigSpec.BooleanValue levelLimit;
-        public final ForgeConfigSpec.DoubleValue enchantingDifficulty;
+        public final ModConfigSpec.BooleanValue levelLimit;
+        public final ModConfigSpec.DoubleValue enchantingDifficulty;
 
         // ==================== 附魔获取途径平衡配置（v2.4新增） ====================
 
-        public final ForgeConfigSpec.BooleanValue useVanillaRarityWeight;
-        public final ForgeConfigSpec.BooleanValue allowVillagerBookTrade;
+        public final ModConfigSpec.BooleanValue useVanillaRarityWeight;
+        public final ModConfigSpec.BooleanValue allowVillagerBookTrade;
 
         // ==================== 高等级衰减 ====================
 
-        public final ForgeConfigSpec.BooleanValue levelDecayEnabled;
-        public final ForgeConfigSpec.IntValue levelDecayThreshold;
-        public final ForgeConfigSpec.ConfigValue<List<? extends String>> levelDecayCurve;
-        public final ForgeConfigSpec.IntValue levelDecayMaxLevel;
-        public final ForgeConfigSpec.BooleanValue levelDecayByMultiple;
-        public final ForgeConfigSpec.BooleanValue levelDecayShowInName;
+        public final ModConfigSpec.BooleanValue levelDecayEnabled;
+        public final ModConfigSpec.IntValue levelDecayThreshold;
+        public final ModConfigSpec.ConfigValue<List<? extends String>> levelDecayCurve;
+        public final ModConfigSpec.IntValue levelDecayMaxLevel;
+        public final ModConfigSpec.BooleanValue levelDecayByMultiple;
+        public final ModConfigSpec.BooleanValue levelDecayShowInName;
 
         // ==================== 怪物附魔触发配置（v2.3新增） ====================
 
-        public final ForgeConfigSpec.BooleanValue allowMobTriggerEnchantments;
-        public final ForgeConfigSpec.BooleanValue allowMobTriggerDeathEnchantments;
+        public final ModConfigSpec.BooleanValue allowMobTriggerEnchantments;
+        public final ModConfigSpec.BooleanValue allowMobTriggerDeathEnchantments;
 
         // ==================== 隐身配置（v2.5新增） ====================
 
-        public final ForgeConfigSpec.BooleanValue hideStealthHitbox;
+        public final ModConfigSpec.BooleanValue hideStealthHitbox;
 
         /**
          * 构造配置
          *
          * @param builder 配置构建器
          */
-        public Common(ForgeConfigSpec.Builder builder) {
+        public Common(ModConfigSpec.Builder builder) {
 
             // ========== 日志系统 ==========
             builder.comment("═══════════════════════════════════════════════════════════════")
@@ -172,7 +186,11 @@ public final class ConfigLoader {
                     .comment("你可以在 en_us.json 文件中找到相关附魔的ID。")
                     .comment("Example: [\"scarlet_rot\", \"doomed_death\"]")
                     .comment("示例: [\"scarlet_rot\", \"doomed_death\"]")
-                    .defineList("uninstallEnchantment", Collections.emptyList(), obj -> obj instanceof String);
+                    .comment("Disabled enchantments stop working at once; enchanting table / loot / trade availability follows after /reload or re-entering the world.")
+                    .comment("禁用后附魔立即不再起作用；附魔台、战利品、交易里不再出现，要 /reload 或重进世界后生效。")
+                    .comment("The generated data pack \"carianstyle:generated\" cannot be disabled; change this config or override with a same-named JSON instead.")
+                    .comment("内置数据包 carianstyle:generated 不能关闭（/datapack disable 无效），要调整请改本配置，或用同名 JSON 覆盖。")
+                    .defineListAllowEmpty("uninstallEnchantment", Collections.emptyList(), () -> "", obj -> obj instanceof String);
 
             rockBlasterMaxRange = builder
                     .comment("The maximum mining radius of the Rock Blaster Enchantment.")
@@ -231,16 +249,22 @@ public final class ConfigLoader {
                     .comment("将所有超稀有(Very Rare)级别的附魔变为宝藏附魔。")
                     .comment("Treasure enchantments cannot be obtained from enchanting tables.")
                     .comment("宝藏附魔无法从附魔台获得，只能从战利品中获取。")
+                    .comment("Takes effect after /reload or re-entering the world.")
+                    .comment("修改后 /reload 或重进世界生效。")
                     .define("isTreasureVeryRareEnchantment", false);
 
             isTreasureRareEnchantment = builder
                     .comment("Convert all Rare enchantments to Treasure enchantments.")
                     .comment("将所有稀有(Rare)级别的附魔变为宝藏附魔。")
+                    .comment("Takes effect after /reload or re-entering the world.")
+                    .comment("修改后 /reload 或重进世界生效。")
                     .define("isTreasureRareEnchantment", false);
 
             isTreasureUncommonEnchantment = builder
                     .comment("Convert all Uncommon enchantments to Treasure enchantments.")
                     .comment("将所有罕见(Uncommon)级别的附魔变为宝藏附魔。")
+                    .comment("Takes effect after /reload or re-entering the world.")
+                    .comment("修改后 /reload 或重进世界生效。")
                     .define("isTreasureUncommonEnchantment", false);
 
             builder.pop();
@@ -263,6 +287,8 @@ public final class ConfigLoader {
                     .comment("设置附魔的难度倍率。")
                     .comment("1.0 is the default difficulty.")
                     .comment("1.0 是默认难度。")
+                    .comment("Takes effect after re-entering the world or restarting the server.")
+                    .comment("修改后要重进世界或重启服务器才生效（附魔花费写在注册表里，只在加载世界时读取）。")
                     .defineInRange("enchantingDifficulty", 1.0, 0.1, 10.0);
 
             // ---------- v2.4新增：附魔台候选权重 ----------
@@ -283,6 +309,8 @@ public final class ConfigLoader {
                     .comment("因此 Rare 与 Very Rare 档的附魔在铁砧上会变贵。")
                     .comment("Set to false to restore the old behaviour (everything weight 10).")
                     .comment("设为 false 可恢复旧行为（全部权重 10）。")
+                    .comment("Takes effect after re-entering the world or restarting the server.")
+                    .comment("修改后要重进世界或重启服务器才生效。")
                     .comment("Default: true")
                     .comment("默认值：true")
                     .define("useVanillaRarityWeight", true);
@@ -299,6 +327,8 @@ public final class ConfigLoader {
                     .comment("「经验修补」的出现概率会掉到原来的四分之一左右。")
                     .comment("This does NOT affect enchanting tables or loot chests.")
                     .comment("此选项不影响附魔台与战利品箱的获取途径。")
+                    .comment("Takes effect after /reload or re-entering the world.")
+                    .comment("修改后 /reload 或重进世界生效。")
                     .comment("Default: false (block)")
                     .comment("默认值：false（拦截）")
                     .define("allowVillagerBookTrade", false);
@@ -327,6 +357,8 @@ public final class ConfigLoader {
                     .comment("超过这个等级才开始衰减。0 = 用每个附魔自己的等级上限（1 / 3 / 5 级）；")
                     .comment("a positive number applies the same threshold to every enchantment.")
                     .comment("填正数则所有附魔统一用这个等级。")
+                    .comment("Note: on 1.21.1 an enchantment level can be at most 255, so a threshold above 255 never triggers.")
+                    .comment("注意：1.21.1 附魔等级最高 255，阈值填 255 以上等于永远不衰减。")
                     .defineInRange("threshold", 0, 0, 10000);
 
             levelDecayByMultiple = builder
@@ -354,11 +386,13 @@ public final class ConfigLoader {
                     .comment("上限 3 级：6 → 5，12 → 9，30 → 15，60 → 20；上限 1 级：2 → 2，10 → 5，100 → 12")
                     .comment("Another option, harsher early and looser late: [\"2:80\", \"5:70\", \"10:60\", \"15:50\", \"20:40\"]")
                     .comment("另一种写法（前段更狠、满级 10 倍以后比默认松）：[\"2:80\", \"5:70\", \"10:60\", \"15:50\", \"20:40\"]（上限 5 级的附魔 10 级 → 8，100 级 → 40）")
-                    .defineList("curve", LevelDecay.DEFAULT_CURVE, obj -> obj instanceof String);
+                    .defineListAllowEmpty("curve", LevelDecay.DEFAULT_CURVE, () -> "", obj -> obj instanceof String);
 
             levelDecayMaxLevel = builder
                     .comment("Hard cap on the effective level after decay. 0 = no cap.")
                     .comment("衰减后实际生效等级的硬上限，0 = 不封顶。指令刷出 32767 级之类时用得上。")
+                    .comment("Note: on 1.21.1 an enchantment level can be at most 255, so a cap above 255 never triggers.")
+                    .comment("注意：1.21.1 附魔等级最高 255，上限填 255 以上等于不封顶。")
                     .defineInRange("maxLevel", 0, 0, 100000);
 
             levelDecayShowInName = builder

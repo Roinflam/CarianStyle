@@ -7,10 +7,8 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.enchantment.EnchantmentCategory;
-import net.minecraftforge.event.entity.EntityJoinLevelEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -23,10 +21,12 @@ import pers.roinflam.carianstyle.utils.helper.AttackCooldownHelper;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
-
 import java.util.UUID;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
+ * PORT-STUB(E1)
+ *
  * 居合附魔
  * <p>
  * 每次攻击有概率触发居合斩（概率 = 1% + 攻击次数 × 0.5%）
@@ -49,158 +49,25 @@ import java.util.UUID;
  * @author RoinFlam
  * @version 2.1
  */
-@AutoRegisterEnchantment(
-        id = "unsheathe",
-        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
-        rarity = EnchantmentRarity.RARE,
-        type = EnchantmentCategory.WEAPON,
-        slots = {EquipmentSlot.MAINHAND}
-)
-@Mod.EventBusSubscriber
+@Deprecated
 public class EnchantmentUnsheathe extends EnchantmentBase {
-
-    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
-    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.unsheathe.desc，
-    //   否则玩家看到的描述会与实际效果不符。
-
-    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "unsheathe";
-
-    /**
-     * 居合基础触发概率（百分比）
-     * <p>默认 1.0，允许范围 0.0 ~ 100.0。</p>
-     */
-    private static final EnchantmentValues.Handle BASE_TRIGGER_CHANCE =
-            EnchantmentValues.define(VALUE_ID, "base_trigger_chance",
+    private static final EnchantmentValues.Handle BASE_TRIGGER_CHANCE = EnchantmentValues.define(VALUE_ID, "base_trigger_chance",
                     1.0D, 0.0D, 100.0D);
-
-    /**
-     * 每累积一次攻击增加的触发概率（百分比）
-     * <p>默认 0.5，允许范围 0.0 ~ 10.0。</p>
-     */
-    private static final EnchantmentValues.Handle CHANCE_PER_ATTACK =
-            EnchantmentValues.define(VALUE_ID, "chance_per_attack",
+    private static final EnchantmentValues.Handle CHANCE_PER_ATTACK = EnchantmentValues.define(VALUE_ID, "chance_per_attack",
                     0.5D, 0.0D, 10.0D);
-
-    /**
-     * 触发时每级的伤害倍率
-     * <p>默认 3.3，允许范围 0.0 ~ 50.0。</p>
-     */
-    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL =
-            EnchantmentValues.define(VALUE_ID, "damage_per_level",
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "damage_per_level",
                     3.3D, 0.0D, 50.0D);
-
-
     private static final UUID ATTACK_SPEED_MODIFIER_ID = UUID.fromString("a9f7b1c6-4c2d-4f0e-9f2c-3a8b3f7d0a5b");
     private static final String ATTACK_SPEED_MODIFIER_NAME = "enchantment.unsheathe";
     private static final String ATTACK_COUNT_KEY = "unsheathe_attack_count";
-
-    public EnchantmentUnsheathe() {
-        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
-    }
-
-    @Override
     protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
-        // 排除水鸟乱舞伤害
-        if (ctx.getDamageSource() != null && "waterfowlDance".equals(ctx.getDamageSource().getMsgId())) {
-            return;
-        }
-
-        // 只有玩家能触发
-        if (!ctx.isHolderPlayer()) {
-            return;
-        }
-
-        Player player = ctx.getHolderAsPlayer();
-
-        // 检查刚挥剑
-        if (!isJustSwung(player)) {
-            return;
-        }
-
-        // 消耗这一下挥击：冷却延后到下一 tick 开头清零（直接清零会让同一下挥击里后面的蓄力判断，如命定之死，全部失效），
-        // 同一 tick 内只结算一次——横扫副目标、范围伤害的其它目标、主副手都带本附魔的重复分发都不再各结算一遍
-        if (!AttackCooldownHelper.spendSwing(player)) {
-            return;
-        }
-
-        // 获取攻击计数
-        int attackCount = EnchantmentDataManager.getCounter(ATTACK_COUNT_KEY, player.getUUID());
-
-        // 触发概率：1% + 攻击次数 × 0.5%
-        double triggerChance = BASE_TRIGGER_CHANCE.get() + attackCount * CHANCE_PER_ATTACK.get();
-
-        if (RandomUtil.percentageChance(triggerChance)) {
-            // 触发居合斩
-            EnchantmentDataManager.resetCounter(ATTACK_COUNT_KEY, player.getUUID());
-            ctx.multiplyDamage(level * (float) DAMAGE_PER_LEVEL.get());
-            // 攻速惩罚和清零一样延后到下一 tick：攻速 -75% 会让蓄力立刻降到原来的 1/4，
-            // 同一下挥击里排在后面的蓄力判断（命定之死、横扫副目标上的附魔）就全部失效了
-            new SynchronizationTask(1) {
-                @Override
-                public void run() {
-                    applyAttackSpeedPenalty(player, level);
-                }
-            }.start();
-
-            // v2.1 视觉：拔刀斩的银白弧形刀光（纯服务端广播，不影响任何机制）
-            if (player.level() instanceof ServerLevel serverLevel) {
-                CarianStyleCombatArtEffects.iaiSlash(serverLevel, player);
-            }
-        } else {
-            // 未触发，累积计数（12000tick过期）
-            EnchantmentDataManager.incrementCounter(ATTACK_COUNT_KEY, player.getUUID(), 12000);
-        }
     }
-
-    /**
-     * 施加攻速惩罚：降低75%，持续等级×66tick
-     */
-    private void applyAttackSpeedPenalty(@NotNull Player player, int level) {
-        AttributeInstance attributeInstance = player.getAttribute(Attributes.ATTACK_SPEED);
-        if (attributeInstance == null || attributeInstance.getModifier(ATTACK_SPEED_MODIFIER_ID) != null) {
-            return;
-        }
-
-        attributeInstance.addPermanentModifier(new AttributeModifier(
-                ATTACK_SPEED_MODIFIER_ID,
-                ATTACK_SPEED_MODIFIER_NAME,
-                -0.75,
-                AttributeModifier.Operation.MULTIPLY_TOTAL
-        ));
-
-        new SynchronizationTask(level * 66) {
-            @Override
-            public void run() {
-                attributeInstance.removeModifier(ATTACK_SPEED_MODIFIER_ID);
-            }
-        }.start();
-    }
-
-    /**
-     * 实体加入世界时清理残留的攻速修正
-     */
-    @SubscribeEvent
-    public static void onEntityJoinLevel(@NotNull EntityJoinLevelEvent evt) {
-        if (evt.getLevel().isClientSide || !(evt.getEntity() instanceof LivingEntity)) {
-            return;
-        }
-
-        LivingEntity entity = (LivingEntity) evt.getEntity();
-        AttributeInstance attributeInstance = entity.getAttribute(Attributes.ATTACK_SPEED);
-        if (attributeInstance != null) {
-            attributeInstance.removeModifier(ATTACK_SPEED_MODIFIER_ID);
-        }
-    }
-
-    @Override
     public int getMinCost(int enchantmentLevel) {
-        return (int) ((28 + (enchantmentLevel - 1) * 8) * ConfigLoader.enchantingDifficulty);
+        return 0;
     }
-
-    @Override
     public int getMaxCost(int enchantmentLevel) {
-        return getMinCost(enchantmentLevel) + 50;
+        return 0;
     }
 }
+

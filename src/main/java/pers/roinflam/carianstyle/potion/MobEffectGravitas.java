@@ -5,19 +5,21 @@ import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraftforge.event.entity.living.LivingEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.event.entity.living.LivingEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
-
 import javax.annotation.Nonnull;
+import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.LivingTickEvent;
 
 /**
+ * PORT-STUB(B2a)
+ *
  * 重力药水效果
  * <p>
  * 效果：
@@ -27,47 +29,13 @@ import javax.annotation.Nonnull;
  * - 无法跳跃
  * </p>
  */
-@Mod.EventBusSubscriber
+@Deprecated
 public class MobEffectGravitas extends IconBase {
-
     public MobEffectGravitas(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
-
-        this.addAttributeModifier(
-                Attributes.ATTACK_SPEED,
-                "64dd94d7-8d83-122b-82be-0c52223463ca",
-                -0.01,
-                AttributeModifier.Operation.MULTIPLY_TOTAL
-        );
-        this.addAttributeModifier(
-                Attributes.MOVEMENT_SPEED,
-                "53878b9c-1134-c379-59c4-391599537f5e",
-                -0.01,
-                AttributeModifier.Operation.MULTIPLY_TOTAL
-        );
-        this.addAttributeModifier(
-                Attributes.FLYING_SPEED,
-                "710bd865-953f-ed1a-facf-eba7de0ce330",
-                -0.01,
-                AttributeModifier.Operation.MULTIPLY_TOTAL
-        );
     }
-
-    /**
-     * 重力状态下无法跳跃
-     */
-    @SubscribeEvent
-    public static void onLivingUpdate(@Nonnull LivingEvent.LivingTickEvent evt) {
-        LivingEntity entityLiving = evt.getEntity();
-        if (entityLiving.hasEffect(CarianStylePotion.GRAVITAS.get())) {
-            EntityLivingUtil.setJumped(entityLiving);
-        }
-    }
-
-    @Nonnull
-    @Override
-    @OnlyIn(Dist.CLIENT)
-    protected ResourceLocation getIconTexture() {
-        return new ResourceLocation(Reference.MOD_ID, "textures/mob_effect/gravitas.png");
+    @Nonnull @OnlyIn(Dist.CLIENT) protected ResourceLocation getIconTexture() {
+        return null;
     }
 }
+

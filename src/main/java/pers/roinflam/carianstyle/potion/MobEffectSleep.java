@@ -8,23 +8,25 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.event.entity.living.LivingAttackEvent;
-import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.event.entity.living.LivingEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
+import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
+import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingEvent;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
-
 import javax.annotation.Nonnull;
+import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.LivingTickEvent;
 
 /**
+ * PORT-STUB(B2a)
+ *
  * 睡眠药水效果
  * <p>
  * 效果：
@@ -139,169 +141,18 @@ import javax.annotation.Nonnull;
  * @author RoinFlam
  * @version 1.2
  */
-@Mod.EventBusSubscriber
+@Deprecated
 public class MobEffectSleep extends IconBase {
-
-    /**
-     * 失明效果的施加时长（tick）。
-     * <p>v1.2：由 21 提高到 {@value}，配合 {@link #BLINDNESS_REFRESH_THRESHOLD} 把刷新周期
-     * 拉长到 20 tick（详见类注释的「v1.2 性能」小节）。取 25 而非更大值，
-     * 是为了把「被打醒后的残留失明」控制在 1.25 秒内、与原先的 1.05 秒足够接近。</p>
-     */
     private static final int BLINDNESS_DURATION = 25;
-
-    /**
-     * 失明刷新阈值（tick）：当前失明剩余时长低于此值时才补一次。
-     * <p>取 5 tick（0.25 秒）留出充裕余量——即便服务器出现轻微卡顿、
-     * 效果 tick 有若干 tick 的延迟，失明也不会出现中断闪烁。</p>
-     */
     private static final int BLINDNESS_REFRESH_THRESHOLD = 5;
-
     public MobEffectSleep(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
-
-        this.addAttributeModifier(
-                Attributes.MOVEMENT_SPEED,
-                "5d59080b-eda9-f5b7-1b3c-51568e5b6682",
-                -1,
-                AttributeModifier.Operation.MULTIPLY_TOTAL
-        );
     }
-
-    /**
-     * 睡眠状态下无法被设为攻击目标
-     */
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingChangeTarget(@Nonnull LivingChangeTargetEvent evt) {
-        if (evt.getEntity().level().isClientSide) {
-            return;
-        }
-
-        if (evt.getNewTarget() == null) {
-            return;
-        }
-
-        if (!(evt.getEntity() instanceof Mob)) {
-            return;
-        }
-
-        Mob entityLiving = (Mob) evt.getEntity();
-        if (entityLiving.hasEffect(CarianStylePotion.SLEEP.get())) {
-            evt.setCanceled(true);
-        }
-    }
-
-    /**
-     * 睡眠状态下无法攻击
-     */
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
-        if (evt.getEntity().level().isClientSide) {
-            return;
-        }
-
-        if (!(evt.getSource().getEntity() instanceof LivingEntity)) {
-            return;
-        }
-
-        LivingEntity attacker = (LivingEntity) evt.getSource().getEntity();
-        if (attacker.hasEffect(CarianStylePotion.SLEEP.get())) {
-            evt.setCanceled(true);
-        }
-    }
-
-    /**
-     * 睡眠状态下受击：伤害加倍并解除睡眠
-     */
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
-        if (evt.getEntity().level().isClientSide) {
-            return;
-        }
-
-        if (!(evt.getSource().getEntity() instanceof LivingEntity)) {
-            return;
-        }
-
-        LivingEntity victim = evt.getEntity();
-        if (victim.hasEffect(CarianStylePotion.SLEEP.get())) {
-            int amplifier = victim.getEffect(CarianStylePotion.SLEEP.get()).getAmplifier();
-            // 伤害 = 原伤害×2 + 原伤害×等级×25%
-            evt.setAmount(evt.getAmount() * 2 + evt.getAmount() * amplifier * 0.25f);
-            victim.removeEffect(CarianStylePotion.SLEEP.get());
-        }
-    }
-
-    /**
-     * 睡眠状态下无法跳跃
-     * <p>
-     * <b>刻意不加客户端守卫：</b>跳跃压制需要在客户端同步生效，
-     * 否则本地预测会让玩家先跳起来、再被服务端拉回，造成抖动。
-     * </p>
-     */
-    @SubscribeEvent
-    public static void onLivingUpdate(@Nonnull LivingEvent.LivingTickEvent evt) {
-        LivingEntity entityLiving = evt.getEntity();
-        if (entityLiving.hasEffect(CarianStylePotion.SLEEP.get())) {
-            EntityLivingUtil.setJumped(entityLiving);
-        }
-    }
-
-    /**
-     * 每 tick 清除攻击目标并按需补充失明效果。
-     * <p>
-     * <b>v1.1：仅在逻辑服务端执行。</b>原版会在双端各调用一次本方法，
-     * 若不加守卫，客户端会自行往本地效果表反复塞失明，与服务端下发的版本打架
-     * （详见类注释的「v1.1 修复」小节）。
-     * </p>
-     * <p>
-     * <b>v1.2 性能：</b>
-     * <ul>
-     *     <li>目标清除加 {@code getTarget() != null} 空判，避免每 tick 空转一次
-     *         全局 {@code LivingChangeTargetEvent} 分发；</li>
-     *     <li>失明改为「剩余不足 {@value #BLINDNESS_REFRESH_THRESHOLD} tick 才补」，
-     *         刷新周期由 1 tick 拉长到 20 tick，效果同步包降为原来的 1/20。</li>
-     * </ul>
-     * 二者均不改变任何可见行为，详见类注释的「v1.2 性能」小节。
-     * </p>
-     *
-     * @param entityLivingBaseIn 受影响的实体
-     * @param amplifier          效果等级
-     */
-    @Override
-    public void applyEffectTick(@Nonnull LivingEntity entityLivingBaseIn, int amplifier) {
-        // v1.1 客户端守卫：目标清除与失明施加只在逻辑服务端执行一次，
-        // 结果由原版效果同步机制下发给客户端，画面表现完全不变。
-        if (entityLivingBaseIn.level().isClientSide) {
-            return;
-        }
-
-        // v1.2：仅在 AI 真的重新锁定了目标时才调用 setTarget。
-        // Forge 会在 setTarget 内无条件触发一次全局 LivingChangeTargetEvent，
-        // 而 target 绝大多数 tick 本就是 null（上一 tick 刚清过），空判可省掉这次空转分发。
-        if (entityLivingBaseIn instanceof Mob mob && mob.getTarget() != null) {
-            mob.setTarget(null);
-        }
-
-        // v1.2：按需补充失明，而非每 tick 覆盖。
-        // 首次施加时 getEffect 返回 null，立刻补上，因此不存在「刚睡着还能看见」的空窗；
-        // 之后每 20 tick 才补一次，效果同步包降为原来的 1/20。
-        // 若目标身上已有其它来源的、更长的失明，这里也不会再把它压短（原实现会）。
-        MobEffectInstance blindness = entityLivingBaseIn.getEffect(MobEffects.BLINDNESS);
-        if (blindness == null || blindness.getDuration() < BLINDNESS_REFRESH_THRESHOLD) {
-            entityLivingBaseIn.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, BLINDNESS_DURATION));
-        }
-    }
-
-    @Override
     public boolean isDurationEffectTick(int duration, int amplifier) {
-        return true;
+        return false;
     }
-
-    @Nonnull
-    @Override
-    @OnlyIn(Dist.CLIENT)
-    protected ResourceLocation getIconTexture() {
-        return new ResourceLocation(Reference.MOD_ID, "textures/mob_effect/sleep.png");
+    @Nonnull @OnlyIn(Dist.CLIENT) protected ResourceLocation getIconTexture() {
+        return null;
     }
 }
+

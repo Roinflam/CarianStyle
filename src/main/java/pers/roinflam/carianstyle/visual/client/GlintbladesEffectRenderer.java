@@ -4,11 +4,10 @@ import com.mojang.blaze3d.vertex.BufferBuilder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
 import pers.roinflam.carianstyle.utils.Reference;
@@ -16,6 +15,7 @@ import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
 import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 
 import java.util.List;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 魔法辉剑「辉石魔法」特效渲染器（纯客户端自绘）。
@@ -102,7 +102,7 @@ import java.util.List;
  * @version 2.0
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
 public final class GlintbladesEffectRenderer {
 
     /**
@@ -537,13 +537,13 @@ public final class GlintbladesEffectRenderer {
             float iy1 = cy + (uy * ca + wy * sa) * rInner;
             float iz1 = cz + (uz * ca + wz * sa) * rInner;
 
-            b.vertex(m, ox0, oy0, oz0).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ox1, oy1, oz1).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ix1, iy1, iz1).color(r, g, bl, alphaInner).endVertex();
+            b.addVertex(m, ox0, oy0, oz0).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ox1, oy1, oz1).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ix1, iy1, iz1).setColor(r, g, bl, alphaInner);
 
-            b.vertex(m, ox0, oy0, oz0).color(r, g, bl, alphaOuter).endVertex();
-            b.vertex(m, ix1, iy1, iz1).color(r, g, bl, alphaInner).endVertex();
-            b.vertex(m, ix0, iy0, iz0).color(r, g, bl, alphaInner).endVertex();
+            b.addVertex(m, ox0, oy0, oz0).setColor(r, g, bl, alphaOuter);
+            b.addVertex(m, ix1, iy1, iz1).setColor(r, g, bl, alphaInner);
+            b.addVertex(m, ix0, iy0, iz0).setColor(r, g, bl, alphaInner);
 
             // 推进到下一段：本段末端即下一段起点（漏掉这两行会让整环塌成一个扇形）
             prevCos = ca;
@@ -590,13 +590,13 @@ public final class GlintbladesEffectRenderer {
         float bx1 = cx + ux * b1u + wx * b1w, by1 = cy + uy * b1u + wy * b1w, bz1 = cz + uz * b1u + wz * b1w;
         float bx2 = cx + ux * b2u + wx * b2w, by2 = cy + uy * b2u + wy * b2w, bz2 = cz + uz * b2u + wz * b2w;
 
-        b.vertex(m, ax1, ay1, az1).color(r, g, bl, a1).endVertex();
-        b.vertex(m, bx1, by1, bz1).color(r, g, bl, a2).endVertex();
-        b.vertex(m, bx2, by2, bz2).color(r, g, bl, a2).endVertex();
+        b.addVertex(m, ax1, ay1, az1).setColor(r, g, bl, a1);
+        b.addVertex(m, bx1, by1, bz1).setColor(r, g, bl, a2);
+        b.addVertex(m, bx2, by2, bz2).setColor(r, g, bl, a2);
 
-        b.vertex(m, ax1, ay1, az1).color(r, g, bl, a1).endVertex();
-        b.vertex(m, bx2, by2, bz2).color(r, g, bl, a2).endVertex();
-        b.vertex(m, ax2, ay2, az2).color(r, g, bl, a1).endVertex();
+        b.addVertex(m, ax1, ay1, az1).setColor(r, g, bl, a1);
+        b.addVertex(m, bx2, by2, bz2).setColor(r, g, bl, a2);
+        b.addVertex(m, ax2, ay2, az2).setColor(r, g, bl, a1);
     }
 
     /**
@@ -642,13 +642,13 @@ public final class GlintbladesEffectRenderer {
                              float ax, float ay, float az, float bx, float by, float bz,
                              float cx, float cy, float cz, float dx, float dy, float dz,
                              float r, float g, float bl, float aAB, float aCD) {
-        b.vertex(m, ax, ay, az).color(r, g, bl, aAB).endVertex();
-        b.vertex(m, bx, by, bz).color(r, g, bl, aAB).endVertex();
-        b.vertex(m, cx, cy, cz).color(r, g, bl, aCD).endVertex();
+        b.addVertex(m, ax, ay, az).setColor(r, g, bl, aAB);
+        b.addVertex(m, bx, by, bz).setColor(r, g, bl, aAB);
+        b.addVertex(m, cx, cy, cz).setColor(r, g, bl, aCD);
 
-        b.vertex(m, ax, ay, az).color(r, g, bl, aAB).endVertex();
-        b.vertex(m, cx, cy, cz).color(r, g, bl, aCD).endVertex();
-        b.vertex(m, dx, dy, dz).color(r, g, bl, aCD).endVertex();
+        b.addVertex(m, ax, ay, az).setColor(r, g, bl, aAB);
+        b.addVertex(m, cx, cy, cz).setColor(r, g, bl, aCD);
+        b.addVertex(m, dx, dy, dz).setColor(r, g, bl, aCD);
     }
 
     /**
@@ -689,9 +689,9 @@ public final class GlintbladesEffectRenderer {
                                    float ax, float ay, float az,
                                    float bx, float by, float bz,
                                    float r, float g, float bl, float alpha) {
-        b.vertex(m, cx, cy, cz).color(r, g, bl, alpha).endVertex();
-        b.vertex(m, ax, ay, az).color(r, g, bl, 0f).endVertex();
-        b.vertex(m, bx, by, bz).color(r, g, bl, 0f).endVertex();
+        b.addVertex(m, cx, cy, cz).setColor(r, g, bl, alpha);
+        b.addVertex(m, ax, ay, az).setColor(r, g, bl, 0f);
+        b.addVertex(m, bx, by, bz).setColor(r, g, bl, 0f);
     }
 
     // ==================== 数学辅助 ====================

@@ -1,8 +1,6 @@
 package pers.roinflam.carianstyle.annotation.data;
 
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
@@ -11,6 +9,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
  * 附魔数据管理器
@@ -37,7 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author RoinFlam
  * @version 2.2
  */
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentDataManager {
 
     // ==================== 服务器Tick计数器 ====================
@@ -445,10 +445,7 @@ public class EnchantmentDataManager {
      * @param event 服务器Tick事件
      */
     @SubscribeEvent
-    public static void onServerTick(@NotNull TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) {
-            return;
-        }
+    public static void onServerTick(@NotNull ServerTickEvent.Post event) {
 
         // 递增tick计数器
         serverTickCount++;

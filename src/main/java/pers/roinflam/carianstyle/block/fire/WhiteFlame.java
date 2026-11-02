@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.block.fire;
 
+import com.mojang.serialization.MapCodec;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import pers.roinflam.carianstyle.base.block.flame.FireBase;
 
@@ -8,7 +9,15 @@ import pers.roinflam.carianstyle.base.block.flame.FireBase;
  */
 public class WhiteFlame extends FireBase {
 
+    /** 1.21.1 的方块都要提供编解码器（{@code BaseFireBlock.codec()} 是抽象的），按属性重建即可 */
+    public static final MapCodec<WhiteFlame> CODEC = simpleCodec(WhiteFlame::new);
+
     public WhiteFlame(BlockBehaviour.Properties properties) {
         super(properties);
+    }
+
+    @Override
+    protected MapCodec<WhiteFlame> codec() {
+        return CODEC;
     }
 }

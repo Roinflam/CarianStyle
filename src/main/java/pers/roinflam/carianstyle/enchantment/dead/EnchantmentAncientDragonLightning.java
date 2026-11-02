@@ -3,7 +3,6 @@ package pers.roinflam.carianstyle.enchantment.dead;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.level.Level;
 import org.apache.commons.lang3.RandomUtils;
 import org.jetbrains.annotations.NotNull;
@@ -18,11 +17,12 @@ import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
-
 import java.util.ArrayList;
 import java.util.List;
 
 /**
+ * PORT-STUB(E2)
+ *
  * 古龙雷电附魔
  * <p>
  * 死亡时触发：
@@ -121,235 +121,34 @@ import java.util.List;
  * @author RoinFlam
  * @version 3.2
  */
-@AutoRegisterEnchantment(
-        id = "ancient_dragon_lightning",
-        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.DEAD,
-        rarity = EnchantmentRarity.RARE,
-        type = EnchantmentCategory.ARMOR_CHEST,
-        slots = {EquipmentSlot.CHEST}
-)
+@Deprecated
 public class EnchantmentAncientDragonLightning extends EnchantmentBase {
-
-    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
-    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.ancient_dragon_lightning.desc，
-    //   否则玩家看到的描述会与实际效果不符。
-
-    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "ancient_dragon_lightning";
-
-    /**
-     * 单次触发最大命中目标数
-     * <p>默认 100，允许范围 1 ~ 500。</p>
-     */
-    private static final EnchantmentValues.Handle MAX_TARGETS =
-            EnchantmentValues.define(VALUE_ID, "max_targets",
+    private static final EnchantmentValues.Handle MAX_TARGETS = EnchantmentValues.define(VALUE_ID, "max_targets",
                     100, 1, 500);
-
-    /**
-     * 水平搜索半径（格）
-     * <p>默认 60，允许范围 1 ~ 128。</p>
-     */
-    private static final EnchantmentValues.Handle SEARCH_RADIUS =
-            EnchantmentValues.define(VALUE_ID, "search_radius",
+    private static final EnchantmentValues.Handle SEARCH_RADIUS = EnchantmentValues.define(VALUE_ID, "search_radius",
                     60, 1, 128);
-
-    /**
-     * 垂直搜索半高（格）
-     * <p>默认 15，允许范围 1 ~ 128。</p>
-     */
-    private static final EnchantmentValues.Handle SEARCH_HEIGHT =
-            EnchantmentValues.define(VALUE_ID, "search_height",
+    private static final EnchantmentValues.Handle SEARCH_HEIGHT = EnchantmentValues.define(VALUE_ID, "search_height",
                     15, 1, 128);
-
-    /**
-     * 触发冷却时间（tick）
-     * <p>默认 1800，允许范围 20 ~ 144000。</p>
-     */
-    private static final EnchantmentValues.Handle COOLDOWN =
-            EnchantmentValues.define(VALUE_ID, "cooldown",
+    private static final EnchantmentValues.Handle COOLDOWN = EnchantmentValues.define(VALUE_ID, "cooldown",
                     1800, 20, 144000);
-
-    /**
-     * 按目标当前生命计算的雷击伤害比例
-     * <p>默认 0.05，允许范围 0.0 ~ 2.0。</p>
-     */
-    private static final EnchantmentValues.Handle DAMAGE_HEALTH_RATIO =
-            EnchantmentValues.define(VALUE_ID, "damage_health_ratio",
+    private static final EnchantmentValues.Handle DAMAGE_HEALTH_RATIO = EnchantmentValues.define(VALUE_ID, "damage_health_ratio",
                     0.05D, 0.0D, 2.0D);
-
-    /**
-     * 按目标最大生命计算的雷击伤害比例
-     * <p>默认 0.005，允许范围 0.0 ~ 1.0。</p>
-     */
-    private static final EnchantmentValues.Handle DAMAGE_MAX_HEALTH_RATIO =
-            EnchantmentValues.define(VALUE_ID, "damage_max_health_ratio",
+    private static final EnchantmentValues.Handle DAMAGE_MAX_HEALTH_RATIO = EnchantmentValues.define(VALUE_ID, "damage_max_health_ratio",
                     0.005D, 0.0D, 1.0D);
-
-    /**
-     * 雷击的击退强度
-     * <p>默认 0.2，允许范围 0.0 ~ 5.0。</p>
-     */
-    private static final EnchantmentValues.Handle KNOCKBACK_STRENGTH =
-            EnchantmentValues.define(VALUE_ID, "knockback_strength",
+    private static final EnchantmentValues.Handle KNOCKBACK_STRENGTH = EnchantmentValues.define(VALUE_ID, "knockback_strength",
                     0.2D, 0.0D, 5.0D);
-
-    /**
-     * 高倍率档的伤害放大倍数
-     * <p>默认 4，允许范围 1 ~ 100。</p>
-     */
-    private static final EnchantmentValues.Handle MAGNIFICATION_HIGH =
-            EnchantmentValues.define(VALUE_ID, "magnification_high",
+    private static final EnchantmentValues.Handle MAGNIFICATION_HIGH = EnchantmentValues.define(VALUE_ID, "magnification_high",
                     4, 1, 100);
-
-    /**
-     * 中倍率档的伤害放大倍数
-     * <p>默认 2，允许范围 1 ~ 100。</p>
-     */
-    private static final EnchantmentValues.Handle MAGNIFICATION_MID =
-            EnchantmentValues.define(VALUE_ID, "magnification_mid",
+    private static final EnchantmentValues.Handle MAGNIFICATION_MID = EnchantmentValues.define(VALUE_ID, "magnification_mid",
                     2, 1, 100);
-
-
-    /**
-     * 单次触发最大命中目标数。
-     * <p>
-     * 每个目标会创建一个独立的周期任务并持续广播特效 / 音效包，
-     * 故必须封顶。取 {@value} 的理由见类注释「v3.1 新增：命中目标数硬上限」小节：
-     * 常规战斗远达不到该值（不影响正常体验），密集场景下则守住并发任务数、
-     * 网络包峰值与客户端红闪特效的存活名额。
-     * </p>
-     * <p>
-     * <b>请勿放宽。</b>若确需更大范围的压制感，应调整 {@code level * 15} 的
-     * 单目标落雷次数上限，而不是放开目标数——前者只增加时长，后者会线性放大
-     * 并发任务与瞬时包量。
-     * </p>
-     */
-
-    public EnchantmentAncientDragonLightning() {
-        super(EnchantmentCategory.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
-    }
-
-    /**
-     * 死亡触发：对范围内敌人持续降下红色龙雷。
-     *
-     * @param ctx   附魔上下文
-     * @param level 附魔等级
-     */
-    @Override
     protected void onDeath(@NotNull EnchantmentContext ctx, int level) {
-        LivingEntity hurter = ctx.getHolder();
-
-        if (EnchantmentDataManager.isOnCooldown("ancient_dragon_lightning", hurter.getUUID())) {
-            return;
-        }
-
-        EnchantmentDataManager.setCooldown("ancient_dragon_lightning", hurter.getUUID(), COOLDOWN.getInt());
-
-        List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
-                LivingEntity.class,
-                hurter,
-                SEARCH_RADIUS.getInt(),
-                SEARCH_HEIGHT.getInt(),
-                entityLivingBase -> !entityLivingBase.equals(hurter)
-        );
-
-        if (nearbyEntities.isEmpty()) {
-            return;
-        }
-
-        // v3.1：命中目标数硬上限。
-        // 必须在 randomList 之前截断——分配基数要用截断后的数量，
-        // 否则 level*100 的落雷总量会被摊给不存在的目标（详见类注释）。
-        // 复制成新列表而非用 subList 视图，避免持有原大列表的引用。
-        final List<LivingEntity> entities;
-        if (nearbyEntities.size() > MAX_TARGETS.getInt()) {
-            entities = new ArrayList<>(nearbyEntities.subList(0, MAX_TARGETS.getInt()));
-        } else {
-            entities = nearbyEntities;
-        }
-
-        List<Integer> list = RandomUtil.randomList(level * 100, entities.size());
-
-        for (int i = 0; i < entities.size(); i++) {
-            LivingEntity entityLivingBase = entities.get(i);
-            int timeLightning = Math.min(list.get(i), level * 15);
-
-            // 分配到 0 次落雷的目标直接跳过，不创建空转任务
-            if (timeLightning <= 0) {
-                continue;
-            }
-
-            new SynchronizationTask(40, 5) {
-                private int time = 0;
-
-                @Override
-                public void run() {
-                    if (++time > timeLightning) {
-                        this.cancel();
-                        return;
-                    }
-
-                    // v3.1：存活检查提前到发包之前。
-                    // 原实现先发一轮红闪 + 两个音效再检查，导致目标死亡 / 卸载后
-                    // 仍会往尸体或空气里多劈一道雷、多发三个包（详见类注释）。
-                    if (!entityLivingBase.isAlive()) {
-                        this.cancel();
-                        return;
-                    }
-
-                    Level world = entityLivingBase.level();
-                    if (world instanceof ServerLevel serverLevel) {
-                        // v3.2：视觉 + 雷声一次调用，两级节流在门面类内部各自生效。
-                        // 视觉按目标实体节流（对本附魔近乎 no-op，刻意为之——
-                        // 每个目标身上那道雷是打击反馈，不该被砍）；
-                        // 雷声按 64 格网格全局节流，把 100 目标场景下的音效包量
-                        // 从约 400/秒压到约 40/秒，而听感几乎不变（详见类注释）。
-                        //
-                        // 客户端还会对 4.5 格内的重复落雷做同位置合并，
-                        // 因此高频重复调用不会叠成一团「鬼畜」，而是一道持续劈着的雷。
-                        CarianStyleEffects.redLightningStrike(serverLevel, entityLivingBase);
-                    }
-
-                    entityLivingBase.invulnerableTime = 10;
-
-                    // 互斥判断，先判雷暴再判下雨。
-                    // MC 中 isThundering() 为 true 时 isRaining() 也为 true，
-                    // 累乘会导致雷暴变成 8x；互斥后雷暴 4x、下雨 2x、晴天 1x
-                    int magnification = 1;
-                    if (entityLivingBase.level().isThundering()) {
-                        magnification = MAGNIFICATION_HIGH.getInt();
-                    } else if (entityLivingBase.level().isRaining()) {
-                        magnification = MAGNIFICATION_MID.getInt();
-                    }
-
-                    entityLivingBase.hurt(
-                            entityLivingBase.damageSources().lightningBolt(),
-                            entityLivingBase.getHealth() * (float) DAMAGE_HEALTH_RATIO.get()
-                                    + entityLivingBase.getMaxHealth() * (float) DAMAGE_MAX_HEALTH_RATIO.get() * magnification
-                    );
-
-                    if (entityLivingBase.onGround()) {
-                        double x = RandomUtils.nextBoolean() ?
-                                hurter.getX() - entityLivingBase.getX() :
-                                entityLivingBase.getX() - hurter.getX();
-                        double z = RandomUtils.nextBoolean() ?
-                                hurter.getZ() - entityLivingBase.getZ() :
-                                entityLivingBase.getZ() - hurter.getZ();
-                        entityLivingBase.knockback((float) KNOCKBACK_STRENGTH.get(), x, z);
-                    }
-                }
-            }.start();
-        }
     }
-
-    @Override
     public int getMinCost(int enchantmentLevel) {
-        return (int) ((36 + (enchantmentLevel - 1) * 20) * ConfigLoader.enchantingDifficulty);
+        return 0;
     }
-
-    @Override
     public int getMaxCost(int enchantmentLevel) {
-        return getMinCost(enchantmentLevel) + 50;
+        return 0;
     }
 }
+

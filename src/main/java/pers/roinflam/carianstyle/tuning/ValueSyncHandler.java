@@ -2,18 +2,17 @@ package pers.roinflam.carianstyle.tuning;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.network.PacketDistributor;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 import pers.roinflam.carianstyle.network.EnchantmentValuesPacket;
-import pers.roinflam.carianstyle.network.NetworkHandler;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
 import javax.annotation.Nonnull;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 共享数值的同步收发。
@@ -45,7 +44,7 @@ import javax.annotation.Nonnull;
  * @author RoinFlam
  * @version 1.0
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.GAME)
 public final class ValueSyncHandler {
 
     private ValueSyncHandler() {
@@ -73,9 +72,7 @@ public final class ValueSyncHandler {
         if (EnchantmentValues.sharedHandles().isEmpty()) {
             return;
         }
-        NetworkHandler.CHANNEL.send(
-                PacketDistributor.PLAYER.with(() -> player),
-                EnchantmentValuesPacket.ofCurrent());
+        PacketDistributor.sendToPlayer(player, EnchantmentValuesPacket.ofCurrent());
     }
 
     /**
@@ -89,8 +86,7 @@ public final class ValueSyncHandler {
         if (EnchantmentValues.sharedHandles().isEmpty()) {
             return;
         }
-        NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(),
-                EnchantmentValuesPacket.ofCurrent());
+        PacketDistributor.sendToAllPlayers(EnchantmentValuesPacket.ofCurrent());
         LogUtil.info("卡利亚式附魔 - 已向 %d 名在线玩家重发共享数值",
                 server.getPlayerList().getPlayerCount());
     }
@@ -98,7 +94,7 @@ public final class ValueSyncHandler {
     /**
      * 客户端侧：断开连接时清空服务端下发的覆盖值。
      */
-    @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE,
+    @EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.GAME,
             value = Dist.CLIENT)
     public static final class ClientSide {
 

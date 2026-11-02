@@ -5,7 +5,7 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
+import pers.roinflam.carianstyle.mixin.accessor.SynchedEntityDataAccessor;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
 import pers.roinflam.carianstyle.source.NewDamageSource;
@@ -345,7 +345,8 @@ public class EntityLivingUtil {
     /**
      * 暴力查找实体真正的血量字段
      *
-     * 反射拿到SynchedEntityData内部的itemsById映射，
+     * 经访问器拿到SynchedEntityData内部的itemsById（1.21.1 是按 id 下标的数组，1.20.1 是映射；
+     * 运行期没有 SRG 名，原来按 {@code f_135345_} 反射的写法在 1.21.1 找不到字段），
      * 遍历所有Float/Double类型字段，匹配当前血量值，
      * 再通过临时赋值验证getHealth()是否同步，确认后缓存该accessor
      * <p>
@@ -363,18 +364,16 @@ public class EntityLivingUtil {
         try {
             SynchedEntityData entityData = entity.getEntityData();
 
-            // 反射获取itemsById字段
-            Field itemsByIdField = ObfuscationReflectionHelper.findField(
-                    SynchedEntityData.class,
-                    "f_135345_"
-            );
-            itemsByIdField.setAccessible(true);
-            Map<Integer, SynchedEntityData.DataItem<?>> itemsById =
-                    (Map<Integer, SynchedEntityData.DataItem<?>>) itemsByIdField.get(entityData);
+            SynchedEntityData.DataItem<?>[] itemsById =
+                    ((SynchedEntityDataAccessor) entityData).carianstyle$getItemsById();
 
             float tolerance = probeTolerance(currentHealth);
 
-            for (SynchedEntityData.DataItem<?> item : itemsById.values()) {
+            // 数组按 id 升序，和 1.20.1 映射的遍历顺序一致
+            for (SynchedEntityData.DataItem<?> item : itemsById) {
+                if (item == null) {
+                    continue;
+                }
                 Object value = item.getValue();
 
                 // 只检查Float和Double类型

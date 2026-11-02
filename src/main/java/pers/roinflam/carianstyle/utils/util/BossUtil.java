@@ -6,7 +6,7 @@ import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraftforge.common.Tags;
+import net.neoforged.neoforge.common.Tags;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
@@ -22,12 +22,12 @@ import java.util.List;
  * </p>
  * <ol>
  *     <li>实体标签 {@code carianstyle:not_bosses}：服主用数据包排除误判，命中就不算；</li>
- *     <li>实体标签 {@code forge:bosses}（Forge 自带末影龙、凋灵，
- *     大多数 BOSS 模组也往里加）或 {@code carianstyle:bosses}（本模组自带的这份只引用
- *     {@code c:bosses}，服主可用数据包追加）；</li>
+ *     <li>实体标签 {@code c:bosses}（NeoForge 公共标签，自带末影龙、凋灵，
+ *     大多数 BOSS 模组也往里加；1.20.1 时叫 {@code forge:bosses}）或 {@code carianstyle:bosses}
+ *     （本模组自带的这份只引用 {@code c:bosses}，服主可用数据包追加）；</li>
  *     <li>身上有没有<b>正在显示</b>的服务端 BOSS 血条（{@link ServerBossEvent} 类型的实例字段，含父类）。
- *     兜住没打标签、或标签放错路径的模组——例如有的模组把标签放在 1.21 才认的 {@code tags/entity_type/}，
- *     在 1.20.1 上不生效，但它的 BOSS 都挂着血条。</li>
+ *     兜住没打标签、或标签放错路径的模组——例如有的模组还把标签放在 1.20.1 的 {@code tags/entity_types/}，
+ *     在 1.21 上不生效，但它的 BOSS 都挂着血条。</li>
  * </ol>
  * <p>
  * 血条要看<b>可见</b>，不能只看字段在不在：有的 NPC 模组每个 NPC 都带一条 BOSS 血条，默认隐藏，
@@ -44,11 +44,11 @@ public final class BossUtil {
 
     /** 额外算作 BOSS 的实体（数据包追加） */
     public static final TagKey<EntityType<?>> BOSSES =
-            TagKey.create(Registries.ENTITY_TYPE, new ResourceLocation(Reference.MOD_ID, "bosses"));
+            TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath(Reference.MOD_ID, "bosses"));
 
     /** 不算 BOSS 的实体（数据包排除误判，优先级最高） */
     public static final TagKey<EntityType<?>> NOT_BOSSES =
-            TagKey.create(Registries.ENTITY_TYPE, new ResourceLocation(Reference.MOD_ID, "not_bosses"));
+            TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath(Reference.MOD_ID, "not_bosses"));
 
     /** 每个实体类里（含父类）类型为 ServerBossEvent 的实例字段 */
     private static final ClassValue<List<Field>> BOSS_EVENT_FIELDS = new ClassValue<>() {

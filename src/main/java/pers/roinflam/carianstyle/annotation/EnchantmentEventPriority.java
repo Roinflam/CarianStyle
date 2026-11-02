@@ -1,6 +1,6 @@
 package pers.roinflam.carianstyle.annotation;
 
-import net.minecraftforge.eventbus.api.EventPriority;
+import net.neoforged.bus.api.EventPriority;
 
 /**
  * 附魔事件优先级枚举

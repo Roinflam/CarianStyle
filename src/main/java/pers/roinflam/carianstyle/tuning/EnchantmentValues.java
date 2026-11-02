@@ -6,11 +6,10 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.loading.FMLPaths;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.fml.loading.FMLPaths;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
@@ -27,13 +26,14 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 附魔数值配置：把散落在各附魔类里的硬编码数字集中到一个可编辑的 JSON 文件。
  *
  * <h3>为什么不用 Forge 的 TOML 配置</h3>
  * <p>
- * 现有的 {@code ConfigLoader} 用的是 {@code ForgeConfigSpec}，它要求所有配置项
+ * 现有的 {@code ConfigLoader} 用的是 {@code ModConfigSpec}，它要求所有配置项
  * 在 spec 构建期（模组构造函数）就全部声明完毕。而附魔的数值声明发生在
  * <b>各附魔类的静态初始化</b>期间——那时 spec 早已 build，无法再追加。
  * </p>
@@ -118,7 +118,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author RoinFlam
  * @version 1.0
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
 public final class EnchantmentValues {
 
     /** 配置文件名 */

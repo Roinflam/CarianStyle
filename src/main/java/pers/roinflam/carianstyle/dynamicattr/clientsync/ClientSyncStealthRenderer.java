@@ -1,14 +1,14 @@
 package pers.roinflam.carianstyle.dynamicattr.clientsync;
 
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderPlayerEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.client.event.RenderPlayerEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 客户端：隐藏处于卡利亚式隐身中的玩家模型（序列号 4）。
@@ -17,7 +17,7 @@ import javax.annotation.Nonnull;
  * <p>
  * 此前这段逻辑写在 {@code DynamicAttributes.StealthEventHandler} 的实例方法里。
  * 那个处理器只在 {@code DynamicAttributeManager.apply} 中经
- * {@code DynamicAttributeInstance.setEventHandler} 注册到 {@code MinecraftForge.EVENT_BUS}，
+ * {@code DynamicAttributeInstance.setEventHandler} 注册到 {@code NeoForge.EVENT_BUS}，
  * 而 {@code apply} 的全部调用点都在服务端事件里（均有 {@code isClientSide} 守卫）。
  * </p>
  * <ul>
@@ -43,7 +43,7 @@ import javax.annotation.Nonnull;
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
 public final class ClientSyncStealthRenderer {
 
     /**

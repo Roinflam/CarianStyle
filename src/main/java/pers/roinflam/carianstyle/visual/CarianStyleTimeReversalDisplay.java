@@ -1,13 +1,13 @@
 package pers.roinflam.carianstyle.visual;
 
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
 import pers.roinflam.carianstyle.utils.Reference;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 时间逆转「储存伤害」的 HUD 叠层注册（双端通用）。
@@ -76,7 +76,7 @@ import pers.roinflam.carianstyle.utils.Reference;
  * @author RoinFlam
  * @version 1.1
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
 public final class CarianStyleTimeReversalDisplay {
 
     /**

@@ -1,10 +1,13 @@
 package pers.roinflam.carianstyle.network;
 
-import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.network.NetworkEvent;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
+import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.client.CombatArtEffectManager;
 
-import java.util.function.Supplier;
 
 /**
  * 战技（COMBAT_SKILL）自绘特效触发包（S2C，服务端 -> 客户端）。
@@ -97,7 +100,16 @@ import java.util.function.Supplier;
  *
  * @version 1.5
  */
-public class CombatArtEffectPacket {
+public class CombatArtEffectPacket implements CustomPacketPayload {
+
+    /** 包 id（1.21.1 每种包一个 id，不再按注册顺序编号） */
+    public static final CustomPacketPayload.Type<CombatArtEffectPacket> TYPE =
+            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(Reference.MOD_ID, "combat_art_effect"));
+
+    /** 编解码沿用下面的 {@link #encode} / {@link #decode}，字段和顺序与 1.20.1 一致 */
+    public static final StreamCodec<RegistryFriendlyByteBuf, CombatArtEffectPacket> STREAM_CODEC =
+            StreamCodec.of((buf, packet) -> encode(packet, buf), CombatArtEffectPacket::decode);
+
 
     // ===== 效果类型（与客户端 CombatArtEffectManager / 各渲染器的分发严格一致）=====
 
@@ -382,7 +394,7 @@ public class CombatArtEffectPacket {
      * @param packet 待编码包
      * @param buf    目标缓冲
      */
-    public static void encode(CombatArtEffectPacket packet, FriendlyByteBuf buf) {
+    public static void encode(CombatArtEffectPacket packet, RegistryFriendlyByteBuf buf) {
         buf.writeByte(packet.type);
         buf.writeDouble(packet.x);
         buf.writeDouble(packet.y);
@@ -397,7 +409,7 @@ public class CombatArtEffectPacket {
      * @param buf 源缓冲
      * @return 解码出的包
      */
-    public static CombatArtEffectPacket decode(FriendlyByteBuf buf) {
+    public static CombatArtEffectPacket decode(RegistryFriendlyByteBuf buf) {
         int type = buf.readByte();
         if (type < 0 || type > MAX_TYPE) {
             throw new IllegalArgumentException("CombatArtEffectPacket 的效果类型非法：" + type);
@@ -429,10 +441,13 @@ public class CombatArtEffectPacket {
      * @param packet 收到的包
      * @param ctx    网络上下文
      */
-    public static void handle(CombatArtEffectPacket packet, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() ->
-                CombatArtEffectManager.spawn(packet.type, packet.x, packet.y, packet.z,
-                        packet.radius, packet.yaw));
-        ctx.get().setPacketHandled(true);
+    public static void handle(CombatArtEffectPacket packet, IPayloadContext ctx) {
+        CombatArtEffectManager.spawn(packet.type, packet.x, packet.y, packet.z,
+                packet.radius, packet.yaw);
+    }
+
+    @Override
+    public CustomPacketPayload.Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 }

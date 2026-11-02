@@ -4,9 +4,9 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.fml.loading.FMLPaths;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.fml.loading.FMLPaths;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.config.ClientVisualConfig;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
@@ -26,7 +26,7 @@ import java.util.Arrays;
  * <h3>为什么用普通 JSON 而不是 Forge 的 CLIENT 配置</h3>
  * <p>
  * 这个开关会在<b>渲染热路径</b>上每帧被查询 20 多次
- * （每个渲染器一次）。{@code ForgeConfigSpec.BooleanValue#get()} 内部有
+ * （每个渲染器一次）。{@code ModConfigSpec.BooleanValue#get()} 内部有
  * 缓存失效检查与 {@code Supplier} 间接调用，虽然单次开销不大，
  * 但没有理由在每帧固定调用的位置上付这个成本。
  * </p>

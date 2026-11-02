@@ -7,11 +7,10 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.event.entity.living.LivingAttackEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
+import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -23,10 +22,12 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
-
 import java.util.UUID;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
+ * PORT-STUB(E1)
+ *
  * 招架附魔
  * <p>v2.2：双向监听器入口接入怪物附魔触发开关</p>
  *
@@ -74,168 +75,22 @@ import java.util.UUID;
  * @author RoinFlam
  * @version 2.4
  */
-@AutoRegisterEnchantment(
-        id = "parry",
-        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
-        rarity = EnchantmentRarity.UNCOMMON,
-        // v2.3：type = BREAKABLE → customType = "SHIELD"，与下方构造函数保持一致
-        customType = "SHIELD",
-        slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND}
-)
-@Mod.EventBusSubscriber
+@Deprecated
 public class EnchantmentParry extends EnchantmentBase {
-
-    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
-    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.parry.desc，
-    //   否则玩家看到的描述会与实际效果不符。
-
-    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "parry";
-
-    /**
-     * 格挡成功后的反击窗口时长（tick）
-     * <p>默认 10，允许范围 1 ~ 200。</p>
-     */
-    private static final EnchantmentValues.Handle WINDOW_TICKS =
-            EnchantmentValues.define(VALUE_ID, "window_ticks",
+    private static final EnchantmentValues.Handle WINDOW_TICKS = EnchantmentValues.define(VALUE_ID, "window_ticks",
                     10, 1, 200);
-
-    /**
-     * 窗口内每级的额外伤害倍率
-     * <p>默认 0.25，允许范围 0.0 ~ 5.0。</p>
-     */
-    private static final EnchantmentValues.Handle BONUS_DAMAGE_PER_LEVEL =
-            EnchantmentValues.define(VALUE_ID, "bonus_damage_per_level",
+    private static final EnchantmentValues.Handle BONUS_DAMAGE_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "bonus_damage_per_level",
                     0.25D, 0.0D, 5.0D);
-
-    /**
-     * 格挡冷却时长（tick）
-     * <p>默认 40，允许范围 0 ~ 2400。</p>
-     */
-    private static final EnchantmentValues.Handle COOLDOWN_TICKS =
-            EnchantmentValues.define(VALUE_ID, "cooldown_ticks",
+    private static final EnchantmentValues.Handle COOLDOWN_TICKS = EnchantmentValues.define(VALUE_ID, "cooldown_ticks",
                     40, 0, 2400);
-
-
     private static final String PARRY_LEVEL_KEY = "parry_level";
     private static final String PARRY_COOLDOWN_KEY = "parry_cooldown";
-
-    public EnchantmentParry() {
-        super(CarianStyleEnchantments.getCustomEnchantmentCategory("SHIELD"), new EquipmentSlot[]{
-                EquipmentSlot.MAINHAND,
-                EquipmentSlot.OFFHAND
-        });
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingAttack(@NotNull LivingAttackEvent evt) {
-        if (evt.getEntity().level().isClientSide) {
-            return;
-        }
-
-        if (!(evt.getSource().getDirectEntity() instanceof LivingEntity)) {
-            return;
-        }
-
-        LivingEntity holder = evt.getEntity();
-
-        // v2.2：怪物附魔触发开关（受击者视角，进入招架状态）
-        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
-
-        UUID uuid = holder.getUUID();
-
-        if (!holder.isUsingItem()) {
-            return;
-        }
-
-        ItemStack activeItem = holder.getUseItem();
-        if (activeItem.isEmpty() || !(activeItem.getItem() instanceof ShieldItem)) {
-            return;
-        }
-
-        Enchantment parry = EnchantmentRegistry.getEnchantmentByClass(EnchantmentParry.class);
-        if (parry == null) {
-            return;
-        }
-
-        int level = EnchantmentHelper.getItemEnchantmentLevel(parry, activeItem);
-        level = decayLevel(parry, level);
-        if (level <= 0) {
-            return;
-        }
-
-        if (EnchantmentDataManager.isOnCooldown(PARRY_COOLDOWN_KEY, uuid)) {
-            return;
-        }
-
-        if (EnchantmentDataManager.hasData(PARRY_LEVEL_KEY, uuid)) {
-            return;
-        }
-
-        LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
-        if (!isAttackFromFront(holder, attacker)) {
-            return;
-        }
-
-        EnchantmentDataManager.setData(PARRY_LEVEL_KEY, uuid, level, WINDOW_TICKS.getInt());
-
-        // v2.4：架住成功，播放「格挡窗口」自绘特效。
-        // 时长与上面那个 10 tick 严格对齐，准星收缩到零即窗口关闭（详见类注释）
-        if (holder.level() instanceof ServerLevel serverLevel) {
-            CarianStyleCombatArtEffects.parryWindow(serverLevel, holder);
-        }
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
-        if (evt.getEntity().level().isClientSide) {
-            return;
-        }
-
-        if (!(evt.getSource().getDirectEntity() instanceof LivingEntity)) {
-            return;
-        }
-
-        LivingEntity attacker = (LivingEntity) evt.getSource().getDirectEntity();
-
-        // v2.2：怪物附魔触发开关（攻击者视角，招架增伤）
-        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
-
-        UUID uuid = attacker.getUUID();
-
-        Integer parryLevel = EnchantmentDataManager.getData(PARRY_LEVEL_KEY, uuid);
-        if (parryLevel == null || parryLevel <= 0) {
-            return;
-        }
-
-        float bonusDamage = evt.getAmount() * parryLevel * (float) BONUS_DAMAGE_PER_LEVEL.get();
-        evt.setAmount(evt.getAmount() + bonusDamage);
-
-        EnchantmentDataManager.removeData(PARRY_LEVEL_KEY, uuid);
-        EnchantmentDataManager.setCooldown(PARRY_COOLDOWN_KEY, uuid, COOLDOWN_TICKS.getInt());
-    }
-
-    private static boolean isAttackFromFront(LivingEntity defender, LivingEntity attacker) {
-        double dx = attacker.getX() - defender.getX();
-        double dz = attacker.getZ() - defender.getZ();
-
-        float yaw = defender.getYRot();
-        double defenderDirX = -Math.sin(Math.toRadians(yaw));
-        double defenderDirZ = Math.cos(Math.toRadians(yaw));
-
-        double dot = dx * defenderDirX + dz * defenderDirZ;
-
-        return dot > 0;
-    }
-
-    @Override
     public int getMinCost(int enchantmentLevel) {
-        return (int) ((10 + (enchantmentLevel - 1) * 10) * ConfigLoader.enchantingDifficulty);
+        return 0;
     }
-
-    @Override
     public int getMaxCost(int enchantmentLevel) {
-        return getMinCost(enchantmentLevel) + 50;
+        return 0;
     }
 }
+

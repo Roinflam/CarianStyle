@@ -11,15 +11,12 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -31,10 +28,13 @@ import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
-
 import java.util.UUID;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /**
+ * PORT-STUB(E1)
+ *
  * 祈祷一击附魔
  * <p>v2.2：LivingDamage双向入口接入怪物附魔触发开关。
  * onPlayerTick 玩家专属，onLivingDeath 是清理类，onPlayerRespawn 是清理类，均无需检查。</p>
@@ -49,268 +49,34 @@ import java.util.UUID;
  * @author RoinFlam
  * @version 2.3
  */
-@AutoRegisterEnchantment(
-        id = "prayerful_strike",
-        category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
-        rarity = EnchantmentRarity.VERY_RARE,
-        type = EnchantmentCategory.WEAPON,
-        slots = {EquipmentSlot.MAINHAND},
-        forceTreasure = true,
-        conflictsWith = {EnchantmentScarletCorruption.class}
-)
-@Mod.EventBusSubscriber
+@Deprecated
 public class EnchantmentPrayerfulStrike extends EnchantmentBase {
-
-    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
-    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
-    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.prayerful_strike.desc，
-    //   否则玩家看到的描述会与实际效果不符。
-
-    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "prayerful_strike";
-
-    /**
-     * 蓄力所需的时长（tick）
-     * <p>默认 160，允许范围 1 ~ 12000。</p>
-     */
-    private static final EnchantmentValues.Handle CHARGING_COOLDOWN =
-            EnchantmentValues.define(VALUE_ID, "charging_cooldown",
+    private static final EnchantmentValues.Handle CHARGING_COOLDOWN = EnchantmentValues.define(VALUE_ID, "charging_cooldown",
                     160, 1, 12000);
-
-    /**
-     * 未就绪状态的时长（tick）。应小于 charging_cooldown，二者共同决定可用节奏
-     * <p>默认 80，允许范围 1 ~ 12000。</p>
-     */
-    private static final EnchantmentValues.Handle NOT_READY_COOLDOWN =
-            EnchantmentValues.define(VALUE_ID, "not_ready_cooldown",
+    private static final EnchantmentValues.Handle NOT_READY_COOLDOWN = EnchantmentValues.define(VALUE_ID, "not_ready_cooldown",
                     80, 1, 12000);
-
-    /**
-     * 按自身最大生命计算的额外伤害比例
-     * <p>默认 0.025，允许范围 0.0 ~ 2.0。</p>
-     */
-    private static final EnchantmentValues.Handle SELF_HEALTH_RATIO =
-            EnchantmentValues.define(VALUE_ID, "self_health_ratio",
+    private static final EnchantmentValues.Handle SELF_HEALTH_RATIO = EnchantmentValues.define(VALUE_ID, "self_health_ratio",
                     0.025D, 0.0D, 2.0D);
-
-    /**
-     * 按目标当前生命计算的额外伤害比例
-     * <p>默认 0.075，允许范围 0.0 ~ 2.0。</p>
-     */
-    private static final EnchantmentValues.Handle VICTIM_HEALTH_RATIO =
-            EnchantmentValues.define(VALUE_ID, "victim_health_ratio",
+    private static final EnchantmentValues.Handle VICTIM_HEALTH_RATIO = EnchantmentValues.define(VALUE_ID, "victim_health_ratio",
                     0.075D, 0.0D, 2.0D);
-
-    /**
-     * 额外伤害的上限（占目标最大生命的比例）
-     * <p>默认 0.1，允许范围 0.0 ~ 2.0。</p>
-     */
-    private static final EnchantmentValues.Handle DAMAGE_CAP_RATIO =
-            EnchantmentValues.define(VALUE_ID, "damage_cap_ratio",
+    private static final EnchantmentValues.Handle DAMAGE_CAP_RATIO = EnchantmentValues.define(VALUE_ID, "damage_cap_ratio",
                     0.1D, 0.0D, 2.0D);
-
-    /**
-     * 额外伤害转化为治疗的除数（2 表示一半）
-     * <p>默认 2.0，允许范围 0.1 ~ 100.0。</p>
-     */
-    private static final EnchantmentValues.Handle HEAL_DIVISOR =
-            EnchantmentValues.define(VALUE_ID, "heal_divisor",
+    private static final EnchantmentValues.Handle HEAL_DIVISOR = EnchantmentValues.define(VALUE_ID, "heal_divisor",
                     2.0D, 0.1D, 100.0D);
-
-    /**
-     * 单次治疗量的最大生命占比上限
-     * <p>默认 0.05，允许范围 0.0 ~ 2.0。</p>
-     */
-    private static final EnchantmentValues.Handle HEAL_CAP_RATIO =
-            EnchantmentValues.define(VALUE_ID, "heal_cap_ratio",
+    private static final EnchantmentValues.Handle HEAL_CAP_RATIO = EnchantmentValues.define(VALUE_ID, "heal_cap_ratio",
                     0.05D, 0.0D, 2.0D);
-
-    /**
-     * 就绪提示音的结算间隔（tick）
-     * <p>默认 20，允许范围 1 ~ 600。</p>
-     */
-    private static final EnchantmentValues.Handle TICK_INTERVAL =
-            EnchantmentValues.define(VALUE_ID, "tick_interval",
+    private static final EnchantmentValues.Handle TICK_INTERVAL = EnchantmentValues.define(VALUE_ID, "tick_interval",
                     20, 1, 600);
-
-
     private static final UUID MAX_HEALTH_MODIFIER_ID = UUID.fromString("b55a7c8a-df03-bca7-b5ea-ec703b261525");
     private static final String MAX_HEALTH_MODIFIER_NAME = "enchantment.prayerful_strike";
     private static final String CHARGING_COOLDOWN_KEY = "prayerful_strike_charging";
     private static final String NOT_READY_COOLDOWN_KEY = "prayerful_strike_not_ready";
-
-    public EnchantmentPrayerfulStrike() {
-        super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
-        if (evt.getEntity().level().isClientSide) {
-            return;
-        }
-
-        if (!(evt.getSource().getEntity() instanceof LivingEntity)) {
-            return;
-        }
-
-        LivingEntity victim = evt.getEntity();
-        LivingEntity attacker = (LivingEntity) evt.getSource().getEntity();
-
-        Enchantment prayerfulStrike = EnchantmentRegistry.getEnchantmentByClass(EnchantmentPrayerfulStrike.class);
-        if (prayerfulStrike == null) {
-            return;
-        }
-
-        // 攻击者视角
-        // v2.2：怪物附魔触发开关（攻击者视角）
-        if (!EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) {
-            ItemStack attackerHeld = attacker.getItemInHand(InteractionHand.MAIN_HAND);
-            if (!attackerHeld.isEmpty()) {
-                int level = EnchantmentHelper.getItemEnchantmentLevel(prayerfulStrike, attackerHeld);
-                if (level > 0) {
-                    handleAttackerLogic(evt, attacker, victim);
-                }
-            }
-        }
-
-        // 受击者视角
-        // v2.2：怪物附魔触发开关（受击者视角）
-        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
-
-        ItemStack victimHeld = victim.getItemInHand(InteractionHand.MAIN_HAND);
-        if (!victimHeld.isEmpty()) {
-            int level = EnchantmentHelper.getItemEnchantmentLevel(prayerfulStrike, victimHeld);
-            if (level > 0) {
-                handleVictimLogic(victim);
-            }
-        }
-    }
-
-    private static void handleAttackerLogic(LivingDamageEvent evt, LivingEntity attacker, LivingEntity victim) {
-        UUID uuid = attacker.getUUID();
-        boolean inChargingPeriod = EnchantmentDataManager.isOnCooldown(CHARGING_COOLDOWN_KEY, uuid);
-        boolean stillWaiting = EnchantmentDataManager.isOnCooldown(NOT_READY_COOLDOWN_KEY, uuid);
-
-        if (inChargingPeriod) {
-            if (!stillWaiting) {
-                triggerPrayerfulStrike(evt, attacker, victim);
-                EnchantmentDataManager.setCooldown(CHARGING_COOLDOWN_KEY, uuid, CHARGING_COOLDOWN.getInt());
-                EnchantmentDataManager.setCooldown(NOT_READY_COOLDOWN_KEY, uuid, NOT_READY_COOLDOWN.getInt());
-            }
-        } else {
-            EnchantmentDataManager.setCooldown(CHARGING_COOLDOWN_KEY, uuid, CHARGING_COOLDOWN.getInt());
-            EnchantmentDataManager.setCooldown(NOT_READY_COOLDOWN_KEY, uuid, NOT_READY_COOLDOWN.getInt());
-        }
-    }
-
-    private static void handleVictimLogic(LivingEntity victim) {
-        UUID uuid = victim.getUUID();
-        boolean inChargingPeriod = EnchantmentDataManager.isOnCooldown(CHARGING_COOLDOWN_KEY, uuid);
-        boolean stillWaiting = EnchantmentDataManager.isOnCooldown(NOT_READY_COOLDOWN_KEY, uuid);
-
-        if (inChargingPeriod && !stillWaiting) {
-            EnchantmentDataManager.setCooldown(NOT_READY_COOLDOWN_KEY, uuid, NOT_READY_COOLDOWN.getInt());
-        } else if (!inChargingPeriod) {
-            EnchantmentDataManager.setCooldown(CHARGING_COOLDOWN_KEY, uuid, CHARGING_COOLDOWN.getInt());
-            EnchantmentDataManager.setCooldown(NOT_READY_COOLDOWN_KEY, uuid, NOT_READY_COOLDOWN.getInt());
-        }
-    }
-
-    private static void triggerPrayerfulStrike(LivingDamageEvent evt, LivingEntity attacker, LivingEntity victim) {
-        float bonusDamage = Math.min(
-                attacker.getMaxHealth() * (float) SELF_HEALTH_RATIO.get()
-                        + victim.getHealth() * (float) VICTIM_HEALTH_RATIO.get(),
-                victim.getMaxHealth() * (float) DAMAGE_CAP_RATIO.get()
-        );
-        evt.setAmount(evt.getAmount() + bonusDamage);
-        applyMaxHealthBonus(attacker, bonusDamage);
-        attacker.heal(bonusDamage);
-        playLevelUpSound(attacker, 0);
-        victim.playSound(SoundEvents.PLAYER_LEVELUP, 1, 0);
-
-        // v2.3 视觉：蓄力完成那一击的金色圣光柱（纯服务端广播，不影响任何机制）
-        // 落在攻击者脚下——这一击的语义是「祈祷得到回应」，光应该降在祈祷者身上而非目标身上
-        if (attacker.level() instanceof ServerLevel serverLevel) {
-            CarianStyleCombatArtEffects.prayerStrike(serverLevel, attacker);
-        }
-    }
-
-    /**
-     * 播提示音，持有者自己也听得到。
-     * <p>{@code Player#playSound} 在服务端排除本人（默认由客户端自己播），这里不能走它。</p>
-     */
-    private static void playLevelUpSound(LivingEntity holder, float pitch) {
-        holder.level().playSound(null, holder.getX(), holder.getY(), holder.getZ(),
-                SoundEvents.PLAYER_LEVELUP, holder.getSoundSource(), 1, pitch);
-    }
-
-    private static void applyMaxHealthBonus(LivingEntity attacker, float bonusDamage) {
-        AttributeInstance attribute = attacker.getAttribute(Attributes.MAX_HEALTH);
-        if (attribute == null) {
-            return;
-        }
-
-        float healthBonus = (float) (bonusDamage / HEAL_DIVISOR.get());
-        float maxBonus = attacker.getMaxHealth() * (float) HEAL_CAP_RATIO.get();
-        AttributeModifier existing = attribute.getModifier(MAX_HEALTH_MODIFIER_ID);
-
-        // 第一次也受单次上限限制，没有修饰符时按 0 起算
-        double currentAmount = existing == null ? 0 : existing.getAmount();
-        double newAmount = Math.min(
-                currentAmount + Math.min(healthBonus, maxBonus),
-                ConfigLoader.prayerfulStrikeMaxHealth
-        );
-        attribute.removeModifier(MAX_HEALTH_MODIFIER_ID);
-        attribute.addPermanentModifier(new AttributeModifier(
-                MAX_HEALTH_MODIFIER_ID, MAX_HEALTH_MODIFIER_NAME,
-                newAmount, AttributeModifier.Operation.ADDITION
-        ));
-    }
-
-    @SubscribeEvent
-    public static void onPlayerRespawn(@NotNull PlayerEvent.PlayerRespawnEvent evt) {
-        if (evt.getEntity().level().isClientSide || evt.isEndConquered()) {
-            return;
-        }
-        AttributeInstance attribute = evt.getEntity().getAttribute(Attributes.MAX_HEALTH);
-        if (attribute != null) {
-            attribute.removeModifier(MAX_HEALTH_MODIFIER_ID);
-        }
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onLivingDeath(@NotNull LivingDeathEvent evt) {
-        // 清理类，无需开关检查
-        UUID uuid = evt.getEntity().getUUID();
-        EnchantmentDataManager.clearCooldown(CHARGING_COOLDOWN_KEY, uuid);
-        EnchantmentDataManager.clearCooldown(NOT_READY_COOLDOWN_KEY, uuid);
-    }
-
-    @SubscribeEvent
-    public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
-        if (evt.player.level().isClientSide || evt.phase != TickEvent.Phase.START
-                || evt.player.tickCount % TICK_INTERVAL.getInt() != 0) {
-            return;
-        }
-        Player player = evt.player;
-        if (!player.isAlive()) {
-            return;
-        }
-        UUID uuid = player.getUUID();
-        boolean inChargingPeriod = EnchantmentDataManager.isOnCooldown(CHARGING_COOLDOWN_KEY, uuid);
-        boolean stillWaiting = EnchantmentDataManager.isOnCooldown(NOT_READY_COOLDOWN_KEY, uuid);
-        if (inChargingPeriod && stillWaiting) {
-            playLevelUpSound(player, 3);
-        }
-    }
-
-    @Override
     public int getMinCost(int enchantmentLevel) {
-        return (int) (35 * ConfigLoader.enchantingDifficulty);
+        return 0;
     }
-
-    @Override
     public int getMaxCost(int enchantmentLevel) {
-        return getMinCost(enchantmentLevel) + 50;
+        return 0;
     }
 }
+
