@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.dynamicattr;
 
+import net.minecraft.core.Holder;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
@@ -15,7 +16,7 @@ import java.util.Map;
  */
 public class DynamicAttribute {
     private final String registryName;
-    private final Map<Attribute, ModifierConfig> modifierConfigs = new HashMap<>();
+    private final Map<Holder<Attribute>, ModifierConfig> modifierConfigs = new HashMap<>();
     private EffectCallback onTickCallback;
     private int tickInterval = 20;
 
@@ -44,12 +45,12 @@ public class DynamicAttribute {
     /**
      * 添加属性修改器(固定值)
      *
-     * @param attribute 目标属性
+     * @param attribute 目标属性（1.21.1 的 {@code Attributes.X} 本身就是 {@code Holder<Attribute>}）
      * @param baseValue 基础值,会根据amplifier放大: baseValue * (amplifier + 1)
      * @param operation 运算方式
      * @return this,支持链式调用
      */
-    public DynamicAttribute addModifier(Attribute attribute, double baseValue, AttributeModifier.Operation operation) {
+    public DynamicAttribute addModifier(Holder<Attribute> attribute, double baseValue, AttributeModifier.Operation operation) {
         modifierConfigs.put(attribute, new ModifierConfig(baseValue, operation, null));
         return this;
     }
@@ -62,7 +63,7 @@ public class DynamicAttribute {
      * @param calculator 自定义计算器,根据amplifier计算最终值
      * @return this,支持链式调用
      */
-    public DynamicAttribute addModifier(Attribute attribute, AttributeModifier.Operation operation,
+    public DynamicAttribute addModifier(Holder<Attribute> attribute, AttributeModifier.Operation operation,
                                         @Nonnull ValueCalculator calculator) {
         modifierConfigs.put(attribute, new ModifierConfig(0, operation, calculator));
         return this;
@@ -228,7 +229,7 @@ public class DynamicAttribute {
         return registryName;
     }
 
-    public Map<Attribute, ModifierConfig> getModifierConfigs() {
+    public Map<Holder<Attribute>, ModifierConfig> getModifierConfigs() {
         return modifierConfigs;
     }
 

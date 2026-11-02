@@ -14,12 +14,11 @@ import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.Reference;
+
 import javax.annotation.Nonnull;
 import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
- * PORT-STUB(B2a)
- *
  * 不祥预感药水效果
  * <p>
  * 效果：
@@ -29,16 +28,65 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * - 治疗量减少50%
  * </p>
  */
-@Deprecated
+@EventBusSubscriber
 public class MobEffectBadOmen extends IconBase {
+
     public MobEffectBadOmen(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
+
+        this.addAttributeModifier(
+                Attributes.ATTACK_DAMAGE,
+                modifierId("bad_omen", "attack_damage"),
+                -0.2,
+                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL
+        );
+        this.addAttributeModifier(
+                Attributes.ATTACK_SPEED,
+                modifierId("bad_omen", "attack_speed"),
+                -0.2,
+                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL
+        );
     }
-    public boolean isDurationEffectTick(int duration, int amplifier) {
-        return false;
+
+    /**
+     * 受到伤害增加25%
+     */
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
+            return;
+        }
+
+        LivingEntity victim = evt.getEntity();
+        if (victim.hasEffect(CarianStylePotion.BAD_OMEN)) {
+            evt.setAmount(evt.getAmount() * 1.25f);
+        }
     }
-    @Nonnull @OnlyIn(Dist.CLIENT) protected ResourceLocation getIconTexture() {
-        return null;
+
+    /**
+     * 治疗量减少50%
+     */
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
+            return;
+        }
+
+        LivingEntity healer = evt.getEntity();
+        if (healer.hasEffect(CarianStylePotion.BAD_OMEN)) {
+            evt.setAmount(evt.getAmount() * 0.5f);
+        }
+    }
+
+    @Override
+    public boolean shouldApplyEffectTickThisTick(int duration, int amplifier) {
+        return duration % 20 == 0;
+    }
+
+    @Nonnull
+    @Override
+    @OnlyIn(Dist.CLIENT)
+    protected ResourceLocation getIconTexture() {
+        return ResourceLocation.fromNamespaceAndPath(Reference.MOD_ID, "textures/mob_effect/bad_omen.png");
     }
 }
-

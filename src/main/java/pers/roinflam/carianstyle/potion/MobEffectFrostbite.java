@@ -10,11 +10,10 @@ import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
+
 import javax.annotation.Nonnull;
 
 /**
- * PORT-STUB(B2a)
- *
  * 冻伤药水效果
  * <p>
  * 效果：
@@ -29,16 +28,38 @@ import javax.annotation.Nonnull;
  *   2. 先移除的效果会把另一个的修改器也删掉
  * </p>
  */
-@Deprecated
 public class MobEffectFrostbite extends IconBase {
+
     public MobEffectFrostbite(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
+
+        // v2.1修复：换用独立UUID，避免与MobEffectSleep的移速修改器冲突
+        // 原UUID "5d59080b-eda9-f5b7-1b3c-51568e5b6682" 与Sleep共用
+        this.addAttributeModifier(
+                Attributes.MOVEMENT_SPEED,
+                modifierId("frostbite", "movement_speed"),
+                -0.075,
+                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL
+        );
     }
-    public boolean isDurationEffectTick(int duration, int amplifier) {
-        return false;
+
+    @Override
+    public boolean applyEffectTick(@Nonnull LivingEntity entityLivingBaseIn, int amplifier) {
+        float damage = entityLivingBaseIn.getMaxHealth() * 0.0025f;
+        damage += damage * amplifier;
+        entityLivingBaseIn.hurt(NewDamageSource.frostbite(entityLivingBaseIn.level()), damage);
+        return true;
     }
-    @Nonnull @OnlyIn(Dist.CLIENT) protected ResourceLocation getIconTexture() {
-        return null;
+
+    @Override
+    public boolean shouldApplyEffectTickThisTick(int duration, int amplifier) {
+        return duration % 10 == 0;
+    }
+
+    @Nonnull
+    @Override
+    @OnlyIn(Dist.CLIENT)
+    protected ResourceLocation getIconTexture() {
+        return ResourceLocation.fromNamespaceAndPath(Reference.MOD_ID, "textures/mob_effect/frostbite.png");
     }
 }
-

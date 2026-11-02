@@ -13,13 +13,12 @@ import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+
 import javax.annotation.Nonnull;
 import net.neoforged.fml.common.EventBusSubscriber;
 import pers.roinflam.carianstyle.event.LivingTickEvent;
 
 /**
- * PORT-STUB(B2a)
- *
  * 重力药水效果
  * <p>
  * 效果：
@@ -29,13 +28,47 @@ import pers.roinflam.carianstyle.event.LivingTickEvent;
  * - 无法跳跃
  * </p>
  */
-@Deprecated
+@EventBusSubscriber
 public class MobEffectGravitas extends IconBase {
+
     public MobEffectGravitas(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
+
+        this.addAttributeModifier(
+                Attributes.ATTACK_SPEED,
+                modifierId("gravitas", "attack_speed"),
+                -0.01,
+                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL
+        );
+        this.addAttributeModifier(
+                Attributes.MOVEMENT_SPEED,
+                modifierId("gravitas", "movement_speed"),
+                -0.01,
+                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL
+        );
+        this.addAttributeModifier(
+                Attributes.FLYING_SPEED,
+                modifierId("gravitas", "flying_speed"),
+                -0.01,
+                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL
+        );
     }
-    @Nonnull @OnlyIn(Dist.CLIENT) protected ResourceLocation getIconTexture() {
-        return null;
+
+    /**
+     * 重力状态下无法跳跃
+     */
+    @SubscribeEvent
+    public static void onLivingUpdate(@Nonnull LivingTickEvent evt) {
+        LivingEntity entityLiving = evt.getEntity();
+        if (entityLiving.hasEffect(CarianStylePotion.GRAVITAS)) {
+            EntityLivingUtil.setJumped(entityLiving);
+        }
+    }
+
+    @Nonnull
+    @Override
+    @OnlyIn(Dist.CLIENT)
+    protected ResourceLocation getIconTexture() {
+        return ResourceLocation.fromNamespaceAndPath(Reference.MOD_ID, "textures/mob_effect/gravitas.png");
     }
 }
-

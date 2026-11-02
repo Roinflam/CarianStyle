@@ -9,11 +9,10 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.utils.Reference;
+
 import javax.annotation.Nonnull;
 
 /**
- * PORT-STUB(B2a)
- *
  * 黄金树祝福药水效果
  * <p>
  * 效果：
@@ -53,16 +52,51 @@ import javax.annotation.Nonnull;
  * @author RoinFlam
  * @version 1.1
  */
-@Deprecated
 public class MobEffectBlessingOfTheErdtree extends IconBase {
+
     public MobEffectBlessingOfTheErdtree(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
+
+        this.addAttributeModifier(
+                Attributes.MAX_HEALTH,
+                modifierId("blessing_of_the_erdtree", "max_health"),
+                0.15,
+                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL
+        );
     }
-    public boolean isDurationEffectTick(int duration, int amplifier) {
-        return false;
+
+    @Override
+    public boolean shouldApplyEffectTickThisTick(int duration, int amplifier) {
+        return duration % 60 == 0;
     }
-    @Nonnull @OnlyIn(Dist.CLIENT) protected ResourceLocation getIconTexture() {
-        return null;
+
+    /**
+     * 每 3 秒回复最大生命值×4%×(等级+1)。
+     * <p>
+     * <b>v1.1：仅在逻辑服务端执行。</b>原版会在双端各调用一次本方法，
+     * 而客户端因各类治疗修正监听器被守卫拦下、算出的治疗量与服务端不一致，
+     * 会造成血条闪跳（详见类注释的「v1.1 修复」小节）。
+     * </p>
+     *
+     * @param entityLivingBaseIn 受影响的实体
+     * @param amplifier          效果等级
+     */
+    @Override
+    public boolean applyEffectTick(@Nonnull LivingEntity entityLivingBaseIn, int amplifier) {
+        // v1.1 客户端守卫：治疗只在逻辑服务端结算一次，
+        // 血量经原版同步机制下发给客户端，避免两侧治疗量不一致导致血条闪跳。
+        if (entityLivingBaseIn.level().isClientSide) {
+            return true;
+        }
+
+        entityLivingBaseIn.heal(entityLivingBaseIn.getMaxHealth() * (amplifier + 1) * 0.04f);
+        return true;
+    }
+
+    @Nonnull
+    @Override
+    @OnlyIn(Dist.CLIENT)
+    protected ResourceLocation getIconTexture() {
+        return ResourceLocation.fromNamespaceAndPath(Reference.MOD_ID, "textures/mob_effect/blessing_of_the_erdtree.png");
     }
 }
-

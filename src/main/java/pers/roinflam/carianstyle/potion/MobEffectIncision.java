@@ -17,13 +17,11 @@ import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
+
 import javax.annotation.Nonnull;
-import java.util.UUID;
 import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
- * PORT-STUB(B2a)
- *
  * 切割药水效果
  * <p>
  * 效果：
@@ -99,7 +97,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * <b>真实成因是每 tick 掉血触发了原版的「受伤镜头倾斜」：</b>
  * </p>
  * <ol>
- *     <li>本效果的 {@link #isDurationEffectTick} 恒为 true，故每 tick 都会
+ *     <li>本效果的 {@link #shouldApplyEffectTickThisTick} 恒为 true，故每 tick 都会
  *         {@code setHealth}，服务端 {@code ServerPlayer.doTick()} 随之每 tick
  *         下发一个 {@code ClientboundSetHealthPacket}；</li>
  *     <li>客户端 {@code ClientPacketListener.handleSetHealth} 调用
@@ -139,27 +137,207 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 3.2
  */
-@Deprecated
+@EventBusSubscriber
 public class MobEffectIncision extends IconBase {
-    public static final String NAME = "potion.incision";
+
+    /**
+     * 瞬时移动速度修饰符的 id
+     * <p>
+     * 1.20.1 是 UUID {@code 0a6b62ca-ead9-3641-c4dd-a4d33daf5cc1}（名字 {@code potion.incision}）；
+     * 1.21.1 的修饰符只有 id、没有名字。客户端的刀痕渲染也按这个 id 读当前加速。
+     * </p>
+     */
+    public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath(Reference.MOD_ID, "effect/incision/speed_transient");
+
+    /** 速度衰减下限 */
     private static final double SPEED_DECAY_FLOOR = 0.3;
+
+    /**
+     * 速度衰减的执行间隔（tick）。
+     * <p>v3.2：由每 tick 改为每 5 tick 执行一次，以削减 {@code MOVEMENT_SPEED}
+     * 的脏属性同步包（详见类注释「v3.2 性能」小节）。</p>
+     */
     private static final int SPEED_DECAY_INTERVAL_TICKS = 5;
+
+    /**
+     * 单次衰减量（每 {@link #SPEED_DECAY_INTERVAL_TICKS} tick 扣减的加成值）。
+     * <p>{@code 0.15 / 4.0 = 0.0375}，即每秒衰减 0.15 —— 与 v3.1 的「每 tick 衰减
+     * {@code 0.15/20}」<b>速率完全相同</b>，机制时长不变（1.20 → 0.30 耗时 6 秒）。</p>
+     */
     private static final double SPEED_DECAY_PER_STEP = 0.15 / 4.0;
+
+    /**
+     * 致死伤害倍率（× 最大生命）。
+     * <p>取足够大的值确保穿透护甲与各类减伤后仍然致命，同时避免使用
+     * {@code Float.MAX_VALUE} 在后续伤害计算中产生溢出 / NaN。</p>
+     */
     private static final float LETHAL_DAMAGE_MULTIPLIER = 10.0f;
+
     public MobEffectIncision(boolean isBadEffectIn, int liquidColorIn) {
         super(isBadEffectIn ? MobEffectCategory.HARMFUL : MobEffectCategory.BENEFICIAL, liquidColorIn);
-    }
-    public void removeAttributeModifiers(@Nonnull LivingEntity entityLivingBaseIn, @Nonnull AttributeMap attributeMapIn, int amplifier) {
-    }
-    public void addAttributeModifiers(@Nonnull LivingEntity entityLivingBaseIn, @Nonnull AttributeMap attributeMapIn, int amplifier) {
-    }
-    public boolean isDurationEffectTick(int duration, int amplifier) {
-        return false;
-    }
-    @Nonnull @OnlyIn(Dist.CLIENT) protected ResourceLocation getIconTexture() {
-        return null;
-    }
-    /** 切腹瞬时移速修饰符的 id（G.2） */
-    public static final net.minecraft.resources.ResourceLocation ID = net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(pers.roinflam.carianstyle.utils.Reference.MOD_ID, "effect/incision/speed_transient"); // PORT-STUB
-}
 
+        this.addAttributeModifier(
+                Attributes.ATTACK_DAMAGE,
+                modifierId("incision", "attack_damage"),
+                0.4,
+                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL
+        );
+        this.addAttributeModifier(
+                Attributes.ATTACK_SPEED,
+                modifierId("incision", "attack_speed"),
+                0.8,
+                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL
+        );
+        this.addAttributeModifier(
+                Attributes.ARMOR,
+                modifierId("incision", "armor"),
+                -0.75,
+                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL
+        );
+        this.addAttributeModifier(
+                Attributes.ARMOR_TOUGHNESS,
+                modifierId("incision", "armor_toughness"),
+                -0.75,
+                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL
+        );
+    }
+
+    /**
+     * 移除时连带去掉瞬时加速
+     * <p>
+     * 1.20.1 覆写的是 {@code removeAttributeModifiers(LivingEntity, AttributeMap, int)}，实体参数只用来取移速属性；
+     * 1.21.1 这个方法只剩 {@code (AttributeMap)}，属性直接从 map 里取，效果一样。
+     * 原版只在服务端调它：效果移除时（{@code onEffectRemoved}），以及升级重施时先删后加（{@code onEffectUpdated}）。
+     * </p>
+     */
+    @Override
+    public void removeAttributeModifiers(@Nonnull AttributeMap attributeMapIn) {
+        AttributeInstance speedAttr = attributeMapIn.getInstance(Attributes.MOVEMENT_SPEED);
+        if (speedAttr != null) {
+            speedAttr.removeModifier(ID);
+        }
+        super.removeAttributeModifiers(attributeMapIn);
+    }
+
+    /**
+     * 加上时给初始 +120% 移速（之后由 {@link #applyEffectTick} 逐步衰减到 +30%）
+     * <p>
+     * <b>为什么覆写这里、不放 {@code onEffectStarted}：</b>1.21.1 的 {@code onEffectStarted} 每次 {@code addEffect} 都会调，
+     * 包括同等级的重复施加（原版只刷新时长），那时修饰符还在，{@code addTransientModifier} 撞 id 直接抛异常。
+     * 本方法的调用时机和 1.20.1 完全一样：首次加上（{@code onEffectAdded}）、升级重施（{@code onEffectUpdated}，
+     * 先调 {@link #removeAttributeModifiers} 再调本方法，加速重置回 +120%），都只在服务端。
+     * </p>
+     * <p>
+     * 用 {@code addOrUpdateTransientModifier}：同 id 已存在时直接替换、不抛异常，
+     * 万一别的模组绕过上面的流程重复调用也不会崩。瞬时修饰符不进存档（和 1.20.1 一样）。
+     * </p>
+     */
+    @Override
+    public void addAttributeModifiers(@Nonnull AttributeMap attributeMapIn, int amplifier) {
+        // 初始移动速度+120%
+        AttributeInstance speedAttr = attributeMapIn.getInstance(Attributes.MOVEMENT_SPEED);
+        if (speedAttr != null) {
+            speedAttr.addOrUpdateTransientModifier(
+                    new AttributeModifier(ID, 1.2, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+        }
+        super.addAttributeModifiers(attributeMapIn, amplifier);
+    }
+
+    /**
+     * 治疗量+60%
+     */
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public static void onLivingHeal(@Nonnull LivingHealEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
+            return;
+        }
+
+        LivingEntity healer = evt.getEntity();
+        if (healer.hasEffect(CarianStylePotion.INCISION)) {
+            evt.setAmount(evt.getAmount() * 1.6f);
+        }
+    }
+
+    /**
+     * 每tick扣血 + 速度衰减（直接执行，不再创建延迟任务）
+     * <p>
+     * <b>v3.1：仅在逻辑服务端执行。</b>原版会在双端各调用一次本方法，
+     * 若不加守卫，客户端会自行走死亡逻辑并因 {@code getServer()} 为 null 而崩溃
+     * （详见类注释的「v3.1 修复」小节）。
+     * </p>
+     * <p>
+     * <b>v3.2：速度衰减改为每 {@link #SPEED_DECAY_INTERVAL_TICKS} tick 执行一次</b>，
+     * 每秒总衰减速率不变，仅削减属性同步包数量（详见类注释的「v3.2 性能」小节）。
+     * 扣血仍保持每 tick，以维持原有的掉血手感与致死时机。
+     * </p>
+     *
+     * @param entityLivingBaseIn 受影响的实体
+     * @param amplifier          效果等级
+     */
+    @Override
+    public boolean applyEffectTick(@Nonnull LivingEntity entityLivingBaseIn, int amplifier) {
+        // v3.1 客户端守卫：扣血与速度衰减只在逻辑服务端执行一次。
+        // 缺少此判断会导致客户端自行走死亡逻辑 -> getServer() 为 null -> 崩溃。
+        if (entityLivingBaseIn.level().isClientSide) {
+            return true;
+        }
+
+        // ========== 扣血 ==========
+        // 回溯无敌期间不掉血：直扣血量拦不到，致死那一击的 10 倍最大生命还会被算进储存伤害
+        if (!EnchantmentTimeReversal.isReversing(entityLivingBaseIn)) {
+            float damage = entityLivingBaseIn.getMaxHealth() * 0.125f / 20;
+
+            if (entityLivingBaseIn.getHealth() - damage * 2 > 0) {
+                // 常规掉血：直扣血量，不走伤害管线。
+                // 每秒 20 次走 hurt() 会让全部受击类附魔各触发 20 次，
+                // 既是性能灾难也会让机制行为跑偏；持续掉血语义上是「自我消耗」而非「受到攻击」。
+                entityLivingBaseIn.setHealth(entityLivingBaseIn.getHealth() - damage);
+            } else {
+                // v3.1 致死路径：改走原版伤害管线，不再用 EntityLivingUtil.kill 强制处决。
+                // 原实现会绕过 hurt()，导致不死图腾与各类免死机制全部失效。
+                entityLivingBaseIn.hurt(
+                        NewDamageSource.hemorrhage(entityLivingBaseIn.level()),
+                        entityLivingBaseIn.getMaxHealth() * LETHAL_DAMAGE_MULTIPLIER
+                );
+                return true;
+            }
+        }
+
+        // ========== 速度衰减 ==========
+        // v3.2 降频：每 SPEED_DECAY_INTERVAL_TICKS tick 才衰减一次。
+        // 用世界游戏刻取模而非各实体独立计数，无需额外状态；不同实体的衰减时机同相，
+        // 但衰减是纯数值变化、无视觉节奏可言，同相不会产生任何观感问题。
+        if (entityLivingBaseIn.level().getGameTime() % SPEED_DECAY_INTERVAL_TICKS != 0) {
+            return true;
+        }
+
+        AttributeInstance attributeInstance = entityLivingBaseIn.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (attributeInstance == null) {
+            return true;
+        }
+
+        AttributeModifier modifier = attributeInstance.getModifier(ID);
+        if (modifier != null) {
+            double currentBonus = modifier.amount();
+            if (currentBonus > SPEED_DECAY_FLOOR) {
+                attributeInstance.removeModifier(ID);
+                double newBonus = Math.max(currentBonus - SPEED_DECAY_PER_STEP, SPEED_DECAY_FLOOR);
+                attributeInstance.addTransientModifier(
+                        new AttributeModifier(ID, newBonus, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public boolean shouldApplyEffectTickThisTick(int duration, int amplifier) {
+        return true;
+    }
+
+    @Nonnull
+    @Override
+    @OnlyIn(Dist.CLIENT)
+    protected ResourceLocation getIconTexture() {
+        return ResourceLocation.fromNamespaceAndPath(Reference.MOD_ID, "textures/mob_effect/incision.png");
+    }
+}

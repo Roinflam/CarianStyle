@@ -1,23 +1,23 @@
 package pers.roinflam.carianstyle.dynamicattr;
 
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
-import net.neoforged.neoforge.event.entity.living.LivingEvent;
 import net.neoforged.bus.api.SubscribeEvent;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import pers.roinflam.carianstyle.event.LivingTickEvent;
+import pers.roinflam.carianstyle.utils.Reference;
 
 /**
- * PORT-STUB(B2a)
- *
  * 动态属性管理器
  * 负责应用、移除、更新实体的动态属性
  * <p>
@@ -81,26 +81,389 @@ import pers.roinflam.carianstyle.event.LivingTickEvent;
  * @author RoinFlam
  * @version 2.2
  */
-@Deprecated
+@EventBusSubscriber
 public class DynamicAttributeManager {
-    private static final String NAMESPACE = "carianstyle:dynamic_attribute:";
+
+
+    /**
+     * 实体UUID → 动态属性实例列表
+     * <p>
+     * ConcurrentHashMap 保证 key 级别的线程安全，但 value(ArrayList) 本身不是线程安全的。
+     * 所有对 List 的操作都应在主线程（服务端tick）中进行。
+     * </p>
+     */
     private static final Map<UUID, List<DynamicAttributeInstance>> ENTITY_ATTRIBUTES = new ConcurrentHashMap<>();
+
+    /**
+     * 应用动态属性到实体
+     * <p>
+     * v2.2：等级相同的重复 apply 只刷新持续时间，不再重建实例
+     * （避免属性同步包、事件总线注册抖动与客户端同步广播风暴，详见类注释）。
+     * </p>
+     *
+     * @param entity   目标实体
+     * @param instance 属性实例
+     */
     public static void apply(@Nonnull LivingEntity entity, @Nonnull DynamicAttributeInstance instance) {
+        UUID entityId = entity.getUUID();
+        List<DynamicAttributeInstance> instances = ENTITY_ATTRIBUTES.computeIfAbsent(entityId, k -> new ArrayList<>());
+
+        // v2.2：普通循环替代 stream，避免每次调用分配 Stream / Predicate / Optional
+        DynamicAttributeInstance existing = null;
+        for (int i = 0; i < instances.size(); i++) {
+            DynamicAttributeInstance candidate = instances.get(i);
+            if (candidate.getAttribute().equals(instance.getAttribute())) {
+                existing = candidate;
+                break;
+            }
+        }
+
+        if (existing != null) {
+            // v2.2 核心：等级相同 → 修正器数值必然一致，拆了重装毫无意义。
+            // 只刷新持续时间即可，跳过「移除修正器 / 注销处理器 / onRemoved / onApplied」全套开销。
+            // 时长取 max(旧, 新)，与优化前的结果完全相同（推导见类注释）
+            if (instance.getAmplifier() == existing.getAmplifier()) {
+                existing.refresh(Math.max(existing.getDuration(), instance.getDuration()));
+                return;
+            }
+
+            // 等级不同：沿用原有覆盖判定，行为一字未改
+            if (instance.shouldOverride(existing)) {
+                remove(entity, existing);
+                instances.remove(existing);
+            } else {
+                existing.refresh(Math.max(existing.getDuration(), instance.getDuration()));
+                return;
+            }
+        }
+
+        instances.add(instance);
+        applyModifiers(entity, instance);
+
+        if (instance.getAttribute().hasEventHandler()) {
+            Object handler = instance.getAttribute().createEventHandler(entity);
+            instance.setEventHandler(handler);
+        }
+
+        // 触发应用回调
+        instance.getAttribute().triggerOnApplied(entity);
     }
+
+    /**
+     * 移除实体的指定动态属性
+     * <p>v2.2：普通循环替代 stream。</p>
+     *
+     * @param entity    目标实体
+     * @param attribute 要移除的属性
+     */
     public static void remove(@Nonnull LivingEntity entity, @Nonnull DynamicAttribute attribute) {
+        UUID entityId = entity.getUUID();
+        List<DynamicAttributeInstance> instances = ENTITY_ATTRIBUTES.get(entityId);
+        if (instances == null) return;
+
+        for (int i = 0; i < instances.size(); i++) {
+            DynamicAttributeInstance instance = instances.get(i);
+            if (!instance.getAttribute().equals(attribute)) {
+                continue;
+            }
+
+            removeModifiers(entity, instance);
+            instance.unregisterEventHandler();
+
+            // 触发移除回调
+            attribute.triggerOnRemoved(entity);
+
+            instances.remove(i);
+            return;
+        }
     }
+
+    /**
+     * 移除动态属性实例(内部方法)
+     *
+     * @param entity   目标实体
+     * @param instance 要移除的实例
+     */
+    private static void remove(@Nonnull LivingEntity entity, @Nonnull DynamicAttributeInstance instance) {
+        removeModifiers(entity, instance);
+        instance.unregisterEventHandler();
+
+        // 触发移除回调
+        instance.getAttribute().triggerOnRemoved(entity);
+
+        UUID entityId = entity.getUUID();
+        List<DynamicAttributeInstance> instances = ENTITY_ATTRIBUTES.get(entityId);
+        if (instances != null) {
+            instances.remove(instance);
+        }
+    }
+
+    /**
+     * 检查实体是否拥有指定动态属性
+     * <p>v2.2：普通循环替代 stream（本方法在战斗中调用极频繁）。</p>
+     *
+     * @param entity    目标实体
+     * @param attribute 要检查的属性
+     * @return true表示拥有
+     */
     public static boolean has(@Nonnull LivingEntity entity, @Nonnull DynamicAttribute attribute) {
+        List<DynamicAttributeInstance> instances = ENTITY_ATTRIBUTES.get(entity.getUUID());
+        if (instances == null) return false;
+
+        for (int i = 0; i < instances.size(); i++) {
+            if (instances.get(i).getAttribute().equals(attribute)) {
+                return true;
+            }
+        }
         return false;
     }
+
+    /**
+     * 获取实体指定动态属性的等级
+     * <p>v2.2：普通循环替代 stream（本方法在战斗中调用极频繁）。</p>
+     *
+     * @param entity    目标实体
+     * @param attribute 要查询的属性
+     * @return 等级，如果不存在返回-1
+     */
     public static int getAmplifier(@Nonnull LivingEntity entity, @Nonnull DynamicAttribute attribute) {
-        return 0;
+        List<DynamicAttributeInstance> instances = ENTITY_ATTRIBUTES.get(entity.getUUID());
+        if (instances == null) return -1;
+
+        for (int i = 0; i < instances.size(); i++) {
+            DynamicAttributeInstance instance = instances.get(i);
+            if (instance.getAttribute().equals(attribute)) {
+                return instance.getAmplifier();
+            }
+        }
+        return -1;
     }
-    @Nullable public static List<DynamicAttributeInstance> getInstances(@Nonnull LivingEntity entity) {
-        return java.util.List.of();
+
+    /**
+     * 获取实体身上的所有动态属性实例
+     *
+     * @param entity 目标实体
+     * @return 动态属性实例列表，如果没有则返回null
+     */
+    @Nullable
+    public static List<DynamicAttributeInstance> getInstances(@Nonnull LivingEntity entity) {
+        return ENTITY_ATTRIBUTES.get(entity.getUUID());
     }
+
+    /**
+     * 清除实体的所有动态属性
+     *
+     * @param entity 目标实体
+     */
     public static void clearAll(@Nonnull LivingEntity entity) {
+        UUID entityId = entity.getUUID();
+        List<DynamicAttributeInstance> instances = ENTITY_ATTRIBUTES.remove(entityId);
+        if (instances != null) {
+            // clearAll不在tick循环中调用，安全性优先，复制后遍历
+            List<DynamicAttributeInstance> snapshot = new ArrayList<>(instances);
+            for (DynamicAttributeInstance instance : snapshot) {
+                removeModifiers(entity, instance);
+                instance.unregisterEventHandler();
+                instance.getAttribute().triggerOnRemoved(entity);
+            }
+        }
     }
+
+    /**
+     * 应用属性修改器到实体
+     *
+     * <h3>1.21.1：改成不进存档的临时修饰符</h3>
+     * <p>
+     * <b>问题：</b>动态属性的状态只在内存（{@link #ENTITY_ATTRIBUTES}），1.20.1 的修饰符却是永久的（进存档）。
+     * 实体离开世界时 {@code ClientSyncEffectEventHandler.onEntityLeaveLevel} 会 {@link #clearAll}，
+     * 可存档在那之前已经写完了：下线是先存玩家数据再移出世界，区块卸载是先存实体再卸载，
+     * 非玩家换维度是新实体从旧实体的存档数据复制。于是存档里永远带着修饰符、内存里的状态却没了，
+     * 读回来就是永久残留（碎步、群星律法的加速一直挂着，效果早就没了）。
+     * </p>
+     * <p>
+     * <b>为什么这么改：</b>用 {@code addTransientModifier}，存档里没有这些修饰符；离开世界时
+     * 状态和修饰符一起清掉，回来两边都是空的，前后一致。玩家重生只复制属性基础值，临时、永久都不复制，和以前一样。
+     * </p>
+     * <p>
+     * <b>行为影响：</b>下线再上、区块重载、换维度、重启之后不再残留加速 / 减益。
+     * 旧存档里已经残留的永久修饰符由 {@link LegacyModifierMigration} 在进世界时清掉。
+     * 要改回永久修饰符，只动下面 {@code addTransientModifier} 那一行。
+     * </p>
+     *
+     * @param entity   目标实体
+     * @param instance 属性实例
+     */
+    private static void applyModifiers(@Nonnull LivingEntity entity, @Nonnull DynamicAttributeInstance instance) {
+        DynamicAttribute attribute = instance.getAttribute();
+
+        for (Map.Entry<Holder<Attribute>, DynamicAttribute.ModifierConfig> entry : attribute.getModifierConfigs().entrySet()) {
+            Holder<Attribute> targetAttr = entry.getKey();
+            DynamicAttribute.ModifierConfig config = entry.getValue();
+
+            AttributeInstance attrInstance = entity.getAttribute(targetAttr);
+            if (attrInstance == null) continue;
+
+            ResourceLocation modifierId = getModifierId(attribute.getRegistryName(), targetAttr);
+
+            // 同 id 重复 add 会抛异常，先摘掉旧的（等级变了要换数值）
+            attrInstance.removeModifier(modifierId);
+
+            double finalValue = config.calculate(instance.getAmplifier());
+
+            AttributeModifier newModifier = new AttributeModifier(
+                    modifierId,
+                    finalValue,
+                    config.operation
+            );
+
+            attrInstance.addTransientModifier(newModifier);
+        }
+    }
+
+    /**
+     * 移除属性修改器
+     *
+     * @param entity   目标实体
+     * @param instance 属性实例
+     */
+    private static void removeModifiers(@Nonnull LivingEntity entity, @Nonnull DynamicAttributeInstance instance) {
+        DynamicAttribute attribute = instance.getAttribute();
+
+        for (Holder<Attribute> targetAttr : attribute.getModifierConfigs().keySet()) {
+            AttributeInstance attrInstance = entity.getAttribute(targetAttr);
+            if (attrInstance == null) continue;
+
+            attrInstance.removeModifier(getModifierId(attribute.getRegistryName(), targetAttr));
+        }
+    }
+
+    /**
+     * 修改器 id：{@code carianstyle:dynamic/<动态属性名>/<属性路径>}
+     * <p>
+     * 1.20.1 用的是 {@code UUID.nameUUIDFromBytes("carianstyle:dynamic_attribute:" + 名 + ":" + 属性 descriptionId)}；
+     * 1.21.1 修饰符按 ResourceLocation 区分，同样由名字确定、重启后不变。旧 UUID 的算法留在
+     * {@link LegacyModifierMigration} 里，只用来清旧存档。
+     * </p>
+     *
+     * @param attributeName 动态属性名
+     * @param targetAttr    目标属性
+     * @return 固定的修改器 id
+     */
+    private static ResourceLocation getModifierId(String attributeName, Holder<Attribute> targetAttr) {
+        String path = targetAttr.unwrapKey()
+                .map(key -> key.location().getPath())
+                .orElseGet(() -> targetAttr.value().getDescriptionId());
+        return ResourceLocation.fromNamespaceAndPath(Reference.MOD_ID, "dynamic/" + attributeName + "/" + path);
+    }
+
+    /**
+     * 玩家Tick事件监听
+     * 处理动态属性的时间流逝和Tick回调
+     */
+    @SubscribeEvent
+    public static void onPlayerTick(PlayerTickEvent.Pre event) {
+        if (event.getEntity().level().isClientSide()) {
+            return;
+        }
+
+        processEntityTick(event.getEntity());
+    }
+
+    /**
+     * 所有生物实体Tick事件监听（包括Mob、动物等）
+     * 处理非玩家实体的动态属性
+     * <p>
+     * v2.1优化：增加快速退出检查。
+     * ENTITY_ATTRIBUTES 通常只包含少量有动态属性的实体UUID，
+     * 但 LivingTickEvent 对加载区块中的所有生物触发（可能数千个）。
+     * 通过 isEmpty() 和 containsKey() 快速退出，避免无效的 getUUID() 调用。
+     * </p>
+     */
+    @SubscribeEvent
+    public static void onLivingTick(LivingTickEvent event) {
+        LivingEntity entity = event.getEntity();
+
+        if (entity.level().isClientSide() || entity instanceof net.minecraft.world.entity.player.Player) {
+            return;
+        }
+
+        // v2.1优化：全局无动态属性时直接退出（覆盖和平时期99%的情况）
+        if (ENTITY_ATTRIBUTES.isEmpty()) {
+            return;
+        }
+
+        // v2.1优化：该实体无动态属性时直接退出
+        if (!ENTITY_ATTRIBUTES.containsKey(entity.getUUID())) {
+            return;
+        }
+
+        processEntityTick(entity);
+    }
+
+    /**
+     * 处理实体的Tick逻辑（提取公共方法）
+     * <p>
+     * v2.1优化：消除每tick的ArrayList快照分配。
+     * 原实现：new ArrayList&lt;&gt;(instances) + new ArrayList&lt;&gt;() for expired → 2次分配/tick/entity
+     * 优化后：使用 Iterator 直接遍历，过期项就地处理并通过 iterator.remove() 移除，零额外分配。
+     * 列表清空后从Map移除entry，减少后续查找范围。
+     * </p>
+     *
+     * @param entity 要处理的实体
+     */
+    private static void processEntityTick(LivingEntity entity) {
+        UUID entityId = entity.getUUID();
+        List<DynamicAttributeInstance> instances = ENTITY_ATTRIBUTES.get(entityId);
+
+        if (instances == null || instances.isEmpty()) return;
+
+        // v2.1优化：使用 Iterator 直接遍历并移除，避免创建快照ArrayList和expired列表
+        Iterator<DynamicAttributeInstance> iterator = instances.iterator();
+        while (iterator.hasNext()) {
+            DynamicAttributeInstance instance = iterator.next();
+
+            // 时间流逝检查：返回true表示已过期
+            if (instance.tick(1)) {
+                // 过期：就地移除并执行清理回调
+                iterator.remove();
+                removeModifiers(entity, instance);
+                instance.unregisterEventHandler();
+                instance.getAttribute().triggerOnRemoved(entity);
+                continue;
+            }
+
+            // Tick回调检查
+            if (instance.shouldTriggerTick()) {
+                DynamicAttribute.EffectCallback onTick = instance.getAttribute().getOnTickCallback();
+                if (onTick != null) {
+                    try {
+                        EffectContext context = new EffectContext(
+                                entity,
+                                instance,
+                                instance.calculateTotalTicks(),
+                                instance.getTotalTicksTriggered()
+                        );
+                        onTick.accept(context);
+                    } catch (Exception e) {
+                        System.err.println("动态属性tick异常: " + instance.getAttribute().getRegistryName());
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+
+        // v2.1：列表清空后从Map移除entry，减少后续 containsKey/isEmpty 的查找范围
+        if (instances.isEmpty()) {
+            ENTITY_ATTRIBUTES.remove(entityId);
+        }
+    }
+
+    /**
+     * 实体移除时清理数据
+     *
+     * @param entity 被移除的实体
+     */
     public static void onEntityRemove(@Nonnull LivingEntity entity) {
+        clearAll(entity);
     }
 }
-

@@ -125,7 +125,12 @@ public class ClientSyncEffectEventHandler {
 
     /**
      * 实体从世界中移除时清理
-     * 包括实体卸载、维度切换等情况
+     * 包括实体卸载、维度切换、玩家下线等情况
+     * <p>
+     * 1.21.1：动态属性的修饰符改成了不进存档的临时修饰符（见 {@code DynamicAttributeManager.applyModifiers}），
+     * 存档在离开世界之前就写完了，这里清掉的状态和修饰符都不会被存下来，回来时两边都是空的。
+     * 这个处理器是「状态一定先清」的保证，别删。
+     * </p>
      */
     @SubscribeEvent
     public static void onEntityLeaveLevel(net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent event) {
