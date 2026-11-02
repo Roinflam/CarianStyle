@@ -1,21 +1,43 @@
 package pers.roinflam.carianstyle.enchantment.recollect;
 
+import net.minecraft.enchantment.Enchantment;
+import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemStack;
+import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.Reference;
+
+import javax.annotation.Nonnull;
+import java.util.UUID;
 
 /**
- * PORT-STUB(E2)
- * <p>米凯拉之刃附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 米凯拉之刃附魔
+ * <p>v2.2：攻击者+受击者计数器累积均接入怪物附魔触发开关</p>
+ * <p>v2.3：攻击者一侧的叠层（加层、刷新过期、按层数增伤）要求玩家满蓄力；
+ * 未满蓄力的一下只吃基础倍率，不加层也不吃层数加成，连点不会比正常节奏更强。受击者一侧不受影响</p>
+ *
+ * @version 2.3
  */
-@Deprecated
 @AutoRegisterEnchantment(id = "mikaela_blade", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnumEnchantmentType.WEAPON, slots = {EntityEquipmentSlot.MAINHAND})
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentMikaelaBlade extends EnchantmentBase {
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.mikaela_blade.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "mikaela_blade";
@@ -57,6 +79,50 @@ public class EnchantmentMikaelaBlade extends EnchantmentBase {
     private static final int RECOLLECT_ENCHANTABILITY = 35;
 
     public EnchantmentMikaelaBlade() { super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND}); }
+
+    @SubscribeEvent
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
+        if (evt.getEntity().world.isRemote) return;
+        Enchantment mikaelaBlade = EnchantmentRegistry.getEnchantmentByClass(EnchantmentMikaelaBlade.class);
+        if (mikaelaBlade == null) return;
+
+        // 攻击者视角
+        if (evt.getSource().getImmediateSource() instanceof EntityLivingBase) {
+            EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+            // v2.2：怪物附魔触发开关（攻击者视角）
+            if (!EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) {
+                ItemStack heldItem = attacker.getHeldItemMainhand();
+                if (!heldItem.isEmpty()) {
+                    int level = EnchantmentHelper.getEnchantmentLevel(mikaelaBlade, heldItem);
+                    level = applyLevelLimit(mikaelaBlade, level, 10);
+                    if (level > 0) {
+                        // v2.3：连点会让每一下都叠一层连击（倍率不封顶），叠层要求满蓄力；
+                        // 未满蓄力的一下只吃基础倍率（它是首击的代价），不加层、不刷新，也拿不到层数加成。
+                        // 不能整段跳过：那样低层数时连点的伤害（×1.0）反而比满蓄力（×0.4 起）更高。
+                        // 下面的受击者分支照常执行
+                        if (EnchantmentBase.isFullyCharged(attacker)) {
+                            UUID uuid = attacker.getUniqueID();
+                            int combo = EnchantmentDataManager.getCounter(COMBO_COUNT_KEY, uuid);
+                            evt.setAmount(evt.getAmount() * (float) BASE_MULTIPLIER.get()
+                                    + evt.getAmount() * combo * (float) MULTIPLIER_PER_COMBO.get());
+                            EnchantmentDataManager.setCounter(COMBO_COUNT_KEY, uuid, combo + 1, COMBO_DURATION.getInt());
+                        } else {
+                            evt.setAmount(evt.getAmount() * (float) BASE_MULTIPLIER.get());
+                        }
+                    }
+                }
+            }
+        }
+
+        // 受击者视角（被打断连击的额外伤害）
+        EntityLivingBase victim = evt.getEntityLiving();
+
+        // v2.2：怪物附魔触发开关（受击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
+        int victimCombo = EnchantmentDataManager.getCounter(COMBO_COUNT_KEY, victim.getUniqueID());
+        if (victimCombo > 0) evt.setAmount(evt.getAmount() + evt.getAmount() * victimCombo * (float) VICTIM_COMBO_BONUS.get());
+    }
 
     @Override public int getMinCost(int l) { return (int)(RECOLLECT_ENCHANTABILITY * ConfigLoader.enchantingDifficulty); }
 

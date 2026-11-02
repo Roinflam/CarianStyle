@@ -1,19 +1,38 @@
 package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
+
+import javax.annotation.Nonnull;
 
 /**
- * PORT-STUB(E2)
- * <p>黑焰刃附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 黑焰刃附魔
+ * <p>
+ * 攻击时施加灭绝火焰燃烧效果
+ * 持续伤害：伤害×等级×0.15/100 每tick，持续100tick
+ * </p>
+ * <p>
+ * 性能优化 v3.0：使用 DamageOverTimeManager 替代 SynchronizationTask(5, 1)
+ * 黑焰刃是RARE级非宝藏附魔，使用频率最高的DoT附魔之一，优化效果显著
+ * </p>
+ * <p>
+ * 1.12.2 版：持续伤害致死的那一下由 {@link DamageOverTimeManager} 换成绝对伤害源结算，
+ * 抗性提升 V 下也烧得死（第一期修过的「烧不死」）。
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 3.0
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "black_flame_blade",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -26,6 +45,11 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         }
 )
 public class EnchantmentBlackFlameBlade extends EnchantmentBase {
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.black_flame_blade.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "black_flame_blade";
@@ -72,6 +96,36 @@ public class EnchantmentBlackFlameBlade extends EnchantmentBase {
 
     public EnchantmentBlackFlameBlade() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
+
+    @Override
+    protected void onHurtAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase victim = ctx.getVictim();
+
+        if (victim == null) {
+            return;
+        }
+
+        int effectiveLevel = level;
+        effectiveLevel = capLevel(effectiveLevel, LEVEL_CAP.getInt());
+
+        // 施加灭绝火焰效果（白色火焰视觉）
+        DynamicAttributeManager.apply(
+                victim,
+                DynamicAttributes.DESTRUCTION_FIRE_BURNING.createInstance(BURNING_SECONDS.getInt() * 20 + 5, 0)
+        );
+
+        // 每tick伤害 = 原伤害×等级×0.15/100
+        float damagePerTick = ctx.getDamage() * effectiveLevel * (float) DAMAGE_PER_LEVEL.get() / DOT_DURATION.getInt();
+
+        DamageOverTimeManager.applyLinear(
+                victim,
+                damagePerTick,
+                DOT_DURATION.getInt(),
+                DOT_DELAY.getInt(),
+                ctx.getDamageSource(),
+                true
+        );
     }
 
     @Override

@@ -1,19 +1,63 @@
 package pers.roinflam.carianstyle.enchantment.dead;
 
 import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.util.DamageSource;
+import net.minecraft.util.math.Vec3d;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
+import pers.roinflam.carianstyle.mc112.damage.CarianEntityDamageSource;
+import pers.roinflam.carianstyle.mc112.damage.DamageTags;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+
+import javax.annotation.Nonnull;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
- * PORT-STUB(E2)
- * <p>巨剑方阵附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 巨剑方阵附魔
+ * <p>
+ * 死亡时触发：
+ * - 在空中生成3把巨大的辉石剑
+ * - 延迟后向攻击者发射
+ * - 伤害基于攻击者损失的生命值
+ * </p>
+ *
+ * <h3>v3.0：把生成距离从 ±10 格收到贴身</h3>
+ * <p>
+ * <b>原实现的问题：</b>三把剑的偏移分别是 {@code (-10,+10)}、{@code (-10,-10)}、{@code (+10,0)}，
+ * 也就是散布在死者周围<b>十格开外</b>、跨度达 20 格。加上 {@code size=7.5} 的体积，
+ * 玩家死的那一刻只会看到三把巨剑从视野边缘外冒出来，完全读不出「这是我的护甲在反击」。
+ * 原作巨剑方阵是在施法者<b>身后上方</b>浮起数把巨剑再压下去。
+ * </p>
+ * <p>
+ * 现改为半径 {@link #RING_RADIUS} 的环形布置、高度 {@link #RING_HEIGHT}——
+ * 巨剑本身就有 7.5 的体积，4 格半径已足够让三把剑彼此不穿模，同时全部落在死者视野内。
+ * </p>
+ * <p>
+ * <b>刻意不挂悬浮锚点：</b>本附魔在持有者<b>死亡瞬间</b>触发，尸体随即移除，
+ * 没有可跟随的对象。{@code EntityGlintblades} 在释放者失效时会自动停止跟随、原地悬停，
+ * 因此这里直接不设锚点即可，行为一致且少一次同步写入。
+ * </p>
+ * <p>
+ * 1.12.2 版：1.20.1 的伤害是间接魔法（{@code indirectMagic(null, hurter)}，无视护甲但盾牌能挡）。
+ * 1.12.2 原版的 {@code causeIndirectMagicDamage} 一造出来就无视护甲，盾牌也跟着失效，直接实体为空时
+ * 打到举盾的目标还会空指针，所以这里另造一个间接魔法源（见 {@link #indirectMagic}）：直接实体是攻击剑，
+ * 来源是死者，受伤阶段才无视护甲，盾牌照样能挡。
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 3.0
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "greatblade_phalanx",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.DEAD,
@@ -22,6 +66,11 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         slots = {EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET}
 )
 public class EnchantmentGreatbladePhalanx extends EnchantmentBase {
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.greatblade_phalanx.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "greatblade_phalanx";
@@ -110,6 +159,97 @@ public class EnchantmentGreatbladePhalanx extends EnchantmentBase {
                 EntityEquipmentSlot.LEGS,
                 EntityEquipmentSlot.FEET
         });
+    }
+
+    /** 1.20.1 {@code indirect_magic} 伤害类型带的、本附魔用得到的标签 */
+    private static final Set<String> INDIRECT_MAGIC_TAGS =
+            new HashSet<>(Arrays.asList(DamageTags.BYPASSES_ARMOR, DamageTags.WITCH_RESISTANT_TO));
+
+    @Override
+    protected void onDeath(@Nonnull EnchantmentContext ctx, int pieceLevel) {
+        if (!(ctx.getDamageSource().getTrueSource() instanceof EntityLivingBase)) {
+            return;
+        }
+
+        EntityLivingBase hurter = ctx.getHolder();
+        int level = highestLevel(hurter);
+        EntityLivingBase attacker = (EntityLivingBase) ctx.getDamageSource().getTrueSource();
+
+        // 检查冷却
+        if (EnchantmentDataManager.isOnCooldown("greatblade_phalanx", hurter.getUniqueID())) {
+            return;
+        }
+
+        // 设置冷却（6000tick = 5分钟）
+        EnchantmentDataManager.setCooldown("greatblade_phalanx", hurter.getUniqueID(), COOLDOWN.getInt());
+
+        // 生成巨剑：以死者为中心的水平环，均布
+        for (int i = 0; i < BLADE_COUNT.getInt(); i++) {
+            double angle = Math.PI * 2.0 * i / BLADE_COUNT.getInt();
+            double posX = hurter.posX + Math.cos(angle) * RING_RADIUS.get();
+            double posY = hurter.posY + RING_HEIGHT.get();
+            double posZ = hurter.posZ + Math.sin(angle) * RING_RADIUS.get();
+
+            // 延迟时间递增（形成连击效果）
+            int delayTicks = BASE_DELAY.getInt() + i * DELAY_STEP.getInt();
+
+            // 显示用的剑（悬浮效果）。不挂锚点：持有者已死，无跟随对象
+            EntityGlintblades showBlade = new EntityGlintblades(hurter, attacker)
+                    .setDeadTick(delayTicks)
+                    .setSize(7.5f);
+            showBlade.setPosition(posX, posY, posZ);
+            hurter.world.spawnEntity(showBlade);
+
+            // 保存位置到final变量供延迟任务使用
+            int finalLevel = level;
+            double finalPosX = posX;
+            double finalPosY = posY;
+            double finalPosZ = posZ;
+
+            // 延迟发射攻击剑
+            new SynchronizationTask(delayTicks) {
+                @Override
+                public void run() {
+                    // v4.1：攻击者死了也照样发射，朝其死亡地点砸下去。
+                    // 巨剑阵是死亡反击，最该出现的场景恰恰是「同归于尽」——
+                    // 原实现在这里 return，等于对方补刀后反击直接作废。
+                    Vec3d aimPoint = new Vec3d(
+                            attacker.posX,
+                            attacker.posY + attacker.getEyeHeight() * 0.8,
+                            attacker.posZ);
+
+                    // 创建攻击剑
+                    EntityGlintblades attackBlade = new EntityGlintblades(hurter, attacker);
+                    attackBlade.setSize(7.5f)
+                            .setAimPoint(aimPoint)
+                            .setDamage((attacker.getMaxHealth() - attacker.getHealth()) * finalLevel * (float) DAMAGE_PER_LEVEL.get())
+                            .setDamageSource(indirectMagic(attackBlade, hurter))
+                            .setTrackingStrength((float) TRACKING_STRENGTH.get())  // 巨剑追踪较慢（更有重量感）
+                            .setMaxLifetime(MAX_LIFETIME.getInt());         // 6秒存活时间
+
+                    attackBlade.setPosition(finalPosX, finalPosY, finalPosZ);
+                    attackBlade.shoot(1.0f);  // 降低初始速度，依靠追踪
+                    hurter.world.spawnEntity(attackBlade);
+                }
+            }.start();
+        }
+    }
+
+    /**
+     * 间接魔法伤害（对应 1.20.1 的 {@code damageSources().indirectMagic}）。
+     * <p>死亡信息键沿用原版的 {@code indirectMagic}；无视护甲推迟到受伤阶段，盾牌照样能挡（见类注释）。</p>
+     *
+     * @param direct 直接造成伤害的实体（攻击剑）
+     * @param owner  真正的来源（死者）
+     * @return 新的伤害源
+     */
+    @Nonnull
+    private static DamageSource indirectMagic(@Nonnull Entity direct, @Nonnull Entity owner) {
+        CarianEntityDamageSource source = new CarianEntityDamageSource(
+                "minecraft:indirect_magic", "indirectMagic", direct, owner, INDIRECT_MAGIC_TAGS, 0.0F, false);
+        source.setMagicDamage();
+        source.setBypassesArmorAtHurt(true);
+        return source;
     }
 
     @Override

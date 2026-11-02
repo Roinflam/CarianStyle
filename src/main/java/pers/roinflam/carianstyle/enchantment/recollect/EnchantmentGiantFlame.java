@@ -1,19 +1,52 @@
 package pers.roinflam.carianstyle.enchantment.recollect;
 
+import net.minecraft.enchantment.Enchantment;
+import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.DamageSource;
+import net.minecraftforge.event.entity.living.LivingAttackEvent;
+import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.mc112.util.Reflect;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.lang.reflect.Field;
+import java.util.UUID;
 
 /**
- * PORT-STUB(E2)
- * <p>巨人火焰附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 巨人火焰附魔
+ * <p>
+ * 着火时受击反弹50%伤害（火焰）
+ * 减伤：伤害 × 血量比例 × 0.25
+ * 免疫火焰伤害并转化为治疗（10tick冷却）
+ * </p>
+ * <p>v2.1：三个监听器入口接入怪物附魔触发开关</p>
+ * <p>
+ * 1.12.2 版保留：三处「创造模式判定」看伤害源能不能伤到创造模式（{@code canHarmInCreative()}，虚空、/kill 这类），
+ * 1.20.1 看的是伤害是不是来自创造模式玩家。剩余燃烧时间读私有字段 {@code Entity.fire}（1.12.2 没有 getter）。
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.1
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "giant_flame",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT,
@@ -21,7 +54,13 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         type = EnumEnchantmentType.ARMOR_CHEST,
         slots = {EntityEquipmentSlot.CHEST}
 )
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentGiantFlame extends EnchantmentBase {
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.giant_flame.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "giant_flame";
@@ -64,6 +103,144 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
 
     public EnchantmentGiantFlame() {
         super(EnumEnchantmentType.ARMOR_CHEST, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+    }
+
+    /**
+     * {@code Entity.fire}（剩余燃烧 tick）。私有字段，没有 getter；找不到时为 null，按没着火算。
+     */
+    @Nullable
+    private static final Field FIRE_FIELD = Reflect.fieldOrNull(Entity.class, "fire", "field_190534_ay");
+
+    /**
+     * 剩余燃烧 tick，对应 1.20.1 的 {@code getRemainingFireTicks()}。
+     *
+     * @param entity 实体
+     * @return 剩余燃烧 tick，读不到时为 0
+     */
+    private static int getRemainingFireTicks(@Nonnull Entity entity) {
+        if (FIRE_FIELD == null) {
+            return 0;
+        }
+        try {
+            return FIRE_FIELD.getInt(entity);
+        } catch (IllegalAccessException e) {
+            return 0;
+        }
+    }
+
+    private static int getTotalLevel(EntityLivingBase entity) {
+        Enchantment giantFlame = EnchantmentRegistry.getEnchantmentByClass(EnchantmentGiantFlame.class);
+        if (giantFlame == null) {
+            return 0;
+        }
+
+        int totalLevel = 0;
+        for (ItemStack armor : entity.getArmorInventoryList()) {
+            if (!armor.isEmpty()) {
+                totalLevel += EnchantmentHelper.getEnchantmentLevel(giantFlame, armor);
+            }
+        }
+        totalLevel = applyLevelLimit(giantFlame, totalLevel, LEVEL_CAP.getInt());
+        return totalLevel;
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        // 1.12.2 版保留：按 canHarmInCreative 判断（见类注释）
+        if (evt.getSource().canHarmInCreative()) {
+            return;
+        }
+
+        if (!(evt.getSource().getImmediateSource() instanceof EntityLivingBase)) {
+            return;
+        }
+
+        EntityLivingBase holder = evt.getEntityLiving();
+
+        // v2.1：怪物附魔触发开关（受击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
+
+        EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+
+        if (getRemainingFireTicks(holder) <= 0) {
+            return;
+        }
+
+        int totalLevel = getTotalLevel(holder);
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        attacker.attackEntityFrom(DamageSource.IN_FIRE,
+                    evt.getAmount() * (float) REFLECT_RATIO.get());
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        // 1.12.2 版保留：按 canHarmInCreative 判断（见类注释）
+        if (evt.getSource().canHarmInCreative()) {
+            return;
+        }
+
+        EntityLivingBase holder = evt.getEntityLiving();
+
+        // v2.1：怪物附魔触发开关（受击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
+
+        int totalLevel = getTotalLevel(holder);
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        float healthRatio = holder.getHealth() / holder.getMaxHealth();
+        evt.setAmount(evt.getAmount() - evt.getAmount() * healthRatio * (float) REDUCTION_RATIO.get());
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGH)
+    public static void onLivingAttack(@Nonnull LivingAttackEvent evt) {
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        if (!evt.getEntity().isEntityAlive()) {
+            return;
+        }
+
+        // 1.12.2 版保留：按 canHarmInCreative 判断（见类注释）
+        if (evt.getSource().canHarmInCreative()) {
+            return;
+        }
+
+        EntityLivingBase holder = evt.getEntityLiving();
+
+        // v2.1：怪物附魔触发开关（受击者视角，火免疫属于自保不属于濒死）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
+
+        UUID uuid = holder.getUniqueID();
+
+        int totalLevel = getTotalLevel(holder);
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        if (!DamageSourceUtil.isFireDamage(evt.getSource())) {
+            return;
+        }
+
+        evt.setCanceled(true);
+
+        if (!EnchantmentDataManager.isOnCooldown(FLAME_HEAL_COOLDOWN_KEY, uuid)) {
+            holder.heal(evt.getAmount());
+            EnchantmentDataManager.setCooldown(FLAME_HEAL_COOLDOWN_KEY, uuid, HEAL_COOLDOWN.getInt());
+        }
     }
 
     @Override

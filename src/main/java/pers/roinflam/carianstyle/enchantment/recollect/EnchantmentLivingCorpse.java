@@ -1,23 +1,63 @@
 package pers.roinflam.carianstyle.enchantment.recollect;
 
 import net.minecraft.enchantment.Enchantment;
+import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.DamageSource;
+import net.minecraftforge.event.entity.EntityJoinWorldEvent;
+import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
+import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+
+import javax.annotation.Nonnull;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
-import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
- * PORT-STUB(E2)
- * <p>死诞者附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 死诞者附魔
+ * <p>
+ * 死亡时满血复活，但开始持续失血直到再次死亡
+ * 冷却4800tick
+ * </p>
+ * <p>
+ * v2.1新增: onLivingDeath 入口接入怪物附魔触发开关，
+ * 怪物身上的"濒死复活+流血"效果可由配置 allowMobTriggerDeathEnchantments 控制
+ * </p>
+ * <p>
+ * v2.2 修复：流血期间不管被什么打死，都算这条命的终点——清掉流血标记、不再复活。
+ * 以前只有流血自己耗死才清标记：被别的伤害打死时标记留着，重生后又开始流血；
+ * 在死亡界面停超过冷却时间，流血致死还会再触发一次复活，一直循环。
+ * 流血任务同一实体只留一份（{@link #RUNNING_BLEEDS}）：切维度也会发实体加入世界事件，
+ * 以前会再开一份，两份一起扣血。
+ * </p>
+ *
+ * <h3>1.12.2 版</h3>
+ * <ul>
+ *     <li>无敌帧是 {@code hurtResistantTime}（1.20.1 的 {@code invulnerableTime}）。</li>
+ *     <li>已经被标记移除（{@code isDead}）的实体不复活：它的死亡事件是别的流程补发的，救不回来。</li>
+ *     <li>实体加入世界用 {@link EntityJoinWorldEvent}，区块重新加载时也会触发；同一个实体对象的任务还在跑就不重开，
+ *         所以只会补上真正断掉的那份。</li>
+ * </ul>
+ *
+ * @author RoinFlam
+ * @version 2.2
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "living_corpse",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT,
@@ -25,7 +65,13 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         type = EnumEnchantmentType.ARMOR_CHEST,
         slots = {EntityEquipmentSlot.CHEST}
 )
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentLivingCorpse extends EnchantmentBase {
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.living_corpse.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "living_corpse";
@@ -64,7 +110,7 @@ public class EnchantmentLivingCorpse extends EnchantmentBase {
      * 正在跑的流血任务，实体 UUID → 任务。
      * <p>玩家切维度实体对象不变，留着原任务；怪物切维度、玩家重新登录是新对象，原任务作废，换新的接上。</p>
      */
-    private static final Map<UUID, Object> RUNNING_BLEEDS = new ConcurrentHashMap<>();
+    private static final Map<UUID, BleedTask> RUNNING_BLEEDS = new ConcurrentHashMap<>();
 
     public EnchantmentLivingCorpse() {
         super(EnumEnchantmentType.ARMOR_CHEST, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
@@ -86,6 +132,179 @@ public class EnchantmentLivingCorpse extends EnchantmentBase {
      */
     private boolean isDeadEnchantment(Enchantment ench) {
         return ench instanceof EnchantmentFullMoon || ench instanceof EnchantmentTimeReversal;
+    }
+
+    /**
+     * 获取实体装备的死诞者附魔总等级
+     *
+     * @param entity 实体
+     * @return 附魔总等级
+     */
+    private static int getTotalLevel(EntityLivingBase entity) {
+        Enchantment livingCorpse = EnchantmentRegistry.getEnchantmentByClass(EnchantmentLivingCorpse.class);
+        if (livingCorpse == null) {
+            return 0;
+        }
+
+        int totalLevel = 0;
+        for (ItemStack armor : entity.getArmorInventoryList()) {
+            if (!armor.isEmpty()) {
+                totalLevel += EnchantmentHelper.getEnchantmentLevel(livingCorpse, armor);
+            }
+        }
+        totalLevel = applyLevelLimit(livingCorpse, totalLevel, LEVEL_CAP.getInt());
+        return totalLevel;
+    }
+
+    /**
+     * 监听生物死亡事件 - 触发复活机制
+     * <p>v2.1新增：怪物附魔触发开关（濒死类）拦截</p>
+     *
+     * @param evt 死亡事件
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        EntityLivingBase holder = evt.getEntityLiving();
+
+        // v2.1：怪物附魔触发开关 —— 死诞者属于濒死复活类，怪物身上不触发
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, true)) {
+            return;
+        }
+
+        UUID uuid = holder.getUniqueID();
+
+        // 流血期间死亡（耗死或被打死）就是真的死了：清标记，不再复活
+        if (Boolean.TRUE.equals(EnchantmentDataManager.getData(BLEEDING_STATE_KEY, uuid))) {
+            EnchantmentDataManager.removeData(BLEEDING_STATE_KEY, uuid);
+            return;
+        }
+
+        int totalLevel = getTotalLevel(holder);
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        if (EnchantmentDataManager.isOnCooldown(REVIVE_COOLDOWN_KEY, uuid)) {
+            return;
+        }
+
+        // 1.12.2 版：已经被移除的实体不复活（见类注释）
+        if (holder.isDead) {
+            return;
+        }
+
+        // 取消死亡事件
+        evt.setCanceled(true);
+
+        // 满血复活
+        holder.setHealth(holder.getMaxHealth());
+        holder.hurtResistantTime = 20;
+
+        // 设置冷却和流血状态
+        EnchantmentDataManager.setCooldown(REVIVE_COOLDOWN_KEY, uuid, REVIVE_COOLDOWN.getInt());
+        EnchantmentDataManager.setData(BLEEDING_STATE_KEY, uuid, true);
+
+        // 启动持续失血任务
+        startBleeding(holder, new BleedTask(holder, evt.getSource(), 5, 75));
+    }
+
+    /**
+     * 监听实体加入世界事件 - 恢复失血状态
+     * <p>注意：此事件用于玩家重新登录时恢复未完结的流血状态，
+     * 不属于"触发亡语"，未接入怪物附魔开关。
+     * 若 onLivingDeath 被拦截，BLEEDING_STATE_KEY 本来就不会被设置，
+     * 本方法不会对怪物产生影响。</p>
+     *
+     * @param evt 实体加入事件
+     */
+    @SubscribeEvent
+    public static void onEntityJoinWorld(@Nonnull EntityJoinWorldEvent evt) {
+        if (evt.getWorld().isRemote) {
+            return;
+        }
+
+        if (!(evt.getEntity() instanceof EntityLivingBase)) {
+            return;
+        }
+
+        EntityLivingBase holder = (EntityLivingBase) evt.getEntity();
+        UUID uuid = holder.getUniqueID();
+
+        Boolean bleeding = EnchantmentDataManager.getData(BLEEDING_STATE_KEY, uuid);
+        if (bleeding == null || !bleeding) {
+            return;
+        }
+
+        // 切维度时实体对象没变，原任务接着跑就行，再开一份会双倍扣血
+        BleedTask running = RUNNING_BLEEDS.get(uuid);
+        if (running != null && running.holder == holder) {
+            return;
+        }
+
+        // 恢复失血任务
+        startBleeding(holder, new BleedTask(holder, DamageSource.OUT_OF_WORLD, 6, 30));
+    }
+
+    /**
+     * 启动流血任务，顶掉这个实体之前的那一份
+     *
+     * @param holder 流血的实体
+     * @param task   新任务
+     */
+    private static void startBleeding(@Nonnull EntityLivingBase holder, @Nonnull BleedTask task) {
+        BleedTask previous = RUNNING_BLEEDS.put(holder.getUniqueID(), task);
+        if (previous != null) {
+            previous.cancel();
+        }
+        task.start();
+    }
+
+    /**
+     * 持续失血任务：每 tick 扣血，扣到快没了就处决。标记没了（已经死过一次）就结束。
+     */
+    private static final class BleedTask extends SynchronizationTask {
+        private final EntityLivingBase holder;
+        private final DamageSource lethalSource;
+        private final int baseMultiplier;
+        private final int rampDivisor;
+        private int elapsed = 0;
+
+        BleedTask(EntityLivingBase holder, DamageSource lethalSource, int baseMultiplier, int rampDivisor) {
+            super(1, 1);
+            this.holder = holder;
+            this.lethalSource = lethalSource;
+            this.baseMultiplier = baseMultiplier;
+            this.rampDivisor = rampDivisor;
+        }
+
+        @Override
+        public void run() {
+            UUID uuid = holder.getUniqueID();
+            if (!holder.isEntityAlive() || !Boolean.TRUE.equals(EnchantmentDataManager.getData(BLEEDING_STATE_KEY, uuid))) {
+                finish(uuid);
+                return;
+            }
+
+            float baseDamage = holder.getMaxHealth() * (float) DRAIN_RATIO_PER_SECOND.get() / 20;
+            float damage = baseDamage * baseMultiplier + baseDamage * ++elapsed / rampDivisor;
+
+            if (holder.getHealth() - damage * 2 > 0) {
+                EntityLivingUtil.damageHealthDirectly(holder, damage);
+            } else {
+                EntityLivingUtil.kill(holder, lethalSource);
+                EnchantmentDataManager.removeData(BLEEDING_STATE_KEY, uuid);
+                finish(uuid);
+            }
+        }
+
+        private void finish(UUID uuid) {
+            RUNNING_BLEEDS.remove(uuid, this);
+            this.cancel();
+        }
     }
 
     @Override

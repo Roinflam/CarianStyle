@@ -1,19 +1,30 @@
 package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.potion.PotionEffect;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
+import javax.annotation.Nonnull;
+
 /**
- * PORT-STUB(E2)
- * <p>猩红腐败附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 猩红腐败附魔
+ * <p>
+ * 武器附魔，攻击时施加腐败效果
+ * 攻击时：
+ * - 给目标施加猩红腐败效果（持续 = 等级 × 20秒）
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.0
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "scarlet_rot",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -23,6 +34,11 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         conflictsWith = {EnchantmentFireGivesPower.class, EnchantmentFireDevoured.class}
 )
 public class EnchantmentScarletCorruption extends EnchantmentBase {
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.scarlet_rot.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "scarlet_rot";
@@ -37,6 +53,29 @@ public class EnchantmentScarletCorruption extends EnchantmentBase {
 
     public EnchantmentScarletCorruption() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
+
+    /**
+     * 修复：改为 onDamageAsAttackerLowest（作为攻击者时触发）
+     */
+    @Override
+    protected void onDamageAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase victim = ctx.getVictim();
+        if (victim == null) {
+            return;
+        }
+
+        // 连点能一下一个地给一群目标挂上腐败，要求满蓄力
+        if (!isFullyCharged(ctx.getHolder())) {
+            return;
+        }
+
+        // 给被攻击的目标施加猩红腐败
+        victim.addPotionEffect(new PotionEffect(
+                CarianStylePotion.SCARLET_ROT.get(),
+                level * SECONDS_PER_LEVEL.getInt() * 20,  // 等级 × 20秒 × 20tick
+                0
+        ));
     }
 
     @Override

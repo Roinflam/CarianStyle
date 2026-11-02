@@ -1,19 +1,44 @@
 package pers.roinflam.carianstyle.enchantment;
 
+import net.minecraft.enchantment.Enchantment;
+import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemStack;
+import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
+import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
+
+import javax.annotation.Nonnull;
 
 /**
- * PORT-STUB(E2)
- * <p>癫火附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 癫火附魔
+ * <p>满蓄力攻击时自己和目标一起烧起来：自己按最大生命持续掉血，目标按自己的掉血量乘等级倍率持续掉血。</p>
+ * <p>v3.1：LivingHurt攻击者视角入口接入怪物附魔触发开关</p>
+ * <p>
+ * 1.12.2 版保留：创造模式玩家不烧自己（自损和自己身上的火焰都跳过），目标照烧；1.20.1 创造模式也会烧自己。
+ * 持续伤害致死的那一下由 {@link DamageOverTimeManager} 换成绝对伤害源结算，抗性提升 V 下也烧得死。
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 3.1
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "epilepsy_fire",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
@@ -21,7 +46,13 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         type = EnumEnchantmentType.WEAPON,
         slots = {EntityEquipmentSlot.MAINHAND}
 )
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentEpilepsyFire extends EnchantmentBase {
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.epilepsy_fire.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "epilepsy_fire";
@@ -76,6 +107,70 @@ public class EnchantmentEpilepsyFire extends EnchantmentBase {
 
     public EnchantmentEpilepsyFire() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingHurt(@Nonnull LivingHurtEvent evt) {
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        if (!(evt.getSource().getImmediateSource() instanceof EntityLivingBase)) {
+            return;
+        }
+
+        EntityLivingBase victim = evt.getEntityLiving();
+        EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
+
+        // v3.1：怪物附魔触发开关（攻击者视角，自损+对敌DoT）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+
+        Enchantment epilepsyFire = EnchantmentRegistry.getEnchantmentByClass(EnchantmentEpilepsyFire.class);
+        if (epilepsyFire == null) {
+            return;
+        }
+
+        ItemStack heldItem = attacker.getHeldItemMainhand();
+        if (heldItem.isEmpty()) {
+            return;
+        }
+
+        int level = EnchantmentHelper.getEnchantmentLevel(epilepsyFire, heldItem);
+        level = applyLevelLimit(epilepsyFire, level, LEVEL_CAP.getInt());
+        if (level <= 0) {
+            return;
+        }
+
+        if (!isFullyCharged(attacker)) {
+            return;
+        }
+
+        final int effectiveLevel = level;
+
+        // 1.12.2 版保留：创造模式玩家不烧自己（见类注释）
+        if (!(attacker instanceof EntityPlayer) || !((EntityPlayer) attacker).isCreative()) {
+            DynamicAttributeManager.apply(attacker,
+                    DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(BURN_VISUAL_DURATION.getInt(), 0));
+            ClientSyncEffectHelper.onAttributeApplied(attacker, DynamicAttributes.EPILEPSY_FIRE_BURNING);
+
+            // 自损：被反噬耗死时致死一击走原版伤害管线（见 DamageOverTimeManager）
+            float attackerDmgPerTick = attacker.getMaxHealth() * (float) SELF_DAMAGE_RATIO.get() / DAMAGE_TICKS.getInt();
+            DamageOverTimeManager.applySelfLinear(
+                    attacker, attackerDmgPerTick, DAMAGE_TICKS.getInt(), DOT_DELAY.getInt(),
+                    NewDamageSource.epilepsyFire(attacker.world)
+            );
+        }
+
+        DynamicAttributeManager.apply(victim,
+                DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(BURN_VISUAL_DURATION.getInt(), 0));
+        ClientSyncEffectHelper.onAttributeApplied(victim, DynamicAttributes.EPILEPSY_FIRE_BURNING);
+
+        float victimDmgPerTick = attacker.getMaxHealth() * (float) SELF_DAMAGE_RATIO.get()
+                * effectiveLevel * (float) VICTIM_DAMAGE_PER_LEVEL.get() / DAMAGE_TICKS.getInt();
+        DamageOverTimeManager.applyLinear(
+                victim, victimDmgPerTick, DAMAGE_TICKS.getInt(), DOT_DELAY.getInt(),
+                NewDamageSource.epilepsyFire(victim.world), true
+        );
     }
 
     @Override

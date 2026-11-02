@@ -1,19 +1,37 @@
 package pers.roinflam.carianstyle.enchantment.recollect;
 
+import net.minecraft.enchantment.Enchantment;
+import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemStack;
+import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.mc112.damage.DamageTags;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
+
+import javax.annotation.Nonnull;
 
 /**
- * PORT-STUB(E2)
- * <p>先祖之魂附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 先祖之魂附魔
+ * <p>受到魔法伤害时减免，每次受伤后 10 秒内按已损失生命持续回复。</p>
+ * <p>v2.1：LivingDamage受击者视角入口接入怪物附魔触发开关</p>
+ *
+ * @author RoinFlam
+ * @version 2.1
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "ancestral_spirits",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT,
@@ -21,7 +39,13 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         type = EnumEnchantmentType.ARMOR_CHEST,
         slots = {EntityEquipmentSlot.CHEST}
 )
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentAncestralSpirits extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.ancestral_spirits.desc，
+    //   否则玩家看到的描述会与实际效果不符。
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "ancestral_spirits";
@@ -54,6 +78,61 @@ public class EnchantmentAncestralSpirits extends EnchantmentBase {
 
     public EnchantmentAncestralSpirits() {
         super(EnumEnchantmentType.ARMOR_CHEST, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        // 1.12.2 的「无视无敌」就是 canHarmInCreative（虚空、/kill 这类），DamageTags 按开关推出这个标签
+        if (DamageTags.is(evt.getSource(), DamageTags.BYPASSES_INVULNERABILITY)) {
+            return;
+        }
+
+        EntityLivingBase holder = evt.getEntityLiving();
+
+        // v2.1：怪物附魔触发开关（受击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
+
+        Enchantment ancestralSpirits = EnchantmentRegistry.getEnchantmentByClass(EnchantmentAncestralSpirits.class);
+        if (ancestralSpirits == null) {
+            return;
+        }
+
+        int totalLevel = 0;
+        for (ItemStack armor : holder.getArmorInventoryList()) {
+            if (!armor.isEmpty()) {
+                totalLevel += EnchantmentHelper.getEnchantmentLevel(ancestralSpirits, armor);
+            }
+        }
+
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        if (DamageSourceUtil.isMagicDamage(evt.getSource())) {
+            evt.setAmount(evt.getAmount() * (float) DAMAGE_MULTIPLIER.get());
+        }
+
+        if (holder.isEntityAlive()) {
+            new SynchronizationTask(10, 10) {
+                private int tick = 0;
+
+                @Override
+                public void run() {
+                    tick += 10;
+                    if (tick > HEAL_DURATION_TICKS.getInt() || !holder.isEntityAlive()) {
+                        this.cancel();
+                        return;
+                    }
+                    // 每次按当时已损失的生命重新算
+                    float healPerTick = (holder.getMaxHealth() - holder.getHealth()) * (float) HEAL_RATIO_PER_SECOND.get() / 20;
+                    holder.heal(healPerTick);
+                }
+            }.start();
+        }
     }
 
     @Override
