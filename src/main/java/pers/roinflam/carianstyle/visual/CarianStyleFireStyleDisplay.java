@@ -1,7 +1,6 @@
 package pers.roinflam.carianstyle.visual;
 
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.enchantment.Enchantment;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
@@ -15,8 +14,6 @@ import pers.roinflam.carianstyle.utils.Reference;
 import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
- * PORT-STUB(V2)
- *
  * 火焰流派「联动徽标」的 HUD 叠层注册（双端通用）。
  *
  * <h3>这一行要回答什么</h3>
@@ -125,12 +122,179 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 1.1
  */
-@Deprecated
+@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
 public final class CarianStyleFireStyleDisplay {
+
+    /**
+     * 「火焰流派」徽标的叠层序列号。
+     * <p>{@code CarianStyleStackDisplays} 已用 1~22，
+     * {@link CarianStyleTimeReversalDisplay} 用了 23，故本项取 24。
+     * 新增其它显示项请从 25 起。</p>
+     */
     public static final int FIRE_STYLE_BADGE = 24;
+
+    /**
+     * 名称翻译键。
+     * <p>需要在 {@code zh_cn.json} 中补上，否则 HUD 会直接显示这个原始键名。</p>
+     */
     private static final String FIRE_STYLE_NAME_KEY = "carianstyle.hud.fire_style";
+
+    /**
+     * 主题色（火焰橙）。
+     * <p>与本模组既有的火焰语汇一致；比癫火黄 {@code 0xFFE020} 深、
+     * 比出血红 {@code 0xE0202F} 暖，在 HUD 列表里一眼能认出是火系那一行。</p>
+     */
     private static final int FIRE_STYLE_COLOR = 0xFF8A2A;
+
+    /** 防止重复注册（{@code register} 抛 IllegalArgumentException 会打断整个 setup） */
+    private static boolean initialized = false;
+
     private CarianStyleFireStyleDisplay() {
     }
-}
 
+    /**
+     * 公共初始化阶段注册显示项。
+     * <p>
+     * 用 {@code enqueueWork} 而非直接注册：{@link FMLCommonSetupEvent} 的监听器
+     * 可能并行执行，而 {@code StackDisplayRegistry} 内部是普通集合，
+     * 并发写入会损坏结构。{@code enqueueWork} 保证在主线程串行执行。
+     * </p>
+     *
+     * @param event 公共初始化事件
+     */
+    @SubscribeEvent
+    public static void onCommonSetup(FMLCommonSetupEvent event) {
+        event.enqueueWork(CarianStyleFireStyleDisplay::register);
+    }
+
+    /**
+     * 实际注册逻辑。重复调用安全。
+     */
+    private static void register() {
+        if (initialized) {
+            return;
+        }
+        initialized = true;
+
+        StackDisplayRegistry.register(
+                FIRE_STYLE_BADGE,
+                new StackDisplayRegistry.Info(FIRE_STYLE_NAME_KEY, FIRE_STYLE_COLOR),
+                CarianStyleFireStyleDisplay::computeStacks);
+    }
+
+    /**
+     * 统计当前「已装备 / 正在生效」的火焰流派件数。
+     * <p>
+     * 一件都没装备时返回 {@link StackDisplayRegistry.Stacks#NONE}——
+     * 没走火焰流派的玩家不该看到这一行。
+     * </p>
+     * <p>
+     * <b>开销：</b>每次 HUD 轮询做 5 次 {@code getEnchantmentByClass}（HashMap 查询）
+     * 加至多 5 次装备槽扫描。HUD 轮询频率远低于每 tick，
+     * 与 {@code CarianStyleStackDisplays} 里既有的十余项同量级，无需额外缓存。
+     * </p>
+     *
+     * @param player 本地玩家
+     * @param ctx    装备附魔上下文
+     * @return 生效件数 / 已装备件数；未装备任何一件时为 {@code NONE}
+     */
+    private static StackDisplayRegistry.Stacks computeStacks(Player player,
+                                                             EquipmentEnchantContext ctx) {
+        // 用同步标志位而非剩余 tick，理由见类注释「判定用 isOnFire()」小节
+        boolean burning = player.isOnFire();
+
+        int equipped = 0;
+        int active = 0;
+
+        // ===== 胸甲：巨人火焰 =====
+        // 五者中唯一部分效果不依赖着火（减伤 + 火免疫转治疗），故只要装备即计入生效
+        if (armorEquipped(ctx, EnchantmentGiantFlame.class)) {
+            equipped++;
+            active++;
+        }
+
+        // ===== 护甲四件套：火焰庇护 / 火焰疗愈 =====
+        if (armorEquipped(ctx, EnchantmentShelterOfFire.class)) {
+            equipped++;
+            if (burning) {
+                active++;
+            }
+        }
+        if (armorEquipped(ctx, EnchantmentHealingByFire.class)) {
+            equipped++;
+            if (burning) {
+                active++;
+            }
+        }
+
+        // ===== 主手：火焰赐力 / 火焰吞噬 =====
+        if (mainHandEquipped(ctx, EnchantmentFireGivesPower.class)) {
+            equipped++;
+            if (burning) {
+                active++;
+            }
+        }
+        if (mainHandEquipped(ctx, EnchantmentFireDevoured.class)) {
+            equipped++;
+            if (burning) {
+                active++;
+            }
+        }
+
+        if (equipped <= 0) {
+            return StackDisplayRegistry.Stacks.NONE;
+        }
+        return new StackDisplayRegistry.Stacks(active, equipped);
+    }
+
+    /**
+     * 判断护甲上是否带有指定附魔。
+     * <p>
+     * 走 {@code armorMaxLevel} 取四个槽位中的最高等级再判正，
+     * 而不是求和——本行只关心「有没有」，与等级无关。
+     * </p>
+     * <p>
+     * <b>v1.1：</b>形参由 {@code Class<?>} 收窄为 {@code Class<? extends EnchantmentBase>}，
+     * 以匹配 {@link EnchantmentRegistry#getEnchantmentByClass} 的签名（详见类注释）。
+     * </p>
+     *
+     * @param ctx          装备附魔上下文
+     * @param enchantClass 附魔实现类
+     * @return 是否装备
+     */
+    private static boolean armorEquipped(EquipmentEnchantContext ctx,
+                                         Class<? extends EnchantmentBase> enchantClass) {
+        EnchantmentBase ench = resolve(enchantClass);
+        // 附魔可能被 uninstallEnchantment 配置禁用而未注册，此时恒为未装备
+        return ench != null && ctx.armorMaxLevel(ench) > 0;
+    }
+
+    /**
+     * 判断主手武器上是否带有指定附魔。
+     * <p><b>v1.1：</b>形参类型同 {@link #armorEquipped}。</p>
+     *
+     * @param ctx          装备附魔上下文
+     * @param enchantClass 附魔实现类
+     * @return 是否装备
+     */
+    private static boolean mainHandEquipped(EquipmentEnchantContext ctx,
+                                            Class<? extends EnchantmentBase> enchantClass) {
+        EnchantmentBase ench = resolve(enchantClass);
+        return ench != null && ctx.mainHandLevel(ench) > 0;
+    }
+
+    /**
+     * 按实现类解析附魔对象。
+     * <p>
+     * <b>v1.1：</b>形参由 {@code Class<?>} 收窄为 {@code Class<? extends EnchantmentBase>}。
+     * 原先的通配符捕获无法满足 {@link EnchantmentRegistry#getEnchantmentByClass} 的
+     * {@code EnchantmentBase} 上界，导致编译失败（详见类注释的「v1.1 修复」小节）。
+     * </p>
+     *
+     * @param enchantClass 附魔实现类
+     * @return 附魔对象；未注册（被配置禁用）时返回 {@code null}
+     */
+    private static EnchantmentBase resolve(Class<? extends EnchantmentBase> enchantClass) {
+        return EnchantmentRegistry.getEnchantmentByClass(enchantClass);
+    }
+}
