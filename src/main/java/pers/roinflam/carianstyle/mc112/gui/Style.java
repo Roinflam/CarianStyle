@@ -145,6 +145,20 @@ public final class Style {
         return withColor(rgb(formatting));
     }
 
+    /**
+     * 按 {@link TextColor} 设颜色（同 1.20.1 Style#withColor(TextColor)）
+     * <p>
+     * 和 {@link #withColor(Integer)} 等价，只是让 1.20.1 里先建好 TextColor 常量再设进样式的写法能原样搬过来。
+     * </p>
+     *
+     * @param color 颜色；null = 继承
+     * @return 新样式
+     */
+    @Nonnull
+    public Style withColor(@Nullable TextColor color) {
+        return withColor(color == null ? null : Integer.valueOf(color.getValue()));
+    }
+
     @Nonnull
     public Style withBold(@Nullable Boolean value) {
         return new Style(color, value, italic, underlined, strikethrough, obfuscated);

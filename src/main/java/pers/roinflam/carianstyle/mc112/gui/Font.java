@@ -217,6 +217,37 @@ public final class Font implements TextLayout.CharWidth {
         return toLines(TextLayout.split(runs, maxWidth, this));
     }
 
+    /**
+     * 一行已排版文字的宽度（同 1.20.1 Font#width(FormattedCharSequence)）
+     *
+     * @param text 一行
+     * @return 宽度
+     */
+    public int width(@Nonnull FormattedCharSequence text) {
+        return TextLayout.width(text.runs(), this);
+    }
+
+    /**
+     * 自动换行，每行一个 {@link FormattedCharSequence}（同 1.20.1 Font#split 的返回类型）
+     * <p>
+     * 1.12.2 版：兼容层的 {@link #split(Component, int)} 早已返回 {@code List<Component>}，
+     * Java 不能只靠返回值类型区分重载，所以换了个名字。断行规则和 {@link #split(Component, int)} 完全相同。
+     * </p>
+     *
+     * @param text     组件
+     * @param maxWidth 每行最大宽度
+     * @return 每行一个；空文字得到空列表
+     */
+    @Nonnull
+    public List<FormattedCharSequence> splitSequences(@Nonnull Component text, int maxWidth) {
+        List<List<TextRun>> lines = TextLayout.split(text.runs(), maxWidth, this);
+        List<FormattedCharSequence> out = new ArrayList<>(lines.size());
+        for (List<TextRun> line : lines) {
+            out.add(FormattedCharSequence.of(line));
+        }
+        return out;
+    }
+
     @Nonnull
     private static List<Component> toLines(@Nonnull List<List<TextRun>> lines) {
         List<Component> out = new ArrayList<>(lines.size());

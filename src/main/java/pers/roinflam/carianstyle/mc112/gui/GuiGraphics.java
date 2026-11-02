@@ -426,6 +426,35 @@ public final class GuiGraphics {
         return drawRuns(font, text.runs(), x, y, color, shadow);
     }
 
+    /**
+     * 画一行已排版文字（默认带阴影，同 1.20.1 drawString(Font, FormattedCharSequence, int, int, int)）
+     */
+    public int drawString(@Nonnull Font font, @Nonnull FormattedCharSequence text, int x, int y, int color) {
+        return drawString(font, text, x, y, color, true);
+    }
+
+    /**
+     * 画一行已排版文字（同 1.20.1 drawString(Font, FormattedCharSequence, int, int, int, boolean)）
+     *
+     * @param font   字体
+     * @param text   一行
+     * @param x      左
+     * @param y      上
+     * @param color  默认颜色（ARGB；段落自己带颜色的按段落颜色画）
+     * @param shadow 是否带阴影
+     * @return 结束 x（带阴影时 +1）
+     */
+    public int drawString(@Nonnull Font font, @Nonnull FormattedCharSequence text, int x, int y, int color, boolean shadow) {
+        return drawRuns(font, text.runs(), x, y, color, shadow);
+    }
+
+    /**
+     * 居中画一行已排版文字（带阴影，同 1.20.1 drawCenteredString(Font, FormattedCharSequence, ...)）
+     */
+    public void drawCenteredString(@Nonnull Font font, @Nonnull FormattedCharSequence text, int centerX, int y, int color) {
+        drawRuns(font, text.runs(), centerX - font.width(text) / 2, y, color, true);
+    }
+
     public void drawCenteredString(@Nonnull Font font, @Nonnull String text, int centerX, int y, int color) {
         drawString(font, text, centerX - font.width(text) / 2, y, color);
     }
@@ -546,6 +575,24 @@ public final class GuiGraphics {
             y = guiHeight - height - 3;
         }
         renderTooltipAt(font, lines, x, y);
+    }
+
+    /**
+     * 画提示框，每个元素一行（同 1.20.1 renderTooltip(Font, List&lt;FormattedCharSequence&gt;, int, int)）
+     * <p>
+     * 1.12.2 版：{@link #renderTooltip(Font, List, int, int)} 已经收 {@code List<Component>}，
+     * 两个 List 参数擦除后签名相同、不能同名重载，所以换了个名字；位置规则、外观和它完全一样。
+     * </p>
+     */
+    public void renderSequenceTooltip(@Nonnull Font font, @Nonnull List<FormattedCharSequence> lines, int mouseX, int mouseY) {
+        if (lines.isEmpty()) {
+            return;
+        }
+        List<Component> components = new ArrayList<>(lines.size());
+        for (FormattedCharSequence line : lines) {
+            components.add(line.toComponent());
+        }
+        renderTooltip(font, components, mouseX, mouseY);
     }
 
     /**
