@@ -6,9 +6,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.enchantment.Enchantment;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
-import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
 import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
@@ -26,6 +24,7 @@ import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
+
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -36,8 +35,6 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
- * PORT-STUB(E1)
- *
  * 重力附魔
  * <p>v2.2：攻击者视角接入怪物附魔触发开关。PlayerTick天然玩家专属，无需检查。</p>
  * <p>v2.3：力场激活/结束时同步给客户端（{@link #GRAVITY_FIELD_SERIAL}），供
@@ -75,21 +72,212 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
         baseEnchantability = 35,
         levelMultiplier = 0
 )
-@Deprecated
+@EventBusSubscriber
 public class EnchantmentGravitas extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.gravitas.desc。
+    //
+    // 注意 FIELD_RADIUS 用的是 defineShared 而非 define：它同时被客户端的
+    // GravitasDistortionRenderer 用来画地面范围圈，必须由服务端下发，
+    // 否则服主改了半径之后会出现「圈画在这里、判定却在那里」。详见 EnchantmentValues 类注释。
+
+    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "gravitas";
-    private static final EnchantmentValues.Handle ACTIVE_SECONDS_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "active_seconds_per_level", 4, 1, 120);
-    private static final EnchantmentValues.Handle EFFECT_SECONDS_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "effect_seconds_per_level", 2, 1, 120);
-    private static final EnchantmentValues.Handle AMPLIFIER_BASE = EnchantmentValues.define(VALUE_ID, "amplifier_base", 10, 1, 127);
-    private static final EnchantmentValues.Handle AMPLIFIER_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "amplifier_per_level", 4, 0, 32);
-    private static final EnchantmentValues.Handle AURA_AMPLIFIER = EnchantmentValues.define(VALUE_ID, "aura_amplifier", 9, 0, 127);
+
+    /**
+     * 每级的力场持续秒数
+     * <p>默认 4，允许范围 1 ~ 120。</p>
+     */
+    private static final EnchantmentValues.Handle ACTIVE_SECONDS_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "active_seconds_per_level", 4, 1, 120);
+
+    /**
+     * 命中时每级施加重力效果的持续秒数
+     * <p>默认 2，允许范围 1 ~ 120。</p>
+     */
+    private static final EnchantmentValues.Handle EFFECT_SECONDS_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "effect_seconds_per_level", 2, 1, 120);
+
+    /**
+     * 命中效果的等级基数（最终等级 = 基数 + 附魔等级 × 每级增量 − 1）
+     * <p>默认 10，允许范围 1 ~ 127。</p>
+     */
+    private static final EnchantmentValues.Handle AMPLIFIER_BASE =
+            EnchantmentValues.define(VALUE_ID, "amplifier_base", 10, 1, 127);
+
+    /**
+     * 命中效果每级增加的等级
+     * <p>默认 4，允许范围 0 ~ 32。</p>
+     */
+    private static final EnchantmentValues.Handle AMPLIFIER_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "amplifier_per_level", 4, 0, 32);
+
+    /**
+     * 力场光环对周围生物施加的效果等级
+     * <p>默认 9，允许范围 0 ~ 127。</p>
+     */
+    private static final EnchantmentValues.Handle AURA_AMPLIFIER =
+            EnchantmentValues.define(VALUE_ID, "aura_amplifier", 9, 0, 127);
+
     private static final String GRAVITAS_ACTIVE_KEY = "gravitas_active";
-    public static final EnchantmentValues.Handle FIELD_RADIUS = EnchantmentValues.defineShared(VALUE_ID, "field_radius", 12, 1, 64);
+
+    /**
+     * 重力力场的作用半径（格）。周围生物范围判定（{@link #onPlayerTick}）与客户端范围圈视觉
+     * （{@code GravitasDistortionRenderer}）必须保持一致，故抽成公开常量供渲染器引用，
+     * 避免两处各自写死 12 导致以后改动漏改一处。
+     */
+    public static final EnchantmentValues.Handle FIELD_RADIUS =
+            EnchantmentValues.defineShared(VALUE_ID, "field_radius", 12, 1, 64);
+
+    /**
+     * 重力力场的客户端同步序列号，供 {@code GravitasDistortionRenderer} 判断「谁正在施放力场」，
+     * 从而绘制以施法者为中心、半径 {@link #FIELD_RADIUS} 格的地面范围圈。序列号 1~3 为自定义火焰、
+     * 4 为隐身、5 为猩红腐败（见 {@code ScarletRotSyncHandler}），本附魔取 6，避免冲突。
+     */
     public static final int GRAVITY_FIELD_SERIAL = 6;
+
+    /**
+     * 力场持有者集合：记录当前「已同步给客户端」的玩家 UUID。
+     * <p>{@link EnchantmentDataManager} 只提供「是否在冷却中」的瞬时查询、没有到期回调，
+     * 故力场的开启/关闭边沿由本集合自行检测：力场刚激活时（此前不在集合中）才调用一次
+     * {@link ClientSyncEffectManager#addEntity} 广播；力场结束时（不再在冷却中但仍在集合中）
+     * 才调用一次 {@link ClientSyncEffectManager#removeEntity}，避免每 tick 重复处理。
+     * 仅服务端 tick 线程访问。</p>
+     * <p>v2.4：新增登出清理路径，见类注释。</p>
+     */
     private static final Set<UUID> ACTIVE_FIELD_HOLDERS = ConcurrentHashMap.newKeySet();
+
     public EnchantmentGravitas() {
         super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
+
+    /**
+     * 攻击时激活重力场并给敌人施加重力效果
+     */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
+            return;
+        }
+
+        if (!(evt.getSource().getEntity() instanceof LivingEntity)) {
+            return;
+        }
+
+        LivingEntity victim = evt.getEntity();
+        LivingEntity attacker = (LivingEntity) evt.getSource().getEntity();
+
+        // v2.2：怪物附魔触发开关（攻击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+
+        ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
+        if (heldItem.isEmpty()) {
+            return;
+        }
+
+        EnchantmentBase gravitas = EnchantmentRegistry.getEnchantmentByClass(EnchantmentGravitas.class);
+        if (gravitas == null) {
+            return;
+        }
+
+        int level = EnchantmentLevels.get(gravitas, heldItem);
+        level = decayLevel(gravitas, level);
+
+        if (level <= 0) {
+            return;
+        }
+
+        int activeDuration = level * ACTIVE_SECONDS_PER_LEVEL.getInt() * 20;
+        EnchantmentDataManager.setCooldown(GRAVITAS_ACTIVE_KEY, attacker.getUUID(), activeDuration);
+
+        int potionDuration = level * EFFECT_SECONDS_PER_LEVEL.getInt() * 20;
+        int potionLevel = AMPLIFIER_BASE.getInt() + level * AMPLIFIER_PER_LEVEL.getInt() - 1;
+        victim.addEffect(new MobEffectInstance(
+                CarianStylePotion.GRAVITAS,
+                potionDuration,
+                potionLevel
+        ));
+    }
+
+    /**
+     * 死亡时清理状态（清理类，不需要拦截）
+     */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingDeath(@NotNull LivingDeathEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
+            return;
+        }
+        LivingEntity dead = evt.getEntity();
+        EnchantmentDataManager.clearCooldown(GRAVITAS_ACTIVE_KEY, dead.getUUID());
+        // 力场持有者死亡：同步移除范围圈视觉，无需等待客户端每 5 秒一次的定期重同步
+        if (ACTIVE_FIELD_HOLDERS.remove(dead.getUUID())) {
+            ClientSyncEffectManager.removeEntity(dead, GRAVITY_FIELD_SERIAL);
+        }
+    }
+
+    /**
+     * 玩家登出时清理力场状态（v2.4 新增）。
+     * <p>
+     * 这里<b>不调用</b> {@link ClientSyncEffectManager#removeEntity}：玩家已经断开，
+     * 发不到他自己那儿；而其余玩家的客户端会在实体被移除时自行清理该实体的视觉状态。
+     * 这里要做的只是把服务端侧的两份状态清干净，让他下次登录时是一个干净的起点。
+     * </p>
+     *
+     * @param evt 玩家登出事件
+     */
+    @SubscribeEvent
+    public static void onPlayerLoggedOut(@NotNull PlayerEvent.PlayerLoggedOutEvent evt) {
+        UUID uuid = evt.getEntity().getUUID();
+        ACTIVE_FIELD_HOLDERS.remove(uuid);
+        EnchantmentDataManager.clearCooldown(GRAVITAS_ACTIVE_KEY, uuid);
+    }
+
+    /**
+     * 激活状态时，周围生物持续受到轻微重力效果；同时维护力场的客户端同步状态，
+     * 驱动 {@code GravitasDistortionRenderer} 绘制以自身为中心的地面范围圈。
+     * <p>PlayerTickEvent 仅玩家触发，无需开关检查</p>
+     */
+    @SubscribeEvent
+    public static void onPlayerTick(@NotNull PlayerTickEvent.Pre evt) {
+        if (evt.getEntity().level().isClientSide) {
+            return;
+        }
+
+        Player holder = evt.getEntity();
+        if (!holder.isAlive()) {
+            return;
+        }
+
+        UUID uuid = holder.getUUID();
+        boolean active = EnchantmentDataManager.isOnCooldown(GRAVITAS_ACTIVE_KEY, uuid);
+
+        if (!active) {
+            // 力场已结束：若此前同步过范围圈，通知客户端移除
+            if (ACTIVE_FIELD_HOLDERS.remove(uuid)) {
+                ClientSyncEffectManager.removeEntity(holder, GRAVITY_FIELD_SERIAL);
+            }
+            return;
+        }
+
+        // 力场刚激活（此前不在集合中）：同步给客户端，绘制范围圈
+        if (ACTIVE_FIELD_HOLDERS.add(uuid)) {
+            ClientSyncEffectManager.addEntity(holder, GRAVITY_FIELD_SERIAL);
+        }
+
+        List<LivingEntity> nearbyEntities = EntityUtil.getNearbyEntities(
+                LivingEntity.class,
+                holder,
+                FIELD_RADIUS.getInt(),
+                entity -> !entity.equals(holder)
+        );
+
+        for (LivingEntity entity : nearbyEntities) {
+            entity.addEffect(new MobEffectInstance(
+                    CarianStylePotion.GRAVITAS, 2, AURA_AMPLIFIER.getInt()));
+        }
+    }
+
     @Override
     protected boolean checkCompatibility(@NotNull EnchantKey ench) {
         if (ench.is(Enchantments.KNOCKBACK)) {
@@ -97,5 +285,5 @@ public class EnchantmentGravitas extends EnchantmentBase {
         }
         return super.checkCompatibility(ench);
     }
-}
 
+}

@@ -19,8 +19,6 @@ import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 /**
- * PORT-STUB(E1)
- *
  * 血刃附魔
  * <p>
  * 消耗自身15%最大生命值，造成额外伤害
@@ -58,19 +56,87 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
         baseEnchantability = 10,
         levelMultiplier = 15
 )
-@Deprecated
 public class EnchantmentBloodBlade extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.blood_blade.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "blood_blade";
-    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "damage_per_level",
+
+    /**
+     * 每级基于本次伤害的额外伤害倍率
+     * <p>默认 0.33，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "damage_per_level",
                     0.33D, 0.0D, 5.0D);
-    private static final EnchantmentValues.Handle VICTIM_HEALTH_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "victim_health_per_level",
+
+    /**
+     * 每级基于目标当前生命的额外伤害倍率
+     * <p>默认 0.033，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle VICTIM_HEALTH_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "victim_health_per_level",
                     0.033D, 0.0D, 1.0D);
-    private static final EnchantmentValues.Handle SELF_DAMAGE_RATIO = EnchantmentValues.define(VALUE_ID, "self_damage_ratio",
+
+    /**
+     * 每次触发自伤的最大生命占比
+     * <p>默认 0.15，允许范围 0.0 ~ 0.9。</p>
+     */
+    private static final EnchantmentValues.Handle SELF_DAMAGE_RATIO =
+            EnchantmentValues.define(VALUE_ID, "self_damage_ratio",
                     0.15D, 0.0D, 0.9D);
+
     public EnchantmentBloodBlade() {
         super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
-    protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
-    }
-}
 
+    /**
+     * 攻击时触发血刃效果
+     * 根据自身血量比例和附魔等级计算额外伤害，同时消耗自身15%最大生命值
+     *
+     * @param ctx   附魔上下文
+     * @param level 附魔等级
+     */
+    @Override
+    protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
+        LivingEntity attacker = ctx.getHolder();
+        LivingEntity victim = ctx.getVictim();
+
+        if (victim == null) {
+            return;
+        }
+
+        // 玩家需要刚挥剑，非玩家可直接触发
+        if (ctx.isHolderPlayer()) {
+            if (!isJustSwung(ctx.getHolderAsPlayer())) {
+                return;
+            }
+        }
+
+        // 额外伤害 = (当前伤害×等级×0.33 + 目标当前生命值×等级×0.033) × 自身血量比例，上限为目标最大生命值
+        float healthRatio = attacker.getHealth() / attacker.getMaxHealth();
+        float bonusDamage = Math.min(
+                (ctx.getDamage() * level * (float) DAMAGE_PER_LEVEL.get()
+                        + victim.getHealth() * level * (float) VICTIM_HEALTH_PER_LEVEL.get()) * healthRatio,
+                victim.getMaxHealth()
+        );
+
+        // 消耗自身15%最大生命值，血量不够付时正常死亡（不死图腾挡得住）
+        EntityLivingUtil.payHealthCost(attacker, attacker.getMaxHealth() * (float) SELF_DAMAGE_RATIO.get());
+
+        // v2.1：血刃打击反馈。
+        // 位置刻意放在扣血之后 —— 只有代价真正付出去了才播，
+        // 上面任何一个 return 都不该看到特效
+        if (attacker.level() instanceof ServerLevel serverLevel) {
+            CarianStyleCombatArtEffects.bloodBlade(serverLevel, attacker);
+        }
+
+        // 增加伤害
+        ctx.addDamage(bonusDamage);
+    }
+
+}

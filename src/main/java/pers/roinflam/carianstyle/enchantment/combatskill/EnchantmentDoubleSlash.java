@@ -1,3 +1,5 @@
+// 文件：EnchantmentDoubleSlash.java
+// 路径：forge/src/main/java/pers/roinflam/carianstyle/enchantment/combatskill/EnchantmentDoubleSlash.java
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
 import net.minecraft.server.level.ServerLevel;
@@ -15,8 +17,6 @@ import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 /**
- * PORT-STUB(E1)
- *
  * 双斩附魔
  * <p>
  * 玩家攻击时有概率（等级×5+20%）触发二段斩
@@ -43,12 +43,61 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
         baseEnchantability = 20,
         levelMultiplier = 8
 )
-@Deprecated
 public class EnchantmentDoubleSlash extends EnchantmentBase {
+
     public EnchantmentDoubleSlash() {
         super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
-    protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
-    }
-}
 
+    @Override
+    protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
+        // 排除水鸟乱舞伤害（防止递归）
+        if (ctx.getDamageSource() != null && "waterfowlDance".equals(ctx.getDamageSource().getMsgId())) {
+            return;
+        }
+
+        // 只有玩家能触发
+        if (!ctx.isHolderPlayer()) {
+            return;
+        }
+
+        Player player = ctx.getHolderAsPlayer();
+        LivingEntity victim = ctx.getVictim();
+
+        if (victim == null) {
+            return;
+        }
+
+        // 检查刚挥剑
+        if (!isJustSwung(player)) {
+            return;
+        }
+
+        // 消耗这一下挥击：冷却延后到下一 tick 开头清零（直接清零会让同一下挥击里后面的蓄力判断，如命定之死，全部失效），
+        // 同一 tick 内只结算一次——横扫副目标、范围伤害的其它目标、主副手都带本附魔的重复分发都不再各结算一遍
+        if (!AttackCooldownHelper.spendSwing(player)) {
+            return;
+        }
+
+        // 概率触发：等级×5 + 20%
+        if (!RandomUtil.percentageChance(level * 5 + 20)) {
+            return;
+        }
+
+        // 减少敌人无敌帧
+        // 1.20.1: hurtResistantTime → invulnerableTime, maxHurtResistantTime → 默认20
+        victim.invulnerableTime = 10;
+
+        // 额外魔法伤害
+        // 1.20.1: 使用原版魔法伤害源
+        float extraDamage = ctx.getDamage() * level * 0.2f;
+        victim.hurt(victim.damageSources().magic(), extraDamage);
+
+        // v2.1：播放「两道交叉刀光」自绘特效。
+        // 位置取受击者、朝向取攻击者（与狮子斩同理）
+        if (player.level() instanceof ServerLevel serverLevel) {
+            CarianStyleCombatArtEffects.doubleSlash(serverLevel, player, victim);
+        }
+    }
+
+}
