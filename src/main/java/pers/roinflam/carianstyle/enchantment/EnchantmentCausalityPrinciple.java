@@ -23,13 +23,12 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.AoeHelper;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
+
 import java.util.List;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
- * PORT-STUB(E3)
- *
  * 因果律附魔
  * <p>
  * 护甲附魔。每累积受击 {@link #TRIGGER_COUNT} 次，对周围敌人发动一次 AOE 反击，
@@ -79,28 +78,190 @@ import net.neoforged.fml.common.EventBusSubscriber;
         baseEnchantability = 10,
         levelMultiplier = 10
 )
-@Deprecated
+@EventBusSubscriber
 public class EnchantmentCausalityPrinciple extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.causality_principle.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "causality_principle";
-    private static final EnchantmentValues.Handle MAX_SEARCH_RADIUS = EnchantmentValues.define(VALUE_ID, "max_search_radius",
+
+    /**
+     * AOE 反击搜索半径上限（格）
+     * <p>默认 10，允许范围 1 ~ 64。</p>
+     */
+    private static final EnchantmentValues.Handle MAX_SEARCH_RADIUS =
+            EnchantmentValues.define(VALUE_ID, "max_search_radius",
                     10, 1, 64);
-    private static final EnchantmentValues.Handle MAX_TARGETS = EnchantmentValues.define(VALUE_ID, "max_targets",
+
+    /**
+     * 单次 AOE 反击最大命中目标数
+     * <p>默认 20，允许范围 1 ~ 200。</p>
+     */
+    private static final EnchantmentValues.Handle MAX_TARGETS =
+            EnchantmentValues.define(VALUE_ID, "max_targets",
                     20, 1, 200);
-    private static final EnchantmentValues.Handle TRIGGER_COUNT = EnchantmentValues.define(VALUE_ID, "trigger_count",
+
+    /**
+     * 触发 AOE 反击所需的受击累积次数
+     * <p>默认 5，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle TRIGGER_COUNT =
+            EnchantmentValues.define(VALUE_ID, "trigger_count",
                     5, 1, 100);
-    private static final EnchantmentValues.Handle TRIGGER_COOLDOWN = EnchantmentValues.define(VALUE_ID, "trigger_cooldown",
+
+    /**
+     * AOE 反击触发冷却（tick）
+     * <p>默认 20，允许范围 0 ~ 1200。</p>
+     */
+    private static final EnchantmentValues.Handle TRIGGER_COOLDOWN =
+            EnchantmentValues.define(VALUE_ID, "trigger_cooldown",
                     20, 0, 1200);
-    private static final EnchantmentValues.Handle LEVEL_CAP = EnchantmentValues.define(VALUE_ID, "level_cap",
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
                     10, 1, 100);
-    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "damage_per_level",
+
+    /**
+     * 每级的反击伤害倍率（基于本次受到的伤害）
+     * <p>默认 0.75，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "damage_per_level",
                     0.75D, 0.0D, 10.0D);
+
+    /** 受击累积计数器键 */
     private static final String COUNTER_KEY = "causality_principle";
+
+    /** AOE 反击触发冷却键 */
     private static final String COOLDOWN_KEY = "causality_principle_cooldown";
+
+    /**
+     * 本附魔专属的线程级重入保护。
+     * <p>
+     * AOE 反击对周围实体造成的二次伤害会再次进入 {@link #onLivingDamage}，
+     * 此守卫在方法入口处直接拦截，防止因果律自身递归触发，
+     * 进而避免与其它模组的反伤、加属性机制形成伤害事件级联导致服务端崩溃。
+     * </p>
+     * <p>
+     * <b>每个附魔必须持有自己独立的一份</b>，不同附魔之间互不影响
+     * （因果律的守卫不应阻止学者盾的反伤）。
+     * </p>
+     */
     private static final AoeHelper.ReentrancyGuard AOE_GUARD = new AoeHelper.ReentrancyGuard();
+
     public EnchantmentCausalityPrinciple() {
         super(EnchantTarget.ARMOR, new EquipmentSlot[]{
                 EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
         });
     }
-}
 
+    /**
+     * 受击事件监听：累积受击次数，每满 {@link #TRIGGER_COUNT} 次对周围敌人造成一次 AOE 反击。
+     *
+     * @param evt 生物受到伤害事件
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
+            return;
+        }
+
+        // 重入保护 —— 若当前线程正在执行因果律 AOE 反击，直接跳过，
+        // 阻断因果律自身的伤害事件级联（核心崩溃修复点，详见类注释）
+        if (AOE_GUARD.isActive()) {
+            return;
+        }
+
+        if (evt.getSource().is(DamageTypeTags.BYPASSES_INVULNERABILITY)) {
+            return;
+        }
+
+        if (!(evt.getSource().getEntity() instanceof LivingEntity)) {
+            return;
+        }
+
+        LivingEntity victim = evt.getEntity();
+
+        // 怪物附魔触发开关（受击者视角，5 次受击触发 AOE 反击）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
+        EnchantmentBase causalityPrinciple = EnchantmentRegistry.getEnchantmentByClass(EnchantmentCausalityPrinciple.class);
+        if (causalityPrinciple == null) {
+            return;
+        }
+
+        int totalLevel = 0;
+        for (ItemStack armor : victim.getArmorSlots()) {
+            if (!armor.isEmpty()) {
+                totalLevel += EnchantmentLevels.get(causalityPrinciple, armor);
+            }
+        }
+
+        totalLevel = applyLevelLimit(causalityPrinciple, totalLevel, LEVEL_CAP.getInt());
+
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        final int effectiveLevel = totalLevel;
+
+        int currentCount = EnchantmentDataManager.incrementCounter(COUNTER_KEY, victim.getUUID());
+
+        if (currentCount >= TRIGGER_COUNT.getInt()) {
+            // 触发冷却判断。冷却中保持计数不重置，冷却结束后下次受击立即触发，
+            // 保证 AOE 反击 1 秒最多触发一次
+            if (EnchantmentDataManager.isOnCooldown(COOLDOWN_KEY, victim.getUUID())) {
+                return;
+            }
+
+            EnchantmentDataManager.resetCounter(COUNTER_KEY, victim.getUUID());
+            EnchantmentDataManager.setCooldown(COOLDOWN_KEY, victim.getUUID(), TRIGGER_COOLDOWN.getInt());
+
+            int searchRadius = Math.min(effectiveLevel * 3, MAX_SEARCH_RADIUS.getInt());
+
+            // AOE 触发时播放一发因果律金紫六芒星法阵（约 1100ms）。
+            // 特效半径取实际作用半径 searchRadius，保证「看到多大就打多大」。
+            // 纯服务端发包，不生成实体、不触发任何事件，
+            // 不影响下方伤害逻辑与两层崩服防护。
+            if (victim.level() instanceof ServerLevel serverLevel) {
+                CarianStyleEffects.causality(
+                        serverLevel,
+                        victim.getX(), victim.getY() + 0.1, victim.getZ(),
+                        searchRadius
+                );
+            }
+
+            List<LivingEntity> targets = EntityUtil.getNearbyEntities(
+                    LivingEntity.class,
+                    victim,
+                    searchRadius,
+                    entity -> !entity.equals(victim)
+            );
+
+            float damage = evt.getAmount() * effectiveLevel * (float) DAMAGE_PER_LEVEL.get();
+
+            // 在守卫保护下执行 AOE 反击，确保 target.hurt 触发的二次伤害事件
+            // 不会再次进入本方法形成级联；ReentrancyGuard 内部用 try-finally 复位标记，
+            // 即使 hurt 抛出异常也不会让标记滞留、导致因果律永久失效
+            AOE_GUARD.run(() -> {
+                int hitCount = 0;
+                for (LivingEntity target : targets) {
+                    if (hitCount >= MAX_TARGETS.getInt()) {
+                        break;
+                    }
+                    target.hurt(victim.damageSources().mobAttack(victim), damage);
+                    hitCount++;
+                }
+            });
+        }
+    }
+
+}

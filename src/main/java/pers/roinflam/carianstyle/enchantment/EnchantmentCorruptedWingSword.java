@@ -12,8 +12,6 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 
 /**
- * PORT-STUB(E3)
- *
  * 腐败翼剑附魔
  * <p>
  * 武器附魔，连击系统
@@ -34,22 +32,87 @@ import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
         baseEnchantability = 15,
         levelMultiplier = 5
 )
-@Deprecated
 public class EnchantmentCorruptedWingSword extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.corrupted_wing_sword.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "corrupted_wing_sword";
-    private static final EnchantmentValues.Handle MAX_COMBO = EnchantmentValues.define(VALUE_ID, "max_combo",
+
+    /**
+     * 连击层数上限
+     * <p>默认 20，允许范围 1 ~ 200。</p>
+     */
+    private static final EnchantmentValues.Handle MAX_COMBO =
+            EnchantmentValues.define(VALUE_ID, "max_combo",
                     20, 1, 200);
-    private static final EnchantmentValues.Handle DECAY_DELAY = EnchantmentValues.define(VALUE_ID, "decay_delay",
+
+    /**
+     * 连击开始衰减前的延迟（tick）
+     * <p>默认 300，允许范围 20 ~ 12000。</p>
+     */
+    private static final EnchantmentValues.Handle DECAY_DELAY =
+            EnchantmentValues.define(VALUE_ID, "decay_delay",
                     300, 20, 12000);
-    private static final EnchantmentValues.Handle COMBO_DIVISOR = EnchantmentValues.define(VALUE_ID, "combo_divisor",
+
+    /**
+     * 连击层数的换算除数（越小同层数增伤越高）
+     * <p>默认 4.0，允许范围 0.5 ~ 100.0。</p>
+     */
+    private static final EnchantmentValues.Handle COMBO_DIVISOR =
+            EnchantmentValues.define(VALUE_ID, "combo_divisor",
                     4.0D, 0.5D, 100.0D);
-    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "damage_per_level",
+
+    /**
+     * 每级每档连击提供的额外伤害倍率
+     * <p>默认 0.03，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "damage_per_level",
                     0.03D, 0.0D, 2.0D);
+
     private static final String COMBO_COUNTER_KEY = "corrupted_wing_sword_combo";
+
     public EnchantmentCorruptedWingSword() {
         super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
-    protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
-    }
-}
 
+    @Override
+    protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
+        if (ctx.isHolderPlayer() && !isJustSwung(ctx.getHolderAsPlayer())) {
+            return;
+        }
+
+        int currentCombo = EnchantmentDataManager.getCounter(COMBO_COUNTER_KEY, ctx.getHolder().getUUID());
+        int maxCombo = MAX_COMBO.getInt();
+
+        int newCombo;
+        if (currentCombo < maxCombo) {
+            newCombo = EnchantmentDataManager.incrementCounter(COMBO_COUNTER_KEY, ctx.getHolder().getUUID());
+
+            new SynchronizationTask(DECAY_DELAY.getInt()) {
+                @Override
+                public void run() {
+                    int combo = EnchantmentDataManager.getCounter(COMBO_COUNTER_KEY, ctx.getHolder().getUUID());
+                    if (combo > 1) {
+                        EnchantmentDataManager.setCounter(COMBO_COUNTER_KEY, ctx.getHolder().getUUID(), combo - 1);
+                    } else {
+                        EnchantmentDataManager.resetCounter(COMBO_COUNTER_KEY, ctx.getHolder().getUUID());
+                    }
+                }
+            }.start();
+        } else {
+            // 连击已到上限：不再叠加、也不再追加衰减任务，但增伤按上限计算。
+            // 原来增伤只写在上面的分支里，连击打满（默认 20）后增伤反而消失，要等衰减掉一层才回来
+            newCombo = maxCombo;
+        }
+
+        float damageBonus = ctx.getDamage() * (float) (newCombo / COMBO_DIVISOR.get())
+            * (float) DAMAGE_PER_LEVEL.get() * level;
+        ctx.addDamage(damageBonus);
+    }
+
+}

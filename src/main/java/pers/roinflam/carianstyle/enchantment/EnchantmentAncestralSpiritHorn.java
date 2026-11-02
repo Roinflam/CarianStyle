@@ -25,8 +25,6 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
- * PORT-STUB(E3)
- *
  * 先祖之角附魔
  * <p>v2.1：LivingDamage受击者视角入口接入怪物附魔触发开关</p>
  *
@@ -47,18 +45,103 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
         baseEnchantability = 20,
         levelMultiplier = 15
 )
-@Deprecated
+@EventBusSubscriber
 public class EnchantmentAncestralSpiritHorn extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.ancestral_spirit_horn.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "ancestral_spirit_horn";
-    private static final EnchantmentValues.Handle LEVEL_CAP = EnchantmentValues.define(VALUE_ID, "level_cap",
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
                     10, 1, 100);
-    private static final EnchantmentValues.Handle DAMAGE_MULTIPLIER = EnchantmentValues.define(VALUE_ID, "damage_multiplier",
+
+    /**
+     * 受到伤害的倍率（越小减伤越多）
+     * <p>默认 0.75，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_MULTIPLIER =
+            EnchantmentValues.define(VALUE_ID, "damage_multiplier",
                     0.75D, 0.0D, 1.0D);
-    private static final EnchantmentValues.Handle HEAL_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "heal_per_level",
+
+    /**
+     * 每级把受到伤害转为持续治疗的比例
+     * <p>默认 0.05，允许范围 0.0 ~ 2.0。</p>
+     */
+    private static final EnchantmentValues.Handle HEAL_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "heal_per_level",
                     0.05D, 0.0D, 2.0D);
+
     public EnchantmentAncestralSpiritHorn() {
         super(EnchantTarget.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
+
+    private static int getTotalLevel(LivingEntity entity) {
+        EnchantmentBase ancestralSpiritHorn = EnchantmentRegistry.getEnchantmentByClass(EnchantmentAncestralSpiritHorn.class);
+        if (ancestralSpiritHorn == null) {
+            return 0;
+        }
+
+        int totalLevel = 0;
+        for (ItemStack armor : entity.getArmorSlots()) {
+            if (!armor.isEmpty()) {
+                totalLevel += EnchantmentLevels.get(ancestralSpiritHorn, armor);
+            }
+        }
+        totalLevel = applyLevelLimit(ancestralSpiritHorn, totalLevel, LEVEL_CAP.getInt());
+        return totalLevel;
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOW)
+    public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
+            return;
+        }
+
+        DamageSource damageSource = evt.getSource();
+
+        if (damageSource.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY) ||
+                !DamageSourceUtil.isMagicDamage(damageSource)) {
+            return;
+        }
+
+        LivingEntity holder = evt.getEntity();
+
+        // v2.1：怪物附魔触发开关（受击者视角，魔法减伤+持续回血）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(holder, false)) return;
+
+        int totalLevel = getTotalLevel(holder);
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        evt.setAmount(evt.getAmount() * (float) DAMAGE_MULTIPLIER.get());
+
+        float healPerTick = evt.getAmount() * totalLevel * (float) HEAL_PER_LEVEL.get() / 20;
+
+        new SynchronizationTask(10, 10) {
+            private int tick = 0;
+
+            @Override
+            public void run() {
+                tick += 10;
+                if (tick > 200 || !holder.isAlive()) {
+                    this.cancel();
+                    return;
+                }
+                holder.heal(healPerTick);
+            }
+        }.start();
+    }
+
     @Override
     protected boolean checkCompatibility(@NotNull EnchantKey ench) {
         if (ench.is(Enchantments.PROTECTION)) {
@@ -66,5 +149,5 @@ public class EnchantmentAncestralSpiritHorn extends EnchantmentBase {
         }
         return super.checkCompatibility(ench);
     }
-}
 
+}

@@ -19,8 +19,6 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
- * PORT-STUB(E3)
- *
  * 祝福露水护符附魔
  * <p>
  * 玩家饱食度满时持续回血
@@ -39,19 +37,105 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
         baseEnchantability = 5,
         levelMultiplier = 10
 )
-@Deprecated
+@EventBusSubscriber
 public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.blessed_dew_talisman.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "blessed_dew_talisman";
-    private static final EnchantmentValues.Handle HEAL_INTERVAL = EnchantmentValues.define(VALUE_ID, "heal_interval",
+
+    /**
+     * 回血结算间隔（tick）
+     * <p>默认 20，允许范围 1 ~ 600。</p>
+     */
+    private static final EnchantmentValues.Handle HEAL_INTERVAL =
+            EnchantmentValues.define(VALUE_ID, "heal_interval",
                     20, 1, 600);
-    private static final EnchantmentValues.Handle LEVEL_CAP = EnchantmentValues.define(VALUE_ID, "level_cap",
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
                     10, 1, 100);
-    private static final EnchantmentValues.Handle HEAL_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "heal_per_level",
+
+    /**
+     * 每次结算每级回复的最大生命占比
+     * <p>默认 0.002，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle HEAL_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "heal_per_level",
                     0.002D, 0.0D, 1.0D);
+
+    /**
+     * 治疗间隔(tick)
+     * 20 tick = 1秒
+     */
+
+    /**
+     * 计数器ID前缀
+     */
     private static final String COUNTER_ID = "blessed_dew_talisman_tick";
+
     public EnchantmentBlessedDewTalisman() {
         super(EnchantTarget.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
+
+    @SubscribeEvent
+    public static void onPlayerTick(@NotNull PlayerTickEvent.Pre evt) {
+        // 只在服务端执行
+        if (evt.getEntity().level().isClientSide) {
+            return;
+        }
+
+        // 只在START阶段执行
+
+        Player player = evt.getEntity();
+
+        // 优化1: 使用计数器控制执行频率,每20tick(1秒)执行一次
+        int tickCounter = EnchantmentDataManager.incrementCounter(COUNTER_ID, player.getUUID());
+        if (tickCounter % HEAL_INTERVAL.getInt() != 0) {
+            return;
+        }
+
+        // 优化2: 提前检查是否满血,满血直接跳过
+        if (player.getHealth() >= player.getMaxHealth()) {
+            return;
+        }
+
+        // 优化3: 提前检查饱食度,不满时直接跳过
+        // 1.20.1: getFoodStats().needFood() → getFoodData().needsFood()
+        if (player.getFoodData().needsFood()) {
+            return;
+        }
+
+        // 获取附魔实例
+        EnchantmentBase blessedDewTalisman = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBlessedDewTalisman.class);
+        if (blessedDewTalisman == null) {
+            return;
+        }
+
+        // 计算总附魔等级（v-cache：走中央装备缓存）
+        int totalLevel = EnchantmentEventHandler.armorTotal(player, blessedDewTalisman);
+
+        // 应用等级上限
+        totalLevel = applyLevelLimit(blessedDewTalisman, totalLevel, LEVEL_CAP.getInt());
+
+        // 执行治疗
+        if (totalLevel > 0) {
+            // 优化4: 因为改为每秒执行一次,所以不再除以20
+            // 原公式: 最大血量 * 等级 * 0.002 / 20 每tick
+            // 新公式: 最大血量 * 等级 * 0.002 每秒
+            float healAmount = player.getMaxHealth() * totalLevel * (float) HEAL_PER_LEVEL.get();
+            player.heal(healAmount);
+        }
+    }
+
     @Override
     protected boolean checkCompatibility(@NotNull EnchantKey ench) {
         if (ench.is(Enchantments.PROTECTION)) {
@@ -59,5 +143,5 @@ public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
         }
         return super.checkCompatibility(ench);
     }
-}
 
+}

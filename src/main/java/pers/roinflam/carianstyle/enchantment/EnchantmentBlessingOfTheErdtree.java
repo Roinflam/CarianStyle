@@ -25,8 +25,6 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
- * PORT-STUB(E3)
- *
  * 黄金树祝福附魔
  * <p>v2.1：LivingAttack双向监听器入口接入怪物附魔触发开关</p>
  *
@@ -43,18 +41,99 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
         baseEnchantability = 35,
         levelMultiplier = 25
 )
-@Deprecated
+@EventBusSubscriber
 public class EnchantmentBlessingOfTheErdtree extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.blessing_of_the_erdtree.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "blessing_of_the_erdtree";
-    private static final EnchantmentValues.Handle LEVEL_CAP = EnchantmentValues.define(VALUE_ID, "level_cap",
+
+    /**
+     * 参与计算的等级上限
+     * <p>默认 10，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle LEVEL_CAP =
+            EnchantmentValues.define(VALUE_ID, "level_cap",
                     10, 1, 100);
-    private static final EnchantmentValues.Handle ATTACKER_AMPLIFIER_CAP = EnchantmentValues.define(VALUE_ID, "attacker_amplifier_cap",
+
+    /**
+     * 攻击方效果等级的上限
+     * <p>默认 5，允许范围 1 ~ 100。</p>
+     */
+    private static final EnchantmentValues.Handle ATTACKER_AMPLIFIER_CAP =
+            EnchantmentValues.define(VALUE_ID, "attacker_amplifier_cap",
                     5, 1, 100);
-    private static final EnchantmentValues.Handle DURATION_SECONDS_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "duration_seconds_per_level",
+
+    /**
+     * 每级的效果持续秒数
+     * <p>默认 2.5，允许范围 0.1 ~ 120.0。</p>
+     */
+    private static final EnchantmentValues.Handle DURATION_SECONDS_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "duration_seconds_per_level",
                     2.5D, 0.1D, 120.0D);
+
     public EnchantmentBlessingOfTheErdtree() {
         super(EnchantTarget.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
+
+    private static int getTotalLevel(LivingEntity entity) {
+        EnchantmentBase blessingOfTheErdtree = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBlessingOfTheErdtree.class);
+        if (blessingOfTheErdtree == null) {
+            return 0;
+        }
+
+        int totalLevel = 0;
+        for (ItemStack armor : entity.getArmorSlots()) {
+            if (!armor.isEmpty()) {
+                totalLevel += EnchantmentLevels.get(blessingOfTheErdtree, armor);
+            }
+        }
+        totalLevel = applyLevelLimit(blessingOfTheErdtree, totalLevel, LEVEL_CAP.getInt());
+        return totalLevel;
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingAttack(@NotNull LivingAttackEvent evt) {
+        if (evt.getEntity().level().isClientSide) {
+            return;
+        }
+
+        DamageSource damageSource = evt.getSource();
+        if (!(damageSource.getEntity() instanceof LivingEntity)) {
+            return;
+        }
+
+        LivingEntity victim = evt.getEntity();
+        LivingEntity attacker = (LivingEntity) damageSource.getEntity();
+
+        // 受击者视角
+        // v2.1：怪物附魔触发开关（受击者视角）
+        if (!EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) {
+            int victimLevel = getTotalLevel(victim);
+            if (victimLevel > 0) {
+                int duration = (int) (DURATION_SECONDS_PER_LEVEL.get() * victimLevel * 20);
+                int amplifier = victimLevel - 1;
+                victim.addEffect(new MobEffectInstance(CarianStylePotion.BLESSING_OF_THE_ERDTREE, duration, amplifier));
+            }
+        }
+
+        // 攻击者视角
+        // v2.1：怪物附魔触发开关（攻击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+
+        int attackerLevel = getTotalLevel(attacker);
+        if (attackerLevel > 0) {
+            attackerLevel = Math.min(attackerLevel, ATTACKER_AMPLIFIER_CAP.getInt());
+            int duration = (int) (DURATION_SECONDS_PER_LEVEL.get() * attackerLevel * 20);
+            int amplifier = attackerLevel - 1;
+            attacker.addEffect(new MobEffectInstance(CarianStylePotion.BLESSING_OF_THE_ERDTREE, duration, amplifier));
+        }
+    }
+
     @Override
     protected boolean checkCompatibility(@NotNull EnchantKey ench) {
         if (ench.is(Enchantments.PROTECTION)) {
@@ -62,5 +141,5 @@ public class EnchantmentBlessingOfTheErdtree extends EnchantmentBase {
         }
         return super.checkCompatibility(ench);
     }
-}
 
+}
