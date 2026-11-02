@@ -1,25 +1,21 @@
 package pers.roinflam.carianstyle.codex;
 
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
 import net.minecraft.world.item.enchantment.Enchantment;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 /**
- * PORT-STUB(G)
- *
  * 原版及其它模组附魔的百科索引。
  *
  * <h3>与 {@link EnchantmentCodex} 的关系</h3>
@@ -28,7 +24,7 @@ import java.util.Set;
  * 本模组附魔的详情里能点开原版的「击退」，原版「击退」的详情里也能点回「重力」。
  * </p>
  * <p>
- * 互通靠的是同一套判定——{@code isCompatibleWith}。这一点很重要：
+ * 互通靠的是同一套判定——{@code Enchantment.areCompatible}。这一点很重要：
  * 如果两边各自维护一份冲突表，迟早会出现「A 说与 B 冲突、B 说不冲突」的矛盾，
  * 而玩家会以为是百科出错。共用同一个判定源就不存在这个问题。
  * </p>
@@ -37,7 +33,11 @@ import java.util.Set;
  * <p>
  * 设外部附魔 N 个（原版 40 左右，装了附魔类模组可能到几百）：
  * 两两互测是 N²，加上与本模组 113 个的互测。N=200 时约 6.2 万次
- * {@code isCompatibleWith}，在客户端首次打开界面时跑一次，几十毫秒量级。
+ * {@code areCompatible}，在客户端首次打开界面时跑一次，几十毫秒量级。
+ * </p>
+ * <p>
+ * 数据来自客户端的世界注册表（服务器同步下来的那份），换了世界就跟着 {@link EnchantmentCodex} 一起重建，
+ * 见那边的类注释。
  * </p>
  * <p>
  * 之所以敢这么算，是因为它<b>只在客户端、只跑一次</b>，
@@ -45,23 +45,196 @@ import java.util.Set;
  * </p>
  *
  * @author RoinFlam
- * @version 1.0
+ * @version 1.1
  */
-@Deprecated
 public final class ForeignCodex {
+
+    /** 构建锁 */
     private static final Object BUILD_LOCK = new Object();
+
+    /** 键 -> 元数据 */
+    private static Map<String, ForeignMeta> byKey = Collections.emptyMap();
+
+    /** 排好序的完整列表 */
+    private static List<ForeignMeta> ordered = Collections.emptyList();
+
+    /** 是否已构建 */
+    private static volatile boolean built = false;
+
+    /** 索引是对着哪一份附魔注册表建的；注册表换了（换世界）就重建 */
+    private static WeakReference<Registry<Enchantment>> builtFor = new WeakReference<>(null);
+
     private ForeignCodex() {
     }
-    @Nonnull public static List<ForeignMeta> getAll() {
-        return java.util.List.of();
+
+    /**
+     * 取全部外部附魔（已排序）。
+     *
+     * @return 不可修改的列表
+     */
+    @Nonnull
+    public static List<ForeignMeta> getAll() {
+        ensureBuilt();
+        return ordered;
     }
-    @Nullable public static ForeignMeta get(@Nullable String key) {
-        return null;
+
+    /**
+     * 按键精确查找。
+     *
+     * @param key {@code 命名空间:路径}
+     * @return 元数据；不存在时返回 null
+     */
+    @Nullable
+    public static ForeignMeta get(@Nullable String key) {
+        if (key == null) {
+            return null;
+        }
+        ensureBuilt();
+        return byKey.get(key);
     }
-    @Nonnull public static List<ForeignMeta> search(@Nullable String keyword) {
-        return java.util.List.of();
+
+    /**
+     * 按关键字筛选。
+     *
+     * @param keyword 关键字，可为 null 或空串
+     * @return 匹配结果
+     */
+    @Nonnull
+    public static List<ForeignMeta> search(@Nullable String keyword) {
+        ensureBuilt();
+        String lower = keyword == null ? "" : keyword.trim().toLowerCase(Locale.ROOT);
+        List<ForeignMeta> result = new ArrayList<>(ordered.size());
+        for (ForeignMeta meta : ordered) {
+            if (meta.matches(lower)) {
+                result.add(meta);
+            }
+        }
+        return result;
     }
+
+    /**
+     * 让索引失效，下次访问时重建。
+     */
     public static void invalidate() {
+        synchronized (BUILD_LOCK) {
+            built = false;
+        }
+    }
+
+    /**
+     * 确保索引已构建（惰性，双重检查）。
+     */
+    private static void ensureBuilt() {
+        Registry<Enchantment> registry = EnchantmentCodex.currentRegistry();
+        if (built && builtFor.get() == registry) {
+            return;
+        }
+        synchronized (BUILD_LOCK) {
+            if (built && builtFor.get() == registry) {
+                return;
+            }
+            if (registry == null) {
+                byKey = Collections.emptyMap();
+                ordered = Collections.emptyList();
+            } else {
+                build(registry);
+            }
+            builtFor = new WeakReference<>(registry);
+            built = true;
+        }
+    }
+
+    /**
+     * 扫描注册表构建索引。
+     *
+     * @param registry 当前世界的附魔注册表
+     */
+    private static void build(@Nonnull Registry<Enchantment> registry) {
+        long start = System.currentTimeMillis();
+
+        Map<String, ForeignMeta> keyMap = new HashMap<>();
+        List<ForeignMeta> list = new ArrayList<>();
+
+        registry.holders().forEach(holder -> {
+            // 本模组的附魔归「附魔百科」标签页，这里只收其余的。
+            // 判断见 EnchantmentCodex.isOurs：先按行为对象表、再看命名空间
+            if (EnchantmentCodex.isOurs(holder)) {
+                return;
+            }
+
+            ForeignMeta meta = new ForeignMeta(holder);
+            meta.buildSearchIndex();
+            keyMap.put(meta.getKey(), meta);
+            list.add(meta);
+        });
+
+        buildConflicts(list);
+
+        // 排序：原版在最前，其余模组按命名空间字母序；组内稀有度由低到高，再按名称
+        list.sort((a, b) -> {
+            int groupCmp = compareNamespace(a.getGroupKey(), b.getGroupKey());
+            if (groupCmp != 0) {
+                return groupCmp;
+            }
+            int rarityCmp = Integer.compare(a.getRarityOrder(), b.getRarityOrder());
+            if (rarityCmp != 0) {
+                return rarityCmp;
+            }
+            return a.getDisplayName().getString().compareTo(b.getDisplayName().getString());
+        });
+
+        byKey = Collections.unmodifiableMap(keyMap);
+        ordered = Collections.unmodifiableList(list);
+
+        LogUtil.info("卡利亚式附魔 - 外部附魔索引构建完成，收录 %d 个，耗时 %d 毫秒",
+                list.size(), System.currentTimeMillis() - start);
+    }
+
+    /**
+     * 实测并记录冲突关系。
+     *
+     * @param list 全部外部附魔
+     */
+    private static void buildConflicts(@Nonnull List<ForeignMeta> list) {
+        // 外部附魔之间
+        for (ForeignMeta meta : list) {
+            Holder<Enchantment> self = meta.getEnchantment();
+            for (ForeignMeta other : list) {
+                if (other == meta) {
+                    continue;
+                }
+                if (!Enchantment.areCompatible(self, other.getEnchantment())) {
+                    meta.addForeignConflict(other.getKey());
+                }
+            }
+        }
+
+        // 与本模组的附魔。这一份是双向的入口：
+        // EnchantmentCodex 那边已经记录了「本模组 -> 外部」，
+        // 这里记录「外部 -> 本模组」，两个标签页才能互相跳转
+        for (EnchantmentMeta ours : EnchantmentCodex.getAll()) {
+            Holder<Enchantment> enchantment = ours.getEnchantment();
+            for (ForeignMeta meta : list) {
+                if (!Enchantment.areCompatible(enchantment, meta.getEnchantment())) {
+                    meta.addCarianConflict(ours.getId());
+                }
+            }
+        }
+    }
+
+    /**
+     * 命名空间排序：原版永远在最前。
+     *
+     * @param a 命名空间 A
+     * @param b 命名空间 B
+     * @return 比较结果
+     */
+    private static int compareNamespace(@Nonnull String a, @Nonnull String b) {
+        boolean va = "minecraft".equals(a);
+        boolean vb = "minecraft".equals(b);
+        if (va != vb) {
+            return va ? -1 : 1;
+        }
+        return a.compareTo(b);
     }
 }
-

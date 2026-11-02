@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.codex;
 
+import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.enchantment.Enchantment;
 
@@ -98,10 +99,10 @@ public interface CodexEntry {
     boolean matches(@Nullable String lowerKeyword);
 
     /**
-     * @return 附魔实例；「放入物品」筛选要拿它去问物品能不能附
+     * @return 当前世界注册表里的附魔定义；「放入物品」筛选要拿它去问物品能不能附
      */
     @Nonnull
-    Enchantment getEnchantment();
+    Holder<Enchantment> getEnchantment();
 
     /**
      * 列表副行右端的补充说明。
