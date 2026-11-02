@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.base.entity;
 
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -63,6 +64,9 @@ public final class AbsorptionShield {
     /** 本模组的吸收上限修饰符 */
     public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath(Reference.MOD_ID, "absorption_shield");
 
+    /** 实体持久数据里的记号：进世界时的旧档吸收值已经核过，见 {@link #onEntityJoinLevel} */
+    static final String LEGACY_CHECKED = Reference.MOD_ID + ":absorption_legacy_checked";
+
     /** 吸收值和上限比较时容忍的误差（属性按 double 算、吸收值是 float） */
     private static final float EPSILON = 1.0E-4F;
 
@@ -93,6 +97,10 @@ public final class AbsorptionShield {
      */
     public static void afterAbsorb(@Nonnull LivingEntity entity) {
         if (entity.level().isClientSide) {
+            return;
+        }
+        // 先只查不建：getAttribute 在实体还没有这份属性实例时会当场建一个，每只怪都会多一条存进存档、发给客户端
+        if (!entity.getAttributes().hasModifier(Attributes.MAX_ABSORPTION, ID)) {
             return;
         }
         AttributeInstance attribute = entity.getAttribute(Attributes.MAX_ABSORPTION);
@@ -139,7 +147,7 @@ public final class AbsorptionShield {
 
     /**
      * 带本模组修饰符的实体每 tick 对一次账（金苹果到期、别的途径扣了吸收之后把多出来的上限收回）。
-     * 没有修饰符的实体两次哈希查找就返回。
+     * 没有修饰符的实体只查一次属性表就返回，不会给它建吸收上限的属性实例。
      */
     @SubscribeEvent
     public static void onLivingTick(LivingTickEvent event) {
@@ -147,13 +155,30 @@ public final class AbsorptionShield {
     }
 
     /**
-     * 旧存档：1.20.1 存下的盾超过 1.21.1 的上限时补一个修饰符，保住吸收值。
+     * 旧存档：1.20.1 存下的盾超过 1.21.1 的上限时补一个修饰符，保住吸收值。每个实体一辈子只核一次。
+     * <p>
+     * <b>问题</b>：进世界那一刻装备、饰品给的吸收上限还没套上（原版装备属性要第一个 tick 才加），
+     * 别的来源合法给到的吸收值这时也显得「超上限」。每次进世界都补的话，配合别的模组「把吸收回满到上限」，
+     * 重进一次上限就涨一截，可以无限刷。
+     * </p>
+     * <p>
+     * <b>为什么这么改</b>：只有 1.20.1 存下的实体才需要补，它们第一次在 1.21.1 进世界时身上没有核过的记号；
+     * 核过一次（不管补没补）就在实体的持久数据里记下，之后进世界不再补。新生成的实体第一次进世界就记上。
+     * </p>
+     * <p>
+     * <b>行为影响</b>：旧档的盾照样保住；之后重进不会再把吸收值转成上限。
+     * </p>
      */
     @SubscribeEvent
     public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
         if (event.getLevel().isClientSide() || !(event.getEntity() instanceof LivingEntity entity)) {
             return;
         }
+        CompoundTag data = entity.getPersistentData();
+        if (data.getBoolean(LEGACY_CHECKED)) {
+            return;
+        }
+        data.putBoolean(LEGACY_CHECKED, true);
         float absorption = entity.getAbsorptionAmount();
         if (absorption > entity.getMaxAbsorption() + EPSILON) {
             grant(entity, absorption);
