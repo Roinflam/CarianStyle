@@ -62,7 +62,8 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * 1.21.1（NeoForge）：附魔改成了数据包注册表，本模组的附魔条目和获取途径标签由内置数据包
  * {@code carianstyle:generated} 按这里的配置现场生成。所以配置项的生效时机分三种：
  * <ul>
- *   <li>花费、权重、铁砧花费（{@code enchantingDifficulty}、{@code useVanillaRarityWeight}）：
+ *   <li>花费、权重、铁砧花费（{@code enchantingDifficulty}、{@code useVanillaRarityWeight}），以及禁用后铁砧、{@code /enchant}
+ *       附不上（{@code uninstallEnchantment} 让附魔条目的适用物品变空）：
  *       写在附魔条目里，注册表只在加载世界时读一次，要<b>重进世界 / 重启服务器</b>；</li>
  *   <li>获取途径（{@code isTreasure*Enchantment}、{@code allowVillagerBookTrade}、{@code uninstallEnchantment}）：
  *       写在附魔标签里，<b>{@code /reload}</b> 或重进世界生效；</li>
@@ -186,8 +187,10 @@ public final class ConfigLoader {
                     .comment("你可以在 en_us.json 文件中找到相关附魔的ID。")
                     .comment("Example: [\"scarlet_rot\", \"doomed_death\"]")
                     .comment("示例: [\"scarlet_rot\", \"doomed_death\"]")
-                    .comment("Disabled enchantments stop working at once; enchanting table / loot / trade availability follows after /reload or re-entering the world.")
-                    .comment("禁用后附魔立即不再起作用；附魔台、战利品、交易里不再出现，要 /reload 或重进世界后生效。")
+                    .comment("Disabled enchantments stop working at once; enchanting table / loot / trade availability follows after /reload or re-entering the world;")
+                    .comment("anvils and /enchant stop accepting them after re-entering the world.")
+                    .comment("禁用后附魔立即不再起作用；附魔台、战利品、交易里不再出现，要 /reload 或重进世界后生效；")
+                    .comment("铁砧和 /enchant 不再能附上它，要重进世界后生效。")
                     .comment("The generated data pack \"carianstyle:generated\" cannot be disabled; change this config or override with a same-named JSON instead.")
                     .comment("内置数据包 carianstyle:generated 不能关闭（/datapack disable 无效），要调整请改本配置，或用同名 JSON 覆盖。")
                     .defineListAllowEmpty("uninstallEnchantment", Collections.emptyList(), () -> "", obj -> obj instanceof String);

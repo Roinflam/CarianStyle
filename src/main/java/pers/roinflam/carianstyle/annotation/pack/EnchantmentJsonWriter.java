@@ -1,7 +1,9 @@
 package pers.roinflam.carianstyle.annotation.pack;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EquipmentSlot;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
@@ -21,7 +23,8 @@ import java.util.Set;
  *   <li>{@code description}：翻译键 {@code enchantment.carianstyle.<id>}，和 1.20.1 一样，lang 不动。</li>
  *   <li>{@code supported_items}：{@code #carianstyle:enchantable/<类别>}，标签按 1.20.1 的 instanceof 现场算
  *       （见 {@link EnchantmentTagWriter#itemTags}）。不写 {@code primary_items}：不写就等于 {@code supported_items}，
- *       1.20.1 附魔台用的 {@code canApplyAtEnchantingTable} 本来也就是 {@code canEnchant}。</li>
+ *       1.20.1 附魔台用的 {@code canApplyAtEnchantingTable} 本来也就是 {@code canEnchant}。
+ *       <b>被 {@code uninstallEnchantment} 禁用的附魔写空列表 {@code []}</b>，见 {@link #supportedItems}。</li>
  *   <li>{@code max_level}：稀有度定的最高级（UNCOMMON 5、RARE 3、VERY_RARE 1）。</li>
  *   <li>{@code weight} / {@code anvil_cost}：{@code useVanillaRarityWeight} 开时按稀有度映射回原版（权重 5 / 2 / 1，铁砧 2 / 4 / 8），
  *       关时退回 1.20.1 构造器里那个占位的 COMMON（权重 10、铁砧 1）。1.21.1 铁砧每级加 {@code anvil_cost}、附魔书减半至少 1，
@@ -70,7 +73,7 @@ final class EnchantmentJsonWriter {
 
         JsonObject json = new JsonObject();
         json.add("description", description(base));
-        json.addProperty("supported_items", "#" + base.getTarget().itemTag().location());
+        json.add("supported_items", supportedItems(base, settings));
         json.addProperty("weight", weight(base, settings));
         json.addProperty("max_level", base.getMaxLevel());
         json.add("min_cost", cost(costBase, costPer));
@@ -100,6 +103,32 @@ final class EnchantmentJsonWriter {
         slots.add("any");
         json.add("slots", slots);
         return json;
+    }
+
+    /**
+     * {@code supported_items}：正常写类别物品标签，被禁用的写空列表。
+     * <p>
+     * <b>问题</b>：1.20.1（Forge）的 {@code Enchantment.canEnchant} 转调 {@code canApplyAtEnchantingTable}，
+     * 而本模组在禁用时让后者返回 false，所以禁用的附魔对任何物品 {@code canEnchant} 都是 false：
+     * 铁砧把附魔书合到装备上时拒绝、{@code /enchant} 报「无法附魔」、不写 options 的随机附魔也不会选它。
+     * 1.21.1 这几处都看 {@code supported_items}（NeoForge 经 {@code ItemStack.supportsEnchantment}），
+     * 只把附魔从获取途径标签里拿掉的话，铁砧和 {@code /enchant} 照样能附上。
+     * </p>
+     * <p>
+     * <b>为什么写空列表</b>：效果和 1.20.1 一样，对所有物品都不支持；附魔书作左边材料时铁砧本来就不查
+     * （1.20.1、1.21.1 都是），两本书照样能合，也一样。创造模式铁砧不查适用物品，同样两边一致。
+     * </p>
+     * <p>
+     * <b>行为影响</b>：这一条写在附魔条目里，跟花费一样要重进世界才更新（获取途径标签 {@code /reload} 就更新）。
+     * 已经带着这个附魔的物品不受影响（1.20.1 也是），只是不起作用、掉出来时被 {@code DisabledEnchantmentDropFilter} 去掉。
+     * </p>
+     */
+    @Nonnull
+    static JsonElement supportedItems(@Nonnull EnchantmentBase base, @Nonnull GeneratedDataPack.Settings settings) {
+        if (settings.isDisabled(base)) {
+            return new JsonArray();
+        }
+        return new JsonPrimitive("#" + base.getTarget().itemTag().location());
     }
 
     /** 同 {@code EnchantmentBase#getWeight}，配置取自 {@code settings} */
