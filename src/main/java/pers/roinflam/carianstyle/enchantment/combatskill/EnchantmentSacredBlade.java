@@ -2,25 +2,129 @@ package pers.roinflam.carianstyle.enchantment.combatskill;
 
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.SharedMonsterAttributes;
+import net.minecraft.entity.ai.attributes.AttributeModifier;
+import net.minecraft.entity.ai.attributes.IAttributeInstance;
 import net.minecraft.init.Enchantments;
 import net.minecraft.inventory.EntityEquipmentSlot;
-import java.util.UUID;
-import javax.annotation.Nonnull;
+import net.minecraft.world.WorldServer;
+import net.minecraftforge.event.entity.EntityJoinWorldEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.PlayerEvent;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.EnchantmentBlackFlameBlade;
 import pers.roinflam.carianstyle.enchantment.EnchantmentDeathBlade;
 import pers.roinflam.carianstyle.enchantment.EnchantmentScarletCorruption;
+import pers.roinflam.carianstyle.mc112.attr.Operation;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
+
+import java.util.UUID;
+import javax.annotation.Nonnull;
 
 /**
- * PORT-STUB(E1)
- * <p>神圣之刃附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 神圣之刃附魔
+ * <p>
+ * 对亡灵生物：额外伤害 = 伤害 × 等级 × 0.25 × 目标血量比例，并治疗自身；
+ * 同时<b>永久削弱该亡灵</b>的攻击力（等级 × -5%，累积，最多 -99%）。
+ * 对非亡灵生物：伤害降为 20%。
+ * </p>
+ *
+ * <h3>v3.0 修复：攻击力削弱施加对象搞反（严重机制 bug）</h3>
+ * <p>
+ * <b>现象：</b>装备本附魔后连续攻击亡灵，会发现<b>自己的伤害越打越低</b>，
+ * 砍一只普通骷髅要砍半天；换下武器也不恢复，必须死亡重生或重进世界才复原。
+ * </p>
+ * <p>
+ * <b>根因：</b>{@link #applyAttackPenalty} 此前传入的是 {@code attacker}——
+ * 也就是把削弱加在了<b>持有者自己</b>身上：
+ * </p>
+ * <pre>
+ * applyAttackPenalty(attacker, level);   // ← 削弱的是自己
+ * </pre>
+ * <p>
+ * 而附魔的设计意图（见语言文件 {@code sacred_blade.desc}）写得很清楚：
+ * </p>
+ * <blockquote>
+ * 对亡灵：基于目标当前血量额外造成至多[附魔等级]×25%伤害，
+ * 回复20%额外伤害的生命值（至多10%最大生命值），<b>永久削弱目标[附魔等级]×5%伤害</b>
+ * </blockquote>
+ * <p>
+ * <b>削弱的对象是「目标」，不是持有者。</b>本附魔的定位是「对亡灵特攻的圣剑」，
+ * 三项收益（额外伤害 / 吸血 / 削弱目标）本就全是正收益，
+ * 唯一的代价是描述第一句的「对非亡灵造成伤害 -80%」——
+ * 也就是说它是一把<b>专精武器</b>：打亡灵极强、打别的极弱。
+ * 而旧代码额外给持有者叠了一个隐藏的、不可逆的、会累积到 -99% 的自我削弱，
+ * 这既不在描述里、也让附魔在实战中越用越废。
+ * </p>
+ * <p>
+ * <b>修复：</b>{@code applyAttackPenalty(attacker, level)} →
+ * {@code applyAttackPenalty(victim, level)}。修复后的实际表现：
+ * </p>
+ * <ul>
+ *     <li>持有者的攻击力<b>不再受任何影响</b>，砍多少刀都是满伤害；</li>
+ *     <li>被砍的那只亡灵每挨一刀，自身攻击力累积降低 {@code 等级 × 5%}（上限 -99%），
+ *         也就是「越砍越虚」——与「神圣之力净化亡灵」的语义一致。</li>
+ * </ul>
+ * <p>
+ * <b>升级提示：</b>旧版本在你的存档里可能已经给玩家累积了很深的攻击力削弱
+ * （{@code MULTIPLY_TOTAL} 的永久修正器，最深 -99%）。本次修复<b>不会自动清除历史残留</b>——
+ * {@link #onPlayerRespawn} 与 {@link #onEntityJoinWorld} 会在玩家重生 / 实体加入世界时清掉它，
+ * 因此<b>受影响的玩家重新登录一次即可恢复</b>（登录会触发 {@code EntityJoinWorldEvent}）。
+ * 若发现有人伤害异常低且不肯重登，让他死一次也行。
+ * </p>
+ *
+ * <h3>历史修复记录</h3>
+ * <ul>
+ *     <li>添加攻击力惩罚清除机制：玩家重生时清除、实体加入世界时清除；</li>
+ *     <li>修复累积逻辑：每次攻击亡灵时惩罚递增，而非固定值。</li>
+ * </ul>
+ *
+ * <h3>v2.2：神圣净化特效</h3>
+ * <p>
+ * 命中亡灵时，调用
+ * {@link CarianStyleEffects#sacredPurge(WorldServer, EntityLivingBase)} 广播一个
+ * <b>定点</b>的短促自绘演出（700ms）：目标处金色三维十字光刃爆开 → 净化环向外扩散 →
+ * 金色光尘升天 → 地面圣徽余辉。
+ * </p>
+ * <p>
+ * <b>为什么用定点而非跟随：</b>这是「打中那一下」的瞬时反馈，锁在命中坐标才有打击感；
+ * 若跟随目标，爆闪会跟着被击退的怪一起飘走，反而把「一刀砍实了」的手感冲淡。
+ * </p>
+ * <p>
+ * <b>只对亡灵触发。</b>对非亡灵是 -80% 伤害的巨大负收益，
+ * 那种情况下放净化特效会误导玩家以为打出了强力一击。
+ * </p>
+ *
+ * <h3>v3.1：削弱与回血要求满蓄力</h3>
+ * <p>
+ * <b>问题：</b>永久削弱是每命中一次亡灵就固定叠一档（{@code 等级 × 5%}），和这一下打了多少无关。
+ * 5 级时连点 4 下就能把一只亡灵削到 -99%，打一群时每次点击削一只。
+ * </p>
+ * <p>
+ * <b>修改：</b>亡灵分支里只把「回血 + 永久削弱」包进 {@link EnchantmentBase#isFullyCharged} 判断，
+ * 玩家未满蓄力时跳过这两项；怪物持有者不受影响。
+ * </p>
+ * <ul>
+ *     <li>对亡灵的增伤照常结算——它按本次伤害成比例，连点本来就不占便宜；</li>
+ *     <li>对非亡灵的 ×0.2 惩罚<b>不受蓄力影响</b>。如果在方法开头按蓄力直接 return，
+ *         连点反而能躲掉惩罚，满蓄力却吃满，那就弄反了。</li>
+ * </ul>
+ * <p>
+ * 1.12.2 版：亡灵按 {@code isEntityUndead()} 判断；{@code EntityJoinWorldEvent} 在区块重新加载时也会发，
+ * 所以亡灵身上的削弱在区块卸载再加载之后同样会被清掉，和 1.20.1 的「重载后失效」一致。
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 3.1
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "sacred_blade",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
@@ -33,6 +137,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
                 EnchantmentBlackFlameBlade.class
         }
 )
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentSacredBlade extends EnchantmentBase {
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -66,7 +171,7 @@ public class EnchantmentSacredBlade extends EnchantmentBase {
      * 攻击力削弱修正器的 UUID。
      * <p>
      * <b>v3.0 起施加在「被砍的亡灵」身上</b>（此前错误地施加在持有者身上，详见类注释）。
-     * UUID 本身保持不变——这样 {@link #onPlayerRespawn} / {@link #onEntityJoinLevel}
+     * UUID 本身保持不变——这样 {@link #onPlayerRespawn} / {@link #onEntityJoinWorld}
      * 的清除逻辑能同时清掉旧版本残留在玩家身上的那份，玩家重登一次即可恢复。
      * </p>
      */
@@ -82,6 +187,144 @@ public class EnchantmentSacredBlade extends EnchantmentBase {
 
     public EnchantmentSacredBlade() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
+
+    @Override
+    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+        EntityLivingBase victim = ctx.getVictim();
+
+        if (victim == null) {
+            return;
+        }
+
+        // 判断是否为亡灵生物
+        if (victim.isEntityUndead()) {
+            // 对亡灵：额外伤害 = 当前伤害 × 等级 × 0.25 × 目标血量比例
+            float healthRatio = victim.getHealth() / victim.getMaxHealth();
+            float bonusDamage = ctx.getDamage() * level * (float) BONUS_DAMAGE_PER_LEVEL.get() * healthRatio;
+            ctx.addDamage(bonusDamage);
+
+            // v3.1：永久削弱每下固定叠一档、与这一下打多少无关，连点几下就能把亡灵削到底，
+            // 回血和削弱一起要求满蓄力。增伤按本次伤害成比例，不拦（详见类注释「v3.1」小节）
+            if (isFullyCharged(attacker)) {
+                // 治疗攻击者（上限为最大血量的10%）
+                float healAmount = Math.min(bonusDamage * (float) LIFESTEAL_RATIO.get(),
+                        attacker.getMaxHealth() * (float) LIFESTEAL_CAP_RATIO.get());
+                attacker.heal(healAmount);
+
+                // v3.0 修复：削弱的是【被砍的亡灵】，不是持有者。
+                // 旧代码传的是 attacker，导致玩家每砍一刀亡灵自己就弱 5%×等级、
+                // 累积到 -99% 后砍普通骷髅都要砍半天（详见类注释「v3.0 修复」小节）。
+                applyAttackPenalty(victim, level);
+            }
+
+            // 神圣净化特效（定点，锁在命中坐标）。
+            // 严格放在亡灵分支内——对非亡灵是 -80% 伤害的负收益，
+            // 那时放净化特效会误导玩家以为打出了强力一击。纯视觉，不产生任何机制影响。
+            if (victim.world instanceof WorldServer) {
+                CarianStyleEffects.sacredPurge((WorldServer) victim.world, victim);
+            }
+        } else {
+            // 对非亡灵：伤害降为20%
+            ctx.multiplyDamage(0.2f);
+        }
+    }
+
+    /**
+     * 对目标施加累积的攻击力削弱（每次命中再降一档，最多 -99%）。
+     * <p>
+     * <b>v3.0：施加对象由「持有者」改为「被命中的亡灵」</b>——
+     * 这才是语言文件里「永久削弱目标」的本意（详见类注释）。
+     * </p>
+     * <p>
+     * 累积方式：读出目标身上已有的同 UUID 修正器，在其基础上再减一个步长后重新写入，
+     * 而非覆盖为固定值。因此连续攻击同一只亡灵，它会越来越虚。
+     * </p>
+     *
+     * @param target 被削弱的目标（v3.0 起为被命中的亡灵）
+     * @param level  附魔等级
+     */
+    private void applyAttackPenalty(@Nonnull EntityLivingBase target, int level) {
+        IAttributeInstance attributeInstance = target.getEntityAttribute(SharedMonsterAttributes.ATTACK_DAMAGE);
+        if (attributeInstance == null) {
+            return;
+        }
+
+        double penaltyStep = level * PENALTY_STEP_PER_LEVEL;
+        AttributeModifier existing = attributeInstance.getModifier(ATTACK_DAMAGE_MODIFIER_ID);
+
+        if (existing == null) {
+            // 首次命中该目标：添加削弱
+            attributeInstance.applyModifier(new AttributeModifier(
+                    ATTACK_DAMAGE_MODIFIER_ID,
+                    ATTACK_DAMAGE_MODIFIER_NAME,
+                    penaltyStep,
+                    Operation.MULTIPLY_TOTAL.id()
+            ));
+        } else {
+            // 再次命中：在现有基础上累积一个步长，下限 -99%
+            double newReduction = Math.max(existing.getAmount() + penaltyStep, PENALTY_FLOOR);
+            attributeInstance.removeModifier(ATTACK_DAMAGE_MODIFIER_ID);
+            attributeInstance.applyModifier(new AttributeModifier(
+                    ATTACK_DAMAGE_MODIFIER_ID,
+                    ATTACK_DAMAGE_MODIFIER_NAME,
+                    newReduction,
+                    Operation.MULTIPLY_TOTAL.id()
+            ));
+        }
+    }
+
+    /**
+     * 玩家重生时清除攻击力削弱。
+     * <p>
+     * <b>v3.0 说明：</b>修复后削弱只会施加在亡灵身上，玩家理论上不会再有这个修正器。
+     * 但本方法<b>必须保留</b>——它负责清理旧版本残留在玩家身上的那份
+     * （最深 -99%，详见类注释的「升级提示」）。
+     * </p>
+     *
+     * @param evt 重生事件
+     */
+    @SubscribeEvent
+    public static void onPlayerRespawn(@Nonnull PlayerEvent.PlayerRespawnEvent evt) {
+        if (evt.player.world.isRemote || evt.isEndConquered()) {
+            return;
+        }
+        removeAttackPenalty(evt.player);
+    }
+
+    /**
+     * 实体加入世界时清除残留的攻击力削弱。
+     * <p>
+     * 对亡灵而言这意味着「削弱在区块重载 / 重进世界后失效」——
+     * 与其说是设计，不如说是永久修正器无法随实体持久化的现实限制；
+     * 但对一场战斗内的连续输出而言完全够用（削弱在同一只怪身上会持续累积）。
+     * </p>
+     * <p>
+     * <b>更重要的是：本方法是旧版本残留削弱的主要清理入口。</b>
+     * 受影响的玩家<b>重新登录一次即可恢复</b>满伤害（登录会触发本事件）。
+     * </p>
+     *
+     * @param evt 实体加入世界事件
+     */
+    @SubscribeEvent
+    public static void onEntityJoinWorld(@Nonnull EntityJoinWorldEvent evt) {
+        if (evt.getWorld().isRemote || !(evt.getEntity() instanceof EntityLivingBase)) {
+            return;
+        }
+        removeAttackPenalty((EntityLivingBase) evt.getEntity());
+    }
+
+    /**
+     * 移除攻击力削弱修正器。
+     *
+     * @param entity 实体
+     */
+    private static void removeAttackPenalty(@Nonnull EntityLivingBase entity) {
+        IAttributeInstance attributeInstance = entity.getEntityAttribute(SharedMonsterAttributes.ATTACK_DAMAGE);
+        if (attributeInstance != null) {
+            attributeInstance.removeModifier(ATTACK_DAMAGE_MODIFIER_ID);
+        }
     }
 
     @Override

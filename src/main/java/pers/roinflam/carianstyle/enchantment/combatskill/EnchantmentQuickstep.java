@@ -1,19 +1,41 @@
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
+import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
+import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.Reference;
+
+import javax.annotation.Nonnull;
 
 /**
- * PORT-STUB(E1)
- * <p>快步附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 快步附魔
+ * <p>
+ * 血量越低速度越快
+ * 速度等级 = (损失血量百分比) / 5 × 附魔总等级，随当前血量实时升降
+ * </p>
+ * <p>
+ * 性能优化记录：
+ * - 每4tick检测一次（而非每tick），给予6tick的duration确保无缝衔接
+ * - 提前检查附魔等级，避免无附魔玩家执行后续计算
+ * - 速度等级为0时跳过apply调用
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.1
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "quickstep",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
@@ -21,6 +43,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         type = EnumEnchantmentType.ARMOR_FEET,
         slots = {EntityEquipmentSlot.FEET}
 )
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentQuickstep extends EnchantmentBase {
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -57,6 +80,58 @@ public class EnchantmentQuickstep extends EnchantmentBase {
 
     public EnchantmentQuickstep() {
         super(EnumEnchantmentType.ARMOR_FEET, new EntityEquipmentSlot[]{EntityEquipmentSlot.FEET});
+    }
+
+    /**
+     * 每4tick检测一次血量比例并调整速度
+     * <p>
+     * 优化：从每tick检测改为每4tick检测，duration给6tick确保覆盖间隔
+     * 血量变化不需要逐tick精确跟踪，4tick的延迟对玩家体验几乎无感知
+     * </p>
+     */
+    @SubscribeEvent
+    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
+        if (evt.player.world.isRemote || evt.phase != TickEvent.Phase.START) {
+            return;
+        }
+
+        // 优化：每4tick检测一次
+        if (evt.player.ticksExisted % CHECK_INTERVAL_TICKS.getInt() != 0) {
+            return;
+        }
+
+        EntityPlayer player = evt.player;
+        if (!player.isEntityAlive()) {
+            return;
+        }
+
+        Enchantment quickstep = EnchantmentRegistry.getEnchantmentByClass(EnchantmentQuickstep.class);
+        if (quickstep == null) {
+            return;
+        }
+
+        // v-cache：走中央装备缓存
+        int totalLevel = EnchantmentEventHandler.armorTotal(player, quickstep);
+        totalLevel = decayLevel(quickstep, totalLevel);
+
+        if (totalLevel <= 0) {
+            return;
+        }
+
+        float missingHealthPercent = 1 - player.getHealth() / player.getMaxHealth();
+        int speedLevel = (int) (missingHealthPercent * 100 / SPEED_DIVISOR.get() * totalLevel);
+
+        // apply 遇到等级更低的新实例只会给旧的续时，回血后速度就降不下来，这里先摘掉旧的
+        if (DynamicAttributeManager.getAmplifier(player, DynamicAttributes.QUICKSTEP_SPEED) > speedLevel - 1) {
+            DynamicAttributeManager.remove(player, DynamicAttributes.QUICKSTEP_SPEED);
+        }
+
+        // 优化：速度等级为0时不创建实例
+        if (speedLevel > 0) {
+            // 优化：duration给6tick覆盖4tick间隔，确保效果无缝
+            DynamicAttributeManager.apply(player,
+                    DynamicAttributes.QUICKSTEP_SPEED.createInstance(SPEED_DURATION_TICKS.getInt(), speedLevel - 1));
+        }
     }
 
     @Override

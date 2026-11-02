@@ -1,20 +1,56 @@
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
 import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.SharedMonsterAttributes;
+import net.minecraft.entity.ai.attributes.AttributeModifier;
+import net.minecraft.entity.ai.attributes.IAttributeInstance;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
-import java.util.UUID;
+import net.minecraft.world.WorldServer;
+import net.minecraftforge.event.entity.EntityJoinWorldEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.mc112.attr.Operation;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.utils.helper.AttackCooldownHelper;
+import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
+import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
+
+import java.util.UUID;
+import javax.annotation.Nonnull;
 
 /**
- * PORT-STUB(E1)
- * <p>居合附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 居合附魔
+ * <p>
+ * 每次攻击有概率触发居合斩（概率 = 1% + 攻击次数 × 0.5%）
+ * 触发时：伤害 × 等级 × 3.3，但攻速降低75%持续等级×66tick
+ * 未触发时：攻击计数+1，继续蓄力
+ * </p>
+ * <p>
+ * v2.1 视觉：触发居合斩的瞬间广播一发自绘刀光特效
+ * （{@link CarianStyleCombatArtEffects#iaiSlash}——沿玩家正面扫出的银白弧形刀光 + 残影 +
+ * 地面切割线）。居合斩是本附魔唯一的「大招时刻」（低概率触发、伤害 ×3.3），此前完全没有
+ * 任何视觉反馈，玩家只能靠伤害数字判断是否触发过。
+ * </p>
+ * <p>
+ * <b>只加视觉，机制不变：</b>触发概率、伤害倍率、攻速惩罚、计数累积与重置
+ * 全部保持原样；特效为纯服务端广播，不生成实体、不触发任何事件，对伤害结算零影响。
+ * 特效只在<b>实际触发居合斩</b>的分支内播放，未触发的普通攻击不会有任何视觉，
+ * 因此不会刷屏——这也正是居合适合作为首批战技特效的原因。
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.1
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "unsheathe",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
@@ -22,6 +58,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         type = EnumEnchantmentType.WEAPON,
         slots = {EntityEquipmentSlot.MAINHAND}
 )
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentUnsheathe extends EnchantmentBase {
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -59,6 +96,100 @@ public class EnchantmentUnsheathe extends EnchantmentBase {
 
     public EnchantmentUnsheathe() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
+
+    @Override
+    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
+        // 排除水鸟乱舞伤害
+        if (ctx.getDamageSource() != null && "waterfowlDance".equals(ctx.getDamageSource().getDamageType())) {
+            return;
+        }
+
+        // 只有玩家能触发
+        if (!ctx.isHolderPlayer()) {
+            return;
+        }
+
+        EntityPlayer player = ctx.getHolderAsPlayer();
+
+        // 检查刚挥剑
+        if (!isJustSwung(player)) {
+            return;
+        }
+
+        // 消耗这一下挥击：冷却延后到下一 tick 开头清零（直接清零会让同一下挥击里后面的蓄力判断，如命定之死，全部失效），
+        // 同一 tick 内只结算一次——横扫副目标、范围伤害的其它目标、主副手都带本附魔的重复分发都不再各结算一遍
+        if (!AttackCooldownHelper.spendSwing(player)) {
+            return;
+        }
+
+        // 获取攻击计数
+        int attackCount = EnchantmentDataManager.getCounter(ATTACK_COUNT_KEY, player.getUniqueID());
+
+        // 触发概率：1% + 攻击次数 × 0.5%
+        double triggerChance = BASE_TRIGGER_CHANCE.get() + attackCount * CHANCE_PER_ATTACK.get();
+
+        if (RandomUtil.percentageChance(triggerChance)) {
+            // 触发居合斩
+            EnchantmentDataManager.resetCounter(ATTACK_COUNT_KEY, player.getUniqueID());
+            ctx.multiplyDamage(level * (float) DAMAGE_PER_LEVEL.get());
+            // 攻速惩罚和清零一样延后到下一 tick：攻速 -75% 会让蓄力立刻降到原来的 1/4，
+            // 同一下挥击里排在后面的蓄力判断（命定之死、横扫副目标上的附魔）就全部失效了
+            new SynchronizationTask(1) {
+                @Override
+                public void run() {
+                    applyAttackSpeedPenalty(player, level);
+                }
+            }.start();
+
+            // v2.1 视觉：拔刀斩的银白弧形刀光（纯服务端广播，不影响任何机制）
+            if (player.world instanceof WorldServer) {
+                CarianStyleCombatArtEffects.iaiSlash((WorldServer) player.world, player);
+            }
+        } else {
+            // 未触发，累积计数（12000tick过期）
+            EnchantmentDataManager.incrementCounter(ATTACK_COUNT_KEY, player.getUniqueID(), 12000);
+        }
+    }
+
+    /**
+     * 施加攻速惩罚：降低75%，持续等级×66tick
+     */
+    private void applyAttackSpeedPenalty(@Nonnull EntityPlayer player, int level) {
+        IAttributeInstance attributeInstance = player.getEntityAttribute(SharedMonsterAttributes.ATTACK_SPEED);
+        if (attributeInstance == null || attributeInstance.getModifier(ATTACK_SPEED_MODIFIER_ID) != null) {
+            return;
+        }
+
+        attributeInstance.applyModifier(new AttributeModifier(
+                ATTACK_SPEED_MODIFIER_ID,
+                ATTACK_SPEED_MODIFIER_NAME,
+                -0.75,
+                Operation.MULTIPLY_TOTAL.id()
+        ));
+
+        new SynchronizationTask(level * 66) {
+            @Override
+            public void run() {
+                attributeInstance.removeModifier(ATTACK_SPEED_MODIFIER_ID);
+            }
+        }.start();
+    }
+
+    /**
+     * 实体加入世界时清理残留的攻速修正
+     */
+    @SubscribeEvent
+    public static void onEntityJoinWorld(@Nonnull EntityJoinWorldEvent evt) {
+        if (evt.getWorld().isRemote || !(evt.getEntity() instanceof EntityLivingBase)) {
+            return;
+        }
+
+        EntityLivingBase entity = (EntityLivingBase) evt.getEntity();
+        IAttributeInstance attributeInstance = entity.getEntityAttribute(SharedMonsterAttributes.ATTACK_SPEED);
+        if (attributeInstance != null) {
+            attributeInstance.removeModifier(ATTACK_SPEED_MODIFIER_ID);
+        }
     }
 
     @Override

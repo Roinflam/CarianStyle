@@ -1,25 +1,74 @@
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
 import net.minecraft.enchantment.Enchantment;
+import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Enchantments;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemStack;
+import net.minecraft.potion.PotionEffect;
+import net.minecraft.util.EnumHand;
+import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.PlayerEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
+import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
+import pers.roinflam.carianstyle.config.ConfigLoader;
+import pers.roinflam.carianstyle.init.CarianStylePotion;
+import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
+import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.utils.util.EntityUtil;
+
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
-import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
-import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
- * PORT-STUB(E1)
- * <p>重力附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 重力附魔
+ * <p>
+ * 造成伤害后开启重力力场（等级 × 4 秒），并给目标挂重力（等级 × 2 秒，等级 10 + 附魔等级 × 4）；
+ * 力场开启期间，持有者周围 {@link #FIELD_RADIUS} 格内的生物持续挂 10 级重力。
+ * </p>
+ * <p>v2.2：攻击者视角接入怪物附魔触发开关。PlayerTick天然玩家专属，无需检查。</p>
+ * <p>v2.3：力场激活/结束时同步给客户端（{@link #GRAVITY_FIELD_SERIAL}），供
+ * {@code GravitasDistortionRenderer} 绘制以施法者为中心、半径 {@link #FIELD_RADIUS} 格的
+ * 地面范围圈。范围判定与视觉共用同一个 {@link #FIELD_RADIUS} 常量，避免两处各自写死数值导致
+ * 以后改动漏改一处。</p>
+ *
+ * <h3>v2.4：补上登出时的集合清理</h3>
+ * <p>
+ * {@link #ACTIVE_FIELD_HOLDERS} 此前只在两处移除条目：力场自然结束、持有者死亡。
+ * 少了第三条路径——<b>玩家在力场生效期间直接退出游戏</b>。
+ * 这种情况下 UUID 会永久留在集合里。
+ * </p>
+ * <p>
+ * 严格说这不是无界泄漏（上限是服务器历史玩家数，每条只有一个 UUID），
+ * 但它会造成一个可观察的副作用：该玩家<b>下次登录时</b>集合里仍有他的 UUID，
+ * 于是 {@code ACTIVE_FIELD_HOLDERS.add(uuid)} 返回 false，
+ * {@link ClientSyncEffectManager#addEntity} 不会被调用，
+ * <b>范围圈视觉不会出现</b>——直到力场结束再重新触发一次才恢复正常。
+ * 也就是说这不只是内存问题，是一个会被玩家看见的显示 bug。
+ * </p>
+ * <p>
+ * 现在在 {@code PlayerLoggedOutEvent} 里一并清掉 UUID 与冷却数据。
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.4
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "gravitas",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
@@ -27,6 +76,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         type = EnumEnchantmentType.WEAPON,
         slots = {EntityEquipmentSlot.MAINHAND}
 )
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentGravitas extends EnchantmentBase {
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -97,6 +147,132 @@ public class EnchantmentGravitas extends EnchantmentBase {
 
     public EnchantmentGravitas() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
+
+    /**
+     * 攻击时激活重力场并给敌人施加重力效果
+     */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingDamage(@Nonnull LivingDamageEvent evt) {
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        if (!(evt.getSource().getTrueSource() instanceof EntityLivingBase)) {
+            return;
+        }
+
+        EntityLivingBase victim = evt.getEntityLiving();
+        EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getTrueSource();
+
+        // v2.2：怪物附魔触发开关（攻击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+
+        ItemStack heldItem = attacker.getHeldItem(EnumHand.MAIN_HAND);
+        if (heldItem.isEmpty()) {
+            return;
+        }
+
+        Enchantment gravitas = EnchantmentRegistry.getEnchantmentByClass(EnchantmentGravitas.class);
+        if (gravitas == null) {
+            return;
+        }
+
+        int level = EnchantmentHelper.getEnchantmentLevel(gravitas, heldItem);
+        level = decayLevel(gravitas, level);
+
+        if (level <= 0) {
+            return;
+        }
+
+        int activeDuration = level * ACTIVE_SECONDS_PER_LEVEL.getInt() * 20;
+        EnchantmentDataManager.setCooldown(GRAVITAS_ACTIVE_KEY, attacker.getUniqueID(), activeDuration);
+
+        int potionDuration = level * EFFECT_SECONDS_PER_LEVEL.getInt() * 20;
+        int potionLevel = AMPLIFIER_BASE.getInt() + level * AMPLIFIER_PER_LEVEL.getInt() - 1;
+        victim.addPotionEffect(new PotionEffect(
+                CarianStylePotion.GRAVITAS.get(),
+                potionDuration,
+                potionLevel
+        ));
+    }
+
+    /**
+     * 死亡时清理状态（清理类，不需要拦截）
+     */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+        EntityLivingBase dead = evt.getEntityLiving();
+        EnchantmentDataManager.clearCooldown(GRAVITAS_ACTIVE_KEY, dead.getUniqueID());
+        // 力场持有者死亡：同步移除范围圈视觉，无需等待客户端每 5 秒一次的定期重同步
+        if (ACTIVE_FIELD_HOLDERS.remove(dead.getUniqueID())) {
+            ClientSyncEffectManager.removeEntity(dead, GRAVITY_FIELD_SERIAL);
+        }
+    }
+
+    /**
+     * 玩家登出时清理力场状态（v2.4 新增）。
+     * <p>
+     * 这里<b>不调用</b> {@link ClientSyncEffectManager#removeEntity}：玩家已经断开，
+     * 发不到他自己那儿；而其余玩家的客户端会在实体被移除时自行清理该实体的视觉状态。
+     * 这里要做的只是把服务端侧的两份状态清干净，让他下次登录时是一个干净的起点。
+     * </p>
+     *
+     * @param evt 玩家登出事件
+     */
+    @SubscribeEvent
+    public static void onPlayerLoggedOut(@Nonnull PlayerEvent.PlayerLoggedOutEvent evt) {
+        UUID uuid = evt.player.getUniqueID();
+        ACTIVE_FIELD_HOLDERS.remove(uuid);
+        EnchantmentDataManager.clearCooldown(GRAVITAS_ACTIVE_KEY, uuid);
+    }
+
+    /**
+     * 激活状态时，周围生物持续受到轻微重力效果；同时维护力场的客户端同步状态，
+     * 驱动 {@code GravitasDistortionRenderer} 绘制以自身为中心的地面范围圈。
+     * <p>PlayerTickEvent 仅玩家触发，无需开关检查</p>
+     */
+    @SubscribeEvent
+    public static void onPlayerTick(@Nonnull TickEvent.PlayerTickEvent evt) {
+        if (evt.player.world.isRemote || evt.phase != TickEvent.Phase.START) {
+            return;
+        }
+
+        EntityPlayer holder = evt.player;
+        if (!holder.isEntityAlive()) {
+            return;
+        }
+
+        UUID uuid = holder.getUniqueID();
+        boolean active = EnchantmentDataManager.isOnCooldown(GRAVITAS_ACTIVE_KEY, uuid);
+
+        if (!active) {
+            // 力场已结束：若此前同步过范围圈，通知客户端移除
+            if (ACTIVE_FIELD_HOLDERS.remove(uuid)) {
+                ClientSyncEffectManager.removeEntity(holder, GRAVITY_FIELD_SERIAL);
+            }
+            return;
+        }
+
+        // 力场刚激活（此前不在集合中）：同步给客户端，绘制范围圈
+        if (ACTIVE_FIELD_HOLDERS.add(uuid)) {
+            ClientSyncEffectManager.addEntity(holder, GRAVITY_FIELD_SERIAL);
+        }
+
+        List<EntityLivingBase> nearbyEntities = EntityUtil.getNearbyEntities(
+                EntityLivingBase.class,
+                holder,
+                FIELD_RADIUS.getInt(),
+                entity -> !entity.equals(holder)
+        );
+
+        for (EntityLivingBase entity : nearbyEntities) {
+            entity.addPotionEffect(new PotionEffect(
+                    CarianStylePotion.GRAVITAS.get(), 2, AURA_AMPLIFIER.getInt()));
+        }
     }
 
     @Override

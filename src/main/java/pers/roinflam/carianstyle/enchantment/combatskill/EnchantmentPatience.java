@@ -1,19 +1,44 @@
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
+import net.minecraft.enchantment.Enchantment;
+import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.EnumHand;
+import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
+import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
+import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.Reference;
+
+import java.util.UUID;
+import javax.annotation.Nonnull;
 
 /**
- * PORT-STUB(E1)
- * <p>忍耐附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 忍耐附魔
+ * <p>
+ * 主手拿着时，被生物打中会把这一下伤害的 10% × 等级攒起来（至多最大生命 40% × 等级），
+ * 下一次攻击把攒下的全部作为额外伤害打出去。
+ * </p>
+ * <p>v2.2：受击累积监听器接入怪物附魔触发开关。
+ * onHurtAsAttackerLowest 走中央事件分发器，已被 scanEntity 入口拦截。
+ * onLivingDeath 是清理类，不影响行为，无需检查。</p>
+ *
+ * @author RoinFlam
+ * @version 2.2
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "patience",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
@@ -21,6 +46,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         type = EnumEnchantmentType.WEAPON,
         slots = {EntityEquipmentSlot.MAINHAND}
 )
+@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class EnchantmentPatience extends EnchantmentBase {
 
     /** 本附魔在数值配置文件中的分组键 */
@@ -46,6 +72,72 @@ public class EnchantmentPatience extends EnchantmentBase {
 
     public EnchantmentPatience() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
+
+    @Override
+    protected void onHurtAsAttackerLowest(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+        UUID uuid = attacker.getUniqueID();
+
+        Float accumulated = EnchantmentDataManager.getData(PATIENCE_DATA_KEY, uuid);
+        if (accumulated != null && accumulated > 0) {
+            ctx.addDamage(accumulated);
+            EnchantmentDataManager.removeData(PATIENCE_DATA_KEY, uuid);
+        }
+    }
+
+    /**
+     * 受击时累积能量
+     */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingDamageStatic(@Nonnull LivingDamageEvent evt) {
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+
+        if (!(evt.getSource().getImmediateSource() instanceof EntityLivingBase)) {
+            return;
+        }
+
+        EntityLivingBase victim = evt.getEntityLiving();
+
+        // v2.2：怪物附魔触发开关（受击者视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
+        ItemStack heldItem = victim.getHeldItem(EnumHand.MAIN_HAND);
+        if (heldItem.isEmpty()) {
+            return;
+        }
+
+        Enchantment patience = EnchantmentRegistry.getEnchantmentByClass(EnchantmentPatience.class);
+        if (patience == null) {
+            return;
+        }
+
+        int level = EnchantmentHelper.getEnchantmentLevel(patience, heldItem);
+        level = decayLevel(patience, level);
+
+        if (level <= 0) {
+            return;
+        }
+
+        UUID uuid = victim.getUniqueID();
+        Float current = EnchantmentDataManager.getData(PATIENCE_DATA_KEY, uuid);
+        float accumulated = current != null ? current : 0f;
+
+        float maxAccumulated = victim.getMaxHealth() * level * (float) MAX_ACCUMULATED_PER_LEVEL.get();
+        accumulated = Math.min(accumulated + evt.getAmount() * level * (float) ACCUMULATE_RATE_PER_LEVEL.get(), maxAccumulated);
+
+        EnchantmentDataManager.setData(PATIENCE_DATA_KEY, uuid, accumulated);
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingDeath(@Nonnull LivingDeathEvent evt) {
+        if (evt.getEntity().world.isRemote) {
+            return;
+        }
+        // 清理类，无需开关检查
+        EnchantmentDataManager.removeData(PATIENCE_DATA_KEY, evt.getEntityLiving().getUniqueID());
     }
 
     @Override

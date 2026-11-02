@@ -1,19 +1,52 @@
 package pers.roinflam.carianstyle.enchantment.combatskill;
 
 import net.minecraft.enchantment.EnumEnchantmentType;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.init.MobEffects;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.potion.PotionEffect;
+import net.minecraft.world.WorldServer;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
+import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
+
+import javax.annotation.Nonnull;
 
 /**
- * PORT-STUB(E1)
- * <p>突刺附魔：1.12.2 的桩。只有注册信息、附魔台花费、兼容性和静态常量（含可调数值句柄），
- * 效果还没有，换成实装时照 1.20.1 同名类写。</p>
+ * 突刺附魔
+ * <p>
+ * 疾跑攻击时触发：停止疾跑、短暂缓慢、5tick后击飞敌人、增伤+15%×等级
+ * </p>
+ * <p>
+ * 修复记录：
+ * - 延迟任务中增加victim存活检查，避免对已死亡实体操作
+ * </p>
+ * <p>v2.2：触发时播放「上挑弧 + 地面急停尘环」自绘特效</p>
+ *
+ * <h3>v2.2 为什么在触发瞬间就播，而不是等 5 tick 后的击飞</h3>
+ * <p>
+ * 特效总时长 600ms（12 tick），已经完整覆盖了「急停 → 蓄力 → 5 tick 后挑起」的全过程；
+ * 而<b>玩家需要在急停的那一刻就得到反馈</b>——那是他的冲刺被中断、
+ * 且被强制施加缓慢的时刻，没有提示的话会读成「卡了一下」。
+ * 上挑弧本身在特效的前 35% 扫完，节奏上正好压在击飞发生之前。
+ * </p>
+ * <p>
+ * 顺带：放在触发处而不是延迟任务里，也就不必操心「延迟期间目标死了 / 世界卸载了」
+ * 这类边界——那正是 v2.1 修复过的坑。
+ * </p>
+ * <p>v2.3：玩家必须满蓄力疾跑攻击才触发（急停、缓慢、挑飞、增伤整段跳过），怪物持有者不受影响</p>
+ * <p>
+ * 1.12.2 版：击飞直接设 {@code motionY} 并打 {@code velocityChanged}，受击者是玩家时客户端也收得到速度。
+ * </p>
+ *
+ * @author RoinFlam
+ * @version 2.3
  */
-@Deprecated
 @AutoRegisterEnchantment(
         id = "lunge_up",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
@@ -44,6 +77,55 @@ public class EnchantmentLungeUp extends EnchantmentBase {
 
     public EnchantmentLungeUp() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
+    }
+
+    @Override
+    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
+        EntityLivingBase attacker = ctx.getHolder();
+        EntityLivingBase victim = ctx.getVictim();
+
+        if (victim == null) {
+            return;
+        }
+
+        // 必须疾跑中
+        if (!attacker.isSprinting()) {
+            return;
+        }
+
+        // v2.3：武器不带击退附魔时，原版低蓄力命中不会打断疾跑，疾跑中连点能把一群怪挨个挑飞，要求满蓄力
+        if (!isFullyCharged(attacker)) {
+            return;
+        }
+
+        // 停止疾跑
+        attacker.setSprinting(false);
+
+        // v2.2：播放「上挑弧 + 地面急停尘环」自绘特效。
+        // 位置取受击者、朝向取攻击者；在急停这一刻就播，理由见类注释
+        if (attacker.world instanceof WorldServer) {
+            CarianStyleCombatArtEffects.lungeUp((WorldServer) attacker.world, attacker, victim);
+        }
+
+        // 施加缓慢效果
+        attacker.addPotionEffect(new PotionEffect(MobEffects.SLOWNESS, 10, 6));
+
+        // 5tick后击飞敌人
+        new SynchronizationTask(5) {
+            @Override
+            public void run() {
+                // 修复：同时检查攻击者和受害者是否存活
+                if (!attacker.isEntityAlive() || !victim.isEntityAlive()) {
+                    return;
+                }
+
+                victim.motionY = level * KNOCKUP_PER_LEVEL.get();
+                victim.velocityChanged = true;
+            }
+        }.start();
+
+        // 增伤 +15% × 等级
+        ctx.addDamage(ctx.getDamage() * level * (float) DAMAGE_PER_LEVEL.get());
     }
 
     @Override
