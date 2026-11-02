@@ -19,8 +19,6 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
- * PORT-STUB(E4)
- *
  * 辉石冰附魔
  * <p>
  * 弓箭附魔，箭矢伤害转为魔法并施加冻伤
@@ -50,20 +48,56 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
         // v2.1修复：移除 conflictsWith = {Enchantments.class}，该配置无效
         // 与火矢(FLAMING_ARROWS)的互斥通过下方 checkCompatibility 方法实现
 )
-@Deprecated
 public class EnchantmentPyroxeneIce extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.pyroxene_ice.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "pyroxene_ice";
-    private static final EnchantmentValues.Handle EFFECT_SECONDS = EnchantmentValues.define(VALUE_ID, "effect_seconds",
+
+    /**
+     * 施加效果的持续秒数
+     * <p>默认 10，允许范围 1 ~ 300。</p>
+     */
+    private static final EnchantmentValues.Handle EFFECT_SECONDS =
+            EnchantmentValues.define(VALUE_ID, "effect_seconds",
                     10, 1, 300);
+
     public EnchantmentPyroxeneIce() {
         super(EnchantTarget.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
+
+    @Override
     protected void onHurtAsAttackerHighest(@NotNull EnchantmentContext ctx, int level) {
+        DamageSource damageSource = ctx.getDamageSource();
+
+        // 必须是箭矢伤害
+        if (damageSource == null || !(damageSource.getDirectEntity() instanceof AbstractArrow)) {
+            return;
+        }
+
+        LivingEntity victim = ctx.getVictim();
+        if (victim == null) {
+            return;
+        }
+
+        // 转为魔法伤害
+        DamageSourceUtil.setMagicDamage(damageSource);
+
+        // 施加冻伤效果
+        victim.addEffect(new MobEffectInstance(
+                CarianStylePotion.FROSTBITE,
+                EFFECT_SECONDS.getInt() * 20,
+                level - 1
+        ));
     }
+
     @Override
     protected boolean checkCompatibility(@NotNull EnchantKey ench) {
         // 与火矢互斥
         return super.checkCompatibility(ench) && !ench.is(Enchantments.FLAME);
     }
 }
-

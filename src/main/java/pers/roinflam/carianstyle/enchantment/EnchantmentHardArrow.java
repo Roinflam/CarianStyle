@@ -25,14 +25,15 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
+
 import java.util.List;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.neoforged.fml.common.EventBusSubscriber;
 import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
+import net.minecraft.world.entity.Entity;
+import pers.roinflam.carianstyle.base.entity.ArrowDamage;
 
 /**
- * PORT-STUB(E4)
- *
  * 硬箭附魔
  * <p>v2.2：ProjectileImpact射手+LivingKnockBack受击者入口接入怪物附魔触发开关。
  * onHurtAsVictimHighest 走中央事件分发器，已被 scanEntity 拦截。</p>
@@ -58,22 +59,124 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
  * @version 2.4
  */
 @AutoRegisterEnchantment(id = "hard_arrow", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.UNCOMMON, type = EnchantTarget.BOW, slots = {EquipmentSlot.MAINHAND}, baseEnchantability = 5, levelMultiplier = 10)
-@Deprecated
+@EventBusSubscriber
 public class EnchantmentHardArrow extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.hard_arrow.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "hard_arrow";
-    private static final EnchantmentValues.Handle ARROW_DAMAGE_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "arrow_damage_per_level",
+
+    /**
+     * 每级的箭矢伤害倍率加成
+     * <p>默认 0.8，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle ARROW_DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "arrow_damage_per_level",
                     0.8D, 0.0D, 10.0D);
-    private static final EnchantmentValues.Handle MELEE_DAMAGE_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "melee_damage_per_level",
+
+    /**
+     * 每级的近战伤害倍率加成
+     * <p>默认 0.8，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle MELEE_DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "melee_damage_per_level",
                     0.8D, 0.0D, 10.0D);
-    private static final EnchantmentValues.Handle KNOCKBACK_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "knockback_per_level",
+
+    /**
+     * 每级的击退强度加成
+     * <p>默认 0.75，允许范围 0.0 ~ 10.0。</p>
+     */
+    private static final EnchantmentValues.Handle KNOCKBACK_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "knockback_per_level",
                     0.75D, 0.0D, 10.0D);
-    private static final EnchantmentValues.Handle AOE_RADIUS = EnchantmentValues.define(VALUE_ID, "aoe_radius",
+
+    /**
+     * 范围搜索半径（格）
+     * <p>默认 12，允许范围 1 ~ 64。</p>
+     */
+    private static final EnchantmentValues.Handle AOE_RADIUS =
+            EnchantmentValues.define(VALUE_ID, "aoe_radius",
                     12, 1, 64);
-    public EnchantmentHardArrow() {
-        super(EnchantTarget.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
+
+    public EnchantmentHardArrow() { super(EnchantTarget.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND}); }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onProjectileImpact_Arrow(@NotNull ProjectileImpactEvent evt) {
+        if (evt.getEntity().level().isClientSide) return;
+        if (!(evt.getProjectile() instanceof AbstractArrow arrow)) return;
+        if (!(arrow.getOwner() instanceof LivingEntity attacker)) return;
+
+        // v2.2：怪物附魔触发开关（射手视角）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(attacker, false)) return;
+
+        ItemStack heldItem = attacker.getItemInHand(InteractionHand.MAIN_HAND);
+        if (heldItem.isEmpty()) return;
+        EnchantmentBase hardArrow = EnchantmentRegistry.getEnchantmentByClass(EnchantmentHardArrow.class);
+        if (hardArrow == null) return;
+        int level = EnchantmentLevels.get(hardArrow, heldItem);
+        level = applyLevelLimit(hardArrow, level, 10);
+        if (level <= 0) return;
+        // 1.21.1 的力量到命中时才加，经 ArrowDamage 把它算进倍率的底数，和 1.20.1 一样乘在含力量的箭伤上
+        final int arrowLevel = level;
+        Entity hitTarget = evt.getRayTraceResult() instanceof EntityHitResult hit ? hit.getEntity() : null;
+        ArrowDamage.scale(arrow, hitTarget,
+                base -> base + base * arrowLevel * ARROW_DAMAGE_PER_LEVEL.get());
+
+        // v2.3：冲击特效。
+        // 本方法对「射中方块」与「射中实体」一视同仁地加伤，但特效需要一个命中实体
+        // 作为锚点（冲击环以它为原点沿箭道后退），故只在实体命中时播。
+        // 射中方块时不播是刻意的：那种情况下加伤没有意义，画出来只会是噪音
+        if (evt.getRayTraceResult() instanceof EntityHitResult entityHit
+                && attacker.level() instanceof ServerLevel serverLevel) {
+            // v2.4：演出尺寸随伤害缩放，故把伤害估值一并传过去。
+            //
+            // 这里必须自己估算，不能直接用 getBaseDamage() —— 原版箭矢的实际伤害是
+            //     Mth.ceil(clamp(速度模长 × baseDamage))
+            // （见 AbstractArrow.onHitEntity）。一支强弓满蓄力射出的箭速度模长约 3，
+            // 直接拿 baseDamage 当伤害会低估到三分之一，演出永远缩在最小档。
+            //
+            // 注意这仍然只是估值：真实伤害还会经过暴击、护甲、抗性、以及本模组
+            // 其它附魔的加成。但演出尺寸只需要一个「这一下重不重」的量级判断，
+            // 为了精确而把特效推迟到伤害结算之后，反而会让视觉比音效和击退慢半拍
+            float estimatedDamage = (float) (ArrowDamage.effectiveBase(arrow, entityHit.getEntity())
+                    * arrow.getDeltaMovement().length());
+            CarianStyleCombatArtEffects.hardArrow(serverLevel, attacker,
+                    entityHit.getEntity(), estimatedDamage);
+        }
     }
+
+    @Override
     protected void onHurtAsVictimHighest(@NotNull EnchantmentContext ctx, int level) {
+        if (ctx.getAttacker() == null) return;
+        LivingEntity victim = ctx.getHolder();
+        List<LivingEntity> entities = EntityUtil.getNearbyEntities(LivingEntity.class, victim, AOE_RADIUS.getInt(), entity -> !entity.equals(victim));
+        if (entities.isEmpty()) return;
+        ctx.addDamage(ctx.getDamage() * level * (float) MELEE_DAMAGE_PER_LEVEL.get());
     }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onLivingKnockBack(@NotNull LivingKnockBackEvent evt) {
+        if (evt.getEntity().level().isClientSide) return;
+        LivingEntity victim = evt.getEntity();
+
+        // v2.2：怪物附魔触发开关（受击者视角，被击退强化）
+        if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
+
+        ItemStack heldItem = victim.getItemInHand(InteractionHand.MAIN_HAND);
+        if (heldItem.isEmpty()) return;
+        EnchantmentBase hardArrow = EnchantmentRegistry.getEnchantmentByClass(EnchantmentHardArrow.class);
+        if (hardArrow == null) return;
+        int level = EnchantmentLevels.get(hardArrow, heldItem);
+        level = applyLevelLimit(hardArrow, level, 10);
+        if (level <= 0) return;
+        List<LivingEntity> entities = EntityUtil.getNearbyEntities(LivingEntity.class, victim, AOE_RADIUS.getInt(), entity -> !entity.equals(victim));
+        if (entities.isEmpty()) return;
+        evt.setStrength(evt.getStrength() + evt.getStrength() * level * (float) KNOCKBACK_PER_LEVEL.get());
+    }
+
     @Override protected boolean checkCompatibility(@NotNull EnchantKey ench) { return super.checkCompatibility(ench) && !ench.is(Enchantments.POWER); }
 }
-

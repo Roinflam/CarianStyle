@@ -17,8 +17,6 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
 
 /**
- * PORT-STUB(E4)
- *
  * 沙布里里嚎叫附魔
  * <p>
  * 武器附魔，叠层诅咒系统
@@ -43,25 +41,110 @@ import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
         baseEnchantability = 25,
         levelMultiplier = 10
 )
-@Deprecated
 public class EnchantmentHowlShabriri extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.howl_shabriri.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "howl_shabriri";
-    private static final EnchantmentValues.Handle SELF_DOT_DURATION = EnchantmentValues.define(VALUE_ID, "self_dot_duration",
+
+    /**
+     * 自损持续时间（tick）
+     * <p>默认 60，允许范围 1 ~ 1200。</p>
+     */
+    private static final EnchantmentValues.Handle SELF_DOT_DURATION =
+            EnchantmentValues.define(VALUE_ID, "self_dot_duration",
                     60, 1, 1200);
-    private static final EnchantmentValues.Handle SELF_DOT_DELAY = EnchantmentValues.define(VALUE_ID, "self_dot_delay",
+
+    /**
+     * 自损起始延迟（tick）
+     * <p>默认 5，允许范围 0 ~ 200。</p>
+     */
+    private static final EnchantmentValues.Handle SELF_DOT_DELAY =
+            EnchantmentValues.define(VALUE_ID, "self_dot_delay",
                     5, 0, 200);
-    private static final EnchantmentValues.Handle MAX_AMPLIFIER = EnchantmentValues.define(VALUE_ID, "max_amplifier",
+
+    /**
+     * 疯狂叠层的最高等级
+     * <p>默认 5，允许范围 0 ~ 127。</p>
+     */
+    private static final EnchantmentValues.Handle MAX_AMPLIFIER =
+            EnchantmentValues.define(VALUE_ID, "max_amplifier",
                     5, 0, 127);
-    private static final EnchantmentValues.Handle BONUS_DAMAGE_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "bonus_damage_per_level",
+
+    /**
+     * 每级的额外伤害倍率
+     * <p>默认 0.15，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle BONUS_DAMAGE_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "bonus_damage_per_level",
                     0.15D, 0.0D, 5.0D);
-    private static final EnchantmentValues.Handle SELF_DAMAGE_RATIO = EnchantmentValues.define(VALUE_ID, "self_damage_ratio",
+
+    /**
+     * 自损总量占最大生命的比例
+     * <p>默认 0.05，允许范围 0.0 ~ 1.0。</p>
+     */
+    private static final EnchantmentValues.Handle SELF_DAMAGE_RATIO =
+            EnchantmentValues.define(VALUE_ID, "self_damage_ratio",
                     0.05D, 0.0D, 1.0D);
-    private static final EnchantmentValues.Handle STACK_SECONDS_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "stack_seconds_per_level",
+
+    /**
+     * 每级叠层的持续秒数
+     * <p>默认 3，允许范围 1 ~ 120。</p>
+     */
+    private static final EnchantmentValues.Handle STACK_SECONDS_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "stack_seconds_per_level",
                     3, 1, 120);
+
     public EnchantmentHowlShabriri() {
         super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
-    protected void onDamageAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
-    }
-}
 
+    @Override
+    protected void onDamageAsAttackerLowest(@NotNull EnchantmentContext ctx, int level) {
+        LivingEntity attacker = ctx.getHolder();
+        LivingEntity victim = ctx.getVictim();
+
+        if (victim == null) {
+            return;
+        }
+
+        if (!isFullyCharged(attacker)) {
+            return;
+        }
+
+        // 获取当前沙布里里嚎叫等级
+        int currentAmplifier = DynamicAttributeManager.getAmplifier(victim, DynamicAttributes.HOWL_SHABRIRI);
+
+        if (currentAmplifier >= MAX_AMPLIFIER.getInt()) {
+            // 满5层，增加伤害
+            float bonusDamage = ctx.getDamage() * level * (float) BONUS_DAMAGE_PER_LEVEL.get();
+            ctx.addDamage(bonusDamage);
+        }
+
+        // 叠加沙布里里嚎叫效果（最高5层）
+        int newAmplifier = currentAmplifier < 0 ? 0 : Math.min(currentAmplifier + 1, MAX_AMPLIFIER.getInt());
+        DynamicAttributeManager.apply(victim,
+                DynamicAttributes.HOWL_SHABRIRI.createInstance(level * STACK_SECONDS_PER_LEVEL.getInt() * 20, newAmplifier));
+
+        // 对攻击者造成癫火伤害（创造模式玩家免疫）
+        if (!(attacker instanceof Player) || !((Player) attacker).isCreative()) {
+            // 应用火焰燃烧视觉效果
+            DynamicAttributeManager.apply(attacker,
+                    DynamicAttributes.EPILEPSY_FIRE_BURNING.createInstance(3 * 20 + 5, 0));
+            ClientSyncEffectHelper.onAttributeApplied(attacker, DynamicAttributes.EPILEPSY_FIRE_BURNING);
+
+            // v3.0优化：自损 5%最大生命值 / 60tick
+            // 按自损登记：被反噬耗死时致死一击走原版伤害管线，死亡消息、死因和伤害事件链与原版伤害致死一致
+            float selfDamagePerTick = attacker.getMaxHealth() * (float) SELF_DAMAGE_RATIO.get() / SELF_DOT_DURATION.getInt();
+            DamageOverTimeManager.applySelfLinear(
+                    attacker, selfDamagePerTick, SELF_DOT_DURATION.getInt(), SELF_DOT_DELAY.getInt(),
+                    NewDamageSource.epilepsyFire(attacker.level())
+            );
+        }
+    }
+
+}

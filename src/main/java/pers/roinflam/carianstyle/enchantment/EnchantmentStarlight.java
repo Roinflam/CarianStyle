@@ -22,6 +22,7 @@ import pers.roinflam.carianstyle.block.light.HideLight;
 import pers.roinflam.carianstyle.init.CarianStyleBlocks;
 import pers.roinflam.carianstyle.tileentity.MoveLight;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,8 +31,6 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /**
- * PORT-STUB(E4)
- *
  * 星光附魔 - 优化: LivingTickEvent -&gt; PlayerTickEvent
  * <p>
  * 亮度 = 全身星光等级之和 × 3，最高 15；光源方块跟着亮度走（{@link HideLight#LEVEL}），
@@ -93,22 +92,159 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  * @version 2.2
  */
 @AutoRegisterEnchantment(id = "starlight", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.UNCOMMON, type = EnchantTarget.ARMOR, slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}, baseEnchantability = 23, levelMultiplier = 9)
-@Deprecated
+@EventBusSubscriber
 public class EnchantmentStarlight extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.starlight.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "starlight";
-    private static final EnchantmentValues.Handle RESCAN_INTERVAL = EnchantmentValues.define(VALUE_ID, "rescan_interval",
+
+    /**
+     * 护甲扫描缓存的刷新间隔（tick）；调大更省性能，代价是换装后生效更慢
+     * <p>默认 20，允许范围 1 ~ 200。</p>
+     */
+    private static final EnchantmentValues.Handle RESCAN_INTERVAL =
+            EnchantmentValues.define(VALUE_ID, "rescan_interval",
                     20, 1, 200);
-    private static final EnchantmentValues.Handle BRIGHTNESS_PER_LEVEL = EnchantmentValues.define(VALUE_ID, "brightness_per_level",
+
+    /**
+     * 每级星光提供的亮度
+     * <p>默认 3，允许范围 1 ~ 15。</p>
+     */
+    private static final EnchantmentValues.Handle BRIGHTNESS_PER_LEVEL =
+            EnchantmentValues.define(VALUE_ID, "brightness_per_level",
                     3, 1, 15);
-    private static final EnchantmentValues.Handle MAX_BRIGHTNESS = EnchantmentValues.define(VALUE_ID, "max_brightness",
+
+    /**
+     * 亮度上限
+     * <p>默认 15，允许范围 1 ~ 15。</p>
+     */
+    private static final EnchantmentValues.Handle MAX_BRIGHTNESS =
+            EnchantmentValues.define(VALUE_ID, "max_brightness",
                     15, 1, 15);
+
+    /**
+     * 护甲扫描的重新检测间隔（tick）。
+     * <p>20 tick = 1 秒。见类注释关于延迟可接受性的说明。</p>
+     */
+
+    /**
+     * 放置光源方块时使用的更新标志。
+     * <p>{@code UPDATE_CLIENTS} 让客户端看见光；{@code UPDATE_KNOWN_SHAPE} 跳过形状传播。
+     * 刻意<b>不含</b> {@code UPDATE_NEIGHBORS}，理由见类注释。</p>
+     */
     private static final int LIGHT_BLOCK_FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
+
+    /**
+     * 玩家装备扫描缓存。
+     * <p>
+     * 用 {@link ConcurrentHashMap} 而非普通 HashMap：本 Map 在服务端 tick 线程写入、
+     * 在玩家登出事件里移除，两者在专用服务器上同属主线程，但 Mohist 这类混合端
+     * 存在插件从其它线程触发登出事件的可能，用并发容器成本极低而更稳妥。
+     * </p>
+     */
     private static final Map<UUID, ArmorScanCache> SCAN_CACHE = new ConcurrentHashMap<>();
+
     public EnchantmentStarlight() {
         super(EnchantTarget.ARMOR, new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET});
     }
 
+    /**
+     * 单个玩家的护甲扫描结果缓存。
+     */
     private static final class ArmorScanCache {
-    }
-}
 
+        /** 上次扫描的结论：玩家身上星光的亮度，0 表示没装备 */
+        private int brightness;
+
+        /**
+         * 距上次扫描过去了多少 tick。
+         * <p>初始值设为 {@link #RESCAN_INTERVAL}，使玩家首次进入 tick 时立即扫描一次，
+         * 而不是先按「未装备」处理一秒。</p>
+         */
+        private int ticksSinceScan = RESCAN_INTERVAL.getInt();
+
+        /**
+         * 取缓存结果，必要时重新扫描。
+         *
+         * @param player    玩家
+         * @param starlight 星光附魔实例
+         * @return 亮度，没装备时为 0
+         */
+        private int brightness(@NotNull Player player, @NotNull EnchantmentBase starlight) {
+            ticksSinceScan++;
+            if (ticksSinceScan < RESCAN_INTERVAL.getInt()) {
+                return brightness;
+            }
+            ticksSinceScan = 0;
+
+            int totalLevel = 0;
+            for (ItemStack armor : player.getArmorSlots()) {
+                if (!armor.isEmpty()) {
+                    totalLevel += EnchantmentLevels.get(starlight, armor);
+                }
+            }
+            brightness = Math.min(decayLevel(starlight, totalLevel) * BRIGHTNESS_PER_LEVEL.getInt(), MAX_BRIGHTNESS.getInt());
+            return brightness;
+        }
+    }
+
+    /**
+     * 每 tick 在玩家脚下放置/续期一个隐形光源方块。
+     * <p>优化：从LivingTickEvent改为PlayerTickEvent，怪物不触发。</p>
+     * <p>v2.2：护甲扫描结果缓存 1 秒，未装备该附魔的玩家几乎零开销。</p>
+     *
+     * @param evt 玩家 tick 事件
+     */
+    @SubscribeEvent
+    public static void onPlayerTick(@NotNull PlayerTickEvent.Pre evt) {
+        if (evt.getEntity().level().isClientSide) return;
+
+        Player entity = evt.getEntity();
+        EnchantmentBase starlight = EnchantmentRegistry.getEnchantmentByClass(EnchantmentStarlight.class);
+        if (starlight == null) return;
+
+        // v2.2：先查缓存再决定要不要解析 NBT。
+        // computeIfAbsent 只在玩家首次 tick 时创建条目，之后是一次 Map 查询。
+        ArmorScanCache cache = SCAN_CACHE.computeIfAbsent(entity.getUUID(), uuid -> new ArmorScanCache());
+        int brightness = cache.brightness(entity, starlight);
+        if (brightness <= 0) return;
+
+        Level world = entity.level();
+        int blockX = Mth.floor(entity.getX());
+        int blockY = Mth.floor(entity.getY() - 0.2D);
+        int blockZ = Mth.floor(entity.getZ());
+        BlockPos blockPos = new BlockPos(blockX, blockY + 1, blockZ);
+        if (!world.isEmptyBlock(blockPos)) return;
+        BlockState lightState = CarianStyleBlocks.HIDE_LIGHT.get().defaultBlockState().setValue(HideLight.LEVEL, brightness);
+        if (world.getBlockEntity(blockPos) instanceof MoveLight moveLight) {
+            // 同种方块改状态不会重建方块实体，脚下这格直接换亮度
+            if (world.getBlockState(blockPos) != lightState) {
+                world.setBlock(blockPos, lightState, LIGHT_BLOCK_FLAGS);
+            }
+            moveLight.retime();
+            return;
+        }
+        else if (world.getBlockState(blockPos).getBlock() instanceof HideLight) { world.removeBlock(blockPos, false); }
+        world.setBlock(blockPos, lightState, LIGHT_BLOCK_FLAGS);
+    }
+
+    /**
+     * 玩家登出时清理缓存条目，防止长期运行的服务器上 Map 无界增长。
+     * <p>
+     * 条目本身只有一个 boolean + 一个 int，单条内存可忽略；但一个开了几个月的服务器
+     * 会积累掉所有历史登录过的玩家 UUID，属于典型的「慢泄漏」。
+     * </p>
+     *
+     * @param evt 玩家登出事件
+     */
+    @SubscribeEvent
+    public static void onPlayerLoggedOut(@NotNull PlayerEvent.PlayerLoggedOutEvent evt) {
+        SCAN_CACHE.remove(evt.getEntity().getUUID());
+    }
+
+}

@@ -14,8 +14,6 @@ import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 /**
- * PORT-STUB(E4)
- *
  * 米莉森义肢附魔
  * <p>
  * 武器附魔，连续攻击增强
@@ -48,19 +46,79 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         baseEnchantability = 30,
         levelMultiplier = 25
 )
-@Deprecated
 public class EnchantmentMillicentProsthesis extends EnchantmentBase {
+
+    // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
+    // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
+    // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.millicent_prosthesis.desc，
+    //   否则玩家看到的描述会与实际效果不符。
+
+    /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "millicent_prosthesis";
-    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL_FULL = EnchantmentValues.define(VALUE_ID, "damage_per_level_full",
+
+    /**
+     * 叠层满时每级的额外伤害倍率
+     * <p>默认 0.1，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL_FULL =
+            EnchantmentValues.define(VALUE_ID, "damage_per_level_full",
                     0.1D, 0.0D, 5.0D);
-    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL_PARTIAL = EnchantmentValues.define(VALUE_ID, "damage_per_level_partial",
+
+    /**
+     * 叠层未满时每级的额外伤害倍率
+     * <p>默认 0.05，允许范围 0.0 ~ 5.0。</p>
+     */
+    private static final EnchantmentValues.Handle DAMAGE_PER_LEVEL_PARTIAL =
+            EnchantmentValues.define(VALUE_ID, "damage_per_level_partial",
                     0.05D, 0.0D, 5.0D);
+
     public EnchantmentMillicentProsthesis() {
         super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
-    protected void onAttackLowest(@NotNull EnchantmentContext ctx, int level) {
-    }
-    protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
-    }
-}
 
+    @Override
+    protected void onAttackLowest(@NotNull EnchantmentContext ctx, int level) {
+        LivingEntity attacker = ctx.getHolder();
+
+        // 玩家必须是刚挥动武器
+        if (attacker instanceof Player) {
+            if (!isJustSwung((Player) attacker)) {
+                return;
+            }
+        }
+
+        // 获取当前攻击提升等级
+        int currentAmplifier = DynamicAttributeManager.getAmplifier(attacker, DynamicAttributes.ATTACK_BOOST);
+
+        if (currentAmplifier < 0) {
+            // 没有效果，初始化
+            DynamicAttributeManager.apply(attacker,
+                    DynamicAttributes.ATTACK_BOOST.createInstance(30, level - 1));
+        } else if (currentAmplifier < level * 7 - 1) {
+            // 未满层，叠加
+            DynamicAttributeManager.apply(attacker,
+                    DynamicAttributes.ATTACK_BOOST.createInstance(30, currentAmplifier + level));
+        } else {
+            // 满层，刷新为更高层
+            DynamicAttributeManager.apply(attacker,
+                    DynamicAttributes.ATTACK_BOOST.createInstance(60, level * 16 - 1));
+        }
+    }
+
+    @Override
+    protected void onHurtAsAttacker(@NotNull EnchantmentContext ctx, int level) {
+        LivingEntity attacker = ctx.getHolder();
+
+        // 获取当前攻击提升等级
+        int currentAmplifier = DynamicAttributeManager.getAmplifier(attacker, DynamicAttributes.ATTACK_BOOST);
+
+        if (currentAmplifier >= level * 7 - 1) {
+            // 满层：增伤10%×等级
+            ctx.addDamage(ctx.getDamage() * level * (float) DAMAGE_PER_LEVEL_FULL.get());
+        } else if (currentAmplifier >= 0) {
+            // 未满层：增伤5%×等级
+            ctx.addDamage(ctx.getDamage() * level * (float) DAMAGE_PER_LEVEL_PARTIAL.get());
+        }
+    }
+
+}
