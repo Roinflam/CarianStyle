@@ -5,7 +5,6 @@ import net.minecraft.enchantment.Enchantment;
 import net.minecraft.init.Items;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.launchwrapper.Launch;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -342,7 +341,7 @@ public final class EnchantmentCodex {
      * 条目数和注册表里本模组附魔的个数对不上时会在第一行写明。
      * </p>
      * <p>
-     * 只给开发和排查用：由 {@link DebugDump} 在开发环境或打开详细日志时于主界面输出一次，正式环境默认不输出。
+     * 只给开发和排查用：由 {@link DebugDump} 在配置里打开详细日志时于主界面输出一次，默认不输出。
      * 必须在客户端、语言表就绪之后调用。
      * </p>
      */
@@ -467,7 +466,8 @@ public final class EnchantmentCodex {
     /**
      * 自检入口：第一次进主界面时把百科条目打进日志。
      * <p>
-     * 只在开发环境（{@code fml.deobfuscatedEnvironment}）或配置里打开了详细日志时输出，每次启动最多一次。
+     * 只在配置里打开了详细日志（{@code enableDetailedLogging}）时输出，每次启动最多一次；
+     * 开发环境也一样，不再默认输出（几百行条目每次启动都刷一遍，盖住了真正要看的日志）。
      * 挑主界面是因为那时语言表、注册表都已就绪，又还没进世界，不会和游戏里的日志搅在一起。
      * </p>
      * <p>
@@ -494,7 +494,7 @@ public final class EnchantmentCodex {
                 return;
             }
             checked = true;
-            if (!isDevEnvironment() && !ConfigLoader.enableDetailedLogging) {
+            if (!ConfigLoader.enableDetailedLogging) {
                 return;
             }
             try {
@@ -503,14 +503,6 @@ public final class EnchantmentCodex {
                 // 自检出错只记日志：它不是玩法的一部分，不能因此进不了游戏
                 LogUtil.error("卡利亚式附魔 - [百科自检] 输出失败", t);
             }
-        }
-
-        /**
-         * @return 是否在开发环境（反混淆环境）里运行
-         */
-        private static boolean isDevEnvironment() {
-            Object value = Launch.blackboard == null ? null : Launch.blackboard.get("fml.deobfuscatedEnvironment");
-            return Boolean.TRUE.equals(value);
         }
     }
 }

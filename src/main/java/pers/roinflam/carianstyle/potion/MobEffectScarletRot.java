@@ -21,15 +21,13 @@ import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.enchantment.EnchantmentAeonia;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.mc112.attr.Operation;
-import pers.roinflam.carianstyle.mc112.util.Reflect;
+import pers.roinflam.carianstyle.mc112.util.EntityFireAccess;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -125,12 +123,6 @@ public class MobEffectScarletRot extends IconBase {
     private static final Map<UUID, AeoniaCacheEntry> AEONIA_CACHE = new ConcurrentHashMap<>();
 
     /**
-     * {@code Entity.fire}（剩余燃烧 tick）。私有字段，没有 getter；找不到时为 null，按没着火算。
-     */
-    @Nullable
-    private static final Field FIRE_FIELD = Reflect.fieldOrNull(Entity.class, "fire", "field_190534_ay");
-
-    /**
      * 一条缓存记录。
      */
     private static final class AeoniaCacheEntry {
@@ -184,23 +176,6 @@ public class MobEffectScarletRot extends IconBase {
                 -0.5,
                 Operation.MULTIPLY_TOTAL.id()
         );
-    }
-
-    /**
-     * 剩余燃烧 tick（1.20.1 的 {@code getRemainingFireTicks()}）
-     *
-     * @param entity 实体
-     * @return 剩余燃烧 tick；字段读不到时返回 0
-     */
-    private static int remainingFireTicks(@Nonnull Entity entity) {
-        if (FIRE_FIELD == null) {
-            return 0;
-        }
-        try {
-            return FIRE_FIELD.getInt(entity);
-        } catch (IllegalAccessException e) {
-            return 0;
-        }
     }
 
     /**
@@ -375,7 +350,7 @@ public class MobEffectScarletRot extends IconBase {
     @Override
     public void applyEffectTick(@Nonnull EntityLivingBase entityLivingBaseIn, int amplifier) {
         if (!entityLivingBaseIn.world.isRemote) {
-            if (remainingFireTicks(entityLivingBaseIn) <= 0 || RandomUtil.percentageChance(25)) {
+            if (EntityFireAccess.getRemainingFireTicks(entityLivingBaseIn) <= 0 || RandomUtil.percentageChance(25)) {
                 float damage = entityLivingBaseIn.getHealth() * 0.03f + entityLivingBaseIn.getMaxHealth() * 0.00075f;
                 damage += damage * amplifier * 0.33;
 

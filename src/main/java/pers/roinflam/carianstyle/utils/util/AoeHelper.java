@@ -69,7 +69,7 @@ public final class AoeHelper {
     /**
      * 遍历中心实体附近的目标并执行动作，自动应用半径封顶与命中数封顶。
      * <p>
-     * 内部走 {@link EntityUtil#getNearbyEntities(Class, net.minecraft.world.entity.Entity, double, Predicate)}
+     * 内部走 {@link EntityUtil#getNearbyEntities(Class, net.minecraft.entity.Entity, double, Predicate)}
      * 的圆柱判定（水平圆 + 垂直 ±R），与本模组其余 AOE 的范围口径完全一致。
      * </p>
      *

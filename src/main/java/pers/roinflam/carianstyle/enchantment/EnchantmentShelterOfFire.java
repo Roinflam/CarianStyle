@@ -13,8 +13,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
-import pers.roinflam.carianstyle.mc112.util.Reflect;
-import java.lang.reflect.Field;
+import pers.roinflam.carianstyle.mc112.util.EntityFireAccess;
 
 /**
  * 火焰庇护附魔
@@ -81,9 +80,6 @@ public class EnchantmentShelterOfFire extends EnchantmentBase {
             EnchantmentValues.define(VALUE_ID, "heal_per_level",
                     0.001D, 0.0D, 0.1D);
 
-    /** 1.12.2 版：{@code Entity.fire} 是私有字段，反射读剩余燃烧 tick */
-    private static final Field FIRE_FIELD = Reflect.fieldOrNull(Entity.class, "fire", "field_190534_ay");
-
     public EnchantmentShelterOfFire() {
         super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
                 EntityEquipmentSlot.HEAD,
@@ -101,7 +97,7 @@ public class EnchantmentShelterOfFire extends EnchantmentBase {
         EntityLivingBase victim = ctx.getHolder();
 
         // 必须处于着火状态
-        if (remainingFireTicks(victim) <= 0) {
+        if (EntityFireAccess.getRemainingFireTicks(victim) <= 0) {
             return;
         }
 
@@ -130,7 +126,7 @@ public class EnchantmentShelterOfFire extends EnchantmentBase {
         EntityLivingBase entity = ctx.getHolder();
 
         // 必须处于着火状态
-        if (remainingFireTicks(entity) <= 0) {
+        if (EntityFireAccess.getRemainingFireTicks(entity) <= 0) {
             return;
         }
 
@@ -153,23 +149,6 @@ public class EnchantmentShelterOfFire extends EnchantmentBase {
 
         if (healAmount > 0) {
             entity.heal(healAmount);
-        }
-    }
-
-    /**
-     * 剩余燃烧 tick（1.20.1 的 {@code getRemainingFireTicks()}）
-     *
-     * @param entity 实体
-     * @return 剩余燃烧 tick；字段读不到时退回 {@code isBurning()}
-     */
-    private static int remainingFireTicks(@Nonnull Entity entity) {
-        if (FIRE_FIELD == null) {
-            return entity.isBurning() ? 1 : 0;
-        }
-        try {
-            return FIRE_FIELD.getInt(entity);
-        } catch (IllegalAccessException e) {
-            return entity.isBurning() ? 1 : 0;
         }
     }
 

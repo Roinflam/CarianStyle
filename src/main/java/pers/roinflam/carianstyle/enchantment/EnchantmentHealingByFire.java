@@ -21,10 +21,9 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import pers.roinflam.carianstyle.mc112.util.Reflect;
+import pers.roinflam.carianstyle.mc112.util.EntityFireAccess;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -70,9 +69,6 @@ public class EnchantmentHealingByFire extends EnchantmentBase {
             EnchantmentValues.define(VALUE_ID, "absorption_ratio",
                     0.1D, 0.0D, 2.0D);
 
-    /** 1.12.2 版：{@code Entity.fire} 是私有字段，反射读剩余燃烧 tick */
-    private static final Field FIRE_FIELD = Reflect.fieldOrNull(Entity.class, "fire", "field_190534_ay");
-
     public EnchantmentHealingByFire() {
         super(EnumEnchantmentType.ARMOR, new EntityEquipmentSlot[]{
                 EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET
@@ -86,7 +82,7 @@ public class EnchantmentHealingByFire extends EnchantmentBase {
         EntityLivingBase victim = evt.getEntityLiving();
         // v2.2：怪物附魔触发开关（受击者视角）
         if (EnchantmentEventHandler.shouldBlockMobTrigger(victim, false)) return;
-        if (remainingFireTicks(victim) <= 0) return;
+        if (EntityFireAccess.getRemainingFireTicks(victim) <= 0) return;
         if (victim.getActivePotionEffects().isEmpty()) return;
         Enchantment healingByFire = EnchantmentRegistry.getEnchantmentByClass(EnchantmentHealingByFire.class);
         if (healingByFire == null) return;
@@ -109,23 +105,6 @@ public class EnchantmentHealingByFire extends EnchantmentBase {
         victim.removePotionEffect(toRemove.getPotion());
         victim.setAbsorptionAmount(victim.getAbsorptionAmount()
                 + victim.getMaxHealth() * (float) ABSORPTION_RATIO.get());
-    }
-
-    /**
-     * 剩余燃烧 tick（1.20.1 的 {@code getRemainingFireTicks()}）
-     *
-     * @param entity 实体
-     * @return 剩余燃烧 tick；字段读不到时退回 {@code isBurning()}
-     */
-    private static int remainingFireTicks(@Nonnull Entity entity) {
-        if (FIRE_FIELD == null) {
-            return entity.isBurning() ? 1 : 0;
-        }
-        try {
-            return FIRE_FIELD.getInt(entity);
-        } catch (IllegalAccessException e) {
-            return entity.isBurning() ? 1 : 0;
-        }
     }
 
     @Override

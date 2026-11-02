@@ -5,7 +5,6 @@ import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.relauncher.Side;
@@ -26,8 +25,12 @@ import javax.annotation.Nonnull;
  * - 受到伤害增加25%
  * - 治疗量减少50%
  * </p>
+ * <p>
+ * 1.12.2 版：不挂自动订阅，由主类在 init 里手动登记。同一优先级的监听按登记先后执行，
+ * 自动订阅的登记顺序不固定（实测这个类会排在附魔分发前面）；手动登记一定排在所有自动订阅之后，
+ * 这样 LOW 的 +25% 落在凶兆附魔的 LOW 之后，和 1.20.1 的执行顺序一致。
+ * </p>
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
 public class MobEffectBadOmen extends IconBase {
 
     public MobEffectBadOmen(boolean isBadEffectIn, int liquidColorIn) {

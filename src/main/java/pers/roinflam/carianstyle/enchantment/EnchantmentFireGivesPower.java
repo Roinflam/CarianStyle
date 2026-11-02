@@ -11,9 +11,8 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
-import pers.roinflam.carianstyle.mc112.util.Reflect;
+import pers.roinflam.carianstyle.mc112.util.EntityFireAccess;
 import javax.annotation.Nonnull;
-import java.lang.reflect.Field;
 
 /**
  * 火焰赋予力量附魔
@@ -73,9 +72,6 @@ public class EnchantmentFireGivesPower extends EnchantmentBase {
             EnchantmentValues.define(VALUE_ID, "ignite_seconds",
                     10, 1, 300);
 
-    /** 1.12.2 版：{@code Entity.fire} 是私有字段，反射读剩余燃烧 tick */
-    private static final Field FIRE_FIELD = Reflect.fieldOrNull(Entity.class, "fire", "field_190534_ay");
-
     public EnchantmentFireGivesPower() {
         super(EnumEnchantmentType.WEAPON, new EntityEquipmentSlot[]{EntityEquipmentSlot.MAINHAND});
     }
@@ -84,8 +80,8 @@ public class EnchantmentFireGivesPower extends EnchantmentBase {
     protected void onDamageAsAttackerLow(@Nonnull EnchantmentContext ctx, int level) {
         EntityLivingBase attacker = ctx.getHolder();
 
-        if (remainingFireTicks(attacker) > 0) {
-            if (remainingFireTicks(attacker) < 200) {
+        if (EntityFireAccess.getRemainingFireTicks(attacker) > 0) {
+            if (EntityFireAccess.getRemainingFireTicks(attacker) < 200) {
                 attacker.setFire(IGNITE_SECONDS.getInt());
             }
             float bonusDamage = ctx.getDamage() * level * (float) BONUS_DAMAGE_PER_LEVEL.get();
@@ -101,7 +97,7 @@ public class EnchantmentFireGivesPower extends EnchantmentBase {
     protected void onDamageAsVictimLow(@Nonnull EnchantmentContext ctx, int level) {
         EntityLivingBase victim = ctx.getHolder();
 
-        if (remainingFireTicks(victim) <= 0) {
+        if (EntityFireAccess.getRemainingFireTicks(victim) <= 0) {
             return;
         }
 
@@ -111,23 +107,6 @@ public class EnchantmentFireGivesPower extends EnchantmentBase {
 
         float reduction = ctx.getDamage() * level * (float) REDUCTION_PER_LEVEL.get();
         ctx.reduceDamage(reduction);
-    }
-
-    /**
-     * 剩余燃烧 tick（1.20.1 的 {@code getRemainingFireTicks()}）
-     *
-     * @param entity 实体
-     * @return 剩余燃烧 tick；字段读不到时退回 {@code isBurning()}
-     */
-    private static int remainingFireTicks(@Nonnull Entity entity) {
-        if (FIRE_FIELD == null) {
-            return entity.isBurning() ? 1 : 0;
-        }
-        try {
-            return FIRE_FIELD.getInt(entity);
-        } catch (IllegalAccessException e) {
-            return entity.isBurning() ? 1 : 0;
-        }
     }
 
     @Override

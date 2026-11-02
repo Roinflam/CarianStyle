@@ -83,11 +83,12 @@ public class EnchantmentBadOmen extends EnchantmentBase {
     }
 
     /**
-     * 放在 NORMAL：凶兆药水的 +25% 挂在 LOW，同一优先级下两者谁先执行没有保证（1.12.2 实测药水先跑）。
-     * 附魔必须先于药水，追加真伤才按未放大的伤害算、第一下挂上的凶兆才能当场生效，和 1.20.1 一致。
+     * 和凶兆药水的 +25% 同在 LOW，附魔必须先于药水：追加真伤按未放大的伤害算、第一下挂上的凶兆当场生效。
+     * 1.12.2 版：同优先级按登记先后执行，而自动订阅的登记顺序不固定，所以药水那边改成在 init 里手动登记，
+     * 排在附魔分发之后（见 {@link pers.roinflam.carianstyle.potion.MobEffectBadOmen}）。
      */
     @Override
-    protected void onHurtAsAttacker(@Nonnull EnchantmentContext ctx, int level) {
+    protected void onHurtAsAttackerLow(@Nonnull EnchantmentContext ctx, int level) {
         // 1.12.2 版保留：排除无视创造模式的伤害（canHarmInCreative，见类注释）
         if (ctx.getDamageSource() != null && ctx.getDamageSource().canHarmInCreative()) {
             return;

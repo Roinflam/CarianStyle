@@ -21,14 +21,12 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.mc112.util.Reflect;
+import pers.roinflam.carianstyle.mc112.util.EntityFireAccess;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import java.lang.reflect.Field;
 import java.util.UUID;
 
 /**
@@ -60,7 +58,6 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
     // 句柄存为 static final，读取时是一次字段访问，可安全用在伤害/tick 路径上。
     // 修改数值后请自行同步修改语言文件中的 enchantment.carianstyle.giant_flame.desc，
     //   否则玩家看到的描述会与实际效果不符。
-
 
     /** 本附魔在数值配置文件中的分组键 */
     private static final String VALUE_ID = "giant_flame";
@@ -105,29 +102,6 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
         super(EnumEnchantmentType.ARMOR_CHEST, new EntityEquipmentSlot[]{EntityEquipmentSlot.CHEST});
     }
 
-    /**
-     * {@code Entity.fire}（剩余燃烧 tick）。私有字段，没有 getter；找不到时为 null，按没着火算。
-     */
-    @Nullable
-    private static final Field FIRE_FIELD = Reflect.fieldOrNull(Entity.class, "fire", "field_190534_ay");
-
-    /**
-     * 剩余燃烧 tick，对应 1.20.1 的 {@code getRemainingFireTicks()}。
-     *
-     * @param entity 实体
-     * @return 剩余燃烧 tick，读不到时为 0
-     */
-    private static int getRemainingFireTicks(@Nonnull Entity entity) {
-        if (FIRE_FIELD == null) {
-            return 0;
-        }
-        try {
-            return FIRE_FIELD.getInt(entity);
-        } catch (IllegalAccessException e) {
-            return 0;
-        }
-    }
-
     private static int getTotalLevel(EntityLivingBase entity) {
         Enchantment giantFlame = EnchantmentRegistry.getEnchantmentByClass(EnchantmentGiantFlame.class);
         if (giantFlame == null) {
@@ -166,7 +140,7 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
 
         EntityLivingBase attacker = (EntityLivingBase) evt.getSource().getImmediateSource();
 
-        if (getRemainingFireTicks(holder) <= 0) {
+        if (EntityFireAccess.getRemainingFireTicks(holder) <= 0) {
             return;
         }
 

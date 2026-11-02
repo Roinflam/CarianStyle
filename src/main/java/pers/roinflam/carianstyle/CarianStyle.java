@@ -21,6 +21,7 @@ import pers.roinflam.carianstyle.mc112.migration.LegacyConfigMigration;
 import pers.roinflam.carianstyle.mc112.util.ServerLifecycle;
 import pers.roinflam.carianstyle.network.NetworkHandler;
 import pers.roinflam.carianstyle.network.VisualNetwork;
+import pers.roinflam.carianstyle.potion.MobEffectBadOmen;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
@@ -150,6 +151,10 @@ public class CarianStyle {
         try {
             // 附魔数据管理器的冷却 / 计数清理（照 1.20.1 commonSetup；类上的自动订阅已经登记过时 Forge 会忽略这次重复登记）
             MinecraftForge.EVENT_BUS.register(EnchantmentDataManager.class);
+
+            // 1.12.2 版：凶兆药水的伤害 / 治疗监听手动登记，排在所有自动订阅（含附魔分发）之后，
+            // 保证同在 LOW 时凶兆附魔先于药水的 +25%（原因见 MobEffectBadOmen 类注释）
+            MinecraftForge.EVENT_BUS.register(MobEffectBadOmen.class);
 
             // 注册叠层显示读取器（HUD 数据源，双端都需要；默认无读取器，接入后才显示）
             LogUtil.info("卡利亚式附魔 - 正在注册叠层显示");
