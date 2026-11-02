@@ -26,19 +26,28 @@ import javax.annotation.Nonnull;
  *
  * <h3>做法</h3>
  * <p>
- * 本模组在这个属性上挂一个永久修饰符 {@link #ID}（加法），数值始终等于「吸收值超出其它来源上限的部分」：
+ * 本模组在这个属性上挂一个永久修饰符 {@link #ID}（加法），记的是「本模组给的那份盾」，只在吸收值低于它时才缩：
  * </p>
  * <ul>
  *   <li>{@link #grant}：把吸收值设成调用方照 1.20.1 原式算好的新值（例如 {@code getAbsorptionAmount() + x}），
- *       先把修饰符设成 {@code max(0, 新值 − 其它来源的上限)}，再 {@code setAbsorptionAmount}；</li>
- *   <li>{@link #afterAbsorb}：伤害阶段扣完吸收之后、以及带这个修饰符的实体每 tick 一次，把修饰符缩回
- *       {@code max(0, 当前吸收 − 其它来源的上限)}，为 0 就移除；</li>
+ *       先把修饰符设成 {@code max(新值 − 其它来源的上限, min(旧修饰符, 新值))}，再 {@code setAbsorptionAmount}；</li>
+ *   <li>{@link #afterAbsorb}：伤害阶段扣完吸收之后、以及带这个修饰符的实体每 tick 一次，把修饰符缩成
+ *       {@code min(旧修饰符, 当前吸收)}，为 0 就移除；</li>
  *   <li>「其它来源的上限」= 去掉本模组修饰符后的属性值，在同一个调用里摘下、取值、按新数值加回
  *       （原版只在 {@code refreshDirtyAttributes} 时按上限夹吸收值，中间不会被夹）。</li>
  * </ul>
+ *
+ * <h3>为什么不按「吸收值 − 其它来源的上限」每 tick 重算</h3>
  * <p>
- * 这样金苹果到期时原版移除它那份上限，吸收值被夹到「当前 − 金苹果那份」，和 1.20.1「减掉 4×(等级+1)」一样；
- * 只有本模组那份已经被打光、吸收值低于原版上限时，按 1.21.1 原版的夹法（夹到新上限）。
+ * 1.21.1 的吸收药水开始时是 {@code max(当前吸收, 4×(等级+1))}，不再往上叠，但上限照样 +4。
+ * 如果每 tick 把修饰符重算成「吸收 − 其它上限」，已经有 20 点盾的实体喝了吸收 I，修饰符会被算成 16；
+ * 药水到期原版扣掉那 4 点上限，盾就从 20 变成 16，喝药反而亏 4 点，看起来像 bug（1.20.1 是先 +4 再 −4，还是 20）。
+ * 所以修饰符只跟着吸收值往下缩，别的来源的上限变化不动它。
+ * </p>
+ * <p>
+ * 已知差别：先吃金苹果、再叠本模组的盾、盾被打掉一部分、然后金苹果到期——1.20.1 是「当前 − 4×(等级+1)」，
+ * 这里吸收值只被夹到「本模组那份」，最多比 1.20.1 多留 4×(等级+1) 点。偏向玩家，实际玩不出来，接受。
+ * 金苹果先吃、盾没挨打就到期的常见情况和 1.20.1 一样（剩本模组给的那份）。
  * </p>
  * <p>
  * 修饰符是永久的，随实体存档；吸收值本身也存档，读档时直接写字段不夹。1.20.1 存下的盾（那时没有这个属性），
@@ -69,13 +78,16 @@ public final class AbsorptionShield {
     public static void grant(@Nonnull LivingEntity entity, float newAbsorption) {
         AttributeInstance attribute = entity.getAttribute(Attributes.MAX_ABSORPTION);
         if (attribute != null) {
-            setExtra(attribute, Math.max(0.0D, (double) newAbsorption - capOther(attribute)));
+            // 已有的那份盾不因这次设值变少（除非新值本身更低），超出其它上限的部分照加
+            double kept = Math.min(currentExtra(attribute), newAbsorption);
+            setExtra(attribute, Math.max(0.0D, Math.max((double) newAbsorption - capOther(attribute), kept)));
         }
         entity.setAbsorptionAmount(newAbsorption);
     }
 
     /**
-     * 吸收值变少之后把本模组那份上限缩回「当前吸收 − 其它来源的上限」，为 0 就移除。没有这个修饰符的实体什么都不做。
+     * 吸收值变少之后把本模组那份上限缩成「min(旧值, 当前吸收)」，为 0 就移除。没有这个修饰符的实体什么都不做。
+     * 只往下缩，其它来源的上限变了也不动（见类注释）。
      *
      * @param entity 实体
      */
@@ -84,11 +96,17 @@ public final class AbsorptionShield {
             return;
         }
         AttributeInstance attribute = entity.getAttribute(Attributes.MAX_ABSORPTION);
-        if (attribute == null || attribute.getModifier(ID) == null) {
+        if (attribute == null) {
             return;
         }
-        double extra = Math.max(0.0D, (double) entity.getAbsorptionAmount() - capOther(attribute));
-        setExtra(attribute, extra);
+        AttributeModifier modifier = attribute.getModifier(ID);
+        if (modifier == null) {
+            return;
+        }
+        double absorption = Math.max(0.0D, entity.getAbsorptionAmount());
+        if (absorption < modifier.amount()) {
+            setExtra(attribute, absorption);
+        }
     }
 
     /**
@@ -104,6 +122,12 @@ public final class AbsorptionShield {
     private static double capOther(AttributeInstance attribute) {
         attribute.removeModifier(ID);
         return attribute.getValue();
+    }
+
+    /** 本模组修饰符现在的数值，没有为 0 */
+    private static double currentExtra(AttributeInstance attribute) {
+        AttributeModifier modifier = attribute.getModifier(ID);
+        return modifier == null ? 0.0D : modifier.amount();
     }
 
     private static void setExtra(AttributeInstance attribute, double extra) {
