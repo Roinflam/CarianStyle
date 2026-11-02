@@ -11,10 +11,12 @@ import net.minecraftforge.fml.common.network.NetworkCheckHandler;
 import net.minecraftforge.fml.common.versioning.DefaultArtifactVersion;
 import net.minecraftforge.fml.common.registry.ForgeRegistries;
 import net.minecraftforge.fml.relauncher.Side;
+import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.*;
 import pers.roinflam.carianstyle.mc112.hook.CreativeTabHook;
+import pers.roinflam.carianstyle.mc112.hook.TradeFilterHook;
 import pers.roinflam.carianstyle.mc112.migration.LegacyConfigMigration;
 import pers.roinflam.carianstyle.mc112.util.ServerLifecycle;
 import pers.roinflam.carianstyle.network.NetworkHandler;
@@ -146,6 +148,9 @@ public class CarianStyle {
         LogUtil.info("卡利亚式附魔 - 开始初始化阶段");
 
         try {
+            // 附魔数据管理器的冷却 / 计数清理（照 1.20.1 commonSetup；类上的自动订阅已经登记过时 Forge 会忽略这次重复登记）
+            MinecraftForge.EVENT_BUS.register(EnchantmentDataManager.class);
+
             // 注册叠层显示读取器（HUD 数据源，双端都需要；默认无读取器，接入后才显示）
             LogUtil.info("卡利亚式附魔 - 正在注册叠层显示");
             CarianStyleStackDisplays.init();
@@ -177,6 +182,9 @@ public class CarianStyle {
         try {
             // 所有附魔类的静态块都已经跑过，define 句柄齐了，这时读数值文件不会缺键
             EnchantmentValues.reload();
+
+            // 别的模组的职业和交易在 init 阶段登记完，这时替换原版附魔书交易
+            TradeFilterHook.install();
 
             // 加载并验证配置
             LogUtil.info("卡利亚式附魔 - 正在验证配置文件");
@@ -304,10 +312,6 @@ public class CarianStyle {
 
     /**
      * 执行最终验证
-     * <p>
-     * 药水、实体缺了直接报错退出；附魔一个都没有时只记一条错误日志，不中断加载
-     * （禁用、扫描出错都只影响附魔本身，方块、药水、网络照常可用，方便排查）。
-     * </p>
      */
     private void performFinalValidation() {
         LogUtil.debug("卡利亚式附魔 - 正在执行最终验证");
@@ -316,6 +320,7 @@ public class CarianStyle {
 
         if (CarianStyleEnchantments.getRegisteredCount() == 0) {
             LogUtil.error("卡利亚式附魔 - 错误：没有附魔被注册");
+            isValid = false;
         }
 
         if (CarianStylePotion.MOB_EFFECTS.getEntries().isEmpty()) {

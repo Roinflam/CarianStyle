@@ -1,7 +1,10 @@
 package pers.roinflam.carianstyle.mc112.util;
 
 import net.minecraftforge.fml.common.event.FMLServerStoppedEvent;
+import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
+import pers.roinflam.carianstyle.utils.helper.AttackCooldownHelper;
+import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
 
 import javax.annotation.Nonnull;
 
@@ -27,5 +30,8 @@ public final class ServerLifecycle {
      */
     public static void onServerStopped(@Nonnull FMLServerStoppedEvent event) {
         ClientSyncEffectManager.clearServerCache();
+        AttackCooldownHelper.onServerStopped(event);
+        EnchantmentDataManager.clearAll();
+        DamageOverTimeManager.clearAll();
     }
 }
