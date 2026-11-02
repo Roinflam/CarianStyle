@@ -34,7 +34,26 @@ import java.util.Stack;
  * <p>
  * NeoForge 在 {@code hurt} 里给每一下压一个 {@link DamageContainer}，之后整条流程以它的 {@code newDamage} 为准
  * （盾、无敌帧扣掉的部分都记在里面）。受伤、伤害阶段从栈顶容器读数、把结果写回，
- * 原版紧接着读的就是容器里的值。伤害阶段里嵌套 {@code hurt}（再打一下）会压自己的容器，栈顶永远是当前这一下。
+ * 原版紧接着读的就是容器里的值。阶段里嵌套 {@code hurt}（再打一下）会压自己的容器，正常结束时自己弹掉。
+ * </p>
+ *
+ * <h3>嵌套那一下被取消时的漏栈</h3>
+ * <p>
+ * <b>问题</b>：NeoForge 的 {@code hurt} 先压容器、再发 {@code LivingIncomingDamageEvent}，事件被取消就直接返回，
+ * 不弹容器（{@code LivingEntity.hurt} 1124～1125 行）。二段斩在受伤阶段、雷龙在伤害阶段里对同一个目标再 {@code hurt} 一下，
+ * 那一下要是被别的模组取消（闪避、限时无敌、伤害类型免疫），它的容器就留在栈顶，
+ * 回到这一下的 {@code actuallyHurt} 后护甲、吸收、扣血读的全是那个容器，扣的血变成追加那一下的数，栈还越压越深。
+ * 1.20.1 的事件按对象传数，没有这个问题。
+ * </p>
+ * <p>
+ * <b>为什么这么改</b>：发事件前记下栈的深度，发完把多出来的容器弹掉，栈顶回到这一下自己的容器。
+ * 不管嵌套几层、是谁取消的都能恢复；嵌套那一下正常结束时本来就弹干净了，什么也不做。
+ * 不去包 NeoForge 那次调用：那要 {@code @Redirect}，会和别的模组对同一处的改动冲突。
+ * </p>
+ * <p>
+ * <b>行为影响</b>：只在嵌套那一下被取消时有区别，主这一下按自己的数扣血，和 1.20.1 一致。
+ * 不在本模组阶段里发生的取消（别的模组直接取消一次普通攻击）仍会在这个实体上漏一个容器，那是 NeoForge 自己的行为，
+ * 下一次 {@code hurt} 压的是新容器，读数不受影响。
  * </p>
  */
 public final class DamageStages {
@@ -68,7 +87,9 @@ public final class DamageStages {
             return false;
         }
         DamageContainer container = containers.peek();
+        int depth = containers.size();
         LivingHurtEvent event = NeoForge.EVENT_BUS.post(new LivingHurtEvent(entity, source, container.getNewDamage()));
+        dropLeaked(containers, depth);
         if (event.isCanceled() || event.getAmount() <= 0) {
             container.setNewDamage(0);
             return true;
@@ -90,8 +111,19 @@ public final class DamageStages {
             return;
         }
         DamageContainer container = containers.peek();
+        int depth = containers.size();
         LivingDamageEvent event = NeoForge.EVENT_BUS.post(new LivingDamageEvent(entity, source, container.getNewDamage()));
+        dropLeaked(containers, depth);
         container.setNewDamage(event.isCanceled() ? 0 : event.getAmount());
         AbsorptionShield.afterAbsorb(entity);
+    }
+
+    /**
+     * 把监听者里嵌套 {@code hurt} 被取消后留下的容器弹掉，栈回到发事件前的深度（见类注释「嵌套那一下被取消时的漏栈」）。
+     */
+    private static void dropLeaked(@Nonnull Stack<DamageContainer> containers, int depth) {
+        while (containers.size() > depth) {
+            containers.pop();
+        }
     }
 }
