@@ -8,6 +8,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.item.ItemShield;
 import net.minecraft.item.ItemStack;
@@ -20,6 +21,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
 import net.minecraft.enchantment.Enchantment;
 import javax.annotation.Nonnull;
 
@@ -149,7 +151,9 @@ public class EnchantmentScholarShield extends EnchantmentBase {
             return;
         }
 
-        if (evt.getSource().getImmediateSource() == null) {
+        // 1.20.1 是「没有直接实体就跳过」；辉剑伤害在 1.20.1 没有直接实体，1.12.2 填的是剑本身，一并跳过
+        Entity direct = evt.getSource().getImmediateSource();
+        if (direct == null || direct instanceof EntityGlintblades) {
             return;
         }
 

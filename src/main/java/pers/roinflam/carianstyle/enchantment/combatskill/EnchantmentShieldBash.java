@@ -13,6 +13,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
 
@@ -100,7 +101,7 @@ public class EnchantmentShieldBash extends EnchantmentBase {
         // 击退攻击者
         double x = holder.posX - attacker.posX;
         double z = holder.posZ - attacker.posZ;
-        attacker.knockBack(holder, level * (float) KNOCKBACK_PER_LEVEL.get(), x, z);
+        EntityLivingUtil.knockBack(attacker, holder, level * (float) KNOCKBACK_PER_LEVEL.get(), x, z);
 
         // v2.2：播放「前向扇形冲击波」自绘特效。
         // 位置与朝向都取持有者——冲击波是从盾面推出去的（详见类注释）

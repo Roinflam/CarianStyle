@@ -26,6 +26,7 @@ import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.mc112.damage.GlintbladeDamageSource;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 
 /**
@@ -230,9 +231,9 @@ public class EnchantmentCarianRetaliation extends EnchantmentBase {
                             .setTrackingStrength((float) TRACKING_STRENGTH.get())
                             .setMaxLifetime(100);
 
-                    // 1.12.2 版：投掷伤害源的直接实体不能为空（原版取伤害位置、死亡信息时会空指针），
-                    // 所以直接实体填这把剑本身；1.20.1 版直接实体为空。
-                    attackBlade.setDamageSource(DamageSource.causeThrownDamage(attackBlade, holder));
+                    // 1.12.2 版：1.20.1 是 thrown(null, holder)，直接实体为空。这里直接实体填这把剑本身（死亡信息、
+                    // 别的模组取实体都要它），伤害位置和难度缩放由 GlintbladeDamageSource 对回 1.20.1：盾牌挡不住
+                    attackBlade.setDamageSource(new GlintbladeDamageSource(attackBlade, holder));
                     DamageSourceUtil.setMagicDamage(attackBlade.getDamageSource());
 
                     attackBlade.setPosition(launchX, launchY, launchZ);

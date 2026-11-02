@@ -11,9 +11,11 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.ItemPickaxe;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.init.Blocks;
 import net.minecraft.init.Enchantments;
 import net.minecraft.world.World;
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockStone;
 import net.minecraft.block.state.IBlockState;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.world.BlockEvent;
@@ -167,12 +169,12 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
      *
      * @param world       世界
      * @param center      起点坐标（不含于结果列表中）
-     * @param targetBlock 目标方块类型
+     * @param targetState 起点方块的状态（按 {@link #sameKind} 比较）
      * @param maxRadius   最大扩散半径（切比雪夫距离）
      * @return 需要破坏的连通同类方块坐标列表
      */
     private static List<BlockPos> findConnectedBlocks(
-            World world, BlockPos center, Block targetBlock, int maxRadius) {
+            World world, BlockPos center, IBlockState targetState, int maxRadius) {
 
         List<BlockPos> result = new ArrayList<>();
 
@@ -218,7 +220,7 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
 
                 // 使用 MutableBlockPos 查询方块状态，避免为每个邻居创建新 BlockPos
                 mutablePos.setPos(nx, ny, nz);
-                if (world.getBlockState(mutablePos).getBlock().equals(targetBlock)) {
+                if (sameKind(world.getBlockState(mutablePos), targetState)) {
                     // 确认需要破坏时才创建不可变 BlockPos 加入结果
                     result.add(new BlockPos(nx, ny, nz));
                     queue.add(new int[]{nx, ny, nz});
@@ -230,14 +232,46 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
     }
 
     /**
+     * 亮的红石矿归到普通红石矿
+     * <p>1.12.2 开始挖红石矿时 {@code onBlockClicked} 就把它换成了另一个方块 {@code LIT_REDSTONE_ORE}，
+     * 1.20.1 亮不亮只是同一个方块的 {@code LIT} 属性，不归一的话整条矿脉连不起来。</p>
+     */
+    private static Block normalize(Block block) {
+        return block == Blocks.LIT_REDSTONE_ORE ? Blocks.REDSTONE_ORE : block;
+    }
+
+    /**
+     * 两个方块状态是不是「同一种方块」（对应 1.20.1 的同一个 {@code Block}）
+     * <p>
+     * 1.12.2 还没扁平化：花岗岩 / 闪长岩 / 安山岩和它们的磨制版、16 色混凝土和陶瓦、石砖的苔石 / 裂纹 / 錾制、
+     * 砂岩和石英的变种都是同一个 {@code Block} 的不同元数据，只比 {@code Block} 会顺着连到别的颜色、别的变种。
+     * 再比一次 {@code damageDropped}：它只看变种，不看原木轴向、石英柱方向、台阶上下半这些摆放属性，
+     * 正好对应 1.20.1 的方块 id。泥土和灰化土的 {@code damageDropped} 都是 0，会被当成一种，影响很小，不单独处理。
+     * </p>
+     */
+    private static boolean sameKind(IBlockState state, IBlockState target) {
+        Block a = normalize(state.getBlock());
+        Block b = normalize(target.getBlock());
+        return a == b && a.damageDropped(state) == b.damageDropped(target);
+    }
+
+    /**
      * 判断指定方块是否属于常见废石，需要在配置开启时抑制掉落
+     * <p>1.12.2 的 {@code minecraft:stone} 还包着花岗岩、闪长岩、安山岩和三种磨制版；磨制版在 1.20.1 是
+     * {@code polished_*}，不在废石列表里，这里只认石头本身和三种原石。</p>
      *
-     * @param block 要检查的方块
+     * @param state 要检查的方块状态
      * @return 如果配置开启且方块在废石列表中则返回 true
      */
-    private static boolean shouldSuppressDrop(Block block) {
+    private static boolean shouldSuppressDrop(IBlockState state) {
         if (!ConfigLoader.rockBlasterSuppressCommonDrops) {
             return false;
+        }
+        Block block = state.getBlock();
+        if (block == Blocks.STONE) {
+            BlockStone.EnumType variant = state.getValue(BlockStone.VARIANT);
+            return variant == BlockStone.EnumType.STONE || variant == BlockStone.EnumType.GRANITE
+                    || variant == BlockStone.EnumType.DIORITE || variant == BlockStone.EnumType.ANDESITE;
         }
         // 从注册表获取方块的注册名进行匹配
         net.minecraft.util.ResourceLocation key = block.getRegistryName();
@@ -310,10 +344,10 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
             return;
         }
 
-        Block targetBlock = evt.getState().getBlock();
+        IBlockState targetState = evt.getState();
 
         // BFS 查找连通同类方块
-        List<BlockPos> targets = findConnectedBlocks(world, centerPos, targetBlock, radius);
+        List<BlockPos> targets = findConnectedBlocks(world, centerPos, targetState, radius);
 
         if (targets.isEmpty()) {
             return;
@@ -323,7 +357,7 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
         int fortuneLevel = EnchantmentHelper.getEnchantmentLevel(Enchantments.FORTUNE, tool);
 
         // 提前判断目标方块是否需要抑制掉落物（同一批 BFS 结果全是同类方块，只需判断一次）
-        boolean suppressDrop = shouldSuppressDrop(targetBlock);
+        boolean suppressDrop = shouldSuppressDrop(targetState);
 
         for (BlockPos pos : targets) {
 
@@ -341,7 +375,7 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
                 Block block = blockState.getBlock();
 
                 // 二次校验，防止 BFS 之后方块已被其他逻辑移除
-                if (!block.equals(targetBlock)) {
+                if (!sameKind(blockState, targetState)) {
                     continue;
                 }
 

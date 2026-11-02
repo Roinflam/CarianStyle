@@ -49,10 +49,10 @@ import java.util.Set;
  * 因此这里直接不设锚点即可，行为一致且少一次同步写入。
  * </p>
  * <p>
- * 1.12.2 版：1.20.1 的伤害是间接魔法（{@code indirectMagic(null, hurter)}，无视护甲但盾牌能挡）。
- * 1.12.2 原版的 {@code causeIndirectMagicDamage} 一造出来就无视护甲，盾牌也跟着失效，直接实体为空时
- * 打到举盾的目标还会空指针，所以这里另造一个间接魔法源（见 {@link #indirectMagic}）：直接实体是攻击剑，
- * 来源是死者，受伤阶段才无视护甲，盾牌照样能挡。
+ * 1.12.2 版：1.20.1 的伤害是间接魔法（{@code indirectMagic(null, hurter)}）。{@code indirect_magic} 在
+ * {@code bypasses_armor} 里，原版 {@code bypasses_shield} 又包含 {@code #bypasses_armor}，所以无视护甲也无视盾牌
+ * （况且直接实体为空，没有来源位置，本来也挡不住）。这里另造一个间接魔法源（见 {@link #indirectMagic}）：
+ * 直接实体是攻击剑、来源是死者，构造时就无视护甲，盾牌跟着失效，死亡信息键、女巫减伤、饥饿消耗 0 照 1.20.1。
  * </p>
  *
  * @author RoinFlam
@@ -237,7 +237,7 @@ public class EnchantmentGreatbladePhalanx extends EnchantmentBase {
 
     /**
      * 间接魔法伤害（对应 1.20.1 的 {@code damageSources().indirectMagic}）。
-     * <p>死亡信息键沿用原版的 {@code indirectMagic}；无视护甲推迟到受伤阶段，盾牌照样能挡（见类注释）。</p>
+     * <p>死亡信息键沿用原版的 {@code indirectMagic}；构造时就无视护甲，盾牌挡不住（见类注释）。</p>
      *
      * @param direct 直接造成伤害的实体（攻击剑）
      * @param owner  真正的来源（死者）
@@ -248,7 +248,7 @@ public class EnchantmentGreatbladePhalanx extends EnchantmentBase {
         CarianEntityDamageSource source = new CarianEntityDamageSource(
                 "minecraft:indirect_magic", "indirectMagic", direct, owner, INDIRECT_MAGIC_TAGS, 0.0F, false);
         source.setMagicDamage();
-        source.setBypassesArmorAtHurt(true);
+        source.setDamageBypassesArmor();
         return source;
     }
 

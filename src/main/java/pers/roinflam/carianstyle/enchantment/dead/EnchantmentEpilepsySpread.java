@@ -296,7 +296,7 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
                     double z = hurter.posZ - entityLivingBase.posZ;
                     float stronge = (float) (level * KNOCKBACK_PER_LEVEL.get()
                             * Math.max(Math.abs(x), Math.abs(z)) / 14);
-                    entityLivingBase.knockBack(hurter, stronge, x, z);
+                    EntityLivingUtil.knockBack(entityLivingBase, hurter, stronge, x, z);
                 }
                 hitCount++;
             }

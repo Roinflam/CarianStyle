@@ -308,7 +308,7 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
             double z = hurter.posZ - entityLivingBase.posZ;
             float stronge = (float) (level * KNOCKBACK_STRENGTH_PER_LEVEL.get()
                             * Math.max(Math.abs(x), Math.abs(z)) / 14);
-            entityLivingBase.knockBack(hurter, stronge, x, z);
+            EntityLivingUtil.knockBack(entityLivingBase, hurter, stronge, x, z);
             knockbackHitCount++;
         }
 
@@ -347,7 +347,7 @@ public class EnchantmentScarletLonia extends EnchantmentBase {
                         // 第二次击退方向原本就正确（hurter - entity）
                         double x = hurter.posX - entityLivingBase.posX;
                         double z = hurter.posZ - entityLivingBase.posZ;
-                        entityLivingBase.knockBack(hurter, finalLevel * (float) FINAL_KNOCKBACK_PER_LEVEL.get(), x, z);
+                        EntityLivingUtil.knockBack(entityLivingBase, hurter, finalLevel * (float) FINAL_KNOCKBACK_PER_LEVEL.get(), x, z);
                         damageHitCount++;
                     }
                 }

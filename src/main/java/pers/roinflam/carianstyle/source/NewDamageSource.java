@@ -32,8 +32,9 @@ import java.util.Set;
  *   <li>{@code bypasses_effects}（抗性和保护附魔都不算）→ 绝对伤害；</li>
  *   <li>{@code bypasses_resistance}（只无视抗性）→ 绝对伤害，保护附魔由 {@code DamageStageHook} 在受伤事件里补算；</li>
  *   <li>{@code witch_resistant_to} → 魔法伤害（女巫减免）；</li>
- *   <li>{@code bypasses_armor} → 没有实体的源构造时直接打开「无视护甲」（没有来源位置，盾牌本来就挡不住）；
- *       有实体的源只打「受伤阶段再无视护甲」标记，盾牌照常检查，和 1.20.1 一样。</li>
+ *   <li>{@code bypasses_armor} → 构造时直接打开「无视护甲」，有没有实体都一样。1.12.2 这个开关同时让盾牌失效，
+ *       而 1.20.1 原版的 {@code bypasses_shield} 包含 {@code #bypasses_armor}，类型本身在 {@code bypasses_armor}
+ *       里的伤害盾牌也挡不住，两边一致。</li>
  * </ul>
  * <p>
  * 使用示例：
@@ -184,7 +185,10 @@ public class NewDamageSource {
         } else {
             CarianEntityDamageSource entitySource = new CarianEntityDamageSource(damageTypeKey, type.msgId, direct,
                     causingEntity, type.tags, type.exhaustion, type.scaling);
-            entitySource.setBypassesArmorAtHurt(type.tags.contains(DamageTags.BYPASSES_ARMOR));
+            if (type.tags.contains(DamageTags.BYPASSES_ARMOR)) {
+                // 1.20.1 的 bypasses_shield 包含 #bypasses_armor：类型自带无视护甲的，盾牌也挡不住
+                entitySource.setDamageBypassesArmor();
+            }
             source = entitySource;
         }
         if (type.tags.contains(DamageTags.BYPASSES_EFFECTS) || type.tags.contains(DamageTags.BYPASSES_RESISTANCE)

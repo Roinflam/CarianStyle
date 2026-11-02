@@ -12,6 +12,7 @@ import net.minecraftforge.event.entity.living.*;
 import net.minecraftforge.event.entity.player.CriticalHitEvent;
 import pers.roinflam.carianstyle.mc112.damage.DamageTags;
 import pers.roinflam.carianstyle.utils.util.DayNightUtil;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -454,7 +455,7 @@ public class EnchantmentContext {
             // knockback内部取反后，对手被推向远离holder的方向
             double dx = enchantmentHolder.posX - opponent.posX;
             double dz = enchantmentHolder.posZ - opponent.posZ;
-            opponent.knockBack(enchantmentHolder, (float) strength, dx, dz);
+            EntityLivingUtil.knockBack(opponent, enchantmentHolder, (float) strength, dx, dz);
         }
     }
 
@@ -472,7 +473,7 @@ public class EnchantmentContext {
             // 修复：方向应为 holder - target（从target指向holder）
             double dx = enchantmentHolder.posX - target.posX;
             double dz = enchantmentHolder.posZ - target.posZ;
-            target.knockBack(enchantmentHolder, (float) strength, dx, dz);
+            EntityLivingUtil.knockBack(target, enchantmentHolder, (float) strength, dx, dz);
         }
     }
 

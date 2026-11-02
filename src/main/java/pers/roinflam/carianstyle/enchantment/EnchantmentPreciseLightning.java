@@ -30,6 +30,8 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
 
 /**
  * 精准落雷附魔
@@ -143,7 +145,7 @@ public class EnchantmentPreciseLightning extends EnchantmentBase {
                 if (attacker.onGround) {
                     double x = RandomUtils.nextBoolean() ? victim.posX - attacker.posX : attacker.posX - victim.posX;
                     double z = RandomUtils.nextBoolean() ? victim.posZ - attacker.posZ : attacker.posZ - victim.posZ;
-                    attacker.knockBack(victim, (float) KNOCKBACK_STRENGTH.get(), x, z);
+                    EntityLivingUtil.knockBack(attacker, victim, (float) KNOCKBACK_STRENGTH.get(), x, z);
                 }
             }
         }.start();
@@ -153,8 +155,13 @@ public class EnchantmentPreciseLightning extends EnchantmentBase {
      * 是不是投射物。
      * <p>1.12.2 版：没有 1.20.1 那样统一的投射物基类，箭、雪球这类实现 {@link IProjectile}，
      * 火球和潜影贝的子弹不实现，这里一并算上，范围和 1.20.1 的 {@code Projectile} 对齐。</p>
+     * <p>辉剑（{@code EntityGlintblades}）不算：1.20.1 里辉剑的伤害没有直接实体，不会触发；
+     * 1.12.2 为了死亡信息和兼容把直接实体填成了剑，剑又是 {@code EntityThrowable}，要单独排除。</p>
      */
     private static boolean isProjectile(@Nullable Entity entity) {
+        if (entity instanceof EntityGlintblades) {
+            return false;
+        }
         return entity instanceof IProjectile
                 || entity instanceof EntityFireball
                 || entity instanceof EntityShulkerBullet;

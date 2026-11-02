@@ -161,7 +161,11 @@ public class EnchantmentFireDevoured extends EnchantmentBase {
             if (hitCount >= MAX_TARGETS.getInt()) {
                 break;
             }
-            entity.attackEntityFrom(DamageSource.IN_FIRE, damage);
+            // 免火生物在 1.20.1 对 is_fire 伤害无敌；1.12.2 的 attackEntityFrom 不看 isImmuneToFire，要自己判。
+            // 计数照旧（1.20.1 里 hurt 返回 false 也算一个目标）；点燃对免火生物没效果，照旧
+            if (!entity.isImmuneToFire()) {
+                entity.attackEntityFrom(DamageSource.IN_FIRE, damage);
+            }
             if (EntityFireAccess.getRemainingFireTicks(entity) < 200) {
                 entity.setFire(IGNITE_SECONDS.getInt());
             }

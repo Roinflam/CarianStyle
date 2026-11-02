@@ -149,6 +149,12 @@ public class EnchantmentGiantFlame extends EnchantmentBase {
             return;
         }
 
+        // 1.20.1 的 isInvulnerableTo 让免火生物对 is_fire 伤害无敌；1.12.2 的 attackEntityFrom 不看 isImmuneToFire，
+        // 烈焰人、岩浆怪、僵尸猪人、恶魂、凋灵骷髅这些会照吃反伤，这里先判掉
+        if (attacker.isImmuneToFire()) {
+            return;
+        }
+
         attacker.attackEntityFrom(DamageSource.IN_FIRE,
                     evt.getAmount() * (float) REFLECT_RATIO.get());
     }

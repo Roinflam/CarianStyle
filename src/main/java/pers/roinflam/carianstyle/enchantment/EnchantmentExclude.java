@@ -21,6 +21,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.network.AoeEffectPacket;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
 import javax.annotation.Nonnull;
 import java.util.List;
@@ -190,7 +191,7 @@ public class EnchantmentExclude extends EnchantmentBase {
             }
             double x = victim.posX - target.posX;
             double z = victim.posZ - target.posZ;
-            target.knockBack(victim, (float) KNOCKBACK_STRENGTH.get(), x, z);
+            EntityLivingUtil.knockBack(target, victim, (float) KNOCKBACK_STRENGTH.get(), x, z);
             hitCount++;
         }
     }

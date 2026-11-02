@@ -28,6 +28,7 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import java.util.List;
 
@@ -184,7 +185,7 @@ public class EnchantmentCallStar extends EnchantmentBase {
             double z = entity.posZ - arrow.posZ;
             float strength = (float) (effectiveLevel * (float) ATTRACT_STRENGTH_PER_LEVEL.get()
                 * Math.max(Math.abs(x), Math.abs(z)) / 7);
-            entity.knockBack(attacker, strength, x, z);
+            EntityLivingUtil.knockBack(entity, attacker, strength, x, z);
             attractHitCount++;
         }
 
@@ -222,7 +223,7 @@ public class EnchantmentCallStar extends EnchantmentBase {
                         if (target.onGround) {
                             double x = RandomUtils.nextBoolean() ? arrow.posX - target.posX : target.posX - arrow.posX;
                             double z = RandomUtils.nextBoolean() ? arrow.posZ - target.posZ : target.posZ - arrow.posZ;
-                            target.knockBack(attacker, 0.2f, x, z);
+                            EntityLivingUtil.knockBack(target, attacker, 0.2f, x, z);
                         }
                         hitCount++;
                     }

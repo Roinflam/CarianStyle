@@ -28,9 +28,10 @@ public interface ICarianDamageSource {
     /**
      * 是否要在受伤阶段才打开「无视护甲」
      * <p>
-     * 1.12.2 的「无视护甲」开关同时让盾牌失效（盾牌检查要求 {@code !isUnblockable()}），
-     * 1.20.1 的 {@code bypasses_armor} 不影响盾牌。带实体的伤害源先不开这个开关，
-     * 等盾牌检查过了、{@code LivingHurtEvent} 时再开，效果就和 1.20.1 一样「无视护甲、盾牌照挡」。
+     * 1.12.2 的「无视护甲」开关同时让盾牌失效（盾牌检查要求 {@code !isUnblockable()}）。
+     * 需要「无视护甲、盾牌照挡」的带实体伤害源先不开这个开关，等盾牌检查过了、{@code LivingHurtEvent} 时再开。
+     * 注意类型本身就在 1.20.1 {@code bypasses_armor} 里的不该用这个标记：1.20.1 的 {@code bypasses_shield}
+     * 包含 {@code #bypasses_armor}，那种伤害盾牌本来就挡不住，构造时直接开开关即可。
      * </p>
      *
      * @return 受伤阶段要不要打开无视护甲

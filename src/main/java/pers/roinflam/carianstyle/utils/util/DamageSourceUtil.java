@@ -22,7 +22,9 @@ import java.lang.reflect.Field;
  * <p>
  * 时机要注意：1.12.2 的「无视护甲」开关同时让盾牌失效。在 {@code LivingAttackEvent} 或更早打开，
  * 等于「无视护甲 + 无视盾牌」；在 {@code LivingHurtEvent} 里打开只无视护甲（盾牌检查已经过了），
- * 这正是 1.20.1 {@code bypasses_armor} 的效果，所以附魔照 1.20.1 在 {@code onHurtAsAttacker} 里调 {@link #setBypassesArmor} 即可。
+ * 和 1.20.1 在受伤阶段临时挂 {@code bypasses_armor} 的效果一样，所以附魔照 1.20.1 在 {@code onHurtAsAttacker} 里调
+ * {@link #setBypassesArmor} 即可。类型本身在 {@code bypasses_armor} 里的伤害不同：1.20.1 的 {@code bypasses_shield}
+ * 包含 {@code #bypasses_armor}，盾牌也挡不住，要在造伤害源时就打开。
  * </p>
  * <p>
  * {@code DamageSource.MAGIC} 这类全服共享的单例一律不改（见 {@link DamageTags} 的类注释），改了会影响以后所有同类伤害。

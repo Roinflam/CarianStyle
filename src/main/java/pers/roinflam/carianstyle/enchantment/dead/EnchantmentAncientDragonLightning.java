@@ -17,6 +17,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
+import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
 
 import javax.annotation.Nonnull;
@@ -345,7 +346,7 @@ public class EnchantmentAncientDragonLightning extends EnchantmentBase {
                         double z = RandomUtils.nextBoolean() ?
                                 hurter.posZ - entityLivingBase.posZ :
                                 entityLivingBase.posZ - hurter.posZ;
-                        entityLivingBase.knockBack(hurter, (float) KNOCKBACK_STRENGTH.get(), x, z);
+                        EntityLivingUtil.knockBack(entityLivingBase, hurter, (float) KNOCKBACK_STRENGTH.get(), x, z);
                     }
                 }
             }.start();

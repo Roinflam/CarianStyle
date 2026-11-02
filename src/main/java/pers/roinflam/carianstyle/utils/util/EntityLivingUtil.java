@@ -1,9 +1,13 @@
 package pers.roinflam.carianstyle.utils.util;
 
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.network.datasync.DataParameter;
 import net.minecraft.network.datasync.EntityDataManager;
 import net.minecraft.util.DamageSource;
+import net.minecraftforge.common.ForgeHooks;
+import net.minecraftforge.event.entity.living.LivingKnockBackEvent;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
 import pers.roinflam.carianstyle.mc112.math.Mth;
@@ -77,6 +81,67 @@ public class EntityLivingUtil {
             this.method = method;
             this.accessor = accessor;
             this.isFloat = isFloat;
+        }
+    }
+
+    // ========== 击退 ==========
+
+    /**
+     * 水平方向长度平方的下限，对应 1.20.1 {@code Vec3.normalize} 的长度下限 1.0E-4（平方即 1.0E-8）。
+     */
+    private static final double KNOCKBACK_MIN_RATIO_SQR = 1.0E-8D;
+
+    /**
+     * 击退（对应 1.20.1 的 {@code LivingEntity.knockback}）
+     * <p>
+     * 1.12.2 的 {@code EntityLivingBase.knockBack} 直接用 (x, z) 除以它自己的长度，没有判零：
+     * 两个实体水平坐标完全重合（最常见的是骑乘，坐骑和乘客的 x / z 一模一样）时算出 NaN 速度，
+     * 生物会卡死在原地、NaN 还会写进存档，骑在上面的玩家随后发 NaN 移动包被服务端踢掉。
+     * 原版自己的受击击退在 {@code attackEntityFrom} 里另有随机抖动兜底，模组直接调就没有这层保护。
+     * </p>
+     * <p>
+     * 1.20.1 遇到零向量时归一化得零，只把水平速度减半、在地面上时往上弹一下；强度不大于 0 时什么都不做。
+     * 这里方向和强度都正常时照常调 {@code knockBack}（保留实体自己的覆写），否则按 1.20.1 的结果手动处理：
+     * 先发一次 {@code LivingKnockBackEvent}，强度不大于 0 就停，击退抗性照 1.12.2 的写法掷骰。
+     * </p>
+     *
+     * @param target   被击退的实体
+     * @param attacker 击退来源（事件里用）
+     * @param strength 强度
+     * @param x        方向 x（会被取反，和原版一样）
+     * @param z        方向 z
+     */
+    public static void knockBack(@Nonnull EntityLivingBase target, @Nullable Entity attacker,
+                                 float strength, double x, double z) {
+        if (strength > 0.0F && x * x + z * z >= KNOCKBACK_MIN_RATIO_SQR) {
+            target.knockBack(attacker, strength, x, z);
+            return;
+        }
+        LivingKnockBackEvent event = ForgeHooks.onLivingKnockBack(target, attacker, strength, x, z);
+        if (event.isCanceled()) {
+            return;
+        }
+        float s = event.getStrength();
+        double ex = event.getRatioX();
+        double ez = event.getRatioZ();
+        if (s <= 0.0F) {
+            return;
+        }
+        if (target.getRNG().nextDouble() < target.getEntityAttribute(SharedMonsterAttributes.KNOCKBACK_RESISTANCE).getAttributeValue()) {
+            return;
+        }
+        target.isAirBorne = true;
+        target.motionX /= 2.0D;
+        target.motionZ /= 2.0D;
+        // 监听器可能改了方向，改成非零的照常推
+        double lenSqr = ex * ex + ez * ez;
+        if (lenSqr >= KNOCKBACK_MIN_RATIO_SQR) {
+            double len = Math.sqrt(lenSqr);
+            target.motionX -= ex / len * s;
+            target.motionZ -= ez / len * s;
+        }
+        if (target.onGround) {
+            target.motionY = Math.min(0.4D, target.motionY / 2.0D + s);
         }
     }
 
