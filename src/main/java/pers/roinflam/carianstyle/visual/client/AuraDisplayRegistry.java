@@ -311,6 +311,10 @@ public final class AuraDisplayRegistry {
                 }
                 boolean isArmor = slot.getType() == EquipmentSlot.Type.HUMANOID_ARMOR;
                 for (Map.Entry<EnchantmentBase, Integer> e : EnchantmentLevels.all(stack).entrySet()) {
+                    // 和效果一致：只认附魔适用的槽位（拿在手上的护甲不显示），见 EnchantmentBase#worksIn
+                    if (!e.getKey().worksIn(slot)) {
+                        continue;
+                    }
                     levels.merge(e.getKey(), e.getValue(), Math::max);
                     if (isArmor) {
                         // 仅护甲槽：同时维护“最高等级”与“等级之和”两套口径

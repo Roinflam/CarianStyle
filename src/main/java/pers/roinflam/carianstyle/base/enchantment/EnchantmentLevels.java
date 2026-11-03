@@ -4,7 +4,6 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import net.minecraft.core.Holder;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 
@@ -33,8 +32,7 @@ import java.util.Map;
  *       查表 Holder 是 {@link EnchantmentBase} 里按注册表键建的 {@code DeferredHolder}：NeoForge 给
  *       {@code Holder.Reference} 和 {@code DeferredHolder} 都补了按键的 {@code equals / hashCode}，
  *       组件内部是按 Holder 查的哈希表，所以不用拿世界里的真 Holder 也能查到。</li>
- *   <li>{@link #all}：附魔书读 {@code stored_enchantments}，其它读 {@code enchantments}（和 1.20.1 的
- *       {@code EnchantmentHelper.getEnchantments} 一样），按注册表键换成行为对象，不是本模组的跳过。</li>
+ *   <li>{@link #all}：同样只读物品自身的 {@code enchantments} 组件，按注册表键换成行为对象，不是本模组的跳过。</li>
  * </ul>
  *
  * <h3>为什么不走 {@code stack.getEnchantmentLevel(holder)}</h3>
@@ -44,9 +42,20 @@ import java.util.Map;
  * 读原始数据的代价：别的模组物品覆写等级钩子给本模组附魔加的等级，1.21.1 不生效（1.20.1 生效）。实际影响很小。
  * </p>
  *
- * <h3>行为说明</h3>
+ * <h3>附魔书不算</h3>
  * <p>
- * {@link #all} 照 1.20.1：主手拿附魔书时书里存的附魔也算进来（老问题，三个版本一起修，这里不改）。
+ * <b>问题</b>：1.20.1 的 {@code EnchantmentHelper.getEnchantments} 对附魔书读书里存的附魔，照搬过来时 {@link #all}
+ * 用的是 1.21.1 对应的 {@code getEnchantmentsForCrafting}。所有「拿在手上 / 穿在身上就生效」的扫描都经过 {@link #all}
+ * （玩家装备缓存、死亡 / 治疗 / 暴击扫描、药水效果修正、光环显示），结果主手拿一本暗月附魔书就有夜视，
+ * 拿其它附魔书也一样会触发对应效果。
+ * </p>
+ * <p>
+ * <b>为什么这么改</b>：附魔书是用来在铁砧上转移附魔的材料，不是装备。{@link #all} 只给「这件装备身上有什么附魔」用，
+ * 改成读 {@code getTagEnchantments()}（物品自身的 {@code enchantments} 组件），和 {@link #get} 口径一致。
+ * 要看书里存了什么的地方（图鉴、物品筛选）自己调 {@code getEnchantmentsForCrafting}，不走这里。
+ * </p>
+ * <p>
+ * <b>行为影响</b>：手持、穿戴附魔书不再触发任何本模组附魔，也不显示光环；装备上的附魔不受影响。
  * </p>
  *
  * <h3>{@link #all} 的顺序</h3>
@@ -90,7 +99,7 @@ public final class EnchantmentLevels {
     }
 
     /**
-     * 物品上全部本模组附魔及其原始等级（附魔书读书里存的）。
+     * 物品上全部本模组附魔及其原始等级（只读物品自身的 {@code enchantments}，附魔书里存的不算）。
      * <p>
      * 返回的表按附魔 id 字典序（见类注释「{@link #all} 的顺序」）；没有本模组附魔时返回不可变的空表（调用方只读）。
      * </p>
@@ -103,7 +112,7 @@ public final class EnchantmentLevels {
         if (stack.isEmpty()) {
             return Collections.emptyMap();
         }
-        ItemEnchantments enchantments = EnchantmentHelper.getEnchantmentsForCrafting(stack);
+        ItemEnchantments enchantments = stack.getTagEnchantments();
         if (enchantments.isEmpty()) {
             return Collections.emptyMap();
         }

@@ -2,7 +2,6 @@ package pers.roinflam.carianstyle.visual;
 
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.enchantment.EnchantmentHelper;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -73,11 +72,9 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
  * </p>
  * <p>
  * <b>行为等价性说明（重要）：</b>本类用 {@link EnchantmentLevels#all(ItemStack)} 读取，
- * 而原实现走的是逐个附魔查等级。两者对<b>普通装备</b>的读取结果完全一致；
- * 唯一差异在于前者对「附魔书」会改读书里存的附魔（1.21.1 是 {@code stored_enchantments} 组件，
- * 见 {@link EnchantmentHelper#getEnchantmentsForCrafting(ItemStack)}）。为保持与原行为一致，
- * 本类用 {@link ItemStack#isEnchanted()}（只看物品自身的 {@code enchantments} 组件）做前置过滤，
- * 因此手持 / 穿戴附魔书时同样不会产生任何叠层显示，与优化前表现相同。
+ * 而原实现走的是逐个附魔查等级。两者都只读物品自身的 {@code enchantments} 组件，
+ * 附魔书里存的（{@code stored_enchantments}）不算，手持 / 穿戴附魔书时不会产生任何叠层显示。
+ * {@link ItemStack#isEnchanted()} 前置过滤只为省掉无附魔槽位的查表。
  * </p>
  * <p>
  * 仅在服务端主线程构造与读取，无并发问题。

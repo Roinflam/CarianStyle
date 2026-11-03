@@ -98,8 +98,9 @@ public class EnchantmentCalamity extends EnchantmentBase {
             return 0;
         }
 
-        // v-cache：走中央装备缓存（主手 + 四个护甲槽）
-        int totalLevel = EnchantmentEventHandler.armorAndMainHand(entity, calamity);
+        // v-cache：走中央装备缓存。原来还数主手，可本附魔只能上胸甲，主手有它只会是手里另拿了一件胸甲，
+        // 穿一件拿一件就叠两份；拿在手上的护甲不算（见 EnchantmentBase#worksIn），只数四个护甲槽
+        int totalLevel = EnchantmentEventHandler.armorTotal(entity, calamity);
 
         totalLevel = applyLevelLimit(calamity, totalLevel, LEVEL_CAP.getInt());
         return totalLevel;

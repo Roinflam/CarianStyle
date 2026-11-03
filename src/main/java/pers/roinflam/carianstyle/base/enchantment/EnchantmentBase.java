@@ -87,6 +87,9 @@ public abstract class EnchantmentBase {
     private final EnchantTarget target;
     private final EquipmentSlot[] slots;
 
+    /** 按 {@link EquipmentSlot#ordinal()} 记哪些槽位上的物品算数，见 {@link #worksIn} */
+    private final boolean[] activeSlots;
+
     /** 注册表键 {@code carianstyle:<id>}；没有注解的类为 null */
     @Nullable
     private final ResourceKey<Enchantment> key;
@@ -118,7 +121,8 @@ public abstract class EnchantmentBase {
     protected EnchantmentBase(@Nonnull EnchantTarget target, @Nonnull EquipmentSlot[] slots) {
         this.target = target;
         this.slots = slots.clone();
-        this.annotation = this.getClass().getAnnotation(AutoRegisterEnchantment.class);
+        this.activeSlots = activeSlotsOf(this.slots);
+        this.annotation =this.getClass().getAnnotation(AutoRegisterEnchantment.class);
 
         if (annotation != null) {
             this.enchantmentRarity = annotation.rarity();
@@ -192,6 +196,42 @@ public abstract class EnchantmentBase {
     @Nonnull
     public EquipmentSlot[] getSlots() {
         return slots.clone();
+    }
+
+    /**
+     * 放在这个槽位上的物品，它身上的本附魔算不算数。
+     * <p>
+     * <b>问题</b>：扫装备的几处（玩家装备缓存、伤害 / 死亡 / 治疗 / 暴击扫描、光环显示）原来 6 个槽位全扫，不看附魔适用的槽位。
+     * 胸甲附魔是按「每件带这个附魔的物品」各结算一次的，身上穿一件、两只手各拿一件，效果就叠三次。
+     * </p>
+     * <p>
+     * <b>为什么这么改</b>：只认附魔声明的槽位。主手、副手当同一类：1.12.2 起武器附魔就把副手算进去（双持），这一点不变；
+     * 主副手都有同一个附魔时只结算等级高的那把，见 {@code EnchantmentEventHandler#shadowedByOtherHand}。
+     * </p>
+     * <p>
+     * <b>行为影响</b>：护甲附魔的装备拿在手上不再生效（包括黑焰仪式、灾祸原来额外数的主手）；武器附魔放进护甲槽
+     * （只有指令放得进去）也不生效。正常穿戴、手持不受影响。
+     * </p>
+     *
+     * @param slot 物品所在槽位
+     * @return 算数为 true
+     */
+    public boolean worksIn(@Nonnull EquipmentSlot slot) {
+        int i = slot.ordinal();
+        return i < activeSlots.length && activeSlots[i];
+    }
+
+    private static boolean[] activeSlotsOf(@Nonnull EquipmentSlot[] slots) {
+        boolean[] active = new boolean[EquipmentSlot.values().length];
+        for (EquipmentSlot slot : slots) {
+            if (slot.getType() == EquipmentSlot.Type.HAND) {
+                active[EquipmentSlot.MAINHAND.ordinal()] = true;
+                active[EquipmentSlot.OFFHAND.ordinal()] = true;
+            } else {
+                active[slot.ordinal()] = true;
+            }
+        }
+        return active;
     }
 
     /**
