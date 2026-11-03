@@ -13,7 +13,7 @@ apply plugin: 'net.minecraftforge.gradle'
 apply plugin: 'eclipse'
 apply plugin: 'maven-publish'
 
-version = '2.3.0'
+version = '2.3.2'
 group = 'pers.roinflam.carianstyle'
 archivesBaseName = 'CarianStyle-1.12.2'
 

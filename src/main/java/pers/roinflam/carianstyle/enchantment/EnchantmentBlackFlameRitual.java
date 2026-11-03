@@ -104,8 +104,9 @@ public class EnchantmentBlackFlameRitual extends EnchantmentBase {
         Enchantment blackFlameRitual = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBlackFlameRitual.class);
         if (blackFlameRitual == null) return;
 
-        // v-cache：走中央装备缓存（主手 + 四个护甲槽）
-        int totalLevel = EnchantmentEventHandler.armorAndMainHand(attacker, blackFlameRitual);
+        // v-cache：走中央装备缓存。原来还数主手，可本附魔只能上胸甲，主手有它只会是手里另拿了一件胸甲，
+        // 穿一件拿一件就叠两份；拿在手上的护甲不算（见 EnchantmentBase#worksIn），只数四个护甲槽
+        int totalLevel = EnchantmentEventHandler.armorTotal(attacker, blackFlameRitual);
         if (totalLevel <= 0) return;
 
         float damageMultiplier = 1;

@@ -5,6 +5,7 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.item.ItemStack;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import net.minecraft.world.World;
 import javax.annotation.Nonnull;
 import pers.roinflam.carianstyle.api.IEffectModifier;
@@ -269,7 +270,8 @@ public class EffectModifierHandler {
                 continue;
             }
 
-            Map<Enchantment, Integer> enchantments = EnchantmentHelper.getEnchantments(item);
+            // 附魔书里存的不算（见 EnchantmentEventHandler#ownEnchantments）
+            Map<Enchantment, Integer> enchantments = EnchantmentEventHandler.ownEnchantments(item);
             for (Enchantment enchantment : enchantments.keySet()) {
                 if (enchantment instanceof IEffectModifier) {
                     if (modifiers == null) {

@@ -8,6 +8,8 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
+import java.util.Collections;
+import net.minecraft.init.Items;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.event.entity.living.*;
 import net.minecraftforge.event.entity.player.CriticalHitEvent;
@@ -238,12 +240,14 @@ public class EnchantmentEventHandler {
                 ItemStack stack = player.getItemStackFromSlot(slot);
                 if (stack.isEmpty()) continue;
 
-                Map<Enchantment, Integer> enchantments = EnchantmentHelper.getEnchantments(stack);
+                Map<Enchantment, Integer> enchantments = ownEnchantments(stack);
                 for (Map.Entry<Enchantment, Integer> entry : enchantments.entrySet()) {
                     if (!(entry.getKey() instanceof EnchantmentBase)) continue;
                 EnchantmentBase base = (EnchantmentBase) entry.getKey();
                     // v3.1：跳过被禁用的附魔
                     if (base.isDisabled()) continue;
+                    // 只认附魔适用的槽位（拿在手上的护甲不算），见 EnchantmentBase#worksIn
+                    if (!base.worksIn(slot)) continue;
                     int level = base.applyLevelLimit(entry.getValue());
                     if (level <= 0) continue;
                     entries.add(new TickEnchantmentEntry(base, level, stack, slot));
@@ -284,12 +288,6 @@ public class EnchantmentEventHandler {
      */
     private static final EntityEquipmentSlot[] ARMOR_SLOTS = {
             EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET
-    };
-
-    /** 护甲 + 主手，供 {@link #armorAndMainHand} 使用 */
-    private static final EntityEquipmentSlot[] ARMOR_AND_MAINHAND = {
-            EntityEquipmentSlot.HEAD, EntityEquipmentSlot.CHEST, EntityEquipmentSlot.LEGS, EntityEquipmentSlot.FEET,
-            EntityEquipmentSlot.MAINHAND
     };
 
     /**
@@ -338,6 +336,9 @@ public class EnchantmentEventHandler {
     public static int levelIn(@Nonnull EntityLivingBase holder, @Nonnull Enchantment enchantment,
                               @Nonnull EntityEquipmentSlot slot) {
         if (!(holder instanceof EntityPlayer)) {
+            if (enchantment instanceof EnchantmentBase && !((EnchantmentBase) enchantment).worksIn(slot)) {
+                return 0;
+            }
             return EnchantmentHelper.getEnchantmentLevel(enchantment, holder.getItemStackFromSlot(slot));
         }
         EntityPlayer player = (EntityPlayer) holder;
@@ -387,6 +388,9 @@ public class EnchantmentEventHandler {
         if (!(holder instanceof EntityPlayer)) {
             int sum = 0;
             for (EntityEquipmentSlot slot : slots) {
+                if (enchantment instanceof EnchantmentBase && !((EnchantmentBase) enchantment).worksIn(slot)) {
+                    continue;
+                }
                 sum += EnchantmentHelper.getEnchantmentLevel(enchantment, holder.getItemStackFromSlot(slot));
             }
             return sum;
@@ -417,17 +421,6 @@ public class EnchantmentEventHandler {
      */
     public static int armorTotal(@Nonnull EntityLivingBase holder, @Nonnull Enchantment enchantment) {
         return totalIn(holder, enchantment, ARMOR_SLOTS);
-    }
-
-    /**
-     * 汇总四个护甲槽位加主手上的附魔等级（走缓存）。
-     *
-     * @param holder      持有者
-     * @param enchantment 要查的附魔
-     * @return 五个槽位的等级之和
-     */
-    public static int armorAndMainHand(@Nonnull EntityLivingBase holder, @Nonnull Enchantment enchantment) {
-        return totalIn(holder, enchantment, ARMOR_AND_MAINHAND);
     }
 
     /**
@@ -502,6 +495,60 @@ public class EnchantmentEventHandler {
      * @param enchantment 附魔实例
      * @return 是否为 DEAD 分类附魔
      */
+    /**
+     * 物品自身的附魔，附魔书里存的（{@code StoredEnchantments}）不算。
+     * <p>
+     * <b>问题</b>：原版 {@code EnchantmentHelper.getEnchantments} 对附魔书读书里存的附魔，扫装备的几处
+     * （玩家装备缓存、伤害 / 死亡 / 治疗 / 暴击扫描）都用它，结果主手拿一本暗月附魔书就有夜视，
+     * 拿其它附魔书也一样会触发对应效果。
+     * </p>
+     * <p>
+     * <b>为什么这么改</b>：附魔书是在铁砧上转移附魔用的材料，不是装备。附魔书直接当没有附魔，
+     * 其它物品照旧读自身的 {@code ench} 列表，和 {@code EnchantmentHelper.getEnchantmentLevel} 口径一致。
+     * </p>
+     *
+     * @param stack 物品
+     * @return 附魔 → 等级
+     */
+    @Nonnull
+    public static Map<Enchantment, Integer> ownEnchantments(@Nonnull ItemStack stack) {
+        if (stack.getItem() == Items.ENCHANTED_BOOK) {
+            return Collections.emptyMap();
+        }
+        return EnchantmentHelper.getEnchantments(stack);
+    }
+
+    /**
+     * 主副手同一个附魔只结算一次（双持）。
+     * <p>
+     * <b>问题</b>：统一分发按槽位逐个结算，主副手各拿一把带同一个附魔的武器，效果结算两次。
+     * 最早按「主副手取等级高的那把」算，改成按槽位扫描之后变成了两把都算。
+     * </p>
+     * <p>
+     * <b>为什么这么改</b>：恢复原来的口径：同一个附魔主副手都有时只认等级高的那把，一样高认主手；副手单独拿照旧生效。
+     * 只用在结算效果的地方；等级查询（{@link #mainHand} 等）按槽位照实返回，各附魔自己的监听器本来就只看主手。
+     * </p>
+     *
+     * @param holder 持有者
+     * @param base   附魔
+     * @param slot   这一条所在的槽位
+     * @param level  这一条的等级（已应用等级上限）
+     * @return true = 被另一只手上的同一个附魔盖过，这一条不结算
+     */
+    private static boolean shadowedByOtherHand(@Nonnull EntityLivingBase holder, @Nonnull EnchantmentBase base,
+                                               @Nonnull EntityEquipmentSlot slot, int level) {
+        if (slot != EntityEquipmentSlot.MAINHAND && slot != EntityEquipmentSlot.OFFHAND) {
+            return false;
+        }
+        boolean mainHand = slot == EntityEquipmentSlot.MAINHAND;
+        ItemStack other = holder.getItemStackFromSlot(mainHand ? EntityEquipmentSlot.OFFHAND : EntityEquipmentSlot.MAINHAND);
+        if (other.isEmpty()) {
+            return false;
+        }
+        int otherLevel = base.applyLevelLimit(EnchantmentHelper.getEnchantmentLevel(base, other));
+        return mainHand ? otherLevel > level : otherLevel >= level;
+    }
+
     private static boolean isDeadCategoryEnchantment(@Nonnull EnchantmentBase enchantment) {
         AutoRegisterEnchantment ann = enchantment.getClass().getAnnotation(AutoRegisterEnchantment.class);
         if (ann == null) {
@@ -552,13 +599,15 @@ public class EnchantmentEventHandler {
             ItemStack stack = holder.getItemStackFromSlot(slot);
             if (stack.isEmpty()) continue;
 
-            Map<Enchantment, Integer> enchantments = EnchantmentHelper.getEnchantments(stack);
+            Map<Enchantment, Integer> enchantments = ownEnchantments(stack);
             for (Map.Entry<Enchantment, Integer> entry : enchantments.entrySet()) {
                 if (!(entry.getKey() instanceof EnchantmentBase)) continue;
                 EnchantmentBase base = (EnchantmentBase) entry.getKey();
 
                 // v3.1：跳过被禁用的附魔
                 if (base.isDisabled()) continue;
+                // 只认附魔适用的槽位（拿在手上的护甲不算），见 EnchantmentBase#worksIn
+                if (!base.worksIn(slot)) continue;
 
                 // v3.2：怪物 + 死亡类关 + 是 DEAD 分类 → 跳过
                 // 覆盖 EnchantmentEpilepsySpread（通过 onDamageAsVictimLowest 触发的濒死类）
@@ -568,6 +617,7 @@ public class EnchantmentEventHandler {
 
                 int level = base.applyLevelLimit(entry.getValue());
                 if (level <= 0) continue;
+                if (shadowedByOtherHand(holder, base, slot, level)) continue;
                 entries.add(new CachedEnchantmentEntry(base, level, stack, holder, isAttacker));
             }
         }
@@ -778,13 +828,15 @@ public class EnchantmentEventHandler {
         for (EntityEquipmentSlot slot : EntityEquipmentSlot.values()) {
             ItemStack stack = victim.getItemStackFromSlot(slot);
             if (stack.isEmpty()) continue;
-            for (Map.Entry<Enchantment, Integer> entry : EnchantmentHelper.getEnchantments(stack).entrySet()) {
+            for (Map.Entry<Enchantment, Integer> entry : ownEnchantments(stack).entrySet()) {
                 if (!(entry.getKey() instanceof EnchantmentBase)) continue;
                 EnchantmentBase base = (EnchantmentBase) entry.getKey();
                 // v3.1：跳过被禁用的附魔
                 if (base.isDisabled()) continue;
+                // 只认附魔适用的槽位（拿在手上的护甲不算），见 EnchantmentBase#worksIn
+                if (!base.worksIn(slot)) continue;
                 int level = base.applyLevelLimit(entry.getValue());
-                if (level > 0) {
+                if (level > 0 && !shadowedByOtherHand(victim, base, slot, level)) {
                     EnchantmentContext ctx = new EnchantmentContext(event, victim, stack, level, null, victim, event.getSource());
                     base.onDeath(ctx, level);
                 }
@@ -813,13 +865,15 @@ public class EnchantmentEventHandler {
         for (EntityEquipmentSlot slot : EntityEquipmentSlot.values()) {
             ItemStack stack = healer.getItemStackFromSlot(slot);
             if (stack.isEmpty()) continue;
-            for (Map.Entry<Enchantment, Integer> entry : EnchantmentHelper.getEnchantments(stack).entrySet()) {
+            for (Map.Entry<Enchantment, Integer> entry : ownEnchantments(stack).entrySet()) {
                 if (!(entry.getKey() instanceof EnchantmentBase)) continue;
                 EnchantmentBase base = (EnchantmentBase) entry.getKey();
                 // v3.1：跳过被禁用的附魔
                 if (base.isDisabled()) continue;
+                // 只认附魔适用的槽位（拿在手上的护甲不算），见 EnchantmentBase#worksIn
+                if (!base.worksIn(slot)) continue;
                 int level = base.applyLevelLimit(entry.getValue());
-                if (level > 0) {
+                if (level > 0 && !shadowedByOtherHand(healer, base, slot, level)) {
                     EnchantmentContext ctx = new EnchantmentContext(event, healer, stack, level);
                     base.onHeal(ctx, level);
                 }
@@ -852,6 +906,8 @@ public class EnchantmentEventHandler {
         if (entries.isEmpty()) return;
 
         for (TickEnchantmentEntry entry : entries) {
+            // 缓存按槽位照实记（等级查询要用），双持去重放在结算这一步
+            if (shadowedByOtherHand(player, entry.enchantment, entry.slot, entry.level)) continue;
             EnchantmentContext ctx = new EnchantmentContext(event, player, entry.stack, entry.level);
             entry.enchantment.onPlayerTick(ctx, entry.level);
         }
@@ -872,11 +928,13 @@ public class EnchantmentEventHandler {
         EntityPlayer player = event.getEntityPlayer();
         ItemStack weapon = player.getHeldItem(EnumHand.MAIN_HAND);
         if (weapon.isEmpty()) return;
-        for (Map.Entry<Enchantment, Integer> entry : EnchantmentHelper.getEnchantments(weapon).entrySet()) {
+        for (Map.Entry<Enchantment, Integer> entry : ownEnchantments(weapon).entrySet()) {
             if (!(entry.getKey() instanceof EnchantmentBase)) continue;
                 EnchantmentBase base = (EnchantmentBase) entry.getKey();
             // v3.1：跳过被禁用的附魔
             if (base.isDisabled()) continue;
+            // 只认附魔适用的槽位（拿在手上的护甲不算），见 EnchantmentBase#worksIn
+            if (!base.worksIn(EntityEquipmentSlot.MAINHAND)) continue;
             int level = base.applyLevelLimit(entry.getValue());
             if (level > 0) {
                 EnchantmentContext ctx = new EnchantmentContext(event, player, weapon, level);

@@ -17,5 +17,5 @@ public class Reference {
     /**
      * 模组版本，和 build.gradle 的 version 保持一致；握手时对方拿到的就是它（见 {@code NetworkHandler.PROTOCOL_SINCE}）
      */
-    public static final String VERSION = "2.3.0";
+    public static final String VERSION = "2.3.2";
 }
