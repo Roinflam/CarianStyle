@@ -13,9 +13,9 @@
 [![GitHub](https://img.shields.io/badge/GitHub-Roinflam-181717?style=for-the-badge&logo=github)](https://github.com/Roinflam)
 [![Bilibili](https://img.shields.io/badge/Bilibili-@Roinflam-00A1D6?style=for-the-badge&logo=bilibili)](https://space.bilibili.com/285030707/)
 
-This is the **1.20.1** branch. The Minecraft 1.12.2 version is on the [`1.12.2` branch](https://github.com/Roinflam/CarianStyle/tree/1.12.2).
+This is the **1.20.1** branch. The other Minecraft versions are on the [`1.21.1`](https://github.com/Roinflam/CarianStyle/tree/1.21.1) and [`1.12.2`](https://github.com/Roinflam/CarianStyle/tree/1.12.2) branches.
 
-本分支是 **1.20.1** 版，Minecraft 1.12.2 版在 [`1.12.2` 分支](https://github.com/Roinflam/CarianStyle/tree/1.12.2)。
+本分支是 **1.20.1** 版，其他 Minecraft 版本在 [`1.21.1`](https://github.com/Roinflam/CarianStyle/tree/1.21.1)、[`1.12.2`](https://github.com/Roinflam/CarianStyle/tree/1.12.2) 分支。
 
 </div>
 
@@ -26,15 +26,15 @@ This is the **1.20.1** branch. The Minecraft 1.12.2 version is on the [`1.12.2` 
 
 ### Versions
 
-| | 1.20.1 | 1.12.2 |
-|---|---|---|
-| Loader / Java | Forge 47.x, Java 17 | Forge 14.23.5.2855 or newer, Java 8 |
-| Install on | Client and server | Client and server |
-| Dependencies | None (Cloth Config API for the config screen is bundled) | None (uses Forge's built-in config screen) |
-| Enchantment Codex (`K`) | Yes | Yes |
-| Config files | `config/carianstyle-common.toml`, plus `config/carianstyle/enchantment_values.json` for every enchantment's numbers | `config/carianstyle-common.cfg`, plus `config/carianstyle/enchantment_values.json` for every enchantment's numbers |
+| | 1.21.1 | 1.20.1 | 1.12.2 |
+|---|---|---|---|
+| Loader / Java | NeoForge 21.1.265 or newer, Java 21 | Forge 47.x, Java 17 | Forge 14.23.5.2855 or newer, Java 8 |
+| Install on | Client and server | Client and server | Client and server |
+| Dependencies | None (Cloth Config API for the config screen is bundled) | None (Cloth Config API for the config screen is bundled) | None (uses Forge's built-in config screen) |
+| Enchantment Codex (`K`) | Yes | Yes | Yes |
+| Config files | `config/carianstyle-common.toml`, plus `config/carianstyle/enchantment_values.json` for every enchantment's numbers | `config/carianstyle-common.toml`, plus `config/carianstyle/enchantment_values.json` for every enchantment's numbers | `config/carianstyle-common.cfg`, plus `config/carianstyle/enchantment_values.json` for every enchantment's numbers |
 
-Both versions have the same enchantments, numbers, effects and codex; on 1.12.2 a few edge cases follow the 1.12.2 game rules.
+All three versions have the same enchantments, numbers, effects and codex; on 1.21.1 and 1.12.2 a few edge cases follow that version's game rules.
 
 ### Enchantment types
 
@@ -307,15 +307,15 @@ Yes, no need to ask. Please credit the author; commercial use is not allowed (se
 
 ### 版本须知
 
-| | 1.20.1 | 1.12.2 |
-|---|---|---|
-| 加载器与 Java | Forge 47.x，Java 17 | Forge 14.23.5.2855 及以上，Java 8 |
-| 安装位置 | 客户端和服务端都要装 | 客户端和服务端都要装 |
-| 前置模组 | 无（配置界面用到的 Cloth Config API 已内置） | 无（配置界面用 Forge 自带的） |
-| 附魔百科（`K` 键） | 有 | 有 |
-| 配置文件 | `config/carianstyle-common.toml`，以及各附魔数值 `config/carianstyle/enchantment_values.json` | `config/carianstyle-common.cfg`，以及各附魔数值 `config/carianstyle/enchantment_values.json` |
+| | 1.21.1 | 1.20.1 | 1.12.2 |
+|---|---|---|---|
+| 加载器与 Java | NeoForge 21.1.265 及以上，Java 21 | Forge 47.x，Java 17 | Forge 14.23.5.2855 及以上，Java 8 |
+| 安装位置 | 客户端和服务端都要装 | 客户端和服务端都要装 | 客户端和服务端都要装 |
+| 前置模组 | 无（配置界面用到的 Cloth Config API 已内置） | 无（配置界面用到的 Cloth Config API 已内置） | 无（配置界面用 Forge 自带的） |
+| 附魔百科（`K` 键） | 有 | 有 | 有 |
+| 配置文件 | `config/carianstyle-common.toml`，以及各附魔数值 `config/carianstyle/enchantment_values.json` | `config/carianstyle-common.toml`，以及各附魔数值 `config/carianstyle/enchantment_values.json` | `config/carianstyle-common.cfg`，以及各附魔数值 `config/carianstyle/enchantment_values.json` |
 
-两个版本的附魔、数值、特效和附魔百科都相同；1.12.2 版少数细节按 1.12.2 的游戏规则处理。
+三个版本的附魔、数值、特效和附魔百科都相同；1.21.1 版和 1.12.2 版少数细节按各自版本的游戏规则处理。
 
 ### 附魔分类
 

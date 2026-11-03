@@ -5,7 +5,8 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -307,7 +308,12 @@ public final class AuraDisplayRegistry {
                     continue;
                 }
                 boolean isArmor = slot.getType() == EquipmentSlot.Type.ARMOR;
-                for (Map.Entry<Enchantment, Integer> e : EnchantmentHelper.getEnchantments(stack).entrySet()) {
+                // 附魔书里存的不算（见 EnchantmentEventHandler#ownEnchantments）
+                for (Map.Entry<Enchantment, Integer> e : EnchantmentEventHandler.ownEnchantments(stack).entrySet()) {
+                    // 和效果一致：只认附魔适用的槽位（拿在手上的护甲不显示），见 EnchantmentBase#worksIn
+                    if (e.getKey() instanceof EnchantmentBase base && !base.worksIn(slot)) {
+                        continue;
+                    }
                     levels.merge(e.getKey(), e.getValue(), Math::max);
                     if (isArmor) {
                         // 仅护甲槽：同时维护“最高等级”与“等级之和”两套口径

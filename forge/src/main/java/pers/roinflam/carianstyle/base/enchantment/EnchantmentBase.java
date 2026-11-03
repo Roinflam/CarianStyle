@@ -128,6 +128,9 @@ public abstract class EnchantmentBase extends Enchantment {
      */
     private int disabledCacheStamp = 0;
 
+    /** 按 {@link EquipmentSlot#ordinal()} 记哪些槽位上的物品算数，见 {@link #worksIn} */
+    private final boolean[] activeSlots;
+
     /**
      * 主构造函数（注解注册方式）
      *
@@ -138,6 +141,7 @@ public abstract class EnchantmentBase extends Enchantment {
         // 这里传入的 COMMON 只是占位：super() 调用时还拿不到子类注解，无法得到真实稀有度。
         // 真正生效的权重由下方覆写的 getRarity() 提供（详见类注释 v2.3）。
         super(Rarity.COMMON, category, slots);
+        this.activeSlots = activeSlotsOf(slots);
 
         this.annotation = this.getClass().getAnnotation(AutoRegisterEnchantment.class);
 
@@ -153,6 +157,42 @@ public abstract class EnchantmentBase extends Enchantment {
     }
 
     /**
+     * 放在这个槽位上的物品，它身上的本附魔算不算数。
+     * <p>
+     * <b>问题</b>：扫装备的几处（玩家装备缓存、伤害 / 死亡 / 治疗 / 暴击扫描、光环显示）原来 6 个槽位全扫，不看附魔适用的槽位。
+     * 胸甲附魔是按「每件带这个附魔的物品」各结算一次的，身上穿一件、两只手各拿一件，效果就叠三次。
+     * </p>
+     * <p>
+     * <b>为什么这么改</b>：只认附魔声明的槽位。主手、副手当同一类：1.12.2 起武器附魔就把副手算进去（双持），这一点不变；
+     * 主副手都有同一个附魔时只结算等级高的那把，见 {@code EnchantmentEventHandler#shadowedByOtherHand}。
+     * </p>
+     * <p>
+     * <b>行为影响</b>：护甲附魔的装备拿在手上不再生效（包括黑焰仪式、灾祸原来额外数的主手）；武器附魔放进护甲槽
+     * （只有指令放得进去）也不生效。正常穿戴、手持不受影响。
+     * </p>
+     *
+     * @param slot 物品所在槽位
+     * @return 算数为 true
+     */
+    public boolean worksIn(@Nonnull EquipmentSlot slot) {
+        int i = slot.ordinal();
+        return i < activeSlots.length && activeSlots[i];
+    }
+
+    private static boolean[] activeSlotsOf(@Nonnull EquipmentSlot[] slots) {
+        boolean[] active = new boolean[EquipmentSlot.values().length];
+        for (EquipmentSlot slot : slots) {
+            if (slot.getType() == EquipmentSlot.Type.HAND) {
+                active[EquipmentSlot.MAINHAND.ordinal()] = true;
+                active[EquipmentSlot.OFFHAND.ordinal()] = true;
+            } else {
+                active[slot.ordinal()] = true;
+            }
+        }
+        return active;
+    }
+
+    /**
      * 传统构造函数（向后兼容）
      *
      * @param rarityIn 稀有度
@@ -163,6 +203,7 @@ public abstract class EnchantmentBase extends Enchantment {
     protected EnchantmentBase(@Nonnull Rarity rarityIn, @Nonnull EnchantmentCategory category,
                               @Nonnull EquipmentSlot[] slots, String name) {
         super(rarityIn, category, slots);
+        this.activeSlots = activeSlotsOf(slots);
         this.annotation = null;
 
         switch (rarityIn) {
