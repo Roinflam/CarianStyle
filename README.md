@@ -296,7 +296,7 @@ Yes, no need to ask. Please credit the author; commercial use is not allowed (se
 
 - Licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/): free to use, modify and include in modpacks; no commercial use; redistributed or modified versions must credit the original author (Roinflam), state what was changed, and use the same license.
 - ELDEN RING is a trademark of FromSoftware, Inc. / BANDAI NAMCO Entertainment Inc. The names, concepts and artwork from Elden Ring referenced in this mod belong to their respective owners. This is an unofficial fan-made mod and is not affiliated with or endorsed by them.
-- The 1.20.1 version bundles [Cloth Config API](https://github.com/shedaniel/cloth-config) by shedaniel (GNU LGPLv3), unmodified, only for the config screen.
+- The 1.20.1 and 1.21.1 versions bundle [Cloth Config API](https://github.com/shedaniel/cloth-config) by shedaniel (GNU LGPLv3), unmodified, only for the config screen.
 
 </details>
 
@@ -577,6 +577,6 @@ Yes, no need to ask. Please credit the author; commercial use is not allowed (se
 
 - 本模组采用 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans)（知识共享 署名-非商业性使用-相同方式共享 4.0 国际）协议：可以免费使用、修改、加入整合包；不得用于商业用途；转载或发布修改版需署名原作者 Roinflam、注明改动，并沿用同一协议；
 - 《艾尔登法环》相关名称、设定与美术素材的版权归 FromSoftware / BANDAI NAMCO 所有，本模组为非官方同人作品，与其无关联；
-- 1.20.1 版内置 shedaniel 的 [Cloth Config API](https://github.com/shedaniel/cloth-config)（GNU LGPLv3），未作修改，只用于配置界面。
+- 1.20.1 和 1.21.1 版内置 shedaniel 的 [Cloth Config API](https://github.com/shedaniel/cloth-config)（GNU LGPLv3），未作修改，只用于配置界面。
 
 </details>
