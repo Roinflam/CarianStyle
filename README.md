@@ -32,7 +32,8 @@ This is the **1.12.2** branch. The other Minecraft versions are on the [`1.21.1`
 | Install on | Client and server | Client and server | Client and server |
 | Dependencies | None (Cloth Config API for the config screen is bundled) | None (Cloth Config API for the config screen is bundled) | None (uses Forge's built-in config screen) |
 | Enchantment Codex (`K`) | Yes | Yes | Yes |
-| Config files | `config/carianstyle-common.toml`, plus `config/carianstyle/enchantment_values.json` for every enchantment's numbers | `config/carianstyle-common.toml`, plus `config/carianstyle/enchantment_values.json` for every enchantment's numbers | `config/carianstyle-common.cfg`, plus `config/carianstyle/enchantment_values.json` for every enchantment's numbers |
+
+Config files: `config/carianstyle-common.toml` (`config/carianstyle-common.cfg` on 1.12.2), plus `config/carianstyle/enchantment_values.json` for every enchantment's numbers.
 
 All three versions have the same enchantments, numbers, effects and codex. A few edge cases follow the 1.12.2 game rules (for example, which damage counts as able to hurt Creative-mode players); the descriptions below and in game are the 1.12.2 ones.
 
@@ -318,7 +319,8 @@ Yes, no need to ask. Please credit the author; commercial use is not allowed (se
 | 安装位置 | 客户端和服务端都要装 | 客户端和服务端都要装 | 客户端和服务端都要装 |
 | 前置模组 | 无（配置界面用到的 Cloth Config API 已内置） | 无（配置界面用到的 Cloth Config API 已内置） | 无（配置界面用 Forge 自带的） |
 | 附魔百科（`K` 键） | 有 | 有 | 有 |
-| 配置文件 | `config/carianstyle-common.toml`，以及各附魔数值 `config/carianstyle/enchantment_values.json` | `config/carianstyle-common.toml`，以及各附魔数值 `config/carianstyle/enchantment_values.json` | `config/carianstyle-common.cfg`，以及各附魔数值 `config/carianstyle/enchantment_values.json` |
+
+配置文件：`config/carianstyle-common.toml`（1.12.2 版是 `config/carianstyle-common.cfg`），各附魔数值在 `config/carianstyle/enchantment_values.json`。
 
 三个版本的附魔、数值、特效和附魔百科都相同；少数细节按 1.12.2 的游戏规则处理（比如哪些伤害算能伤到创造模式），下表和游戏内写的是 1.12.2 的说明。
 
