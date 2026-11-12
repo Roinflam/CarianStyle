@@ -174,8 +174,11 @@ public class EnchantmentDataManager {
      * @return 计数器值，0表示无计数或已过期
      */
     public static int getCounter(@NotNull String counterId, @NotNull UUID entityUuid) {
-        String key = buildKey(counterId, entityUuid);
+        return getCounterByKey(buildKey(counterId, entityUuid));
+    }
 
+    /** {@link #getCounter} 的本体；递增 / 递减时已经拼过键，直接用，不再拼第二遍 */
+    private static int getCounterByKey(@NotNull String key) {
         Long expireTime = COUNTER_EXPIRY.get(key);
         if (expireTime != null && serverTickCount >= expireTime) {
             COUNTERS.remove(key);
@@ -221,7 +224,7 @@ public class EnchantmentDataManager {
      */
     public static int incrementCounter(@NotNull String counterId, @NotNull UUID entityUuid) {
         String key = buildKey(counterId, entityUuid);
-        int newValue = getCounter(counterId, entityUuid) + 1;
+        int newValue = getCounterByKey(key) + 1;
         COUNTERS.put(key, newValue);
         return newValue;
     }
@@ -236,7 +239,7 @@ public class EnchantmentDataManager {
      */
     public static int incrementCounter(@NotNull String counterId, @NotNull UUID entityUuid, int expiryTicks) {
         String key = buildKey(counterId, entityUuid);
-        int newValue = getCounter(counterId, entityUuid) + 1;
+        int newValue = getCounterByKey(key) + 1;
         COUNTERS.put(key, newValue);
         COUNTER_EXPIRY.put(key, serverTickCount + expiryTicks);
         return newValue;
@@ -251,7 +254,7 @@ public class EnchantmentDataManager {
      */
     public static int decrementCounter(@NotNull String counterId, @NotNull UUID entityUuid) {
         String key = buildKey(counterId, entityUuid);
-        int newValue = Math.max(0, getCounter(counterId, entityUuid) - 1);
+        int newValue = Math.max(0, getCounterByKey(key) - 1);
         COUNTERS.put(key, newValue);
         return newValue;
     }
@@ -414,9 +417,35 @@ public class EnchantmentDataManager {
     private static String buildKey(@NotNull String id, @NotNull UUID uuid) {
         StringBuilder sb = KEY_BUILDER.get();
         sb.setLength(0); // 重置长度而非创建新实例
-        sb.append(id).append(':').append(uuid);
+        sb.append(id).append(':').append(uuidString(uuid));
         return sb.toString();
     }
+
+    /**
+     * UUID 的字符串形式，按 UUID 缓存。
+     * <p>
+     * <b>问题</b>：{@code append(uuid)} 每次都要 {@code UUID.toString()} 新建一个 36 字符的串；
+     * 露滴护符、重力等附魔每个玩家每 tick 都查计数器 / 冷却，人多的服务器上拼键这一项约 0.02 ms/tick。
+     * </p>
+     * <p>
+     * <b>为什么这么改</b>：同一个 UUID 的字符串永远一样，拼出来的键与原来逐字相同，存取的数据不受影响。
+     * 表超过 {@value #UUID_STRING_CACHE_LIMIT} 条（怪物也会查冷却）就整张清掉重来，内存有上限。
+     * </p>
+     */
+    private static String uuidString(@NotNull UUID uuid) {
+        String s = UUID_STRINGS.get(uuid);
+        if (s == null) {
+            if (UUID_STRINGS.size() >= UUID_STRING_CACHE_LIMIT) {
+                UUID_STRINGS.clear();
+            }
+            s = uuid.toString();
+            UUID_STRINGS.put(uuid, s);
+        }
+        return s;
+    }
+
+    private static final int UUID_STRING_CACHE_LIMIT = 4096;
+    private static final Map<UUID, String> UUID_STRINGS = new ConcurrentHashMap<>();
 
     /**
      * 获取当前游戏时间

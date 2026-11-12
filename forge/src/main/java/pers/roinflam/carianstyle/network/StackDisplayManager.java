@@ -7,6 +7,8 @@ import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.server.ServerLifecycleHooks;
+import net.minecraft.world.item.ItemStack;
+import pers.roinflam.carianstyle.base.enchantment.EquipmentStamp;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.EquipmentEnchantContext;
 import pers.roinflam.carianstyle.visual.StackDisplayRegistry;
@@ -150,7 +152,8 @@ public final class StackDisplayManager {
      */
     private static void pollAndSync(ServerPlayer player, List<StackDisplayRegistry.Entry> providers) {
         // v2：本玩家本轮的装备附魔快照，供全部读取器共用（至多 5 次 NBT 反序列化）
-        EquipmentEnchantContext equipmentContext = new EquipmentEnchantContext(player);
+        // v4：主手和 4 件护甲都没变就沿用上一轮的快照，见 contextFor
+        EquipmentEnchantContext equipmentContext = contextFor(player);
 
         Map<Integer, StackDisplayRegistry.Stacks> current = null;
         for (StackDisplayRegistry.Entry entry : providers) {
@@ -189,6 +192,60 @@ public final class StackDisplayManager {
         }
     }
 
+    // ==================== v4：装备快照跨轮复用 ====================
+
+    /** 快照最多沿用这么多轮（4 轮 = 20 tick），到了强制重建，兜底原地改附魔这种看不出来的情况 */
+    private static final int CONTEXT_MAX_ROUNDS = 4;
+
+    /**
+     * 一名玩家上一轮用的装备快照，以及判断装备变没变的依据（主手 + 4 件护甲）。
+     */
+    private static final class ContextCache {
+        final EquipmentStamp[] stamps = new EquipmentStamp[5];
+        EquipmentEnchantContext context;
+        int rounds;
+
+        ContextCache() {
+            for (int i = 0; i < stamps.length; i++) {
+                stamps[i] = new EquipmentStamp();
+            }
+        }
+    }
+
+    /** UUID → 上一轮的装备快照。仅服务端主线程访问，登出时清。 */
+    private static final Map<UUID, ContextCache> CONTEXTS = new HashMap<>();
+
+    /**
+     * 取本轮的装备快照。
+     * <p>
+     * <b>问题</b>：v2 每轮每人都新建一次快照，主手 + 4 件护甲逐件解析附魔 NBT、查注册表，
+     * 人多的服务器上这一项约 0.04 ms/tick；装备绝大多数时候没变，每轮解析出来的都一样。
+     * </p>
+     * <p>
+     * <b>为什么这么改</b>：快照只由这 5 件物品的附魔决定。5 件的 {@link EquipmentStamp} 都没变
+     * （同一个物品对象、附魔列表标签对象和长度都没变）就沿用上一轮的快照，否则当场重建；
+     * 最多沿用 {@value #CONTEXT_MAX_ROUNDS} 轮。读取器照旧每轮都调，类注释里说的「不能跳过玩家」不受影响。
+     * </p>
+     */
+    private static EquipmentEnchantContext contextFor(ServerPlayer player) {
+        ContextCache cache = CONTEXTS.computeIfAbsent(player.getUUID(), uuid -> new ContextCache());
+        boolean changed = cache.stamps[0].update(player.getMainHandItem());
+        int i = 1;
+        for (ItemStack armor : player.getArmorSlots()) {
+            if (i >= cache.stamps.length) {
+                // 护甲槽多于 4 个的玩家（原版不存在）不走复用
+                changed = true;
+                break;
+            }
+            changed |= cache.stamps[i++].update(armor);
+        }
+        if (changed || cache.context == null || ++cache.rounds >= CONTEXT_MAX_ROUNDS) {
+            cache.context = new EquipmentEnchantContext(player);
+            cache.rounds = 0;
+        }
+        return cache.context;
+    }
+
     /**
      * 玩家登出时清理其快照缓存。
      *
@@ -197,5 +254,6 @@ public final class StackDisplayManager {
     @SubscribeEvent
     public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         LAST_SENT.remove(event.getEntity().getUUID());
+        CONTEXTS.remove(event.getEntity().getUUID());
     }
 }
