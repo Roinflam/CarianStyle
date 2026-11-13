@@ -3,7 +3,22 @@
   "minVersion": "0.8",
   "package": "pers.roinflam.carianstyle.fabric.mixin",
   "compatibilityLevel": "JAVA_21",
-  "mixins": [],
+  "mixins": [
+    "damage.FabricLivingEntityDamageMixin",
+    "damage.FabricPlayerDamageMixin",
+    "event.FabricAbstractArrowMixin",
+    "event.FabricBlockMixin",
+    "event.FabricEnderDragonMixin",
+    "event.FabricEntitySectionManagerMixin",
+    "event.FabricLivingEntityEventsMixin",
+    "event.FabricMobMixin",
+    "event.FabricPlayerEventsMixin",
+    "event.FabricPlayerListMixin",
+    "event.FabricServerEntityCallbacksMixin",
+    "event.FabricServerLevelMixin",
+    "event.FabricServerPlayerEventsMixin",
+    "event.FabricStartAttackingMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
