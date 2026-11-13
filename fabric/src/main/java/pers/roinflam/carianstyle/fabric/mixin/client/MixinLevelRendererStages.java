@@ -22,6 +22,9 @@ import pers.roinflam.carianstyle.fabric.FabricClientEvents;
  * <p>
  * 回退点包住 {@code renderLevel} 里全部对 {@code renderSectionLayer} 的调用（原版 7 处，半透明的两处分别在
  * 极佳画质和其它画质两支里），半透明那次返回后主发出点还没发，就补发一次；这时还在模型视图栈压入相机旋转的范围内。
+ * 回退点同样 {@code require = 0}：别的渲染模组改掉了这些调用时游戏照常启动，只是特效可能不显示；
+ * 两处都没发出时由 {@code FabricClientEvents} 在世界渲染结束时打一次警告。{@code expect = 7} 只在开了
+ * {@code mixin.debug.countInjections} 时检查，开发时用来发现少挂了几处。
  * </p>
  */
 @Mixin(LevelRenderer.class)
@@ -40,7 +43,8 @@ public abstract class MixinLevelRendererStages {
 
     @WrapOperation(method = "renderLevel",
             at = @At(value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/LevelRenderer;renderSectionLayer(Lnet/minecraft/client/renderer/RenderType;DDDLorg/joml/Matrix4f;Lorg/joml/Matrix4f;)V"))
+                    target = "Lnet/minecraft/client/renderer/LevelRenderer;renderSectionLayer(Lnet/minecraft/client/renderer/RenderType;DDDLorg/joml/Matrix4f;Lorg/joml/Matrix4f;)V"),
+            require = 0, expect = 7)
     private void carianstyle$wrapSectionLayer(LevelRenderer self, RenderType renderType, double camX, double camY,
                                               double camZ, Matrix4f frustumMatrix, Matrix4f projectionMatrix,
                                               Operation<Void> original) {
