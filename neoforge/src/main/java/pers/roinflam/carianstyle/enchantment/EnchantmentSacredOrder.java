@@ -3,6 +3,7 @@ package pers.roinflam.carianstyle.enchantment;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
@@ -22,6 +23,7 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.platform.Services;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import pers.roinflam.carianstyle.bus.EventBusSubscriber;
@@ -274,9 +276,12 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
             }
         }
 
-        if (totalLevel > 0 && !entity.getPersistentData().getBoolean(INITIAL_SHIELD_GIVEN_KEY)) {
-            entity.getPersistentData().putBoolean(INITIAL_SHIELD_GIVEN_KEY, true);
-            AbsorptionShield.grant(entity, entity.getMaxHealth());
+        if (totalLevel > 0) {
+            CompoundTag data = Services.platform().persistentData(entity);
+            if (!data.getBoolean(INITIAL_SHIELD_GIVEN_KEY)) {
+                data.putBoolean(INITIAL_SHIELD_GIVEN_KEY, true);
+                AbsorptionShield.grant(entity, entity.getMaxHealth());
+            }
         }
     }
 
@@ -285,8 +290,8 @@ public class EnchantmentSacredOrder extends EnchantmentBase {
      */
     @SubscribeEvent
     public static void onPlayerClone(@NotNull PlayerEvent.Clone evt) {
-        if (!evt.isWasDeath() && evt.getOriginal().getPersistentData().getBoolean(INITIAL_SHIELD_GIVEN_KEY)) {
-            evt.getEntity().getPersistentData().putBoolean(INITIAL_SHIELD_GIVEN_KEY, true);
+        if (!evt.isWasDeath() && Services.platform().persistentData(evt.getOriginal()).getBoolean(INITIAL_SHIELD_GIVEN_KEY)) {
+            Services.platform().persistentData(evt.getEntity()).putBoolean(INITIAL_SHIELD_GIVEN_KEY, true);
         }
     }
 

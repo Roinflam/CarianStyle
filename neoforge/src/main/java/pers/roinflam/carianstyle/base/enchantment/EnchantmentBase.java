@@ -15,7 +15,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import pers.roinflam.carianstyle.bus.EventPriority;
-import net.neoforged.neoforge.registries.DeferredHolder;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -95,12 +94,6 @@ public abstract class EnchantmentBase {
     private final ResourceKey<Enchantment> key;
 
     /**
-     * 只当查表键用的 Holder，见 {@link #lookupHolder()}。
-     */
-    @Nullable
-    private final DeferredHolder<Enchantment, Enchantment> lookupHolder;
-
-    /**
      * 缓存禁用状态，避免每次调用都遍历数组
      * <p>
      * 最低位是结果（1 = 禁用），其余位是算出它时的配置版本号 {@link ConfigLoader#bakeGeneration()}。
@@ -128,13 +121,11 @@ public abstract class EnchantmentBase {
             this.enchantmentRarity = annotation.rarity();
             this.key = ResourceKey.create(Registries.ENCHANTMENT,
                     ResourceLocation.fromNamespaceAndPath(Reference.MOD_ID, annotation.id()));
-            this.lookupHolder = DeferredHolder.create(this.key);
             CarianStyleEnchantments.ENCHANTMENTS.add(this);
             LogUtil.debug("卡利亚式附魔 - 通过注解注册附魔: %s", annotation.id());
         } else {
             this.enchantmentRarity = EnchantmentRarity.UNCOMMON;
             this.key = null;
-            this.lookupHolder = null;
             LogUtil.warn("卡利亚式附魔 - 附魔类 %s 未使用AutoRegisterEnchantment注解",
                     this.getClass().getSimpleName());
         }
@@ -157,19 +148,6 @@ public abstract class EnchantmentBase {
      */
     public ResourceKey<Enchantment> getKey() {
         return key;
-    }
-
-    /**
-     * 只当查表键用的 Holder，包内私有，只给 {@link EnchantmentLevels#get} 用。
-     * <p>
-     * 它是按键建的 {@code DeferredHolder}，没有绑定值：{@code value()} 会抛异常，{@code is(TagKey)} 恒 false，
-     * 拿它写进物品再编码会失败。物品组件按 Holder 的 {@code equals / hashCode}（按键）查表，所以只拿来查等级是对的。
-     * 判标签、写物品、取定义一律用世界注册表里的真 Holder（{@link #getKey()}）。
-     * </p>
-     */
-    @Nullable
-    Holder<Enchantment> lookupHolder() {
-        return lookupHolder;
     }
 
     @Nullable

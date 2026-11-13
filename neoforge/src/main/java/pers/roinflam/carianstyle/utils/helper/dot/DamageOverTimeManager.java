@@ -10,6 +10,7 @@ import pers.roinflam.carianstyle.event.LivingDeathEvent;
 import pers.roinflam.carianstyle.bus.EventPriority;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
+import pers.roinflam.carianstyle.mixin.accessor.DamageSourceInvoker;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
@@ -505,7 +506,7 @@ public class DamageOverTimeManager {
      * @param source 条目登记时的伤害源
      */
     private static void killThroughDamagePipeline(@Nonnull LivingEntity target, @Nonnull DamageSource source) {
-        DamageSource lethal = new DamageSource(source.typeHolder(), source.getDirectEntity(),
+        DamageSource lethal = DamageSourceInvoker.carianstyle$create(source.typeHolder(), source.getDirectEntity(),
                 source.getEntity(), source.sourcePositionRaw());
         DamageSourceUtil.setBypassesInvulnerability(lethal);
         DamageSourceUtil.setBypassesCooldown(lethal);

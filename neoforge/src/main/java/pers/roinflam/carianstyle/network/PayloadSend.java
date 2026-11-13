@@ -8,8 +8,8 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
-import net.neoforged.neoforge.common.util.FakePlayer;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
+import pers.roinflam.carianstyle.platform.Services;
 
 import javax.annotation.Nonnull;
 
@@ -20,7 +20,7 @@ import javax.annotation.Nonnull;
  * <p>
  * NeoForge 发自定义包时先查对端有没有协商过这个频道（{@code ServerCommonPacketListenerImpl.send} 第一行
  * {@code NetworkRegistry.checkPacket}），没有就抛 {@code UnsupportedOperationException}。
- * 真玩家都协商过；NeoForge 自己的 {@link FakePlayer} 发包是空操作。但别的模组用普通 {@code ServerPlayer}
+ * 真玩家都协商过；NeoForge 自己的 {@code FakePlayer} 发包是空操作。但别的模组用普通 {@code ServerPlayer}
  * 加假连接做的机器人 / 假人也在玩家列表里，{@code PacketDistributor} 的按维度、按范围广播会挨个发到它们，
  * 异常从服务器 tick 里的同步逻辑冒出来，轻则这一轮同步中断，重则整个 tick 出错。
  * 1.20.1 的 {@code SimpleChannel} 不查对端频道，照发不误，没有这个问题。
@@ -43,18 +43,12 @@ public final class PayloadSend {
     }
 
     /**
-     * 这个玩家能不能收这个包：不是 {@link FakePlayer}、连接还在、协商过这个包的频道。
+     * 这个玩家能不能收这个包：不是假人、连接还在、协商过这个包的频道。
+     * 判断交给平台（{@code PlatformNetwork.canSend}）：NeoForge 上就是原来这几条，
+     * 不是 {@code FakePlayer}、{@code connection} 不为空、{@code hasChannel(包类型)}，查的时候抛异常按不能收。
      */
     public static boolean canReceive(@Nonnull ServerPlayer player, @Nonnull CustomPacketPayload payload) {
-        if (player instanceof FakePlayer || player.connection == null) {
-            return false;
-        }
-        try {
-            return player.connection.hasChannel(payload.type());
-        } catch (RuntimeException e) {
-            // 自己拼的假连接可能连协商信息都没有，按不能收处理
-            return false;
-        }
+        return Services.network().canSend(player, payload.type());
     }
 
     /** 发给一个玩家（对应 {@code PacketDistributor.sendToPlayer}） */

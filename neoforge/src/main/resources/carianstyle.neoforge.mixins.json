@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "package": "pers.roinflam.carianstyle.neoforge.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "damage.MixinLivingEntityDamageStages",
+    "damage.MixinPlayerDamageStages"
+  ],
+  "client": [
+  ],
+  "server": [
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "minVersion": "0.8"
+}

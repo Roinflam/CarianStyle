@@ -7,6 +7,7 @@ import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.Items;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
+import pers.roinflam.carianstyle.platform.Services;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
 import javax.annotation.Nonnull;
@@ -132,7 +133,7 @@ public final class ItemProbe {
         List<Item> result = new ArrayList<>(4);
         for (Item item : PROBE_ITEMS) {
             try {
-                if (new ItemStack(item).supportsEnchantment(enchantment)) {
+                if (Services.platform().supportsEnchantment(new ItemStack(item), enchantment)) {
                     result.add(item);
                 }
             } catch (Exception e) {

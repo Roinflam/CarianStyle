@@ -9,7 +9,6 @@ import com.google.gson.JsonPrimitive;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.neoforged.fml.loading.FMLPaths;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
@@ -450,7 +449,7 @@ public final class EnchantmentValues {
      */
     @Nonnull
     private static Path resolvePath() {
-        Path dir = FMLPaths.CONFIGDIR.get().resolve(Reference.MOD_ID);
+        Path dir = pers.roinflam.carianstyle.platform.Services.platform().configDir().resolve(Reference.MOD_ID);
         try {
             Files.createDirectories(dir);
         } catch (IOException e) {

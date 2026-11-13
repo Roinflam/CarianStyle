@@ -10,6 +10,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.neoforged.fml.ModList;
+import pers.roinflam.carianstyle.platform.Services;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -503,6 +504,6 @@ public final class ForeignMeta implements CodexEntry {
      * @return 是否可附魔
      */
     public boolean canEnchant(@Nonnull Item item) {
-        return new ItemStack(item).supportsEnchantment(enchantment);
+        return Services.platform().supportsEnchantment(new ItemStack(item), enchantment);
     }
 }

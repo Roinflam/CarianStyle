@@ -1,4 +1,4 @@
-package pers.roinflam.carianstyle.mixin.damage;
+package pers.roinflam.carianstyle.neoforge.mixin.damage;
 
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import pers.roinflam.carianstyle.event.damage.DamageStages;
+import pers.roinflam.carianstyle.neoforge.damage.DamageStages;
 
 /**
  * 伤害适配层的玩家部分：{@link Player} 覆写了 {@code hurt} 和 {@code actuallyHurt}（后者不调 super），

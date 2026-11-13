@@ -17,7 +17,8 @@ import pers.roinflam.carianstyle.event.LivingEvent;
  *   <li>{@link #getAmount()} 是原始伤害，只读。</li>
  * </ul>
  * <p>
- * 发出端在 {@code event/damage/DamageStages} 和 {@code mixin/damage/} 两个 mixin 里。
+ * 发出端：NeoForge 版在 {@code neoforge/damage/DamageStages} 和 {@code neoforge/mixin/damage/} 两个 mixin 里，
+ * Fabric 版在 fabric 模块自己的伤害三段 mixin 里。
  * 名字和 NeoForge 的 {@code LivingDamageEvent} 等撞了的，同一个文件两个都要用时写全名。
  * </p>
  */

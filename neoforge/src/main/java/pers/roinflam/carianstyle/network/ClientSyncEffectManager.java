@@ -8,7 +8,6 @@ import net.minecraft.world.level.Level;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
-import net.neoforged.fml.loading.FMLEnvironment;
 
 import javax.annotation.Nonnull;
 import java.util.*;
@@ -211,7 +210,7 @@ public class ClientSyncEffectManager {
     private static final IClientCacheProxy CLIENT_PROXY;
 
     static {
-        CLIENT_PROXY = FMLEnvironment.dist == Dist.CLIENT
+        CLIENT_PROXY = pers.roinflam.carianstyle.platform.Services.platform().isClient()
                 ? new ClientCacheProxyImpl()
                 : new ServerCacheProxyImpl();
     }

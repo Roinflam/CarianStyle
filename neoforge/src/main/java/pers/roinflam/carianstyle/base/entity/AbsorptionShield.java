@@ -1,6 +1,7 @@
 package pers.roinflam.carianstyle.base.entity;
 
 import net.minecraft.nbt.CompoundTag;
+import pers.roinflam.carianstyle.platform.Services;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -174,7 +175,7 @@ public final class AbsorptionShield {
         if (event.getLevel().isClientSide() || !(event.getEntity() instanceof LivingEntity entity)) {
             return;
         }
-        CompoundTag data = entity.getPersistentData();
+        CompoundTag data = Services.platform().persistentData(entity);
         if (data.getBoolean(LEGACY_CHECKED)) {
             return;
         }

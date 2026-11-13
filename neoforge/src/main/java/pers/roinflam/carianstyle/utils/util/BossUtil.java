@@ -6,7 +6,6 @@ import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.neoforged.neoforge.common.Tags;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
@@ -41,6 +40,13 @@ import java.util.List;
  * @version 1.0
  */
 public final class BossUtil {
+
+    /**
+     * 加载器通用标签 {@code c:bosses}（NeoForge 的 {@code Tags.EntityTypes.BOSSES} 就是它，Fabric 的惯例标签同名），
+     * 直接按 id 建，不引用某个加载器的标签类。
+     */
+    private static final TagKey<EntityType<?>> COMMON_BOSSES =
+            TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath("c", "bosses"));
 
     /** 额外算作 BOSS 的实体（数据包追加） */
     public static final TagKey<EntityType<?>> BOSSES =
@@ -96,7 +102,7 @@ public final class BossUtil {
         if (type.is(NOT_BOSSES)) {
             return false;
         }
-        if (type.is(Tags.EntityTypes.BOSSES) || type.is(BOSSES)) {
+        if (type.is(COMMON_BOSSES) || type.is(BOSSES)) {
             return true;
         }
         return hasVisibleBossBar(entity);

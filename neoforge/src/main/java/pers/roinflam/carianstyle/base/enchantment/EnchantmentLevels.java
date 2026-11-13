@@ -2,6 +2,7 @@ package pers.roinflam.carianstyle.base.enchantment;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
@@ -28,17 +29,33 @@ import java.util.Map;
  *
  * <h3>做法</h3>
  * <ul>
- *   <li>{@link #get}：直接读组件原始数据 {@code stack.getTagEnchantments().getLevel(查表 Holder)}。
- *       查表 Holder 是 {@link EnchantmentBase} 里按注册表键建的 {@code DeferredHolder}：NeoForge 给
- *       {@code Holder.Reference} 和 {@code DeferredHolder} 都补了按键的 {@code equals / hashCode}，
- *       组件内部是按 Holder 查的哈希表，所以不用拿世界里的真 Holder 也能查到。</li>
+ *   <li>{@link #get}：直接读组件原始数据 {@code stack.getEnchantments()}，逐条比注册表键
+ *       （{@code holder.is(附魔.getKey())}），对上就返回等级。不用拿世界里的真 Holder，也不靠某个加载器
+ *       给 Holder 补的 {@code equals}，见下面「为什么按键逐条比」。</li>
  *   <li>{@link #all}：同样只读物品自身的 {@code enchantments} 组件，按注册表键换成行为对象，不是本模组的跳过。</li>
  * </ul>
+ *
+ * <h3>为什么按键逐条比</h3>
+ * <p>
+ * <b>问题</b>：原来按注册表键建一个 {@code DeferredHolder} 当查表键，直接 {@code getLevel(查表 Holder)} 查哈希表。
+ * 这能查到全靠 NeoForge 给 {@code Holder.Reference} 补的按键 {@code equals / hashCode}；原版的 {@code Holder.Reference}
+ * 按对象身份比较，同一套写法在 Fabric 上永远查不到（等级恒 0）。
+ * </p>
+ * <p>
+ * <b>为什么这么改</b>：遍历组件里的条目，用原版的 {@code Holder.is(ResourceKey)} 比键。NeoForge 补的 {@code equals}
+ * 也只认「引用型 Holder 且键是同一个对象」，{@code is(ResourceKey)} 对引用型 Holder 同样是键的身份比较、对直接型 Holder
+ * 恒 false，所以两种写法在 NeoForge 上查到的是同一条。
+ * 代价：原版 {@code ItemEnchantments.keySet()} 每次套一层不可修改视图，遍历时还要建迭代器，每次调用多两三个
+ * 短命小对象（逐条比本身不分配）；物品上的附魔只有个位数，比较次数可以忽略，多出来的只是这几个对象。
+ * </p>
+ * <p>
+ * <b>行为影响</b>：NeoForge 版查到的等级不变；Fabric 版能正常查到。
+ * </p>
  *
  * <h3>为什么不走 {@code stack.getEnchantmentLevel(holder)}</h3>
  * <p>
  * NeoForge 的这个方法会先问物品自己的 {@code getEnchantmentLevel}，再发全局 {@code GetEnchantmentLevelEvent}，
- * 要传真 Holder，监听者还可能对查表 Holder 调 {@code value()}（它没绑定值，会抛异常）。
+ * 要传世界注册表里的真 Holder，每次查等级都得先去注册表取一次；而且这是 NeoForge 独有的方法，Fabric 上没有。
  * 读原始数据的代价：别的模组物品覆写等级钩子给本模组附魔加的等级，1.21.1 不生效（1.20.1 生效）。实际影响很小。
  * </p>
  *
@@ -51,7 +68,8 @@ import java.util.Map;
  * </p>
  * <p>
  * <b>为什么这么改</b>：附魔书是用来在铁砧上转移附魔的材料，不是装备。{@link #all} 只给「这件装备身上有什么附魔」用，
- * 改成读 {@code getTagEnchantments()}（物品自身的 {@code enchantments} 组件），和 {@link #get} 口径一致。
+ * 改成读 {@code getEnchantments()}（物品自身的 {@code enchantments} 组件；NeoForge 的 {@code getTagEnchantments()}
+ * 就是原样转调它），和 {@link #get} 口径一致。
  * 要看书里存了什么的地方（图鉴、物品筛选）自己调 {@code getEnchantmentsForCrafting}，不走这里。
  * </p>
  * <p>
@@ -91,11 +109,21 @@ public final class EnchantmentLevels {
         if (enchantment == null || stack.isEmpty()) {
             return 0;
         }
-        Holder<Enchantment> holder = enchantment.lookupHolder();
-        if (holder == null) {
+        ResourceKey<Enchantment> key = enchantment.getKey();
+        if (key == null) {
             return 0;
         }
-        return stack.getTagEnchantments().getLevel(holder);
+        ItemEnchantments enchantments = stack.getEnchantments();
+        if (enchantments.isEmpty()) {
+            return 0;
+        }
+        // 走 keySet 不走 entrySet：fastutil 的条目迭代器每条都新建一个条目对象，键迭代器不建
+        for (Holder<Enchantment> holder : enchantments.keySet()) {
+            if (holder.is(key)) {
+                return enchantments.getLevel(holder);
+            }
+        }
+        return 0;
     }
 
     /**
@@ -112,7 +140,7 @@ public final class EnchantmentLevels {
         if (stack.isEmpty()) {
             return Collections.emptyMap();
         }
-        ItemEnchantments enchantments = stack.getTagEnchantments();
+        ItemEnchantments enchantments = stack.getEnchantments();
         if (enchantments.isEmpty()) {
             return Collections.emptyMap();
         }

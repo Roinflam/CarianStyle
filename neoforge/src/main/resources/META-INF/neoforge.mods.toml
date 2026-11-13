@@ -18,6 +18,10 @@ Carian Style!
 [[mixins]]
 config="${mod_id}.mixins.json"
 
+# 依赖 NeoForge 补丁成员（LivingEntity.damageContainers）的伤害三段 mixin 单独一份，只在 NeoForge 版里有
+[[mixins]]
+config="${mod_id}.neoforge.mixins.json"
+
 [[dependencies.${mod_id}]]
 modId="neoforge"
 type="required"

@@ -681,8 +681,9 @@ public class EntityGlintblades extends ThrowableProjectile {
         Entity hitEntity = result.getEntity();
         // 多部位生物（末影龙、一些模组的 BOSS 等）被撞到的是部位实体，它不是 LivingEntity，
         // 伤害要转给本体，否则这一剑什么也不做
-        if (hitEntity instanceof net.neoforged.neoforge.entity.PartEntity<?> part && part.getParent() != null) {
-            hitEntity = part.getParent();
+        Entity parent = pers.roinflam.carianstyle.platform.Services.platform().partParent(hitEntity);
+        if (parent != null) {
+            hitEntity = parent;
         }
 
         // 不伤害投掷者

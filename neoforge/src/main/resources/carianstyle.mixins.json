@@ -9,9 +9,8 @@
     "MixinEnchantmentFullname",
     "MixinLivingEntityTick",
     "accessor.LivingEntityAccessor",
+    "accessor.DamageSourceInvoker",
     "accessor.SynchedEntityDataAccessor",
-    "damage.MixinLivingEntityDamageStages",
-    "damage.MixinPlayerDamageStages",
     "helper.DamageSourceMixin"
   ],
   "client": [

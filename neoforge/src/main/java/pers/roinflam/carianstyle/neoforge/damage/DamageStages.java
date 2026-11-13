@@ -1,10 +1,13 @@
-package pers.roinflam.carianstyle.event.damage;
+package pers.roinflam.carianstyle.neoforge.damage;
 
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.neoforged.neoforge.common.damagesource.DamageContainer;
 import pers.roinflam.carianstyle.base.entity.AbsorptionShield;
 import pers.roinflam.carianstyle.bus.CarianBus;
+import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
+import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
+import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
 
 import javax.annotation.Nonnull;
 import java.util.Stack;

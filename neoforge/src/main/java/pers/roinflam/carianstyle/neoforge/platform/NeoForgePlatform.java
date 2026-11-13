@@ -16,7 +16,7 @@ import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.util.FakePlayer;
 import net.neoforged.neoforge.entity.PartEntity;
-import pers.roinflam.carianstyle.enchantment.RockBlasterProbeEvent;
+import pers.roinflam.carianstyle.neoforge.event.RockBlasterProbeEvent;
 import pers.roinflam.carianstyle.platform.Platform;
 
 import javax.annotation.Nonnull;

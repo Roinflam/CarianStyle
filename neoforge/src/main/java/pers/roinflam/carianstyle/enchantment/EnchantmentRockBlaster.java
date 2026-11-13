@@ -12,7 +12,6 @@ import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.common.NeoForge;
 import pers.roinflam.carianstyle.event.BlockEvent;
 import pers.roinflam.carianstyle.bus.EventPriority;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
@@ -23,6 +22,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.platform.Services;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 import java.util.*;
@@ -353,7 +353,7 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
                     block.playerWillDestroy(world, pos, blockState, player);
 
                     // willHarvest 参数：抑制掉落时传 false，阻止方块保留状态给后续掉落逻辑
-                    if (block.onDestroyedByPlayer(blockState, world, pos, player, !suppressDrop, world.getFluidState(pos))) {
+                    if (Services.platform().destroyByPlayer(blockState, world, pos, player, !suppressDrop, world.getFluidState(pos))) {
                         block.destroy(world, pos, blockState);
 
                         if (!suppressDrop) {
@@ -396,7 +396,8 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
     }
 
     /**
-     * 连带挖的这一格先以玩家身份问一遍领地 / 保护（{@link RockBlasterProbeEvent}），被取消就不挖。
+     * 连带挖的这一格先以玩家身份问一遍领地 / 保护（{@code Platform.probeBlockBreak}：NeoForge 上照旧在 NeoForge 总线发
+     * {@code RockBlasterProbeEvent}，Fabric 上问 {@code PlayerBlockBreakEvents.BEFORE}），被取消就不挖。
      * 只有中心那一格走过了原版破坏流程的权限检查，相连的方块可能越过领地边界（在自己地皮边上挖到路或隔壁地皮）。
      * 发事件那一下把拿着镐的那只手临时清空：按手上工具连带挖的监听器（本附魔、别的范围挖掘附魔）看到空手就不会再挖一片，
      * 领地模组只看玩家和位置，照样拦得住。直接改背包格、不走 setItemInHand，不触发换装备的事件和音效。
@@ -412,7 +413,7 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
             inventory.offhand.set(0, ItemStack.EMPTY);
         }
         try {
-            return !NeoForge.EVENT_BUS.post(new RockBlasterProbeEvent(level, pos, state, player)).isCanceled();
+            return Services.platform().probeBlockBreak(level, pos, state, player);
         } finally {
             if (mainHand) {
                 inventory.items.set(slot, held);
