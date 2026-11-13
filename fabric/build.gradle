@@ -42,6 +42,9 @@ dependencies {
 
 // loom 闭包里 rootProject 会被解析到别的对象上，先取成局部变量
 def modId = rootProject.mod_id
+// 开发运行时开自测：gradle :fabric:runServer -Pcarianstyle.selftest=<组>
+// （Gradle 命令行的 -D 只进 Gradle 自己的 JVM，传不到游戏进程，所以经项目属性转一道）
+def selftestGroup = project.findProperty('carianstyle.selftest')
 
 loom {
     mixin {
@@ -56,6 +59,11 @@ loom {
         }
     }
     runs {
+        if (selftestGroup) {
+            configureEach {
+                vmArg "-Dcarianstyle.selftest=${selftestGroup}"
+            }
+        }
         // 客户端、服务端各用自己的游戏目录（同 neoforge 模块）
         client {
             runDir 'run/client'
