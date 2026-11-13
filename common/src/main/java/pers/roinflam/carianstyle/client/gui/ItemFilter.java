@@ -10,7 +10,7 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import pers.roinflam.carianstyle.codex.CodexEntry;
 import pers.roinflam.carianstyle.client.codex.EnchantmentCodex;
 import pers.roinflam.carianstyle.codex.EnchantmentMeta;
-import pers.roinflam.carianstyle.codex.ForeignCodex;
+import pers.roinflam.carianstyle.client.codex.ForeignCodex;
 import pers.roinflam.carianstyle.client.codex.ForeignMeta;
 import pers.roinflam.carianstyle.codex.ItemFit;
 

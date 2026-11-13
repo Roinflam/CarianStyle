@@ -13,7 +13,7 @@ import net.minecraft.world.item.enchantment.Enchantment;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.base.enchantment.LevelDecay;
 import pers.roinflam.carianstyle.client.codex.EnchantmentCodex;
-import pers.roinflam.carianstyle.codex.ModNames;
+import pers.roinflam.carianstyle.client.codex.ModNames;
 import pers.roinflam.carianstyle.codex.EnchantmentMeta;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;

@@ -1,4 +1,4 @@
-package pers.roinflam.carianstyle.codex;
+package pers.roinflam.carianstyle.client.codex;
 
 import net.minecraft.network.chat.Component;
 import pers.roinflam.carianstyle.platform.Services;

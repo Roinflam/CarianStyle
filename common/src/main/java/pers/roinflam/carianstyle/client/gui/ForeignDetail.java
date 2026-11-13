@@ -10,9 +10,9 @@ import net.minecraft.world.item.enchantment.Enchantment;
 import pers.roinflam.carianstyle.client.codex.EnchantmentCodex;
 import pers.roinflam.carianstyle.codex.EnchantmentSlots;
 import pers.roinflam.carianstyle.codex.EnchantmentMeta;
-import pers.roinflam.carianstyle.codex.ForeignCodex;
+import pers.roinflam.carianstyle.client.codex.ForeignCodex;
 import pers.roinflam.carianstyle.codex.ItemCategoryNamer;
-import pers.roinflam.carianstyle.codex.ModNames;
+import pers.roinflam.carianstyle.client.codex.ModNames;
 import pers.roinflam.carianstyle.client.codex.ForeignMeta;
 
 import javax.annotation.Nonnull;

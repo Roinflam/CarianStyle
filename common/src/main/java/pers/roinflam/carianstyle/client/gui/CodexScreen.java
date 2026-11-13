@@ -11,7 +11,7 @@ import net.minecraft.world.item.ItemStack;
 import pers.roinflam.carianstyle.codex.CodexTheme;
 import pers.roinflam.carianstyle.mixin.client.ScreenAccessor;
 import pers.roinflam.carianstyle.client.codex.EnchantmentCodex;
-import pers.roinflam.carianstyle.codex.ForeignCodex;
+import pers.roinflam.carianstyle.client.codex.ForeignCodex;
 import pers.roinflam.carianstyle.client.codex.ForeignMeta;
 import pers.roinflam.carianstyle.codex.EnchantmentMeta;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
