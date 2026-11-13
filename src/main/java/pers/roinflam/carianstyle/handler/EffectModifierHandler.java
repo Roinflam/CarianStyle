@@ -1,12 +1,16 @@
 package pers.roinflam.carianstyle.handler;
 
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.api.IEffectModifier;
+import pers.roinflam.carianstyle.base.enchantment.EquipmentStamp;
+import pers.roinflam.carianstyle.utils.Reference;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -24,7 +28,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
  * 具体的等级获取和修改逻辑都在各个附魔类中
  * </p>
  * <p>
- * <b>性能优化：同一 tick 内按实体缓存「装备上有哪些 IEffectModifier 附魔」。</b>
+ * <b>性能优化：按实体缓存「装备上有哪些 IEffectModifier 附魔」，装备没变就一直复用，最多 20 tick 强制重扫一次。</b>
  * </p>
  * <p>
  * <b>问题：</b>本处理器由 {@code MixinEffectModifier} 挂在 {@code LivingEntity.addEffect(MobEffectInstance, Entity)}
@@ -43,24 +47,24 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
  *       按迭代顺序逐件读取。这一点不能改——三个 IEffectModifier 附魔的 {@code modifyEffect} 不可交换
  *       （例如 BeastRobust「等级×2+1」和 Lucidity「等级+1」先后次序不同结果不同），而 HashSet
  *       在两个元素落进同一个桶时按插入顺序迭代，所以插入顺序必须与原来一致。</li>
- *   <li>命中条件：同一世界、同一 gameTime（即同一 tick），且这次扫到的物品对象与缓存时<b>逐个引用相同</b>、
- *       每件的 {@code isEmpty()} 也与缓存时相同。换装、换物品会换成新对象；耐久耗尽不换对象
- *       （{@code hurtAndBreak} 是原地 shrink 到 0），所以另外比较空/非空状态——两种情况都立即失效重算。</li>
+ *   <li>命中条件：缓存不到 {@link #MAX_AGE_TICKS} 个服务端 tick，且这次扫到的物品对象与缓存时<b>逐个引用相同</b>、
+ *       每件的 {@code isEmpty()} 也与缓存时相同、每件的附魔组件对象也相同（{@link EquipmentStamp}）。
+ *       换装、换物品会换成新对象；耐久耗尽不换对象（{@code hurtAndBreak} 是原地 shrink 到 0），所以另外比较空/非空状态；
+ *       {@code /enchant}、{@code ItemStack.enchant}、铁砧、{@code set(ENCHANTMENTS, ...)} 都会换上新对象——都立即失效重算。</li>
  *   <li>{@code getEnchantmentLevel} <b>不缓存</b>，仍按原实现每次调用现算；{@code modifyEffect} 同样每次现算。</li>
  * </ul>
- * 与原实现唯一可能不同的情况：同一 tick 内有代码<b>原地</b>改了一件已扫描过的装备的附魔 NBT
- * （同一个物品对象上增删 Lucidity / BeastRobust / BeastVitality，而不是换物品对象），且该实体在同一 tick
- * 稍后又被 addEffect——这一次沿用改之前的附魔集合（新增的会漏掉；删掉的因为等级现算为 0 会被跳过，
- * 但若同一附魔在别的部位还有、且与另一附魔落进同一 HashSet 桶，应用先后可能与原实现不同），下一 tick 自动恢复。
- * 原版铁砧、砂轮都是 copy 出新物品对象；附魔台和 {@code /enchant} 是原地改，但前者改的是附魔台格子里的物品，
- * 后者只改主手且要权限。
- * CarianStyle 自己没有任何原地改附魔的代码（全库无 {@code .enchant(} / {@code setEnchantments} 调用）。
+ * 1.21.1 正常途径改附魔都会换上新的组件对象，都看得出来；看不出来的只有绕开正常写法、在原组件上改的情况
+ * （见 {@link EquipmentStamp} 类注释，原版和本模组都没有），之后 {@link #MAX_AGE_TICKS} tick 内的 addEffect 沿用改之前的附魔集合（换进来的会漏掉；换走的因为等级现算为 0 会被跳过），
+ * 到时间强制重扫后恢复。
  * </p>
  * <p>
- * <b>内存与线程：</b>缓存只对「当前这一个 (世界, gameTime)」有效，一旦看到别的世界或别的 tick 就整张表清空，
- * 所以表里最多只有「最近这一小段连续调用里出现过的实体」，不会随时间累积；键再用弱引用，
- * 单人游戏关服回主菜单后也不会因为静态表而拽住整个 ServerLevel（除非某个物品对象反过来强引用着持有它的实体，
- * 那也只会留住最后一代的几条，下一次换代即清空）。
+ * 以前缓存只在同一 tick 内有效（按「世界 + gameTime」换代就清表）：饰品每 tick 给佩戴者续 buff，
+ * 每个玩家每 tick 至少重扫一次；玩家分在几个世界时连续调用在不同世界之间来回，表被反复清空。
+ * </p>
+ * <p>
+ * <b>内存与线程：</b>每 {@link #MAX_AGE_TICKS} 个服务端 tick 把过期的条目清掉，表里只有最近 1 秒内被 addEffect 过的实体，
+ * 不会随时间累积；键再用弱引用，快照里只存物品和组件对象、不存世界；关服时整张表清空，
+ * 单人游戏回主菜单后不会因为静态表而拽住整个 ServerLevel。
  * 客户端在方法开头已经直接返回，不会进缓存；但 Mohist 的 addEffect 对非主线程调用只是跳过 Bukkit 事件
  * （{@code AsyncCatcher.catchAsync()} 只返回布尔值、不抛异常），而本钩子在方法头、比那个判断更早，
  * 所以确实可能被异步线程调到，缓存的读写都在 {@link #CACHE_LOCK} 内完成。
@@ -69,24 +73,30 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
  *
  * @author RoinFlam
  */
+@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.GAME)
 public class EffectModifierHandler {
 
+    /** 快照最多用这么多个服务端 tick，到了强制重扫（兜底看不出来的原地改动） */
+    private static final int MAX_AGE_TICKS = 20;
+
     /**
-     * 保护 {@link #CACHE}、{@link #cacheDimension}、{@link #cacheGameTime}。
+     * 服务端 tick 计数（每个 tick 开头 +1）。
+     * <p>不用 {@code level.getGameTime()}：各世界的 gameTime 不一定相同（插件建的世界有自己的），按它算年龄会错。</p>
+     */
+    private static volatile long serverTick = 0L;
+
+    /**
+     * 保护 {@link #CACHE}。
      * 锁内只做表操作（外加 WeakHashMap 查表时调用的实体 equals/hashCode），物品/附魔/装备读取都在锁外，
      * 避免持锁期间回调进别的模组逻辑。
      */
     private static final Object CACHE_LOCK = new Object();
 
     /**
-     * 实体 → 本 tick 的扫描快照。只存当前 {@link #cacheDimension} + {@link #cacheGameTime} 这一代的数据，
-     * 换代即 clear。{@code Entity} 的 equals/hashCode 按实体 id 覆写，id 相同的两个对象会共用一格；
+     * 实体 → 最近一次的扫描快照。{@code Entity} 的 equals/hashCode 按实体 id 覆写，id 相同的两个对象会共用一格；
      * 这不影响正确性，因为命中还要求扫到的物品对象逐个引用相同，而结果只由这些物品对象决定。
      */
     private static final Map<LivingEntity, EquipmentSnapshot> CACHE = new WeakHashMap<>();
-
-    private static ResourceKey<Level> cacheDimension = null;
-    private static long cacheGameTime = Long.MIN_VALUE;
 
     /**
      * 一次装备扫描的结果：扫到的物品对象（按原扫描顺序）、当时各件是否为空（位掩码），
@@ -95,20 +105,35 @@ public class EffectModifierHandler {
     private static final class EquipmentSnapshot {
         final ItemStack[] equipment;
         final long emptyMask;
+        final EquipmentStamp[] stamps;
+        final long createdTick;
         final Set<IEffectModifier> modifiers;
 
-        EquipmentSnapshot(ItemStack[] equipment, long emptyMask, Set<IEffectModifier> modifiers) {
+        EquipmentSnapshot(ItemStack[] equipment, long emptyMask, EquipmentStamp[] stamps, long createdTick,
+                          Set<IEffectModifier> modifiers) {
             this.equipment = equipment;
             this.emptyMask = emptyMask;
+            this.stamps = stamps;
+            this.createdTick = createdTick;
             this.modifiers = modifiers;
         }
 
-        boolean matches(ItemStack[] current, long currentEmptyMask) {
-            if (this.equipment.length != current.length || this.emptyMask != currentEmptyMask) {
+        boolean expired(long now) {
+            long age = now - createdTick;
+            return age < 0 || age >= MAX_AGE_TICKS;
+        }
+
+        boolean matches(ItemStack[] current, long currentEmptyMask, long now) {
+            if (expired(now) || this.equipment.length != current.length || this.emptyMask != currentEmptyMask) {
                 return false;
             }
             for (int i = 0; i < current.length; i++) {
                 if (this.equipment[i] != current[i]) {
+                    return false;
+                }
+            }
+            for (int i = 0; i < current.length; i++) {
+                if (!this.stamps[i].matches(current[i])) {
                     return false;
                 }
             }
@@ -174,12 +199,10 @@ public class EffectModifierHandler {
     }
 
     /**
-     * 取本 tick、当前装备下的附魔集合；命中缓存直接复用，否则重新扫描并写回。
+     * 取当前装备下的附魔集合；命中缓存直接复用，否则重新扫描并写回。
      */
     private static Set<IEffectModifier> resolveModifiers(@NotNull LivingEntity entity) {
-        Level level = entity.level();
-        ResourceKey<Level> dimension = level.dimension();
-        long gameTime = level.getGameTime();
+        long now = serverTick;
         ItemStack[] equipment = captureEquipment(entity);
         if (equipment.length > Long.SIZE) {
             // 空/非空状态用 long 位掩码记录；装备件数超过 64 的实体（不存在于原版，防御用）不走缓存
@@ -187,31 +210,44 @@ public class EffectModifierHandler {
         }
         long emptyMask = emptyMask(equipment);
 
+        EquipmentSnapshot cached;
         synchronized (CACHE_LOCK) {
-            // 原版/模组维度走 DerivedLevelData，共用主世界的 gameTime；但 Bukkit 插件 createWorld 建的世界
-            // 有自己的 PrimaryLevelData 和 gameTime（CraftServer 核实），所以「代」要用 (世界, gameTime) 一起判定。
-            // ResourceKey 是驻留的（ResourceKey.create 走 VALUES 表）且没覆写 equals，!= 即按值比较。
-            if (gameTime != cacheGameTime || dimension != cacheDimension) {
-                CACHE.clear();
-                cacheGameTime = gameTime;
-                cacheDimension = dimension;
-            } else {
-                EquipmentSnapshot cached = CACHE.get(entity);
-                if (cached != null && cached.matches(equipment, emptyMask)) {
-                    return cached.modifiers;
-                }
-            }
+            cached = CACHE.get(entity);
+        }
+        // 判命中要读物品组件，放在锁外（快照创建后不再修改，可以安全读）
+        if (cached != null && cached.matches(equipment, emptyMask, now)) {
+            return cached.modifiers;
         }
 
+        // 先记判据再扫描：扫描读到的就是记下的这几个对象
+        EquipmentStamp[] stamps = new EquipmentStamp[equipment.length];
+        for (int i = 0; i < equipment.length; i++) {
+            stamps[i] = new EquipmentStamp();
+            stamps[i].update(equipment[i]);
+        }
         Set<IEffectModifier> modifiers = collectModifiers(equipment);
 
         synchronized (CACHE_LOCK) {
-            // 扫描期间别的线程可能已经换代，只有还在同一代时才写回
-            if (gameTime == cacheGameTime && dimension == cacheDimension) {
-                CACHE.put(entity, new EquipmentSnapshot(equipment, emptyMask, modifiers));
-            }
+            CACHE.put(entity, new EquipmentSnapshot(equipment, emptyMask, stamps, now, modifiers));
         }
         return modifiers;
+    }
+
+    @SubscribeEvent
+    public static void onServerTick(@NotNull ServerTickEvent.Pre event) {
+        long now = ++serverTick;
+        if (now % MAX_AGE_TICKS == 0) {
+            synchronized (CACHE_LOCK) {
+                CACHE.values().removeIf(snapshot -> snapshot.expired(now));
+            }
+        }
+    }
+
+    @SubscribeEvent
+    public static void onServerStopped(@NotNull ServerStoppedEvent event) {
+        synchronized (CACHE_LOCK) {
+            CACHE.clear();
+        }
     }
 
     /**

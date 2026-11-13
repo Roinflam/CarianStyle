@@ -24,6 +24,8 @@ import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
 import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import pers.roinflam.carianstyle.utils.util.EquipmentSlots;
 
 /**
@@ -41,12 +43,15 @@ import pers.roinflam.carianstyle.utils.util.EquipmentSlots;
  * 每次都反序列化ItemStack的NBT附魔标签，是最大的tick性能瓶颈之一。
  *
  * 优化策略：
- * - 为每个玩家缓存6个槽位的物品身份哈希（item注册单例+count+damage，不含tag）
- * - 哈希不含tag的原因：科技模组物品的能量NBT每tick变化，如果含tag则每tick都miss
- * - 哈希匹配 → 用缓存结果，跳过NBT反序列化
- * - 哈希不匹配（换装备/耐久变化） → 立即重新扫描
- * - 每20tick（1秒）强制重新扫描一次 → 覆盖铁砧修改附魔等tag变但item不变的极端情况
- * - 玩家体验：换装备立即生效，铁砧加附魔最多1秒后生效（完全无感知）
+ * - 为每个玩家记下6个槽位的物品对象和附魔组件对象（{@link EquipmentStamp}），不看别的组件
+ * - 不看别的组件的原因：科技模组物品的能量数据每tick变化，如果都看则每tick都miss
+ * - 都没变 → 用缓存结果，跳过附魔读取
+ * - 变了（换装备、换物品、附魔组件换了） → 立即重扫变了的那个槽位
+ * - 每20tick（1秒）强制重新扫描一次 → 兜底看不出来的极端情况（保持和 1.20.1 一样的生效时机）
+ * - 玩家体验：换装备、加附魔立即生效
+ * - 以前判变用的是「item注册单例+count+damage」哈希：每tick要读耐久（有的模组工具读耐久要重建
+ *   工具数据，人多的服务器上很贵），而且换成另一把同物品、同耐久、附魔不同的武器时看不出来，
+ *   要等强制重扫才换过来
  *
  * 效果：50人服务器 300次NBT读取/tick → 约15次/秒（仅强制刷新时），降低95%。
  *
@@ -54,7 +59,7 @@ import pers.roinflam.carianstyle.utils.util.EquipmentSlots;
  * </p>
  * <p>
  * v3.1修复 - 黑名单附魔过滤：
- * 在所有扫描点（scanEntity / scanPlayerEnchantments / 独立事件处理）
+ * 在所有扫描点（scanEntity / PlayerEquipmentCache#scanSlot / 独立事件处理）
  * 增加 isDisabled() 检查，被 uninstallEnchantment 配置禁用的附魔
  * 不会进入缓存，不会触发任何效果。
  * </p>
@@ -145,9 +150,18 @@ public class EnchantmentEventHandler {
      * 玩家装备缓存条目
      */
     private static class PlayerEquipmentCache {
-        private final int[] slotHashes = new int[EquipmentSlots.SCAN.length];
+        /**
+         * 每个槽位的判变依据，下标 = {@link EquipmentSlots#SCAN} 的顺序。
+         * <p>以前存的是「物品 + 数量 + 耐久」哈希，读耐久太贵且和附魔无关，换成 {@link EquipmentStamp}。</p>
+         */
+        private final EquipmentStamp[] stamps = newStamps();
+        /** 每个槽位自己的条目；只重扫变了的槽位，合起来的顺序和整扫一遍完全一样 */
+        @SuppressWarnings("unchecked")
+        private final List<TickEnchantmentEntry>[] slotEntries = new List[ALL_SLOTS.length];
         private List<TickEnchantmentEntry> tickEntries = Collections.emptyList();
         private int ticksSinceForceRescan = 0;
+        /** 上次整扫时的配置版本号（{@link ConfigLoader#bakeGeneration()}），变了就整扫 */
+        private int configGeneration = Integer.MIN_VALUE;
 
         /**
          * 上次重扫时玩家的 {@code tickCount}；-1 表示尚未扫过。
@@ -167,7 +181,7 @@ public class EnchantmentEventHandler {
          * </p>
          * <p>
          * 因此加一个 tick 戳记：本 tick 已经扫过就直接返回快照，
-         * 装备哈希比对和计数器推进都只在每 tick 的<b>第一次</b>调用时发生。
+         * 装备判变和计数器推进都只在每 tick 的<b>第一次</b>调用时发生。
          * 谁先调用无所谓——玩家的装备在一个 tick 内不会变，快照对所有调用者都一样。
          * </p>
          *
@@ -182,70 +196,79 @@ public class EnchantmentEventHandler {
             lastTickStamp = now;
 
             ticksSinceForceRescan++;
+            boolean forceRescan = ticksSinceForceRescan >= FORCE_RESCAN_INTERVAL;
+            if (forceRescan) {
+                ticksSinceForceRescan = 0;
+            }
+            // 条目里的结果还取决于配置（禁用名单、levelLimit、等级衰减）：配置重载过就整扫一遍。
+            // 以前耐久一变就六个槽位全按新配置重扫，改成按槽位判变后不跟一下，没变的槽位要等强制重扫才换成新配置。
+            // 不动强制重扫的计数，节奏和原来一样
+            int generation = ConfigLoader.bakeGeneration();
+            if (generation != configGeneration) {
+                configGeneration = generation;
+                forceRescan = true;
+            }
 
-            boolean equipmentChanged = false;
-            EquipmentSlot[] slots = EquipmentSlots.SCAN;
-
-            for (int i = 0; i < slots.length; i++) {
-                ItemStack stack = player.getItemBySlot(slots[i]);
-                int hash = computeSlotHash(stack);
-                if (hash != slotHashes[i]) {
-                    slotHashes[i] = hash;
-                    equipmentChanged = true;
+            boolean anyChanged = false;
+            for (int i = 0; i < ALL_SLOTS.length; i++) {
+                ItemStack stack = player.getItemBySlot(ALL_SLOTS[i]);
+                // 判变每个槽位都要做（顺带把新对象记下）；强制重扫时不管变没变都重扫
+                boolean changed = stamps[i].update(stack);
+                if (changed || forceRescan || slotEntries[i] == null) {
+                    slotEntries[i] = scanSlot(ALL_SLOTS[i], stack);
+                    anyChanged = true;
                 }
             }
 
-            boolean forceRescan = ticksSinceForceRescan >= FORCE_RESCAN_INTERVAL;
-
-            if (equipmentChanged || forceRescan) {
-                tickEntries = scanPlayerEnchantments(player);
-                if (forceRescan) {
-                    ticksSinceForceRescan = 0;
+            if (anyChanged) {
+                List<TickEnchantmentEntry> merged = new ArrayList<>();
+                for (List<TickEnchantmentEntry> part : slotEntries) {
+                    merged.addAll(part);
                 }
+                tickEntries = merged.isEmpty() ? Collections.emptyList() : merged;
             }
 
             return tickEntries;
         }
 
-        private static int computeSlotHash(ItemStack stack) {
-            if (stack.isEmpty()) {
-                return 0;
-            }
-            int h = System.identityHashCode(stack.getItem());
-            h = h * 31 + stack.getCount();
-            h = h * 31 + stack.getDamageValue();
-            return h;
-        }
-
         /**
-         * 完整扫描玩家所有槽位的CarianStyle附魔
+         * 扫一个槽位的 CarianStyle 附魔（原来整扫六个槽位的循环体，逻辑没改）
          * <p>
          * v3.1修复：增加 isDisabled() 检查，被禁用的附魔不进入缓存
          * </p>
          *
-         * @param player 玩家
-         * @return 附魔条目列表
+         * @param slot  槽位
+         * @param stack 槽位里的物品
+         * @return 该槽位的附魔条目
          */
-        private static List<TickEnchantmentEntry> scanPlayerEnchantments(Player player) {
-            List<TickEnchantmentEntry> entries = new ArrayList<>();
-            for (EquipmentSlot slot : EquipmentSlots.SCAN) {
-                ItemStack stack = player.getItemBySlot(slot);
-                if (stack.isEmpty()) continue;
-
-                Map<EnchantmentBase, Integer> enchantments = EnchantmentLevels.all(stack);
-                for (Map.Entry<EnchantmentBase, Integer> entry : enchantments.entrySet()) {
-                    EnchantmentBase base = entry.getKey();
-                    // v3.1：跳过被禁用的附魔
-                    if (base.isDisabled()) continue;
-                    // 只认附魔适用的槽位（拿在手上的护甲不算），见 EnchantmentBase#worksIn
-                    if (!base.worksIn(slot)) continue;
-                    int level = base.applyLevelLimit(entry.getValue());
-                    if (level <= 0) continue;
-                    entries.add(new TickEnchantmentEntry(base, level, stack, slot));
-                }
+        private static List<TickEnchantmentEntry> scanSlot(EquipmentSlot slot, ItemStack stack) {
+            if (stack.isEmpty()) return Collections.emptyList();
+            List<TickEnchantmentEntry> entries = null;
+            Map<EnchantmentBase, Integer> enchantments = EnchantmentLevels.all(stack);
+            for (Map.Entry<EnchantmentBase, Integer> entry : enchantments.entrySet()) {
+                EnchantmentBase base = entry.getKey();
+                // v3.1：跳过被禁用的附魔
+                if (base.isDisabled()) continue;
+                // 只认附魔适用的槽位（拿在手上的护甲不算），见 EnchantmentBase#worksIn
+                if (!base.worksIn(slot)) continue;
+                int level = base.applyLevelLimit(entry.getValue());
+                if (level <= 0) continue;
+                if (entries == null) entries = new ArrayList<>(2);
+                entries.add(new TickEnchantmentEntry(base, level, stack, slot));
             }
-            return entries;
+            return entries == null ? Collections.emptyList() : entries;
         }
+    }
+
+    /** 扫描用的 6 个槽位（{@link EquipmentSlots#SCAN}），下标与各处的 {@link EquipmentStamp} 数组对应 */
+    private static final EquipmentSlot[] ALL_SLOTS = EquipmentSlots.SCAN;
+
+    private static EquipmentStamp[] newStamps() {
+        EquipmentStamp[] stamps = new EquipmentStamp[ALL_SLOTS.length];
+        for (int i = 0; i < stamps.length; i++) {
+            stamps[i] = new EquipmentStamp();
+        }
+        return stamps;
     }
 
     /**
@@ -298,7 +321,7 @@ public class EnchantmentEventHandler {
      *
      * <h3>与直接调 EnchantmentHelper 的两点行为差异</h3>
      * <p>
-     * 快照是由 {@code scanPlayerEnchantments} 构建的，它做了两件直接调用不会做的事：
+     * 快照是由 {@code PlayerEquipmentCache#scanSlot} 构建的，它做了两件直接调用不会做的事：
      * </p>
      * <ol>
      *   <li><b>跳过被禁用的附魔</b>（{@code isDisabled()}）——直接调用会无视黑名单配置，
@@ -538,12 +561,10 @@ public class EnchantmentEventHandler {
      * @param entries    收集结果的列表
      * @param holder     装备持有者
      * @param isAttacker 是否为攻击方
-     * @param slots      需要扫描的槽位
      */
     private static void scanEntity(@Nonnull List<CachedEnchantmentEntry> entries,
                                    @Nonnull LivingEntity holder,
-                                   boolean isAttacker,
-                                   @Nonnull EquipmentSlot[] slots) {
+                                   boolean isAttacker) {
 
         // v3.2：怪物 + 通用关 → 整个 holder 跳过
         // 这是性能收益最大的拦截点，跳过整个装备槽位的 NBT 扫描
@@ -552,12 +573,132 @@ public class EnchantmentEventHandler {
             return;
         }
 
+        for (ScannedEnchantment found : scanEquipment(holder)) {
+            entries.add(new CachedEnchantmentEntry(found.enchantment, found.level, found.stack, holder, isAttacker));
+        }
+    }
+
+    // ==================== 伤害事件扫描：同一 tick 同一实体复用 ====================
+
+    /**
+     * 一个实体身上扫出来、要参与伤害事件结算的一条附魔（不含攻守方，攻守方在 {@link #scanEntity} 里补）。
+     */
+    private static final class ScannedEnchantment {
+        final EnchantmentBase enchantment;
+        final int level;
+        final ItemStack stack;
+
+        ScannedEnchantment(EnchantmentBase enchantment, int level, ItemStack stack) {
+            this.enchantment = enchantment;
+            this.level = level;
+            this.stack = stack;
+        }
+    }
+
+    /**
+     * 某个实体在某一 tick 的扫描结果。
+     */
+    private static final class DamageScan {
+        final net.minecraft.world.level.Level level;
+        final long gameTime;
+        final int configGeneration;
+        final EquipmentStamp[] stamps;
+        final List<ScannedEnchantment> found;
+
+        DamageScan(net.minecraft.world.level.Level level, long gameTime, int configGeneration,
+                   EquipmentStamp[] stamps, List<ScannedEnchantment> found) {
+            this.level = level;
+            this.gameTime = gameTime;
+            this.configGeneration = configGeneration;
+            this.stamps = stamps;
+            this.found = found;
+        }
+
+        boolean stillValid(LivingEntity holder, net.minecraft.world.level.Level now, long time, int generation) {
+            if (level != now || gameTime != time || configGeneration != generation) {
+                return false;
+            }
+            for (int i = 0; i < ALL_SLOTS.length; i++) {
+                if (!stamps[i].matches(holder.getItemBySlot(ALL_SLOTS[i]))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+
+    /**
+     * 伤害事件扫描结果，按实体对象（不按实体编号判等）存，每个服务端 tick 开头清空。
+     * <p>
+     * <b>问题</b>：攻击、受伤、扣血三段事件的 HIGHEST 各建一次缓存，每次都把攻守双方 6 个槽位的附魔
+     * 重新读一遍；一个实体同一 tick 挨好几下（多段伤害、范围伤害、每 tick 判一次的持续伤害），
+     * 次数再翻几倍。1.20.1 上实测一个实体每 tick 打同一个玩家时，这里平均 0.29 ms/tick。
+     * </p>
+     * <p>
+     * <b>为什么这么改</b>：同一 tick 内同一实体的装备只要没换（{@link EquipmentStamp} 判），扫出来的结果就一样，
+     * 直接复用。装备中途变了（被打坏、被换掉）、换了维度、配置重载了，照旧重扫。
+     * 结果里的「另一只手有没有盖过」也一并复用，同一 tick 内它只取决于两只手上的物品。
+     * </p>
+     */
+    private static final Map<LivingEntity, DamageScan> DAMAGE_SCAN = new IdentityHashMap<>();
+
+    @SubscribeEvent
+    public static void clearDamageScanEachTick(@Nonnull ServerTickEvent.Pre event) {
+        synchronized (DAMAGE_SCAN) {
+            if (!DAMAGE_SCAN.isEmpty()) {
+                DAMAGE_SCAN.clear();
+            }
+        }
+    }
+
+    /**
+     * 关服时整表清空（玩家装备缓存一并清）：表里的实体连着所在世界，单人存档退回主菜单后不会再有服务端 tick 来清，
+     * 不清的话旧世界一直放不掉。不能改成 tick 末尾清，玩家攻击包在两个 tick 之间处理，要靠开头那次。
+     */
+    @SubscribeEvent
+    public static void clearDamageScanOnStop(@Nonnull ServerStoppedEvent event) {
+        synchronized (DAMAGE_SCAN) {
+            DAMAGE_SCAN.clear();
+        }
+        PLAYER_TICK_CACHE.clear();
+    }
+
+    @Nonnull
+    private static List<ScannedEnchantment> scanEquipment(@Nonnull LivingEntity holder) {
+        net.minecraft.world.level.Level level = holder.level();
+        long time = level.getGameTime();
+        int generation = ConfigLoader.bakeGeneration();
+        DamageScan cached;
+        synchronized (DAMAGE_SCAN) {
+            cached = DAMAGE_SCAN.get(holder);
+        }
+        if (cached != null && cached.stillValid(holder, level, time, generation)) {
+            return cached.found;
+        }
+        EquipmentStamp[] stamps = newStamps();
+        for (int i = 0; i < ALL_SLOTS.length; i++) {
+            stamps[i].update(holder.getItemBySlot(ALL_SLOTS[i]));
+        }
+        List<ScannedEnchantment> found = scanEquipmentNow(holder);
+        synchronized (DAMAGE_SCAN) {
+            DAMAGE_SCAN.put(holder, new DamageScan(level, time, generation, stamps, found));
+        }
+        return found;
+    }
+
+    /**
+     * 实际扫描（原 scanEntity 的循环体，逻辑没改）。
+     */
+    @Nonnull
+    private static List<ScannedEnchantment> scanEquipmentNow(@Nonnull LivingEntity holder) {
+        boolean holderIsPlayer = holder instanceof Player;
         // 是否需要在循环内过滤 DEAD 分类附魔
         // 仅当：非玩家 + 通用开 + 死亡类关 时为 true
         boolean filterDeathEnchantmentsInLoop = !holderIsPlayer
                 && !ConfigLoader.allowMobTriggerDeathEnchantments;
 
-        for (EquipmentSlot slot : slots) {
+        List<ScannedEnchantment> found = null;
+        for (EquipmentSlot slot : ALL_SLOTS) {
             ItemStack stack = holder.getItemBySlot(slot);
             if (stack.isEmpty()) continue;
 
@@ -579,9 +720,11 @@ public class EnchantmentEventHandler {
                 int level = base.applyLevelLimit(entry.getValue());
                 if (level <= 0) continue;
                 if (shadowedByOtherHand(holder, base, slot, level)) continue;
-                entries.add(new CachedEnchantmentEntry(base, level, stack, holder, isAttacker));
+                if (found == null) found = new ArrayList<>(4);
+                found.add(new ScannedEnchantment(base, level, stack));
             }
         }
+        return found == null ? Collections.emptyList() : found;
     }
 
     /**
@@ -597,10 +740,10 @@ public class EnchantmentEventHandler {
         List<CachedEnchantmentEntry> entries = new ArrayList<>();
 
         if (attacker != null) {
-            scanEntity(entries, attacker, true, EquipmentSlots.SCAN);
+            scanEntity(entries, attacker, true);
         }
 
-        scanEntity(entries, victim, false, EquipmentSlots.SCAN);
+        scanEntity(entries, victim, false);
 
         return entries;
     }
@@ -844,7 +987,7 @@ public class EnchantmentEventHandler {
      * 玩家Tick事件处理
      * <p>
      * v3.0核心优化：使用装备缓存。
-     * v3.1修复：scanPlayerEnchantments 中已增加 isDisabled() 过滤。
+     * v3.1修复：PlayerEquipmentCache#scanSlot 中已增加 isDisabled() 过滤。
      * v3.2备注：本方法本身就是 PlayerTickEvent，仅玩家触发，
      * 不受怪物附魔触发开关影响（怪物本来就不会进入此方法）。
      * </p>
