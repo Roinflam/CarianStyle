@@ -2,8 +2,15 @@ pluginManagement {
     repositories {
         gradlePluginPortal()                                   // Gradle 官方插件
         maven { url 'https://maven.neoforged.net/releases' }   // NeoForge 与 ModDevGradle
+        maven { url 'https://maven.fabricmc.net/' }            // Fabric Loom
     }
 }
 
 // 项目名称：自动从 gradle.properties 读取 mod_name
 rootProject.name = providers.gradleProperty('mod_name').get()
+
+// common：只有原版，两个加载器都能用的代码放这里
+// neoforge / fabric：各自把 common 的源码和资源重新编进自己的 jar，每个平台只出一个 jar
+include 'common'
+include 'neoforge'
+include 'fabric'

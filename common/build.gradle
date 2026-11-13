@@ -1,0 +1,60 @@
+plugins {
+    // 只要原版：neoFormVersion 模式下类路径上只有 Mojang 映射的原版和它的库，
+    // 写了 NeoForge / Fabric 的类就编译不过，平台代码漏进 common 当场就能发现
+    id 'net.neoforged.moddev'
+}
+
+neoForge {
+    neoFormVersion = rootProject.neo_form_version
+}
+
+repositories {
+    maven { url 'https://raw.githubusercontent.com/Fuzss/modresources/main/maven/' } // Forge Config API Port
+}
+
+dependencies {
+    // Mixin、MixinExtras 两个加载器运行期都自带，这里只要注解
+    compileOnly "org.spongepowered:mixin:${rootProject.mixin_version}"
+    compileOnly "io.github.llamalad7:mixinextras-common:${rootProject.mixinextras_version}"
+    annotationProcessor "io.github.llamalad7:mixinextras-common:${rootProject.mixinextras_version}"
+
+    // Cloth Config 没有不带加载器的 Mojang 映射工件；NeoForge 版本来就是 Mojang 映射，
+    // 拿来当 compileOnly 只为编译 common 里的配置界面代码，运行期由各平台自己内嵌
+    compileOnly("me.shedaniel.cloth:cloth-config-neoforge:${rootProject.cloth_version}") { transitive = false }
+
+    // 配置：NeoForge 自带 net.neoforged.neoforge.common.ModConfigSpec，Fabric 上由 Forge Config API Port 提供同名类。
+    // 它的「NeoForge API」工件只有 ModConfigSpec、IConfigSpec、TranslatableEnum 几个类（外加 Night Config），
+    // 拿来给 common 编译，NeoForge 的其他类照样不在类路径上
+    compileOnly "fuzs.forgeconfigapiport:forgeconfigapiport-common-neoforgeapi:${rootProject.fcap_version}"
+
+    // javax.annotation（@Nonnull / @Nullable）和 org.jetbrains.annotations 在代码里用得很多。
+    // 现在 NeoForm 的库里就带着这两个版本，这里再写一遍，免得哪天原版换了库 common 突然编不过
+    compileOnly "com.google.code.findbugs:jsr305:3.0.2"
+    compileOnly "org.jetbrains:annotations:24.1.0"
+
+    // 纯逻辑的单元测试（总线、清单读取这类不碰游戏的代码）
+    testImplementation platform('org.junit:junit-bom:5.10.5')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+// 把源码目录和资源目录作为工件交给平台模块（见 gradle/loader.gradle）
+configurations {
+    commonJava {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+    commonResources {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+}
+
+artifacts {
+    commonJava sourceSets.main.java.sourceDirectories.singleFile
+    commonResources sourceSets.main.resources.sourceDirectories.singleFile
+}

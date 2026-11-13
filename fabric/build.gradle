@@ -1,0 +1,88 @@
+plugins {
+    id 'fabric-loom'
+}
+
+apply from: rootProject.file('gradle/loader.gradle')
+
+repositories {
+    maven { url 'https://raw.githubusercontent.com/Fuzss/modresources/main/maven/' } // Forge Config API Port
+    maven { url 'https://maven.terraformersmc.com/releases/' }                        // Mod Menu
+}
+
+// 自测代码单独一个源码集：开发环境运行时在类路径上（和主代码算同一个模组），
+// 不进 jar。只在带 -Dcarianstyle.selftest=<组> 启动时才会被加载。
+sourceSets {
+    selftest {
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
+
+    // Cloth Config：include 进 jar（jar-in-jar），玩家不用另装
+    modImplementation("me.shedaniel.cloth:cloth-config-fabric:${rootProject.cloth_version}") {
+        exclude group: 'net.fabricmc.fabric-api'
+    }
+    include "me.shedaniel.cloth:cloth-config-fabric:${rootProject.cloth_version}"
+
+    // Forge Config API Port：提供 ModConfigSpec 和配置登记接口，jar-in-jar 内嵌
+    modImplementation("fuzs.forgeconfigapiport:forgeconfigapiport-fabric:${rootProject.fcap_version}") {
+        exclude group: 'net.fabricmc.fabric-api'
+    }
+    include "fuzs.forgeconfigapiport:forgeconfigapiport-fabric:${rootProject.fcap_version}"
+
+    // Mod Menu：只编译 ModMenuApi 入口，不打包、开发环境也不装
+    modCompileOnly("com.terraformersmc:modmenu:${rootProject.modmenu_version}") { transitive = false }
+}
+
+// loom 闭包里 rootProject 会被解析到别的对象上，先取成局部变量
+def modId = rootProject.mod_id
+
+loom {
+    mixin {
+        // 不用 refmap：remapJar 时直接把 mixin 注解里的名字改写成 intermediary，
+        // common 的 mixins.json 也就不用写 "refmap"（写了 Loom 也不会给从 common 来的那份注入，正式环境会找不到注入点）
+        useLegacyMixinAp = false
+    }
+    mods {
+        "${modId}" {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.selftest
+        }
+    }
+    runs {
+        // 客户端、服务端各用自己的游戏目录（同 neoforge 模块）
+        client {
+            runDir 'run/client'
+            source sourceSets.selftest
+            vmArgs '-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8'
+        }
+        server {
+            runDir 'run/server'
+            source sourceSets.selftest
+            programArgs '--nogui'
+            vmArgs '-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8'
+        }
+    }
+}
+
+processResources {
+    var props = [
+            mod_id                : rootProject.mod_id,
+            mod_name              : rootProject.mod_name,
+            version               : project.version,
+            mod_author            : rootProject.mod_author,
+            mod_license           : rootProject.mod_license,
+            minecraft_version     : rootProject.minecraft_version,
+            fabric_loader_version : rootProject.fabric_loader_version
+    ]
+    inputs.properties props
+    filesMatching('fabric.mod.json') {
+        expand props
+    }
+}

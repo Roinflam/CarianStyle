@@ -1,0 +1,67 @@
+plugins {
+    // NeoForge 官方构建插件；1.20.5 起运行期就是 Mojang 映射，不再需要重映射和 refmap
+    id 'net.neoforged.moddev'
+}
+
+apply from: rootProject.file('gradle/loader.gradle')
+
+neoForge {
+    version = rootProject.neo_version
+
+    runs {
+        // 客户端、服务端各用自己的游戏目录：测试客户端要往 mods 里放只给客户端用的开发 jar，
+        // 和专用服共用一个 run/ 时专用服会因为加载到客户端类起不来
+        client {
+            client()
+            gameDirectory = file('run/client')
+        }
+        server {
+            server()
+            gameDirectory = file('run/server')
+            programArgument '--nogui'
+        }
+        gameTestServer {
+            type = 'gameTestServer'
+        }
+        configureEach {
+            // 控制台中文不乱码
+            jvmArguments.addAll('-Dfile.encoding=UTF-8', '-Dconsole.encoding=UTF-8',
+                    '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8')
+        }
+    }
+
+    mods {
+        "${rootProject.mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+dependencies {
+    // Cloth Config：游戏内配置界面，以 jar-in-jar 内嵌，玩家不用另装
+    jarJar(api("me.shedaniel.cloth:cloth-config-neoforge:${rootProject.cloth_version}")) {
+        version {
+            strictly "[${rootProject.cloth_version},)"
+            prefer rootProject.cloth_version
+        }
+    }
+}
+
+// 只对 neoforge.mods.toml 做占位符替换
+processResources {
+    var props = [
+            mod_id                 : rootProject.mod_id,
+            mod_name               : rootProject.mod_name,
+            version                : project.version,
+            mod_author             : rootProject.mod_author,
+            mod_license            : rootProject.mod_license,
+            minecraft_version_range: rootProject.minecraft_version_range,
+            neo_version_range      : rootProject.neo_version_range,
+            loader_version_range   : rootProject.loader_version_range,
+            cloth_version          : rootProject.cloth_version
+    ]
+    inputs.properties props
+    filesMatching('META-INF/neoforge.mods.toml') {
+        expand props
+    }
+}

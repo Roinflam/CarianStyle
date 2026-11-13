@@ -1,85 +1,31 @@
 plugins {
-    id 'java-library'
-    // NeoForge 官方构建插件；1.20.5 起运行期就是 Mojang 映射，不再需要重映射和 refmap
-    id 'net.neoforged.moddev' version '2.0.148'
+    // 两个加载器的构建插件在根项目一起声明（apply false），由子项目各自应用；
+    // 放在同一个类加载器里，配置阶段不会出现两个版本的同名类
+    id 'fabric-loom' version '1.10-SNAPSHOT' apply false
+    id 'net.neoforged.moddev' version '2.0.148' apply false
 }
 
-version = mod_version
-group = maven_group
+subprojects {
+    apply plugin: 'java-library'
 
-base {
-    // 产物：CarianStyle-neoforge-1.21.1-<版本>.jar
-    archivesName = "${mod_name}-neoforge-${minecraft_version}"
-}
+    version = rootProject.mod_version
+    group = rootProject.maven_group
 
-// Minecraft 1.21.1 需要 Java 21
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
-
-neoForge {
-    version = project.neo_version
-
-    runs {
-        // 客户端、服务端各用自己的游戏目录：测试客户端要往 mods 里放只给客户端用的开发 jar，
-        // 和专用服共用一个 run/ 时专用服会因为加载到客户端类起不来
-        client {
-            client()
-            gameDirectory = file('run/client')
-        }
-        server {
-            server()
-            gameDirectory = file('run/server')
-            programArgument '--nogui'
-        }
-        gameTestServer {
-            type = 'gameTestServer'
-        }
-        configureEach {
-            // 控制台中文不乱码
-            jvmArguments.addAll('-Dfile.encoding=UTF-8', '-Dconsole.encoding=UTF-8',
-                    '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8')
-        }
+    base {
+        // 产物：CarianStyle-<平台>-1.21.1-<版本>.jar；common 的 jar 只给平台模块做类型检查，不发布
+        archivesName = "${rootProject.mod_name}-${project.name}-${rootProject.minecraft_version}"
     }
 
-    mods {
-        "${mod_id}" {
-            sourceSet(sourceSets.main)
-        }
+    // Minecraft 1.21.1 需要 Java 21
+    java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+    repositories {
+        mavenCentral()                                                          // MixinExtras、注解库、JUnit
+        maven { url 'https://repo.spongepowered.org/repository/maven-public/' } // Mixin 注解
+        maven { url 'https://maven.shedaniel.me/' }                             // Cloth Config
     }
-}
 
-repositories {
-    maven { url 'https://maven.shedaniel.me/' }  // Cloth Config
-}
-
-dependencies {
-    // Cloth Config：游戏内配置界面，以 jar-in-jar 内嵌，玩家不用另装
-    jarJar(api("me.shedaniel.cloth:cloth-config-neoforge:${cloth_version}")) {
-        version {
-            strictly "[${cloth_version},)"
-            prefer cloth_version
-        }
-    }
-}
-
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-}
-
-// 只对 neoforge.mods.toml 做占位符替换
-processResources {
-    var props = [
-            mod_id                 : mod_id,
-            mod_name               : mod_name,
-            version                : version,
-            mod_author             : mod_author,
-            mod_license            : mod_license,
-            minecraft_version_range: minecraft_version_range,
-            neo_version_range      : neo_version_range,
-            loader_version_range   : loader_version_range,
-            cloth_version          : cloth_version
-    ]
-    inputs.properties props
-    filesMatching('META-INF/neoforge.mods.toml') {
-        expand props
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
     }
 }

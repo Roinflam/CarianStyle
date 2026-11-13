@@ -1,0 +1,31 @@
+// 平台模块（neoforge / fabric）共用：把 common 的源码、资源直接编进本模块，
+// 每个平台只出一个 jar，玩家不用另装 common。
+// common 的源码在每个平台上各编一次，所以 common 里用到的配置类（ModConfigSpec 等）
+// 链接的是本平台自己的那份（NeoForge 自带的、Fabric 上 Forge Config API Port 提供的）。
+configurations {
+    commonJava {
+        canBeResolved = true
+        canBeConsumed = false
+    }
+    commonResources {
+        canBeResolved = true
+        canBeConsumed = false
+    }
+}
+
+dependencies {
+    // 只给编辑器和类型检查用；真正进 jar 的是下面重新编译的源码
+    compileOnly(project(':common')) { transitive = false }
+    commonJava project(path: ':common', configuration: 'commonJava')
+    commonResources project(path: ':common', configuration: 'commonResources')
+}
+
+tasks.named('compileJava', JavaCompile) {
+    dependsOn configurations.commonJava
+    source configurations.commonJava
+}
+
+tasks.named('processResources', ProcessResources) {
+    dependsOn configurations.commonResources
+    from configurations.commonResources
+}
