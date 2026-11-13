@@ -47,6 +47,26 @@ dependencies {
     }
 }
 
+// 类清单（附魔类、事件订阅类）由 common 的 generateScanIndex 扫本模块的编译输出生成，打进本模块的资源。
+// 业务代码整体挪进 common 之后，这段挪到 gradle/loader.gradle、两个平台都加
+configurations {
+    commonScanIndex {
+        canBeResolved = true
+        canBeConsumed = false
+    }
+}
+dependencies {
+    commonScanIndex project(path: ':common', configuration: 'scanIndexElements')
+}
+processResources {
+    from configurations.commonScanIndex
+}
+// IDE 里起开发运行时，MDG 生成的运行配置只先跑 prepareXxxRun；让它带上编译和资源处理，清单跟着重新生成。
+// IDE 自己编译、不交给 Gradle 时，IDE 的输出里没有清单，启动时报「找不到类清单」，要把 IDE 设成用 Gradle 构建
+tasks.matching { it.name.startsWith('prepare') && it.name.endsWith('Run') }.configureEach {
+    dependsOn 'classes'
+}
+
 // 只对 neoforge.mods.toml 做占位符替换
 processResources {
     var props = [

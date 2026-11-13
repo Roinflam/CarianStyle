@@ -12,6 +12,15 @@ repositories {
     maven { url 'https://raw.githubusercontent.com/Fuzss/modresources/main/maven/' } // Forge Config API Port
 }
 
+// 构建时跑类清单扫描用的类路径（只有 ASM，扫描代码本身取 common 的编译输出）
+def asm_version = '9.7.1'
+configurations {
+    scanIndexTool {
+        canBeResolved = true
+        canBeConsumed = false
+    }
+}
+
 dependencies {
     // Mixin、MixinExtras 两个加载器运行期都自带，这里只要注解
     compileOnly "org.spongepowered:mixin:${rootProject.mixin_version}"
@@ -31,6 +40,12 @@ dependencies {
     // 现在 NeoForm 的库里就带着这两个版本，这里再写一遍，免得哪天原版换了库 common 突然编不过
     compileOnly "com.google.code.findbugs:jsr305:3.0.2"
     compileOnly "org.jetbrains:annotations:24.1.0"
+
+    // 类清单的扫描（scan/ScanIndexScanner）用 ASM 读类文件。两个加载器运行期都自带 ASM（Mixin 要用），
+    // 所以只在编译时要；构建时跑扫描、单测里造夹具类另外带上
+    compileOnly "org.ow2.asm:asm:${asm_version}"
+    scanIndexTool "org.ow2.asm:asm:${asm_version}"
+    testImplementation "org.ow2.asm:asm:${asm_version}"
 
     // 纯逻辑的单元测试（总线、清单读取这类不碰游戏的代码）
     testImplementation platform('org.junit:junit-bom:5.10.5')
@@ -59,4 +74,50 @@ configurations {
 artifacts {
     commonJava sourceSets.main.java.sourceDirectories.singleFile
     commonResources sourceSets.main.resources.sourceDirectories.singleFile
+}
+
+// ==================== 类清单（附魔类、事件订阅类） ====================
+// 用 ASM 扫编译输出，把带 @AutoRegisterEnchantment 的类和带总线订阅注解的类写成
+// META-INF/carianstyle/enchantments.list、subscribers.list，运行期照清单加载（格式见 scan/ScanIndex）。
+// Fabric 没有 NeoForge 那种运行期注解扫描结果，两个平台都改成读同一份构建时清单，发现的类和登记先后就一致了。
+//
+// 现在附魔类、订阅类都还在 neoforge 模块里（业务代码还没挪进 common），所以扫的是 neoforge 的编译输出，
+// 清单也只交给 neoforge 打包；代码整体挪进 common 之后，改成扫 common 自己的编译输出、交给两个平台。
+// 注意：common 自己的 processResources 不能依赖这个任务——neoforge 编译要 common 的 jar，会成环。
+def scanIndexDir = layout.buildDirectory.dir('generated/scanindex')
+// 写成路径而不是取 neoforge 的 compileJava 任务：common 先于 neoforge 配置，这时那个任务还不存在。
+// MDG 不改编译输出目录，路径就是这个；万一不对，生成的附魔清单是空的，运行期一读就报错，不会带着空表开服
+def scanIndexInput = project(':neoforge').layout.buildDirectory.dir('classes/java/main')
+
+def generateScanIndex = tasks.register('generateScanIndex', JavaExec) {
+    group = 'build'
+    description = '扫编译输出，生成附魔类、事件订阅类清单'
+    dependsOn ':neoforge:compileJava'
+
+    // 输入是整个编译输出目录：加类、删类、改名、改注解都会让任务重跑，不会拿上一次的结果
+    inputs.dir(scanIndexInput).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName('classes')
+    outputs.dir(scanIndexDir).withPropertyName('scanIndex')
+
+    classpath = files(sourceSets.main.output, configurations.scanIndexTool)
+    mainClass = 'pers.roinflam.carianstyle.scan.ScanIndexScanner'
+    // 输出目录每次先清空：清单里删掉的类不会因为旧文件留着而残留
+    doFirst {
+        scanIndexDir.get().asFile.deleteDir()
+    }
+    argumentProviders.add({
+        [scanIndexDir.get().asFile.absolutePath, scanIndexInput.get().asFile.absolutePath]
+    } as CommandLineArgumentProvider)
+}
+
+// 交给平台模块打进资源（见 neoforge/build.gradle 的 commonScanIndex）
+configurations {
+    scanIndexElements {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+}
+artifacts {
+    scanIndexElements(scanIndexDir) {
+        builtBy generateScanIndex
+    }
 }
