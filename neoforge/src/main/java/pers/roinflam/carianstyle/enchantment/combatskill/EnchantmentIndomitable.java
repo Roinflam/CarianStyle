@@ -7,8 +7,8 @@ import net.minecraft.world.item.ItemStack;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.Enchantments;
 import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -19,7 +19,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
-import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
@@ -75,7 +75,8 @@ public class EnchantmentIndomitable extends EnchantmentBase {
         super(EnchantTarget.ARMOR_CHEST, new EquipmentSlot[]{EquipmentSlot.CHEST});
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
+    // order = -1：排在顶层附魔的受击监听之前：这里免疫时取消这一下，同档后面的受击触发跟着跳过
+    @SubscribeEvent(priority = EventPriority.LOWEST, order = -1)
     public static void onLivingAttack(@NotNull LivingAttackEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;

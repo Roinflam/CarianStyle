@@ -7,9 +7,9 @@ import net.minecraft.world.entity.ai.attributes.AttributeMap;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
-import net.neoforged.neoforge.event.entity.living.LivingHealEvent;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.event.LivingHealEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
@@ -19,7 +19,7 @@ import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
-import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 切割药水效果

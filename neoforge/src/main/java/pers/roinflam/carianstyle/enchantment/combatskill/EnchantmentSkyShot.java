@@ -9,9 +9,9 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
-import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.event.ProjectileImpactEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -22,7 +22,7 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
-import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 对空射击附魔
@@ -83,7 +83,8 @@ public class EnchantmentSkyShot extends EnchantmentBase {
         super(EnchantTarget.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    // order = -1：排在硬箭之前：这里的箭伤有加法项，和硬箭的乘法先后颠倒伤害不同
+    @SubscribeEvent(priority = EventPriority.HIGHEST, order = -1)
     public static void onProjectileImpact_Arrow(@NotNull ProjectileImpactEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;

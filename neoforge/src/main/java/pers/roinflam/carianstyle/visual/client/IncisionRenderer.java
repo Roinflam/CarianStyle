@@ -12,20 +12,19 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
 import pers.roinflam.carianstyle.network.IncisionSyncHandler;
 import pers.roinflam.carianstyle.potion.MobEffectIncision;
-import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
 import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 
 import javax.annotation.Nullable;
 import java.util.List;
-import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 切腹「狂化」客户端渲染器（纯客户端自绘）。
@@ -169,7 +168,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @version 4
  */
 @OnlyIn(Dist.CLIENT)
-@EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class IncisionRenderer {
 
     /** 距离裁剪（格）。必须 ≤ {@link SharedEntityQuery#QUERY_RANGE}，否则会漏掉实体。 */

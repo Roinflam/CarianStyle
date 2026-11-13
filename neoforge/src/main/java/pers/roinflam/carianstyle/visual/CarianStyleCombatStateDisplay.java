@@ -3,7 +3,7 @@ package pers.roinflam.carianstyle.visual;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import pers.roinflam.carianstyle.event.PlayerEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentWarrior;
@@ -486,7 +486,7 @@ public final class CarianStyleCombatStateDisplay {
      * {@code @EventBusSubscriber}。
      * </p>
      */
-    @EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.GAME)
+    @pers.roinflam.carianstyle.bus.EventBusSubscriber
     public static final class CacheCleanup {
 
         private CacheCleanup() {
@@ -499,7 +499,7 @@ public final class CarianStyleCombatStateDisplay {
          *
          * @param event 登出事件
          */
-        @SubscribeEvent
+        @pers.roinflam.carianstyle.bus.SubscribeEvent
         public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
             NEARBY_CACHE.remove(event.getEntity().getUUID());
         }

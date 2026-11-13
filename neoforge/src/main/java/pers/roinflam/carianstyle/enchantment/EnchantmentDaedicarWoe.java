@@ -7,8 +7,8 @@ import net.minecraft.world.item.enchantment.Enchantment;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -17,7 +17,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
-import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 戴狄卡之祸附魔（诅咒）

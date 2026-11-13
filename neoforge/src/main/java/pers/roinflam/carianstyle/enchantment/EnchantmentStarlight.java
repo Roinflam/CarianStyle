@@ -11,8 +11,8 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.event.PlayerEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -27,8 +27,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.PlayerTickEvent;
 
 /**
  * 星光附魔 - 优化: LivingTickEvent -&gt; PlayerTickEvent

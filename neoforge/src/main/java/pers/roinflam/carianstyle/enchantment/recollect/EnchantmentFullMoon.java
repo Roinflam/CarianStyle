@@ -10,11 +10,11 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
-import net.neoforged.neoforge.event.entity.living.LivingHealEvent;
+import pers.roinflam.carianstyle.event.LivingDeathEvent;
+import pers.roinflam.carianstyle.event.LivingHealEvent;
 import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -30,7 +30,7 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
 
 import java.util.UUID;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
-import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**

@@ -2,12 +2,11 @@ package pers.roinflam.carianstyle.network;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.event.PlayerEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import net.minecraft.world.item.ItemStack;
 import pers.roinflam.carianstyle.base.enchantment.EquipmentStamp;
-import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.EquipmentEnchantContext;
 import pers.roinflam.carianstyle.visual.StackDisplayRegistry;
 
@@ -16,8 +15,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.ServerTickEvent;
 
 /**
  * 叠层显示服务端管理器：定期轮询每个在线玩家的叠层读取器，
@@ -91,7 +90,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * @author RoinFlam
  * @version 3
  */
-@EventBusSubscriber(modid = Reference.MOD_ID)
+@EventBusSubscriber
 public final class StackDisplayManager {
 
     /**

@@ -1,7 +1,6 @@
 package pers.roinflam.carianstyle.utils.helper.task;
 
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.common.NeoForge;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 
 import javax.annotation.Nonnull;
 import java.util.Iterator;
@@ -10,7 +9,8 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
-import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import pers.roinflam.carianstyle.event.ServerTickEvent;
+import pers.roinflam.carianstyle.bus.CarianBus;
 
 /**
  * 同步任务调度器
@@ -318,7 +318,7 @@ public abstract class SynchronizationTask implements Runnable {
         private synchronized void ensureRegistered() {
             if (!registered) {
                 registered = true;
-                NeoForge.EVENT_BUS.register(this);
+                CarianBus.register(this);
             }
         }
 

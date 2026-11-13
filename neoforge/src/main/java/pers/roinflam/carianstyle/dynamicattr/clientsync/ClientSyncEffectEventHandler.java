@@ -1,12 +1,12 @@
 package pers.roinflam.carianstyle.dynamicattr.clientsync;
 
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.event.LivingDeathEvent;
+import pers.roinflam.carianstyle.event.PlayerEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
-import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 客户端同步效果事件监听器
@@ -133,7 +133,7 @@ public class ClientSyncEffectEventHandler {
      * </p>
      */
     @SubscribeEvent
-    public static void onEntityLeaveLevel(net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent event) {
+    public static void onEntityLeaveLevel(pers.roinflam.carianstyle.event.EntityLeaveLevelEvent event) {
         if (event.getEntity() instanceof net.minecraft.world.entity.LivingEntity living) {
             if (!living.level().isClientSide()) {
                 // 清除该实体的所有动态属性

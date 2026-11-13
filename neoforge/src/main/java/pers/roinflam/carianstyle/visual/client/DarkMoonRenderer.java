@@ -10,10 +10,9 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.joml.Matrix4f;
-import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
 import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 import pers.roinflam.carianstyle.utils.util.DayNightUtil;
@@ -22,7 +21,7 @@ import javax.annotation.Nullable;
 import java.util.List;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
-import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 暗月「月华」客户端渲染器（纯客户端自绘，<b>零网络包</b>）。
@@ -170,7 +169,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @version 3.0
  */
 @OnlyIn(Dist.CLIENT)
-@EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class DarkMoonRenderer {
 
     /** 暗月附魔的注册 id（按 {@code carianstyle:<id>} 解析） */

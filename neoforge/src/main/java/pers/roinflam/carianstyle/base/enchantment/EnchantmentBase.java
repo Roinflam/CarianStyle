@@ -14,7 +14,7 @@ import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.neoforged.bus.api.EventPriority;
+import pers.roinflam.carianstyle.bus.EventPriority;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;

@@ -11,8 +11,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.event.entity.living.*;
-import net.neoforged.neoforge.event.entity.player.CriticalHitEvent;
+import pers.roinflam.carianstyle.event.*;
+import pers.roinflam.carianstyle.event.CriticalHitEvent;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;

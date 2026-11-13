@@ -8,7 +8,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ShieldItem;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -21,8 +21,8 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.PlayerTickEvent;
 
 /**
  * 圣地附魔
@@ -140,7 +140,8 @@ public class EnchantmentHolyGround extends EnchantmentBase {
     /**
      * 治疗/护盾光环（PlayerTickEvent，玩家专属）
      */
-    @SubscribeEvent
+    // order = -1：排在黑焰仪式之前：这里回血，黑焰仪式按比例扣血，先后颠倒剩下的血不同
+    @SubscribeEvent(order = -1)
     public static void onPlayerTick(@NotNull PlayerTickEvent.Pre evt) {
         if (evt.getEntity().level().isClientSide) {
             return;

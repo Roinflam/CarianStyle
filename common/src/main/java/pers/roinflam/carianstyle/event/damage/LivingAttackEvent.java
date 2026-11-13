@@ -2,8 +2,8 @@ package pers.roinflam.carianstyle.event.damage;
 
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
-import net.neoforged.bus.api.ICancellableEvent;
-import net.neoforged.neoforge.event.entity.living.LivingEvent;
+import pers.roinflam.carianstyle.bus.ICancellableEvent;
+import pers.roinflam.carianstyle.event.LivingEvent;
 
 /**
  * 伤害链「攻击阶段」：生物受到攻击、任何检查（无敌、已死、抗火）之前发出，可取消。
@@ -22,13 +22,19 @@ import net.neoforged.neoforge.event.entity.living.LivingEvent;
  * </p>
  */
 public class LivingAttackEvent extends LivingEvent implements ICancellableEvent {
+    private final LivingEntity entity;
     private final DamageSource source;
     private final float amount;
 
     public LivingAttackEvent(LivingEntity entity, DamageSource source, float amount) {
-        super(entity);
+        this.entity = entity;
         this.source = source;
         this.amount = amount;
+    }
+
+    @Override
+    public LivingEntity getEntity() {
+        return entity;
     }
 
     public DamageSource getSource() {

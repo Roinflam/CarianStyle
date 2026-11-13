@@ -6,14 +6,14 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.PlayerTickEvent;
 import pers.roinflam.carianstyle.event.LivingTickEvent;
 import pers.roinflam.carianstyle.utils.Reference;
 
@@ -55,7 +55,7 @@ import pers.roinflam.carianstyle.utils.Reference;
  * <ol>
  *     <li>移除 + 重加 {@link AttributeModifier} 会把该属性标记为脏，
  *         导致服务端每次都向客户端下发一个 {@code ClientboundUpdateAttributesPacket}；</li>
- *     <li>事件处理器被反复 {@code NeoForge.EVENT_BUS.unregister/register}，
+ *     <li>事件处理器被反复 {@code CarianBus.unregister/register}，
  *         每次都要操作全局监听器表；</li>
  *     <li><b>onRemoved / onApplied 回调被反复触发。</b>对 STEALTH 这类注册了客户端同步的属性，
  *         这意味着每 2 tick 就向<b>该维度所有玩家</b>广播一次「移除隐身」+「添加隐身」——
@@ -360,7 +360,8 @@ public class DynamicAttributeManager {
      * 玩家Tick事件监听
      * 处理动态属性的时间流逝和Tick回调
      */
-    @SubscribeEvent
+    // order = -1：动态属性计时排在本档前面（圣域、碎步钉在前面，它仍要在它们之前）
+    @SubscribeEvent(order = -1)
     public static void onPlayerTick(PlayerTickEvent.Pre event) {
         if (event.getEntity().level().isClientSide()) {
             return;

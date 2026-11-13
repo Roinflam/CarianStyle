@@ -13,9 +13,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.event.level.BlockEvent;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.event.BlockEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -28,10 +28,10 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import java.util.*;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
-import net.neoforged.neoforge.event.level.BlockDropsEvent;
+import pers.roinflam.carianstyle.event.BlockDropsEvent;
 import net.minecraft.world.entity.LivingEntity;
 
 /**

@@ -6,9 +6,9 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
-import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.event.LivingDeathEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -21,7 +21,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 import java.util.UUID;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
-import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 忍耐附魔
@@ -89,7 +89,8 @@ public class EnchantmentPatience extends EnchantmentBase {
     /**
      * 受击时累积能量
      */
-    @SubscribeEvent(priority = EventPriority.LOWEST)
+    // order = -1：排在顶层附魔之前：这里按伤害累积，读的是维克的龙雷减免之前的值
+    @SubscribeEvent(priority = EventPriority.LOWEST, order = -1)
     public static void onLivingDamageStatic(@NotNull LivingDamageEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;

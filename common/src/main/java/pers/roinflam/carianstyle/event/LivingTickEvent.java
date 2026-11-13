@@ -1,8 +1,7 @@
 package pers.roinflam.carianstyle.event;
 
 import net.minecraft.world.entity.LivingEntity;
-import net.neoforged.bus.api.ICancellableEvent;
-import net.neoforged.neoforge.event.entity.living.LivingEvent;
+import pers.roinflam.carianstyle.bus.ICancellableEvent;
 
 /**
  * 生物 tick 事件：在 {@code LivingEntity.tick()} 开头发出，可取消（取消后本次 tick 整个跳过）。
@@ -19,12 +18,19 @@ import net.neoforged.neoforge.event.entity.living.LivingEvent;
  * 监听代码只改 import，用法和 1.20.1 相同（{@link #getEntity()}）。
  * </p>
  * <p>
- * 事件在 {@code NeoForge.EVENT_BUS} 上发，客户端和服务端都会发。
+ * 事件在本模组自己的总线（{@code CarianBus}）上发，客户端和服务端都会发，不经过平台总线。
  * </p>
  */
 public class LivingTickEvent extends LivingEvent implements ICancellableEvent {
 
+    private final LivingEntity entity;
+
     public LivingTickEvent(LivingEntity entity) {
-        super(entity);
+        this.entity = entity;
+    }
+
+    @Override
+    public LivingEntity getEntity() {
+        return entity;
     }
 }

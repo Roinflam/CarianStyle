@@ -11,18 +11,17 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
-import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
+import pers.roinflam.carianstyle.event.LivingChangeTargetEvent;
 import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
-import net.neoforged.neoforge.event.entity.living.LivingEvent;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
-import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 import pers.roinflam.carianstyle.event.LivingTickEvent;
 
 /**

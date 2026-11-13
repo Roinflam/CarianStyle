@@ -2,18 +2,17 @@ package pers.roinflam.carianstyle.utils.helper;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.player.Player;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
-import net.neoforged.neoforge.event.server.ServerStoppedEvent;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
-import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.event.PlayerEvent;
+import pers.roinflam.carianstyle.event.ServerStoppedEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 
 import javax.annotation.Nonnull;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.ServerTickEvent;
 
 /**
  * 攻击冷却（蓄力）的延后清零
@@ -66,7 +65,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * 普通换维度沿用同一个玩家对象，清零照常生效。
  * </p>
  */
-@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.GAME)
+@EventBusSubscriber
 public final class AttackCooldownHelper {
 
     /** 等待清零的玩家，按对象身份去重；只在服务端主线程读写 */

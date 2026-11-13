@@ -7,16 +7,15 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
-import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.StackHudManager;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.client.ClientTickEvent;
 
 /**
  * 光环客户端扫描器：定期扫描玩家附近的生物，判断各自激活了哪些光环，
@@ -38,7 +37,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * @author RoinFlam
  */
 @OnlyIn(Dist.CLIENT)
-@EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class AuraScanner {
 
     /**

@@ -1,6 +1,5 @@
 package pers.roinflam.carianstyle;
 
-import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -8,7 +7,14 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
+import net.neoforged.fml.loading.FMLEnvironment;
+import pers.roinflam.carianstyle.bus.CarianBus;
+import pers.roinflam.carianstyle.event.LivingTickEvent;
+import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
+import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
+import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
+import pers.roinflam.carianstyle.scan.CarianSubscribers;
+import pers.roinflam.carianstyle.scan.SubscriberSide;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.entity.render.GlintbladesRender;
 import pers.roinflam.carianstyle.init.*;
@@ -91,6 +97,19 @@ public class CarianStyle {
             modEventBus.addListener(this::commonSetup);
             modEventBus.addListener(this::clientSetup);
 
+            // 本模组自己发的事件（生物 tick、伤害三段，由 mixin 发出）声明给总线，要在加载完成的检查之前
+            CarianBus.provide(LivingTickEvent.class, LivingAttackEvent.class, LivingHurtEvent.class,
+                    LivingDamageEvent.class);
+
+            // 照构建时生成的订阅清单把订阅类登记到本模组总线：先两端的，客户端再登记仅客户端的。
+            // 放在构造器最后，和平台自动登记订阅类的时机一样（模组实例建好之后），订阅类的静态初始化照旧晚于内容注册
+            LogUtil.info("卡利亚式附魔 - 正在登记事件订阅类");
+            int subscribers = CarianSubscribers.register(SubscriberSide.BOTH, CarianBus::register).size();
+            if (FMLEnvironment.dist.isClient()) {
+                subscribers += CarianSubscribers.register(SubscriberSide.CLIENT, CarianBus::register).size();
+            }
+            LogUtil.info("卡利亚式附魔 - 事件订阅类登记完成，共 %d 个", subscribers);
+
             LogUtil.separator();
 
         } catch (Exception e) {
@@ -108,10 +127,8 @@ public class CarianStyle {
 
         try {
             event.enqueueWork(() -> {
-                // 注册数据管理器到事件总线
-                LogUtil.info("卡利亚式附魔 - 正在注册数据管理器");
-                NeoForge.EVENT_BUS.register(EnchantmentDataManager.class);
-                LogUtil.debug("卡利亚式附魔 - 数据管理器注册成功");
+                // EnchantmentDataManager 本身是订阅类，构造器里照订阅清单登记过了，这里不再手动登记一次
+                // （它每 tick 递减冷却，登记两份就会一 tick 减两次；总线虽然对同一个类去重，也不靠这个兜底）
 
                 // 注册叠层显示读取器（HUD 数据源，双端都需要；默认无读取器，接入后才显示）
                 LogUtil.info("卡利亚式附魔 - 正在注册叠层显示");

@@ -6,9 +6,9 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.EntityJoinLevelEvent;
 import pers.roinflam.carianstyle.event.LivingTickEvent;
 import pers.roinflam.carianstyle.utils.Reference;
 
@@ -58,7 +58,7 @@ import javax.annotation.Nonnull;
  * 只在服务端调。读吸收值的地方不用改。
  * </p>
  */
-@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.GAME)
+@EventBusSubscriber
 public final class AbsorptionShield {
 
     /** 本模组的吸收上限修饰符 */

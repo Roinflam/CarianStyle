@@ -2,17 +2,15 @@ package pers.roinflam.carianstyle.tuning;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.event.client.ClientPlayerNetworkEvent;
+import pers.roinflam.carianstyle.event.PlayerEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.network.EnchantmentValuesPacket;
 import pers.roinflam.carianstyle.network.PayloadSend;
-import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
 import javax.annotation.Nonnull;
-import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 共享数值的同步收发。
@@ -44,7 +42,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 1.0
  */
-@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.GAME)
+@EventBusSubscriber
 public final class ValueSyncHandler {
 
     private ValueSyncHandler() {
@@ -94,8 +92,7 @@ public final class ValueSyncHandler {
     /**
      * 客户端侧：断开连接时清空服务端下发的覆盖值。
      */
-    @EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.GAME,
-            value = Dist.CLIENT)
+    @EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
     public static final class ClientSide {
 
         private ClientSide() {

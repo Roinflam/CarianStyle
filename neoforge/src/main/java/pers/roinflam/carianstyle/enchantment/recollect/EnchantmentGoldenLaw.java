@@ -11,8 +11,8 @@ import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
 import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
@@ -26,7 +26,7 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 import java.util.UUID;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
-import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**

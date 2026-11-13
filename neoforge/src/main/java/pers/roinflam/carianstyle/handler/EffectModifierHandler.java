@@ -3,14 +3,13 @@ package pers.roinflam.carianstyle.handler;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.server.ServerStoppedEvent;
-import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.ServerStoppedEvent;
+import pers.roinflam.carianstyle.event.ServerTickEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.api.IEffectModifier;
 import pers.roinflam.carianstyle.base.enchantment.EquipmentStamp;
-import pers.roinflam.carianstyle.utils.Reference;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -73,7 +72,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
  *
  * @author RoinFlam
  */
-@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.GAME)
+@EventBusSubscriber
 public class EffectModifierHandler {
 
     /** 快照最多用这么多个服务端 tick，到了强制重扫（兜底看不出来的原地改动） */

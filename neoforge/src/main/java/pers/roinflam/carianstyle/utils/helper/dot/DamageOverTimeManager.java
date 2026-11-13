@@ -6,11 +6,10 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.event.LivingDeathEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
-import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
@@ -20,8 +19,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.BiFunction;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.ServerTickEvent;
 
 /**
  * 持续伤害（DoT）集中管理器
@@ -150,7 +149,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * @author RoinFlam
  * @version 1.4
  */
-@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.GAME)
+@EventBusSubscriber
 public class DamageOverTimeManager {
 
     /**

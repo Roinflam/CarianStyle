@@ -11,13 +11,12 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
 import pers.roinflam.carianstyle.network.ScarletRotSyncHandler;
-import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
 import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 
@@ -26,7 +25,7 @@ import java.util.List;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
-import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 猩红腐败「红雾」客户端渲染器（纯客户端自绘，还原艾尔登法环猩红沼泽弥漫的红色孢子雾）。
@@ -92,7 +91,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  */
 @OnlyIn(Dist.CLIENT)
-@EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class ScarletRotMistRenderer {
 
     /** 腐败女神附魔注册 id（与 {@code AuraDisplayRegistry} 一致，按 {@code carianstyle:<id>} 解析） */

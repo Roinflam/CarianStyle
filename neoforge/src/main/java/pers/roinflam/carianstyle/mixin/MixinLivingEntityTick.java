@@ -1,12 +1,12 @@
 package pers.roinflam.carianstyle.mixin;
 
 import net.minecraft.world.entity.LivingEntity;
-import net.neoforged.neoforge.common.NeoForge;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import pers.roinflam.carianstyle.event.LivingTickEvent;
+import pers.roinflam.carianstyle.bus.CarianBus;
 
 /**
  * 在 {@code LivingEntity.tick()} 开头发出本模组的 {@link LivingTickEvent}。
@@ -26,7 +26,7 @@ public abstract class MixinLivingEntityTick {
 
     @Inject(method = "tick", at = @At("HEAD"), cancellable = true)
     private void carianstyle$fireLivingTick(CallbackInfo ci) {
-        if (NeoForge.EVENT_BUS.post(new LivingTickEvent((LivingEntity) (Object) this)).isCanceled()) {
+        if (CarianBus.post(new LivingTickEvent((LivingEntity) (Object) this)).isCanceled()) {
             ci.cancel();
         }
     }

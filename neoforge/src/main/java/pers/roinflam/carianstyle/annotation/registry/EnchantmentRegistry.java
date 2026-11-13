@@ -10,7 +10,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import pers.roinflam.carianstyle.event.ServerStartedEvent;
 import net.neoforged.neoforgespi.language.ModFileScanData;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -51,7 +51,7 @@ import java.util.*;
  * @author RoinFlam
  * @version 3.0
  */
-@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.GAME)
+@pers.roinflam.carianstyle.bus.EventBusSubscriber
 public class EnchantmentRegistry {
 
     private static final Map<String, EnchantmentBase> BY_ID = new HashMap<>();
@@ -385,7 +385,7 @@ public class EnchantmentRegistry {
     /**
      * 服务器启动后核对写了别的命名空间的条目（附魔注册表这时才有）
      */
-    @SubscribeEvent
+    @pers.roinflam.carianstyle.bus.SubscribeEvent
     public static void onServerStarted(ServerStartedEvent event) {
         try {
             checkUninstallList(event.getServer().registryAccess().registryOrThrow(Registries.ENCHANTMENT), true);

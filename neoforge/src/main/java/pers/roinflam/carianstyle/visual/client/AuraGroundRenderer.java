@@ -7,11 +7,10 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
 import org.joml.Matrix4f;
-import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
 import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 
@@ -273,7 +272,7 @@ import java.util.Map;
  * @version 6
  */
 @OnlyIn(Dist.CLIENT)
-@EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class AuraGroundRenderer {
 
     // ===== 外观/性能常量（可按需调整）=====

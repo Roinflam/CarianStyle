@@ -15,9 +15,8 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.joml.Matrix4f;
-import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
 import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 
@@ -27,8 +26,8 @@ import java.util.Iterator;
 import java.util.Map;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.client.ClientTickEvent;
 
 /**
  * 护盾类附魔的<b>物品局部空间</b>特效渲染器（纯客户端自绘）。
@@ -92,7 +91,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * @version 6.0
  */
 @OnlyIn(Dist.CLIENT)
-@EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class ShieldWardRenderer {
 
     /** 魔力盾牌附魔的注册 id */

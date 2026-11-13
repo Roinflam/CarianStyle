@@ -8,13 +8,12 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.EntityJoinLevelEvent;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -64,7 +63,7 @@ import javax.annotation.Nullable;
  *
  * @author RoinFlam
  */
-@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.GAME)
+@EventBusSubscriber
 public final class DisabledEnchantmentDropFilter {
 
     private DisabledEnchantmentDropFilter() {

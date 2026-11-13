@@ -6,8 +6,8 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -18,7 +18,7 @@ import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
-import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 岩石剑附魔
@@ -59,7 +59,8 @@ public class EnchantmentCragblade extends EnchantmentBase {
         super(EnchantTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
+    // order = -1：排在顶层附魔之前：维克的龙雷会减掉或免掉这一下，战技在它之前结算
+    @SubscribeEvent(priority = EventPriority.LOWEST, order = -1)
     public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;

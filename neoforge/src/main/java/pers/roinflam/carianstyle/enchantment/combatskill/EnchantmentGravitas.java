@@ -9,10 +9,10 @@ import net.minecraft.world.item.ItemStack;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.Enchantments;
 import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
-import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.event.LivingDeathEvent;
+import pers.roinflam.carianstyle.event.PlayerEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -30,8 +30,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.PlayerTickEvent;
 import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
 /**
@@ -155,7 +155,8 @@ public class EnchantmentGravitas extends EnchantmentBase {
     /**
      * 攻击时激活重力场并给敌人施加重力效果
      */
-    @SubscribeEvent(priority = EventPriority.LOWEST)
+    // order = -1：排在顶层附魔之前：维克的龙雷会减掉或免掉这一下，战技在它之前结算
+    @SubscribeEvent(priority = EventPriority.LOWEST, order = -1)
     public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;
@@ -238,7 +239,8 @@ public class EnchantmentGravitas extends EnchantmentBase {
      * 驱动 {@code GravitasDistortionRenderer} 绘制以自身为中心的地面范围圈。
      * <p>PlayerTickEvent 仅玩家触发，无需开关检查</p>
      */
-    @SubscribeEvent
+    // order = -1：排在回归性原理之前：这里给周围上的重力效果，回归性原理触发时会一并清掉
+    @SubscribeEvent(order = -1)
     public static void onPlayerTick(@NotNull PlayerTickEvent.Pre evt) {
         if (evt.getEntity().level().isClientSide) {
             return;

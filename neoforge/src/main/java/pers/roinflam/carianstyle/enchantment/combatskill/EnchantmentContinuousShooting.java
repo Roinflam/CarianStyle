@@ -10,10 +10,9 @@ import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
-import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
-import net.neoforged.neoforge.event.entity.living.LivingEvent;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.event.ProjectileImpactEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -24,7 +23,7 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
-import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 import pers.roinflam.carianstyle.event.LivingTickEvent;
 import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
 
@@ -86,7 +85,8 @@ public class EnchantmentContinuousShooting extends EnchantmentBase {
         return cachedEnchantment;
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    // order = -1：和对空射击一起排在硬箭之前：箭伤倍率的先后不同，伤害和硬箭命中特效的估值都不同
+    @SubscribeEvent(priority = EventPriority.HIGHEST, order = -1)
     public static void onProjectileImpact(@NotNull ProjectileImpactEvent evt) {
         if (!(evt.getProjectile() instanceof AbstractArrow arrow)) {
             return;

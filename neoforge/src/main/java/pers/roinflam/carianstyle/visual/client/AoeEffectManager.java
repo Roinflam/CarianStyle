@@ -3,16 +3,14 @@ package pers.roinflam.carianstyle.visual.client;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.network.AoeEffectPacket;
-import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.client.ClientTickEvent;
 
 /**
  * 定点 AOE 自绘特效管理器（纯客户端）。
@@ -178,7 +176,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
  * @author RoinFlam
  * @version 6.6
  */
-@EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class AoeEffectManager {
 
     /**

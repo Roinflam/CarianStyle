@@ -5,10 +5,10 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.AABB;
-import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
-import net.neoforged.neoforge.event.entity.living.LivingHealEvent;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.event.LivingChangeTargetEvent;
+import pers.roinflam.carianstyle.event.LivingHealEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.dynamicattr.ClientSyncAttribute;
 import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttribute;
@@ -31,7 +31,7 @@ import pers.roinflam.carianstyle.event.LivingTickEvent;
  * <p>
  * <b>问题：per-entity 事件处理器挂在全局事件总线上，却监听高频事件。</b>
  * {@code DynamicAttributeInstance.setEventHandler} 会把每个实体的处理器
- * 单独 {@code NeoForge.EVENT_BUS.register}。若处理器里监听的是
+ * 单独 {@code CarianBus.register}。若处理器里监听的是
  * {@code LivingTickEvent}，就意味着：
  * </p>
  * <pre>
@@ -389,7 +389,9 @@ public class DynamicAttributes {
             this.boundEntityId = entity.getUUID();
         }
 
-        @SubscribeEvent(priority = EventPriority.LOW)
+        // 治疗 LOW 档里有乘有加（翠绿乌龟是加法），这里的乘法要排在本模组同档监听的最后，连加上的那部分一起打折；
+        // order 取最大值把它固定在最后，以后改成静态监听也不会因为登记顺序跑到前面
+        @SubscribeEvent(priority = EventPriority.LOW, order = Integer.MAX_VALUE)
         public void onHeal(LivingHealEvent event) {
             if (!event.getEntity().getUUID().equals(boundEntityId)) return;
             if (event.getEntity().level().isClientSide()) return;
@@ -415,7 +417,8 @@ public class DynamicAttributes {
             this.boundEntityId = entity.getUUID();
         }
 
-        @SubscribeEvent(priority = EventPriority.LOW)
+        // 同嚎叫：乘法固定排在治疗 LOW 档本模组监听的最后
+        @SubscribeEvent(priority = EventPriority.LOW, order = Integer.MAX_VALUE)
         public void onHeal(LivingHealEvent event) {
             if (!event.getEntity().getUUID().equals(boundEntityId)) return;
             if (event.getEntity().level().isClientSide()) return;

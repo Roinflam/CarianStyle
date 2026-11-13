@@ -10,10 +10,10 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeMap;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.EntityJoinLevelEvent;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.Reference;
 
@@ -68,7 +68,7 @@ import java.util.UUID;
  * 升级后药水修饰符的数值和 1.20.1 一样（按当前等级重算），祈祷一击的加成原样保留，其余残留清掉。
  * </p>
  */
-@EventBusSubscriber(modid = Reference.MOD_ID)
+@EventBusSubscriber
 public final class LegacyModifierMigration {
 
     /** 祈祷一击最大生命：1.20.1 的 UUID */

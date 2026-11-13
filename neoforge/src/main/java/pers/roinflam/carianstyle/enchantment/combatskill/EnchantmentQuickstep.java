@@ -3,7 +3,7 @@ package pers.roinflam.carianstyle.enchantment.combatskill;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -13,8 +13,8 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.PlayerTickEvent;
 
 /**
  * 快步附魔
@@ -92,7 +92,8 @@ public class EnchantmentQuickstep extends EnchantmentBase {
      * 血量变化不需要逐tick精确跟踪，4tick的延迟对玩家体验几乎无感知
      * </p>
      */
-    @SubscribeEvent
+    // order = -1：排在黑焰仪式、恩惠露滴之前：这里按当前已损生命算加速
+    @SubscribeEvent(order = -1)
     public static void onPlayerTick(@NotNull PlayerTickEvent.Pre evt) {
         if (evt.getEntity().level().isClientSide) {
             return;

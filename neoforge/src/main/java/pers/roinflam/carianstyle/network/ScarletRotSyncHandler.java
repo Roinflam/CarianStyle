@@ -4,13 +4,12 @@ import net.minecraft.core.Holder;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.LivingEntity;
-import net.neoforged.neoforge.event.entity.living.MobEffectEvent;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.event.MobEffectEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
-import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
-import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 猩红腐败「客户端可见性」同步处理器（服务端逻辑，双端加载安全）。
@@ -45,7 +44,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
  *
  * @author RoinFlam
  */
-@EventBusSubscriber(modid = Reference.MOD_ID)
+@EventBusSubscriber
 public final class ScarletRotSyncHandler {
 
     /**

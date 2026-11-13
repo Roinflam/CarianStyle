@@ -13,7 +13,7 @@ import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
+import pers.roinflam.carianstyle.event.client.ClientTickEvent;
 
 /**
  * 客户端按键绑定：打开附魔百科 / 特效开关界面。
@@ -71,7 +71,7 @@ public final class CarianStyleKeys {
     /**
      * 运行时按键处理（游戏总线）。
      */
-    @EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
+    @pers.roinflam.carianstyle.bus.EventBusSubscriber(side = pers.roinflam.carianstyle.bus.EventBusSubscriber.Side.CLIENT)
     public static final class Handler {
 
         private Handler() {
@@ -87,7 +87,7 @@ public final class CarianStyleKeys {
          *
          * @param event 客户端 tick 事件
          */
-        @SubscribeEvent
+        @pers.roinflam.carianstyle.bus.SubscribeEvent
         public static void onClientTick(@Nonnull ClientTickEvent.Post event) {
 
             Minecraft minecraft = Minecraft.getInstance();

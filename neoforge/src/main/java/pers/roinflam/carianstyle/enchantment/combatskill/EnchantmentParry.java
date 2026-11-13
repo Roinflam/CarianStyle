@@ -7,8 +7,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ShieldItem;
 import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
 import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -22,7 +22,7 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 import java.util.UUID;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
-import net.neoforged.fml.common.EventBusSubscriber;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
 
 /**
@@ -187,7 +187,8 @@ public class EnchantmentParry extends EnchantmentBase {
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.LOW)
+    // order = -1：排在顶层附魔之前：格挡反击加成先乘，暗月有加法项，先后颠倒伤害不同
+    @SubscribeEvent(priority = EventPriority.LOW, order = -1)
     public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;

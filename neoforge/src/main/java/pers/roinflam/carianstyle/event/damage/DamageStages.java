@@ -2,9 +2,9 @@ package pers.roinflam.carianstyle.event.damage;
 
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
-import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.damagesource.DamageContainer;
 import pers.roinflam.carianstyle.base.entity.AbsorptionShield;
+import pers.roinflam.carianstyle.bus.CarianBus;
 
 import javax.annotation.Nonnull;
 import java.util.Stack;
@@ -67,7 +67,7 @@ public final class DamageStages {
      * @return true 表示被取消，{@code hurt} 直接返回 false（不写无敌时间、不压容器、NeoForge 的伤害事件都不发）
      */
     public static boolean attack(@Nonnull LivingEntity entity, @Nonnull DamageSource source, float amount) {
-        return NeoForge.EVENT_BUS.post(new LivingAttackEvent(entity, source, amount)).isCanceled();
+        return CarianBus.post(new LivingAttackEvent(entity, source, amount)).isCanceled();
     }
 
     /**
@@ -88,7 +88,7 @@ public final class DamageStages {
         }
         DamageContainer container = containers.peek();
         int depth = containers.size();
-        LivingHurtEvent event = NeoForge.EVENT_BUS.post(new LivingHurtEvent(entity, source, container.getNewDamage()));
+        LivingHurtEvent event = CarianBus.post(new LivingHurtEvent(entity, source, container.getNewDamage()));
         dropLeaked(containers, depth);
         if (event.isCanceled() || event.getAmount() <= 0) {
             container.setNewDamage(0);
@@ -112,7 +112,7 @@ public final class DamageStages {
         }
         DamageContainer container = containers.peek();
         int depth = containers.size();
-        LivingDamageEvent event = NeoForge.EVENT_BUS.post(new LivingDamageEvent(entity, source, container.getNewDamage()));
+        LivingDamageEvent event = CarianBus.post(new LivingDamageEvent(entity, source, container.getNewDamage()));
         dropLeaked(containers, depth);
         container.setNewDamage(event.isCanceled() ? 0 : event.getAmount());
         AbsorptionShield.afterAbsorb(entity);
