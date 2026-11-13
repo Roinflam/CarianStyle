@@ -12,16 +12,13 @@ import java.util.Map;
 
 /**
  * 动态属性定义
- * 支持属性修改器、Tick回调和自定义事件处理器
+ * 支持属性修改器、Tick回调和生命周期回调；要监听事件的效果写静态监听，查 {@link DynamicAttributeManager} 判断实体身上有没有效果
  */
 public class DynamicAttribute {
     private final String registryName;
     private final Map<Holder<Attribute>, ModifierConfig> modifierConfigs = new HashMap<>();
     private EffectCallback onTickCallback;
     private int tickInterval = 20;
-
-    // 事件处理器工厂 - 用于创建事件监听器实例
-    private EventHandlerFactory eventHandlerFactory;
 
     // ========== 新增：生命周期回调 ==========
     private LifecycleCallback onAppliedCallback;
@@ -153,53 +150,6 @@ public class DynamicAttribute {
         }
     }
 
-    // ========== 事件处理器 ==========
-
-    /**
-     * 设置事件处理器工厂
-     * 用于创建监听各种Forge事件的处理器对象
-     *
-     * 使用示例:
-     * <pre>
-     * new DynamicAttribute("virus")
-     *     .withEventHandler(entity -> new Object() {
-     *         @SubscribeEvent
-     *         public void onHurt(LivingHurtEvent event) {
-     *             if (event.getEntity() != entity) return;
-     *             event.setAmount(event.getAmount() * 1.25f);
-     *         }
-     *     });
-     * </pre>
-     *
-     * @param factory 工厂函数,接收LivingEntity参数,返回包含@SubscribeEvent方法的对象
-     * @return this,支持链式调用
-     */
-    public DynamicAttribute withEventHandler(@Nonnull EventHandlerFactory factory) {
-        this.eventHandlerFactory = factory;
-        return this;
-    }
-
-    /**
-     * 创建事件处理器实例
-     *
-     * @param entity 关联的实体
-     * @return 事件处理器对象,如果没有设置工厂则返回null
-     */
-    @Nullable
-    public Object createEventHandler(@Nonnull LivingEntity entity) {
-        if (eventHandlerFactory == null) return null;
-        return eventHandlerFactory.create(entity);
-    }
-
-    /**
-     * 检查是否有事件处理器
-     *
-     * @return true表示设置了事件处理器工厂
-     */
-    public boolean hasEventHandler() {
-        return eventHandlerFactory != null;
-    }
-
     // ========== 实例创建 ==========
 
     /**
@@ -256,20 +206,6 @@ public class DynamicAttribute {
          * @param attribute 触发的属性
          */
         void accept(LivingEntity entity, DynamicAttribute attribute);
-    }
-
-    /**
-     * 事件处理器工厂接口
-     */
-    @FunctionalInterface
-    public interface EventHandlerFactory {
-        /**
-         * 创建事件处理器
-         *
-         * @param entity 关联的实体
-         * @return 包含@SubscribeEvent方法的事件处理器对象
-         */
-        Object create(LivingEntity entity);
     }
 
     /**

@@ -2,25 +2,19 @@ package pers.roinflam.carianstyle.init;
 
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Tiers;
-import net.neoforged.neoforge.registries.DeferredRegister;
-import net.neoforged.neoforge.registries.DeferredHolder;
 import pers.roinflam.carianstyle.item.entity.ItemGlintblades;
-import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.CarianContent;
 import net.minecraft.core.registries.Registries;
+
+import java.util.function.Supplier;
 
 /**
  * 模组物品注册类
  * <p>
- * 使用 DeferredRegister 方式注册所有自定义物品
+ * 声明交给 {@link CarianContent}，由它在模组加载时触发本类、交给平台注册；字段在注册完成后才能 {@code get()}。
  * </p>
  */
 public class CarianStyleItem {
-
-    /**
-     * 物品延迟注册器
-     */
-    public static final DeferredRegister<Item> ITEMS =
-            DeferredRegister.create(Registries.ITEM, Reference.MOD_ID);
 
     /**
      * 魔法辉剑物品
@@ -28,8 +22,8 @@ public class CarianStyleItem {
      * 用于渲染 EntityGlintblades 实体
      * </p>
      */
-    public static final DeferredHolder<Item, ItemGlintblades> GLINTBLADES =
-            ITEMS.register("glintblades", () ->
+    public static final Supplier<ItemGlintblades> GLINTBLADES =
+            CarianContent.register(Registries.ITEM, "glintblades", () ->
                     new ItemGlintblades(
                             Tiers.DIAMOND,
                             new Item.Properties()

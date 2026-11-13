@@ -1,31 +1,25 @@
 package pers.roinflam.carianstyle.init;
 
 import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.neoforged.neoforge.registries.DeferredRegister;
-import net.neoforged.neoforge.registries.DeferredHolder;
 import pers.roinflam.carianstyle.tileentity.MoveLight;
-import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.CarianContent;
 import net.minecraft.core.registries.Registries;
+
+import java.util.function.Supplier;
 
 /**
  * 模组方块实体注册类
  * <p>
- * 使用 DeferredRegister 方式注册所有方块实体类型
+ * 声明交给 {@link CarianContent}，由它在模组加载时触发本类、交给平台注册；字段在注册完成后才能 {@code get()}。
  * </p>
  */
 public class CarianStyleBlockEntities {
 
     /**
-     * 方块实体延迟注册器
-     */
-    public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITY_TYPES =
-            DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, Reference.MOD_ID);
-
-    /**
      * 移动光源方块实体类型
      */
-    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MoveLight>> MOVE_LIGHT =
-            BLOCK_ENTITY_TYPES.register("move_light", () ->
+    public static final Supplier<BlockEntityType<MoveLight>> MOVE_LIGHT =
+            CarianContent.register(Registries.BLOCK_ENTITY_TYPE, "move_light", () ->
                     BlockEntityType.Builder.of(
                             MoveLight::new,
                             CarianStyleBlocks.HIDE_LIGHT.get()

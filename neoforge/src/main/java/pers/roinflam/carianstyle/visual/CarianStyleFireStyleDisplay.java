@@ -1,8 +1,6 @@
 package pers.roinflam.carianstyle.visual;
 
 import net.minecraft.world.entity.player.Player;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.enchantment.EnchantmentFireDevoured;
@@ -10,8 +8,6 @@ import pers.roinflam.carianstyle.enchantment.EnchantmentFireGivesPower;
 import pers.roinflam.carianstyle.enchantment.EnchantmentHealingByFire;
 import pers.roinflam.carianstyle.enchantment.EnchantmentShelterOfFire;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentGiantFlame;
-import pers.roinflam.carianstyle.utils.Reference;
-import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 火焰流派「联动徽标」的 HUD 叠层注册（双端通用）。
@@ -94,7 +90,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * <h3>为什么单开一个类而不是并进 CarianStyleStackDisplays</h3>
  * <p>
  * 与 {@link CarianStyleTimeReversalDisplay} 同理：那个类七百余行、集中登记 22 项，
- * 为加一项而整体重写的风险大于收益。本类用 {@link FMLCommonSetupEvent} 自行注册，
+ * 为加一项而整体重写的风险大于收益。本类在通用设置阶段自行注册，
  * {@code StackDisplayRegistry.register} 只是往列表里追加，注册先后不影响任何行为。
  * </p>
  * <p>
@@ -122,7 +118,6 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 1.1
  */
-@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
 public final class CarianStyleFireStyleDisplay {
 
     /**
@@ -153,24 +148,10 @@ public final class CarianStyleFireStyleDisplay {
     }
 
     /**
-     * 公共初始化阶段注册显示项。
-     * <p>
-     * 用 {@code enqueueWork} 而非直接注册：{@link FMLCommonSetupEvent} 的监听器
-     * 可能并行执行，而 {@code StackDisplayRegistry} 内部是普通集合，
-     * 并发写入会损坏结构。{@code enqueueWork} 保证在主线程串行执行。
-     * </p>
-     *
-     * @param event 公共初始化事件
+     * 通用设置阶段注册显示项，由入口在主线程上调：{@code StackDisplayRegistry} 内部是普通集合，不能并发写。
+     * 重复调用安全。
      */
-    @SubscribeEvent
-    public static void onCommonSetup(FMLCommonSetupEvent event) {
-        event.enqueueWork(CarianStyleFireStyleDisplay::register);
-    }
-
-    /**
-     * 实际注册逻辑。重复调用安全。
-     */
-    private static void register() {
+    public static void register() {
         if (initialized) {
             return;
         }

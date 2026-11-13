@@ -6,9 +6,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
@@ -25,7 +22,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 附魔数值配置：把散落在各附魔类里的硬编码数字集中到一个可编辑的 JSON 文件。
@@ -117,7 +113,6 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * @author RoinFlam
  * @version 1.0
  */
-@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
 public final class EnchantmentValues {
 
     /** 配置文件名 */
@@ -370,23 +365,11 @@ public final class EnchantmentValues {
     // ==================== 加载与写回 ====================
 
     /**
-     * 在通用初始化阶段加载配置。
-     * <p>
-     * 用 {@link EventPriority#LOWEST} 是为了确保排在附魔注册之后——
-     * 注册过程会 {@code Class.forName} 每个附魔类，触发它们的静态块，
-     * 数值声明必须先于加载完成，否则生成的文件会缺键。
-     * </p>
-     *
-     * @param event 通用初始化事件
-     */
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onCommonSetup(@Nonnull FMLCommonSetupEvent event) {
-        event.enqueueWork(EnchantmentValues::reload);
-    }
-
-    /**
      * 重新加载配置文件并写回合并结果。
-     * <p>可由百科界面的「重载数值」按钮调用。</p>
+     * <p>
+     * 入口在通用设置阶段调一次，排在附魔行为对象建完之后：建对象时会加载每个附魔类、跑它们的静态初始化，
+     * 数值声明必须先于第一次加载做完，否则写回的文件会缺键。也可由百科界面的「重载数值」按钮调用。
+     * </p>
      *
      * @return 是否成功
      */

@@ -38,7 +38,7 @@ import javax.annotation.Nonnull;
  * <p>
  * 开关由服务端配置 {@link ConfigLoader#hideStealthHitbox} 决定。
  * 若让客户端自己判断「在隐身列表里 且 开关为真」，就得新增一个下发配置的数据包，
- * 进而要升级 {@code NetworkHandler} 的协议版本、处理登录下发与断线复位。
+ * 进而要升 {@code CarianNetwork} 主通道的版本号、处理登录下发与断线复位。
  * </p>
  * <p>
  * 改为由服务端逐实体决定：开关打开时，隐身玩家除了序列号 4（隐藏模型）之外

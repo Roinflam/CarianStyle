@@ -2,9 +2,6 @@ package pers.roinflam.carianstyle.network;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.PacketDistributor;
-import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
-import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 /**
  * 可视化系统专用网络通道（与现有 {@code NetworkHandler} 完全独立）。
@@ -13,8 +10,8 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  * 因而不会影响已经在工作的火焰/隐身同步逻辑。本通道承载：叠层显示包、定点 AOE 自绘特效包、
  * 战技自绘特效包。
  * <p>
- * 注意：{@link #register} 挂在 MOD 总线的包登记事件上（主类构造器里 addListener），
- * 双端各触发一次——客户端需要登记解码/处理器才能接收 S2C 包。
+ * 三个包的登记信息（类型、编解码、版本号、客户端处理器）在 {@link CarianNetwork#PACKETS}，
+ * 由各加载器的入口照表登记；这里只剩发包的几个便捷方法。
  * <p>
  * <b>v2 新增：</b>{@link CombatArtEffectPacket}（战技特效，带朝向 yaw）。
  * 包 ID 追加在既有两个包之后，<b>不改动既有包的注册顺序</b>——SimpleChannel 的包 ID 由
@@ -42,11 +39,11 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  *
  * <h3>1.21.1（NeoForge）</h3>
  * <p>
- * {@code SimpleChannel} 换成 MOD 总线的 {@link RegisterPayloadHandlersEvent}，三个包各有自己的 id
+ * {@code SimpleChannel} 换成按 id 登记，三个包各有自己的 id
  * （{@code carianstyle:stack_display}、{@code aoe_effect}、{@code combat_art_effect}），版本号照旧是
- * {@link #PROTOCOL_VERSION}（按包记，和主通道的 "4" 互不影响），都不是可选包。
- * 都用 {@code playToClient} 登记，方向由 NeoForge 校验，客户端反向发来的包在入口就被拒，
- * 与上面 v3 的方向声明等价。发送走 {@link PayloadSend}（只发给协商过频道的玩家，范围同 {@link PacketDistributor}）。
+ * {@link CarianNetwork#VISUAL_VERSION}（按包记，和主通道的 "4" 互不影响），都不是可选包。
+ * 都只许服务端发往客户端，方向由加载器校验，客户端反向发来的包在入口就被拒，
+ * 与上面 v3 的方向声明等价。发送走 {@link PayloadSend}（只发给协商过频道的玩家，范围同 NeoForge 的 {@code PacketDistributor}）。
  * </p>
  *
  * @author RoinFlam
@@ -54,25 +51,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class VisualNetwork {
 
-    /** 协议版本（双端一致即可） */
-    private static final String PROTOCOL_VERSION = "1";
-
     private VisualNetwork() {
-    }
-
-    /**
-     * 登记全部包（MOD 总线 {@link RegisterPayloadHandlersEvent}，双端都会触发）。
-     */
-    public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar(PROTOCOL_VERSION);
-        registrar.playToClient(StackDisplayPacket.TYPE, StackDisplayPacket.STREAM_CODEC,
-                StackDisplayPacket::handle);
-        // 定点 AOE 自绘特效包（S2C）
-        registrar.playToClient(AoeEffectPacket.TYPE, AoeEffectPacket.STREAM_CODEC,
-                AoeEffectPacket::handle);
-        // v2：战技自绘特效包（S2C，带朝向）
-        registrar.playToClient(CombatArtEffectPacket.TYPE, CombatArtEffectPacket.STREAM_CODEC,
-                CombatArtEffectPacket::handle);
     }
 
     /**
@@ -88,7 +67,7 @@ public final class VisualNetwork {
     /**
      * 把包广播给某点附近一定范围内的玩家（用于定点 AOE 自绘特效）。
      * <p>
-     * 走 {@link PayloadSend#toNear}（范围同 {@link PacketDistributor#sendToPlayersNear}），只会发给该维度内距 (x,y,z) 在 {@code range} 格内、
+     * 走 {@link PayloadSend#toNear}（范围同 NeoForge 的 {@code PacketDistributor.sendToPlayersNear}），只会发给该维度内距 (x,y,z) 在 {@code range} 格内、
      * 且正在追踪该区域的玩家，因此带宽随近场玩家数自然受限。
      * </p>
      *

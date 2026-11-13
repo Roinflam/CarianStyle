@@ -5,10 +5,6 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.AABB;
-import pers.roinflam.carianstyle.event.LivingChangeTargetEvent;
-import pers.roinflam.carianstyle.event.LivingHealEvent;
-import pers.roinflam.carianstyle.bus.EventPriority;
-import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.dynamicattr.ClientSyncAttribute;
 import pers.roinflam.carianstyle.dynamicattr.ClientSyncEffectHelper;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttribute;
@@ -20,7 +16,6 @@ import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nullable;
 import java.util.List;
-import java.util.UUID;
 import pers.roinflam.carianstyle.event.LivingTickEvent;
 
 /**
@@ -30,8 +25,7 @@ import pers.roinflam.carianstyle.event.LivingTickEvent;
  * <h3>性能优化 v2.1（效果行为基本不变，差异见下）</h3>
  * <p>
  * <b>问题：per-entity 事件处理器挂在全局事件总线上，却监听高频事件。</b>
- * {@code DynamicAttributeInstance.setEventHandler} 会把每个实体的处理器
- * 单独 {@code CarianBus.register}。若处理器里监听的是
+ * 当时每个实体的处理器单独登记到总线上（后来处理器整个改成了静态监听，见 {@link DynamicAttributeEventHandlers}）。若处理器里监听的是
  * {@code LivingTickEvent}，就意味着：
  * </p>
  * <pre>
@@ -56,7 +50,7 @@ import pers.roinflam.carianstyle.event.LivingTickEvent;
  *         （效果数据只存在于服务端），因此实际只在服务端生效——与 onTick 完全一致，
  *         跳跃压制的手感一模一样。</li>
  *     <li><b>隐身：</b>处理器保留（仍需监听 {@code LivingChangeTargetEvent} 与
- *         客户端渲染事件），但其中的 {@code LivingTickEvent} 被移除，
+ *         客户端渲染事件，现在是 {@link DynamicAttributeEventHandlers} 里的静态监听），但其中的 {@code LivingTickEvent} 被移除，
  *         清仇恨改为 {@code onTick + setTickInterval(}{@value #STEALTH_AGGRO_CLEAR_INTERVAL}{@code )}。</li>
  * </ul>
  *
@@ -221,7 +215,7 @@ public class DynamicAttributes {
      * 沙布里里的嚎叫效果
      * - 护甲-15%×等级
      * - 韧性-15%×等级
-     * - 治疗量-10%×(等级+1)
+     * - 治疗量-10%×(等级+1)（{@link DynamicAttributeEventHandlers#onHowlShabririHeal}）
      * <p>
      * v2.2：新增层数的客户端同步（见静态块），使观察者能看出目标叠了几层发狂。
      * 同步只做网络广播，不影响本效果的任何数值与判定。
@@ -229,8 +223,7 @@ public class DynamicAttributes {
      */
     public static final DynamicAttribute HOWL_SHABRIRI = new DynamicAttribute("carianstyle_howl_shabriri")
             .addModifier(Attributes.ARMOR, -0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL)
-            .addModifier(Attributes.ARMOR_TOUGHNESS, -0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL)
-            .withEventHandler(HowlShabririEventHandler::new);
+            .addModifier(Attributes.ARMOR_TOUGHNESS, -0.15, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
 
     // ========== 隐身效果 ==========
 
@@ -243,7 +236,7 @@ public class DynamicAttributes {
      * <p>
      * v2.1：清仇恨由原来的 per-entity {@code LivingTickEvent} 处理器
      * 改为框架自带的 onTick 回调（每 {@value #STEALTH_AGGRO_CLEAR_INTERVAL} tick 触发）。
-     * 事件处理器保留，仍负责拦截目标锁定。
+     * 拦截目标锁定在 {@link DynamicAttributeEventHandlers#onStealthChangeTarget}。
      * </p>
      * <p>
      * 2.2.0：
@@ -261,8 +254,7 @@ public class DynamicAttributes {
                 clearNearbyAggroTowards(context.getEntity());
                 StealthHitboxSyncHelper.sync(context.getEntity());
             })
-            .setTickInterval(STEALTH_AGGRO_CLEAR_INTERVAL)
-            .withEventHandler(StealthEventHandler::new);
+            .setTickInterval(STEALTH_AGGRO_CLEAR_INTERVAL);
 
     // ========== 火焰燃烧效果 ==========
 
@@ -280,11 +272,10 @@ public class DynamicAttributes {
 
     /**
      * 癫痫火焰燃烧效果
-     * - 治疗量减少90%
+     * - 治疗量减少90%（{@link DynamicAttributeEventHandlers#onEpilepsyFireHeal}）
      * - 火焰渲染：黄色火焰（序列号3）
      */
-    public static final DynamicAttribute EPILEPSY_FIRE_BURNING = new DynamicAttribute("carianstyle_epilepsy_fire_burning")
-            .withEventHandler(EpilepsyFireEventHandler::new);
+    public static final DynamicAttribute EPILEPSY_FIRE_BURNING = new DynamicAttribute("carianstyle_epilepsy_fire_burning");
 
     // ========== 静态初始化：注册需要客户端同步的属性 ==========
 
@@ -372,97 +363,6 @@ public class DynamicAttributes {
 
         for (Mob mob : nearbyMobs) {
             mob.setTarget(null);
-        }
-    }
-
-    // ========== 命名内部类：事件处理器 ==========
-
-    /**
-     * 沙布里里的嚎叫效果的事件处理器
-     * 减少治疗量
-     * <p>只监听低频的 {@code LivingHealEvent}，无需改造。</p>
-     */
-    private static class HowlShabririEventHandler {
-        private final UUID boundEntityId;
-
-        public HowlShabririEventHandler(LivingEntity entity) {
-            this.boundEntityId = entity.getUUID();
-        }
-
-        // 治疗 LOW 档里有乘有加（翠绿乌龟是加法），这里的乘法要排在本模组同档监听的最后，连加上的那部分一起打折；
-        // order 取最大值把它固定在最后，以后改成静态监听也不会因为登记顺序跑到前面
-        @SubscribeEvent(priority = EventPriority.LOW, order = Integer.MAX_VALUE)
-        public void onHeal(LivingHealEvent event) {
-            if (!event.getEntity().getUUID().equals(boundEntityId)) return;
-            if (event.getEntity().level().isClientSide()) return;
-
-            int level = DynamicAttributeManager.getAmplifier((LivingEntity) event.getEntity(),
-                    DynamicAttributes.HOWL_SHABRIRI);
-            if (level < 0) return;
-
-            float reduction = (level + 1) * 0.1f;
-            event.setAmount(event.getAmount() * (1 - reduction));
-        }
-    }
-
-    /**
-     * 癫痫火焰燃烧效果的事件处理器
-     * 大幅减少治疗量(90%)
-     * <p>只监听低频的 {@code LivingHealEvent}，无需改造。</p>
-     */
-    private static class EpilepsyFireEventHandler {
-        private final UUID boundEntityId;
-
-        public EpilepsyFireEventHandler(LivingEntity entity) {
-            this.boundEntityId = entity.getUUID();
-        }
-
-        // 同嚎叫：乘法固定排在治疗 LOW 档本模组监听的最后
-        @SubscribeEvent(priority = EventPriority.LOW, order = Integer.MAX_VALUE)
-        public void onHeal(LivingHealEvent event) {
-            if (!event.getEntity().getUUID().equals(boundEntityId)) return;
-            if (event.getEntity().level().isClientSide()) return;
-
-            if (DynamicAttributeManager.has((LivingEntity) event.getEntity(),
-                    DynamicAttributes.EPILEPSY_FIRE_BURNING)) {
-                event.setAmount(event.getAmount() * 0.1f);
-            }
-        }
-    }
-
-    /**
-     * 隐身效果的事件处理器
-     * <p>
-     * v2.1：原先的 {@code LivingTickEvent} 监听（首次 tick 清仇恨）已移除，
-     * 改由 {@link #STEALTH} 的 onTick 回调周期执行——详见类注释。
-     * </p>
-     * <p>
-     * 2.2.0：原先这里还有一个 {@code RenderPlayerEvent.Pre} 监听负责隐藏玩家模型，已移到
-     * {@code ClientSyncStealthRenderer}。本处理器只在 {@code DynamicAttributeManager.apply}
-     * 里注册到事件总线，而 apply 只在服务端执行——单人游戏里服务端和客户端共用一条总线，
-     * 所以一直看起来正常；<b>独立服务器上客户端从来没注册过它，隐身者的模型对其他玩家始终可见</b>。
-     * 现在本处理器只剩拦截生物锁定目标一项（纯服务端逻辑）。
-     * </p>
-     */
-    private static class StealthEventHandler {
-        private final UUID boundEntityId;
-
-        public StealthEventHandler(LivingEntity entity) {
-            this.boundEntityId = entity.getUUID();
-        }
-
-        /**
-         * 阻止生物将隐身实体设为目标
-         */
-        @SubscribeEvent(priority = EventPriority.HIGHEST)
-        public void onLivingChangeTarget(LivingChangeTargetEvent event) {
-            if (event.getEntity().level().isClientSide()) return;
-            if (event.getNewAboutToBeSetTarget() == null) return;
-            if (!event.getNewAboutToBeSetTarget().getUUID().equals(boundEntityId)) return;
-
-            if (DynamicAttributeManager.has(event.getNewAboutToBeSetTarget(), DynamicAttributes.STEALTH)) {
-                event.setCanceled(true);
-            }
         }
     }
 }

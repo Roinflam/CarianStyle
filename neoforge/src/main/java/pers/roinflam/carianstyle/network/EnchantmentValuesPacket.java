@@ -4,7 +4,6 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
@@ -148,8 +147,8 @@ public class EnchantmentValuesPacket implements CustomPacketPayload {
     /**
      * 处理（仅客户端执行：本包为 S2C）。
      * <p>
-     * 本包已在 {@code NetworkHandler} 注册时声明为
-     * {@code NetworkDirection.PLAY_TO_CLIENT}，服务端收到反向包会被 Forge
+     * 本包已在 {@link CarianNetwork} 里登记为只许服务端发往客户端，
+     * 服务端收到反向包会被加载器
      * 在分发入口直接拒绝。
      * </p>
      * <p>
@@ -158,9 +157,8 @@ public class EnchantmentValuesPacket implements CustomPacketPayload {
      * </p>
      *
      * @param packet 收到的包
-     * @param ctx    网络上下文
      */
-    public static void handle(EnchantmentValuesPacket packet, IPayloadContext ctx) {
+    public static void handle(EnchantmentValuesPacket packet) {
         EnchantmentValues.applySynced(packet.values);
     }
 

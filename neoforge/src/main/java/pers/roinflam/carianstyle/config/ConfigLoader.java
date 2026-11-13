@@ -1,8 +1,6 @@
 package pers.roinflam.carianstyle.config;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.event.config.ModConfigEvent;
 import org.apache.commons.lang3.tuple.Pair;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.LevelDecay;
@@ -13,7 +11,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
-import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
  * 卡利亚风格模组配置类
@@ -75,7 +72,6 @@ import net.neoforged.fml.common.EventBusSubscriber;
  *
  * @author RoinFlam
  */
-@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
 public final class ConfigLoader {
 
     // ==================== 配置规范 ====================
@@ -717,25 +713,13 @@ public final class ConfigLoader {
     }
 
     /**
-     * 配置加载事件监听器
-     * Config loading event listener
+     * 配置文件加载或重载完成后调（平台的配置事件里转过来，本模组的 COMMON 配置才调）。
+     * <p>
+     * 重载可能发生在文件监视线程上，{@link #bake()} 先换数组、再递增版本号，读的一侧按版本号判断要不要重算。
+     * </p>
      */
-    @SubscribeEvent
-    public static void onConfigLoading(ModConfigEvent.Loading event) {
-        if (event.getConfig().getModId().equals(Reference.MOD_ID)) {
-            bake();
-        }
-    }
-
-    /**
-     * 配置重载事件监听器
-     * Config reloading event listener
-     */
-    @SubscribeEvent
-    public static void onConfigReloading(ModConfigEvent.Reloading event) {
-        if (event.getConfig().getModId().equals(Reference.MOD_ID)) {
-            bake();
-        }
+    public static void onLoaded() {
+        bake();
     }
 
     // 私有构造函数，防止实例化

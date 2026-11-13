@@ -15,9 +15,6 @@ import net.minecraft.server.packs.metadata.MetadataSectionSerializer;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.repository.PackSource;
 import net.minecraft.server.packs.resources.IoSupplier;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.AddPackFindersEvent;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
@@ -51,7 +48,7 @@ import java.util.TreeMap;
  *
  * <h3>做法</h3>
  * <ul>
- *   <li>MOD 总线 {@link AddPackFindersEvent} 里给服务端数据包仓库塞一个自己的 {@link Pack}：必选（始终启用，老世界也会被补进已选列表）、
+ *   <li>平台在建服务端数据包仓库时，经 {@link #createPack()} 给它塞一个自己的 {@link Pack}：必选（始终启用，老世界也会被补进已选列表）、
  *       放在最底下（世界数据包、别的模组能用同名文件覆盖）。</li>
  *   <li>{@code knownPackInfo} 留空。注册表同步时，来自「客户端也认识的已知包」的条目只发引用、让客户端用本地那份；
  *       模组 jar 的数据包和 {@code addPackFinders} 这个帮手都会带上已知包信息，所以不用帮手。
@@ -73,7 +70,6 @@ import java.util.TreeMap;
  *
  * @author RoinFlam
  */
-@EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
 public final class GeneratedDataPack implements PackResources {
 
     public static final String PACK_ID = Reference.MOD_ID + ":generated";
@@ -117,19 +113,36 @@ public final class GeneratedDataPack implements PackResources {
 
     // ==================== 注册 ====================
 
-    @SubscribeEvent
-    public static void onAddPackFinders(AddPackFindersEvent event) {
-        if (event.getPackType() != PackType.SERVER_DATA) {
-            return;
+    /**
+     * 建本模组的内置数据包（来源 {@link PackSource#BUILT_IN}），给平台挂进服务端数据包仓库用。
+     * <p>
+     * 仓库每次重新扫描包源都要调一次。建不出来时直接抛异常：没有这个包，注册表里一个本模组附魔都没有，
+     * 存档里的本模组附魔读出来全部丢掉、存盘后永久没了，宁可拒绝加载世界。
+     * </p>
+     */
+    @Nonnull
+    public static Pack createPack() {
+        return createPack(LOCATION);
+    }
+
+    /**
+     * 同 {@link #createPack()}，换一个包的来源（来源决定包在已选列表里怎么排、{@code /datapack list} 里怎么标）。
+     */
+    @Nonnull
+    public static Pack createPack(@Nonnull PackSource source) {
+        if (source == LOCATION.source()) {
+            return createPack(LOCATION);
         }
-        event.addRepositorySource(consumer -> {
-            Pack pack = Pack.readMetaAndCreate(LOCATION, SUPPLIER, PackType.SERVER_DATA, SELECTION);
-            if (pack == null) {
-                // 没有这个包，注册表里一个本模组附魔都没有，存档里的本模组附魔读出来全部丢掉、存盘后永久没了：直接拒绝加载世界
-                throw new IllegalStateException("卡利亚式附魔：内置数据包 " + PACK_ID + " 创建失败，拒绝加载世界以免存档里的附魔被清掉");
-            }
-            consumer.accept(pack);
-        });
+        return createPack(new PackLocationInfo(LOCATION.id(), LOCATION.title(), source, LOCATION.knownPackInfo()));
+    }
+
+    @Nonnull
+    private static Pack createPack(@Nonnull PackLocationInfo location) {
+        Pack pack = Pack.readMetaAndCreate(location, SUPPLIER, PackType.SERVER_DATA, SELECTION);
+        if (pack == null) {
+            throw new IllegalStateException("卡利亚式附魔：内置数据包 " + PACK_ID + " 创建失败，拒绝加载世界以免存档里的附魔被清掉");
+        }
+        return pack;
     }
 
     // ==================== 生成 ====================

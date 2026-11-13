@@ -4,7 +4,6 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.StackDisplayRegistry;
 import pers.roinflam.carianstyle.visual.StackHudManager;
@@ -133,14 +132,13 @@ public class StackDisplayPacket implements CustomPacketPayload {
     /**
      * 处理（仅客户端执行：本包为 S2C）。
      * <p>
-     * 本包已在 {@code VisualNetwork} 注册时声明为
-     * {@code NetworkDirection.PLAY_TO_CLIENT}，反向包会被 Forge 在分发入口拒绝。
+     * 本包已在 {@link CarianNetwork} 里登记为只许服务端发往客户端，
+     * 反向包会被加载器在分发入口拒绝。
      * </p>
      *
      * @param packet 收到的包
-     * @param ctx    网络上下文
      */
-    public static void handle(StackDisplayPacket packet, IPayloadContext ctx) {
+    public static void handle(StackDisplayPacket packet) {
         StackHudManager.accept(packet.stacks);
     }
 

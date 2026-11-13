@@ -4,33 +4,27 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
-import net.neoforged.neoforge.registries.DeferredRegister;
-import net.neoforged.neoforge.registries.DeferredHolder;
 import pers.roinflam.carianstyle.block.fire.CrimsonFlame;
 import pers.roinflam.carianstyle.block.fire.WhiteFlame;
 import pers.roinflam.carianstyle.block.fire.YellowFlame;
 import pers.roinflam.carianstyle.block.light.HideLight;
-import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.CarianContent;
 import net.minecraft.core.registries.Registries;
+
+import java.util.function.Supplier;
 
 /**
  * 模组方块注册类
  * <p>
- * 使用 DeferredRegister 方式注册所有自定义方块
+ * 声明交给 {@link CarianContent}，由它在模组加载时触发本类、交给平台注册；字段在注册完成后才能 {@code get()}。
  * </p>
  */
 public class CarianStyleBlocks {
 
     /**
-     * 方块延迟注册器
-     */
-    public static final DeferredRegister<Block> BLOCKS =
-            DeferredRegister.create(Registries.BLOCK, Reference.MOD_ID);
-
-    /**
      * 猩红火焰方块
      */
-    public static final DeferredHolder<Block, CrimsonFlame> CRIMSON_FLAME = BLOCKS.register("crimson_flame", () ->
+    public static final Supplier<CrimsonFlame> CRIMSON_FLAME = CarianContent.register(Registries.BLOCK, "crimson_flame", () ->
             new CrimsonFlame(
                     BlockBehaviour.Properties.of()
                             .mapColor(MapColor.FIRE)
@@ -43,7 +37,7 @@ public class CarianStyleBlocks {
     /**
      * 白色火焰方块
      */
-    public static final DeferredHolder<Block, WhiteFlame> WHITE_FLAME = BLOCKS.register("white_flame", () ->
+    public static final Supplier<WhiteFlame> WHITE_FLAME = CarianContent.register(Registries.BLOCK, "white_flame", () ->
             new WhiteFlame(
                     BlockBehaviour.Properties.of()
                             .mapColor(MapColor.FIRE)
@@ -56,7 +50,7 @@ public class CarianStyleBlocks {
     /**
      * 黄色火焰方块
      */
-    public static final DeferredHolder<Block, YellowFlame> YELLOW_FLAME = BLOCKS.register("yellow_flame", () ->
+    public static final Supplier<YellowFlame> YELLOW_FLAME = CarianContent.register(Registries.BLOCK, "yellow_flame", () ->
             new YellowFlame(
                     BlockBehaviour.Properties.of()
                             .mapColor(MapColor.FIRE)
@@ -69,7 +63,7 @@ public class CarianStyleBlocks {
     /**
      * 隐藏光源方块
      */
-    public static final DeferredHolder<Block, HideLight> HIDE_LIGHT = BLOCKS.register("hide_light", () ->
+    public static final Supplier<HideLight> HIDE_LIGHT = CarianContent.register(Registries.BLOCK, "hide_light", () ->
             new HideLight(
                     BlockBehaviour.Properties.of()
                             .mapColor(MapColor.NONE)

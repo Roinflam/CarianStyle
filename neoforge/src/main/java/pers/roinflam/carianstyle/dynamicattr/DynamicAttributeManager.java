@@ -140,11 +140,6 @@ public class DynamicAttributeManager {
         instances.add(instance);
         applyModifiers(entity, instance);
 
-        if (instance.getAttribute().hasEventHandler()) {
-            Object handler = instance.getAttribute().createEventHandler(entity);
-            instance.setEventHandler(handler);
-        }
-
         // 触发应用回调
         instance.getAttribute().triggerOnApplied(entity);
     }
@@ -168,7 +163,6 @@ public class DynamicAttributeManager {
             }
 
             removeModifiers(entity, instance);
-            instance.unregisterEventHandler();
 
             // 触发移除回调
             attribute.triggerOnRemoved(entity);
@@ -186,7 +180,6 @@ public class DynamicAttributeManager {
      */
     private static void remove(@Nonnull LivingEntity entity, @Nonnull DynamicAttributeInstance instance) {
         removeModifiers(entity, instance);
-        instance.unregisterEventHandler();
 
         // 触发移除回调
         instance.getAttribute().triggerOnRemoved(entity);
@@ -263,7 +256,6 @@ public class DynamicAttributeManager {
             List<DynamicAttributeInstance> snapshot = new ArrayList<>(instances);
             for (DynamicAttributeInstance instance : snapshot) {
                 removeModifiers(entity, instance);
-                instance.unregisterEventHandler();
                 instance.getAttribute().triggerOnRemoved(entity);
             }
         }
@@ -428,7 +420,6 @@ public class DynamicAttributeManager {
                 // 过期：就地移除并执行清理回调
                 iterator.remove();
                 removeModifiers(entity, instance);
-                instance.unregisterEventHandler();
                 instance.getAttribute().triggerOnRemoved(entity);
                 continue;
             }

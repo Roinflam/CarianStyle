@@ -84,7 +84,7 @@ public final class ValueSyncHandler {
         if (EnchantmentValues.sharedHandles().isEmpty()) {
             return;
         }
-        PayloadSend.toAll(EnchantmentValuesPacket.ofCurrent());
+        PayloadSend.toAll(server, EnchantmentValuesPacket.ofCurrent());
         LogUtil.info("卡利亚式附魔 - 已向 %d 名在线玩家重发共享数值",
                 server.getPlayerList().getPlayerCount());
     }

@@ -4,7 +4,6 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.client.AoeEffectManager;
 
@@ -313,16 +312,15 @@ public class AoeEffectPacket implements CustomPacketPayload {
      * 「服务端引用 {@code @OnlyIn(CLIENT)} 类」而引发的类加载问题。
      * </p>
      * <p>
-     * <b>v5.1 补充：</b>本包已在 {@code VisualNetwork} 注册时声明为
-     * {@code NetworkDirection.PLAY_TO_CLIENT}，服务端收到反向包会被 Forge
+     * <b>v5.1 补充：</b>本包已在 {@link CarianNetwork} 里登记为只许服务端发往客户端，
+     * 服务端收到反向包会被加载器
      * 在分发入口直接拒绝，处理器根本不会进入——这从源头消除了上述类加载顾虑，
      * 比 {@code DistExecutor} 更彻底。
      * </p>
      *
      * @param packet 收到的包
-     * @param ctx    网络上下文
      */
-    public static void handle(AoeEffectPacket packet, IPayloadContext ctx) {
+    public static void handle(AoeEffectPacket packet) {
         AoeEffectManager.spawn(packet.type, packet.x, packet.y, packet.z,
                 packet.radius, packet.entityId, packet.durationMs);
     }

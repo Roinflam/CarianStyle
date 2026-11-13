@@ -8,7 +8,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
-import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import pers.roinflam.carianstyle.platform.Services;
 
 import javax.annotation.Nonnull;
@@ -30,6 +29,8 @@ import javax.annotation.Nonnull;
  * <p>
  * 广播的几种范围照 {@code PlayerList.broadcastAll} / {@code broadcast} 原样自己遍历，逐个先判
  * {@code connection.hasChannel(包类型)}，不支持的跳过；包对象只建一次，和原来一样。
+ * 能不能收、单发交给平台接口；广播时多人共用一个原版的自定义包对象，直接 {@code connection.send}，
+ * 省得每人新建一个（各加载器发自定义包最后都是这个原版包，结果一样）。
  * </p>
  *
  * <h3>行为影响</h3>
@@ -51,10 +52,10 @@ public final class PayloadSend {
         return Services.network().canSend(player, payload.type());
     }
 
-    /** 发给一个玩家（对应 {@code PacketDistributor.sendToPlayer}） */
+    /** 发给一个玩家（对应 {@code PacketDistributor.sendToPlayer}），发送交给平台（{@code PlatformNetwork.send}） */
     public static void toPlayer(@Nonnull ServerPlayer player, @Nonnull CustomPacketPayload payload) {
         if (canReceive(player, payload)) {
-            player.connection.send(new ClientboundCustomPayloadPacket(payload));
+            Services.network().send(player, payload);
         }
     }
 
@@ -97,9 +98,12 @@ public final class PayloadSend {
         }
     }
 
-    /** 发给全部在线玩家（对应 {@code PacketDistributor.sendToAllPlayers}） */
-    public static void toAll(@Nonnull CustomPacketPayload payload) {
-        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+    /**
+     * 发给全部在线玩家（对应 {@code PacketDistributor.sendToAllPlayers}）。
+     * 服务器由调用方给（调用方手里本来就有），不去全局取当前服务器；{@code server} 为 null 时什么都不做，
+     * 和以前「没有在运行的服务器就不发」一样。
+     */
+    public static void toAll(MinecraftServer server, @Nonnull CustomPacketPayload payload) {
         if (server == null) {
             return;
         }

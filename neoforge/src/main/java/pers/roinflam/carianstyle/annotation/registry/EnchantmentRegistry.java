@@ -6,19 +6,14 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.ModList;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import pers.roinflam.carianstyle.event.ServerStartedEvent;
-import net.neoforged.neoforgespi.language.ModFileScanData;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.objectweb.asm.Type;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.scan.ScanIndex;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
@@ -27,7 +22,7 @@ import java.util.*;
 
 /**
  * 附魔注册管理器
- * 使用 ModFileScanData 进行注解扫描
+ * 照构建时生成的附魔清单（{@code META-INF/carianstyle/enchantments.list}）建行为对象
  *
  * <h3>v3.0：1.21.1 起只建行为对象，不注册</h3>
  * <p>
@@ -44,7 +39,7 @@ import java.util.*;
  * <h3>uninstallEnchantment 的 id 校验</h3>
  * <p>
  * 原来在主类的通用设置阶段拿 Forge 的附魔注册表逐条核对。1.21.1 的附魔注册表要等世界加载才有，改成：
- * 写的是本模组附魔的，在通用设置阶段（配置已经读完）按这里的 id 表核对；写的是别的命名空间的，
+ * 写的是本模组附魔的，在通用设置阶段（配置已经读完）由 {@link #checkOwnUninstallEntries()} 按这里的 id 表核对；写的是别的命名空间的，
  * 等服务器启动后按服务器的注册表核对，各打一条警告（这一项只对本模组的附魔生效）。
  * </p>
  *
@@ -60,36 +55,26 @@ public class EnchantmentRegistry {
     private static final List<EnchantmentBase> ALL = new ArrayList<>();
 
     /**
-     * 使用 ModFileScanData 扫描并建立所有附魔的行为对象
-     *
-     * @param packageName 要扫描的包名（实际上这里会扫描整个mod）
+     * 照构建时生成的附魔清单建立所有附魔的行为对象。
+     * <p>
+     * 清单由构建从编译输出里收集带 {@link AutoRegisterEnchantment} 的类，按类名排好序；缺文件、格式不对直接抛异常。
+     * 建表顺序就是清单顺序。表只用来按 id / 键 / 类查，生成数据包时另按 id 排序，建表先后不影响结果。
+     * </p>
      */
-    public static void scanAndRegister(@NotNull String packageName) {
-        LogUtil.info("卡利亚式附魔 - 开始扫描包：%s", packageName);
+    public static void loadFromIndex() {
+        LogUtil.info("卡利亚式附魔 - 开始按附魔清单建立行为对象");
         long startTime = System.currentTimeMillis();
 
         try {
-            // 获取ModFileScanData
-            ModFileScanData scanData = ModList.get()
-                    .getModFileById(Reference.MOD_ID)
-                    .getFile()
-                    .getScanResult();
+            List<String> classNames = ScanIndex.enchantmentClasses();
 
-            // 获取所有带有AutoRegisterEnchantment注解的类
-            Type annotationType = Type.getType(AutoRegisterEnchantment.class);
-            List<ModFileScanData.AnnotationData> annotations = scanData.getAnnotations().stream()
-                    .filter(a -> annotationType.equals(a.annotationType()))
-                    .toList();
-
-            int scannedCount = annotations.size();
+            int scannedCount = classNames.size();
             int registeredCount = 0;
 
             LogUtil.debug("卡利亚式附魔 - 找到 %d 个带注解的类", scannedCount);
 
-            for (ModFileScanData.AnnotationData annotationData : annotations) {
+            for (String className : classNames) {
                 try {
-                    // 获取类名
-                    String className = annotationData.memberName();
                     LogUtil.debug("卡利亚式附魔 - 处理类：%s", className);
 
                     // 加载类
@@ -115,14 +100,14 @@ public class EnchantmentRegistry {
                     }
 
                 } catch (ClassNotFoundException e) {
-                    LogUtil.error("卡利亚式附魔 - 无法加载类：%s", e, annotationData.memberName());
+                    LogUtil.error("卡利亚式附魔 - 无法加载类：%s", e, className);
                 } catch (Exception e) {
-                    LogUtil.error("卡利亚式附魔 - 处理类时出错：%s", e, annotationData.memberName());
+                    LogUtil.error("卡利亚式附魔 - 处理类时出错：%s", e, className);
                 }
             }
 
             long endTime = System.currentTimeMillis();
-            LogUtil.info("卡利亚式附魔 - 扫描完成，扫描了 %d 个类，注册了 %d 个附魔，耗时 %d 毫秒",
+            LogUtil.info("卡利亚式附魔 - 清单读取完成，清单里 %d 个类，建成 %d 个附魔，耗时 %d 毫秒",
                     scannedCount, registeredCount, endTime - startTime);
 
             // 有附魔类没建成就不开服。1.21.1 的附魔在数据包注册表里，少了哪一条，存档里带它的物品读出来就丢掉这条附魔，
@@ -395,16 +380,9 @@ public class EnchantmentRegistry {
     }
 
     /**
-     * 通用设置阶段（配置已读完）核对写本模组附魔的条目
+     * 通用设置阶段（配置已读完）核对写本模组附魔的条目，由入口在通用设置里调。
      */
-    @EventBusSubscriber(modid = Reference.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
-    public static final class SetupCheck {
-        private SetupCheck() {
-        }
-
-        @SubscribeEvent
-        public static void onCommonSetup(FMLCommonSetupEvent event) {
-            checkUninstallList(null, false);
-        }
+    public static void checkOwnUninstallEntries() {
+        checkUninstallList(null, false);
     }
 }

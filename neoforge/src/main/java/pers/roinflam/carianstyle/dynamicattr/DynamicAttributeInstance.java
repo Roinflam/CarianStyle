@@ -2,8 +2,6 @@ package pers.roinflam.carianstyle.dynamicattr;
 
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import pers.roinflam.carianstyle.bus.CarianBus;
 
 /**
  * 动态属性实例
@@ -16,9 +14,6 @@ public class DynamicAttributeInstance {
     private final int amplifier;
     private int tickCounter = 0;
     private int totalTicksTriggered = 0;
-
-    // 事件处理器实例
-    private Object eventHandler;
 
     /**
      * 构造动态属性实例
@@ -90,35 +85,6 @@ public class DynamicAttributeInstance {
         return this.attribute.equals(other.attribute) &&
                 (this.amplifier > other.amplifier ||
                         (this.amplifier == other.amplifier && this.duration > other.duration));
-    }
-
-    // ========== 事件处理器管理 ==========
-
-    /**
-     * 设置并注册事件处理器到Forge事件总线
-     *
-     * @param handler 事件处理器对象(包含@SubscribeEvent方法)
-     */
-    public void setEventHandler(@Nullable Object handler) {
-        if (handler != null) {
-            this.eventHandler = handler;
-            CarianBus.register(handler);
-        }
-    }
-
-    /**
-     * 注销事件处理器
-     */
-    public void unregisterEventHandler() {
-        if (eventHandler != null) {
-            CarianBus.unregister(eventHandler);
-            eventHandler = null;
-        }
-    }
-
-    @Nullable
-    public Object getEventHandler() {
-        return eventHandler;
     }
 
     // ========== Getter方法 ==========

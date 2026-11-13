@@ -25,7 +25,7 @@ import javax.annotation.Nonnull;
  * </p>
  * <ol>
  *     <li><b>每层占一个序列号</b>（本实现）——零协议改动、零新增包，
- *         {@code VisualNetwork} / {@code NetworkHandler} 一行都不用碰；</li>
+ *         {@code CarianNetwork} 一行都不用碰；</li>
  *     <li>新增一个带等级字段的包 —— 更干净，但要在通道末尾追加注册、
  *         新写一套 manager，而这条链路只服务这一个附魔。</li>
  * </ol>
