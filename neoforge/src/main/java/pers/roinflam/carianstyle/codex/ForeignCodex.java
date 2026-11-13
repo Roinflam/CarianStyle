@@ -3,6 +3,8 @@ package pers.roinflam.carianstyle.codex;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.world.item.enchantment.Enchantment;
+import pers.roinflam.carianstyle.client.codex.EnchantmentCodex;
+import pers.roinflam.carianstyle.client.codex.ForeignMeta;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
 import javax.annotation.Nonnull;

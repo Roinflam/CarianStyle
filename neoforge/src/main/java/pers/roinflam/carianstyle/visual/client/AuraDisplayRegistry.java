@@ -3,8 +3,6 @@ package pers.roinflam.carianstyle.visual.client;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
@@ -44,7 +42,6 @@ import java.util.Map;
  *
  * @author RoinFlam
  */
-@OnlyIn(Dist.CLIENT)
 public final class AuraDisplayRegistry {
 
     /**

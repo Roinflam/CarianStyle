@@ -6,8 +6,6 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 import pers.roinflam.carianstyle.event.client.ClientTickEvent;
@@ -119,7 +117,6 @@ import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
  * @author RoinFlam
  * @version 3.1
  */
-@OnlyIn(Dist.CLIENT)
 @EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class HardArrowRangeRenderer {
 

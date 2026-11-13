@@ -8,8 +8,6 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.joml.Matrix4f;
@@ -168,7 +166,6 @@ import pers.roinflam.carianstyle.bus.EventBusSubscriber;
  * @author RoinFlam
  * @version 3.0
  */
-@OnlyIn(Dist.CLIENT)
 @EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class DarkMoonRenderer {
 

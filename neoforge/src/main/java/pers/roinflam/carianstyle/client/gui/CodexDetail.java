@@ -10,11 +10,9 @@ import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.base.enchantment.LevelDecay;
-import pers.roinflam.carianstyle.codex.EnchantmentCodex;
+import pers.roinflam.carianstyle.client.codex.EnchantmentCodex;
 import pers.roinflam.carianstyle.codex.ModNames;
 import pers.roinflam.carianstyle.codex.EnchantmentMeta;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
@@ -49,7 +47,6 @@ import java.util.Locale;
  * @author RoinFlam
  * @version 1.1
  */
-@OnlyIn(Dist.CLIENT)
 public final class CodexDetail {
 
     /** 内容左右内边距 */

@@ -1,4 +1,4 @@
-package pers.roinflam.carianstyle.codex;
+package pers.roinflam.carianstyle.client.codex;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -7,6 +7,8 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.enchantment.Enchantment;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.codex.CodexTheme;
+import pers.roinflam.carianstyle.codex.EnchantmentMeta;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
@@ -158,7 +160,7 @@ public final class EnchantmentCodex {
      * @return 注册表；还没进世界时为 null
      */
     @Nullable
-    static Registry<Enchantment> currentRegistry() {
+    public static Registry<Enchantment> currentRegistry() {
         ClientLevel level = Minecraft.getInstance().level;
         if (level == null) {
             return null;
@@ -358,7 +360,7 @@ public final class EnchantmentCodex {
      * @param holder 注册表里的附魔
      * @return 是否本模组的
      */
-    static boolean isOurs(@Nonnull Holder.Reference<Enchantment> holder) {
+    public static boolean isOurs(@Nonnull Holder.Reference<Enchantment> holder) {
         return EnchantmentRegistry.byKey(holder.key()) != null
                 || Reference.MOD_ID.equals(holder.key().location().getNamespace());
     }

@@ -1,7 +1,5 @@
 package pers.roinflam.carianstyle.visual.client;
 
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
 import javax.annotation.Nonnull;
@@ -64,7 +62,6 @@ import java.util.List;
  * @author RoinFlam
  * @version 1.0
  */
-@OnlyIn(Dist.CLIENT)
 public final class VisualRangeCheck {
 
     // ==================== 字段名常量 ====================

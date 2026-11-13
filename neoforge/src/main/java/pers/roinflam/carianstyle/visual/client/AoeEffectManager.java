@@ -1,16 +1,13 @@
 package pers.roinflam.carianstyle.visual.client;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
-import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.network.AoeEffectPacket;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
-import pers.roinflam.carianstyle.bus.EventBusSubscriber;
-import pers.roinflam.carianstyle.event.client.ClientTickEvent;
 
 /**
  * 定点 AOE 自绘特效管理器（纯客户端）。
@@ -42,7 +39,7 @@ import pers.roinflam.carianstyle.event.client.ClientTickEvent;
  * </p>
  * <p>
  * <b>修复：</b>{@link AoeEffect#entityId} 去掉 {@code final}，
- * 在 {@link #onClientTick} 中每 tick 调用 {@link #detachDeadBindings}：
+ * 在 {@link #tick} 中每 tick 调用 {@link #detachDeadBindings}：
  * 绑定实体一旦<b>死亡或卸载</b>，立即把 {@code entityId} 置为 {@link AoeEffectPacket#NO_ENTITY}
  * <b>永久解绑</b>，此后再也不会重新解析实体。渲染器侧的
  * {@code if (fx.entityId >= 0)} 分支自然不成立，直接走「最后已知坐标」路径，
@@ -176,7 +173,6 @@ import pers.roinflam.carianstyle.event.client.ClientTickEvent;
  * @author RoinFlam
  * @version 6.6
  */
-@EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class AoeEffectManager {
 
     /**
@@ -673,11 +669,14 @@ public final class AoeEffectManager {
      * 重新吸附并跟着玩家跑的问题（详见类注释）。
      * </p>
      *
-     * @param event tick 事件
+     * <p>
+     * 由 {@link AoeEffectClientTicker} 每个客户端 tick 调一次。本类只放数据和 {@link #spawn}，
+     * 不碰客户端专有的类，网络包类引用它时两端都能正常加载。
+     * </p>
+     *
+     * @param level 客户端当前世界，不在世界里为 null
      */
-    @SubscribeEvent
-    public static void onClientTick(ClientTickEvent.Post event) {
-        Level level = Minecraft.getInstance().level;
+    static void tick(@Nullable Level level) {
         if (level == null) {
             ACTIVE.clear();
             return;

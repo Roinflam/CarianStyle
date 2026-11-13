@@ -68,8 +68,8 @@ import pers.roinflam.carianstyle.visual.client.ShieldWardRenderer;
  * 用它做锚点还要处理 ordinal，反而更啰嗦。
  * </p>
  * <p>
- * 注入点上的 {@code remap = false} 是 1.20.1 留下来的写法（那时 {@code com.mojang.blaze3d}
- * 下的类不参与混淆映射）。NeoForge 1.21.1 运行期就是 Mojmap、不做任何重映射，写不写都一样，保留不动。
+ * 注入点不写 {@code remap = false}：{@code PoseStack#popPose} 在 Fabric 上同样要经 intermediary 重映射，
+ * 标了不重映射，运行期名字对不上会直接起不来。NeoForge 运行期就是 Mojmap，写不写都一样。
  * 目标方法签名 1.21.1 与 1.20.1 相同，方法里也仍只有一处 {@code popPose}。
  * </p>
  *
@@ -120,8 +120,7 @@ public abstract class MixinItemInHandRenderer {
                     + "Lnet/minecraft/client/renderer/MultiBufferSource;I)V",
             at = @At(
                     value = "INVOKE",
-                    target = "Lcom/mojang/blaze3d/vertex/PoseStack;popPose()V",
-                    remap = false
+                    target = "Lcom/mojang/blaze3d/vertex/PoseStack;popPose()V"
             )
     )
     private void carianstyle$renderShieldWardFirstPerson(AbstractClientPlayer player,

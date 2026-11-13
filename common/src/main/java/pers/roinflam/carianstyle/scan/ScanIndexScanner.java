@@ -35,12 +35,16 @@ import java.util.stream.Stream;
  * Fabric 专用服上没有客户端类，解析到就 {@code NoClassDefFoundError}：
  * </p>
  * <ul>
- *   <li>出现 {@code event.client} 包下的事件：构建失败。这些事件是模组自己的客户端事件，现有代码里没有这种写法；</li>
- *   <li>出现原版客户端类（{@code net.minecraft.client}、{@code com.mojang.blaze3d}）：只打警告。NeoForge 专用服靠
- *       {@code @OnlyIn} 剥掉这类方法，现有代码可能还有，要等客户端拆分那一步清干净后再改成构建失败。</li>
+ *   <li>出现 {@code event.client} 包下的事件：构建失败。这些事件是模组自己的客户端事件；</li>
+ *   <li>出现原版客户端类（{@code net.minecraft.client}、{@code com.mojang.blaze3d}）：同样构建失败。</li>
  * </ul>
  * <p>
- * 只看方法，不看字段、静态块：总线登记不碰它们。
+ * {@link Result#warnings()} 目前没有会产生警告的检查，留着给以后只提示、不拦构建的项。
+ * </p>
+ * <p>
+ * 覆盖范围只到「订阅类自己声明的方法的参数、返回值描述符」，下面几处会在专用服上同样出错、但这里查不到，
+ * 写两端订阅类时自己注意：父类和接口上声明的方法（总线登记会逐级反射）、方法 {@code throws} 里的异常类型、
+ * 静态块和方法体（第一次分发时初始化、校验）。字段不查：总线登记不碰它们。
  * </p>
  */
 public final class ScanIndexScanner {
@@ -102,7 +106,8 @@ public final class ScanIndexScanner {
                                     + "把订阅类改成只在客户端（side = CLIENT），或把这个方法挪进客户端订阅类");
                         }
                         for (String bad : info.clientTypeMethods) {
-                            warnings.add(info.name + "#" + bad + "：两端都登记的订阅类里，方法签名带客户端类，Fabric 专用服上登记会出错");
+                            errors.add(info.name + "#" + bad + "：两端都登记的订阅类里，方法签名不许带客户端类（专用服上没有这些类，"
+                                    + "登记时反射取签名就出错），把订阅类改成只在客户端，或把这个方法挪进客户端的类");
                         }
                     }
                     subscribers.put(info.name, new ScanIndex.Subscriber(info.side, info.name));

@@ -13,7 +13,7 @@ import javax.annotation.Nullable;
  * <h3>为什么要抽这个接口</h3>
  * <p>
  * 百科现在有两份数据源：本模组的 113 个附魔（{@link EnchantmentMeta}），
- * 以及原版与其它模组的全部附魔（{@link ForeignMeta}）。
+ * 以及原版与其它模组的全部附魔（{@link pers.roinflam.carianstyle.client.codex.ForeignMeta}）。
  * 两者能提供的信息差别很大——本模组的有主题分组、可调数值、宝藏归因，
  * 外部附魔这些一概没有。
  * </p>

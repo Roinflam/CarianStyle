@@ -4,7 +4,6 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.bus.CarianBus;
@@ -27,7 +26,8 @@ import pers.roinflam.carianstyle.utils.util.LogUtil;
  * 1.21.1（NeoForge）：模组总线和 {@link ModContainer} 由构造器参数传进来，不再从全局上下文取。
  * 附魔不再走 {@code DeferredRegister}：1.21.1 的附魔是数据包注册表，本模组的附魔类只是行为对象，
  * 由 {@link EnchantmentRegistry#loadFromIndex} 照构建时生成的清单建出来，注册表条目由内置数据包提供。
- * 配置界面入口放在只在客户端加载的 {@link CarianStyleClient} 里，主类常量池不带客户端类。
+ * 客户端的事（配置界面入口、按键、HUD、渲染器）放在只在客户端实例化的 {@code neoforge.NeoForgeClientEntry} 里，
+ * 主类常量池不带客户端类。
  * </p>
  * <p>
  * 这里只做 NeoForge 特有的接线：挂模组总线、登记配置文件、把平台事件转给通用代码。
@@ -79,9 +79,8 @@ public class CarianStyle {
             EnchantmentRegistry.loadFromIndex();
             LogUtil.info("卡利亚式附魔 - 附魔行为对象建立完成");
 
-            // 注册设置事件
+            // 注册设置事件（客户端设置在客户端入口里挂）
             modEventBus.addListener(this::commonSetup);
-            modEventBus.addListener(this::clientSetup);
 
             // 本模组自己发的事件（生物 tick、伤害三段，由 mixin 发出）声明给总线，要在加载完成的检查之前
             CarianBus.provide(LivingTickEvent.class, LivingAttackEvent.class, LivingHurtEvent.class,
@@ -119,25 +118,6 @@ public class CarianStyle {
         } catch (Exception e) {
             LogUtil.error("卡利亚式附魔 - 通用设置阶段发生错误", e);
             throw new RuntimeException("卡利亚式附魔通用设置失败", e);
-        }
-    }
-
-    /**
-     * 客户端设置阶段
-     */
-    private void clientSetup(final FMLClientSetupEvent event) {
-        LogUtil.separator();
-        LogUtil.info("卡利亚式附魔 - 开始客户端设置阶段");
-
-        try {
-            // 使用客户端处理器处理客户端设置
-            ClientSetupHandler.onClientSetup(event);
-            LogUtil.info("卡利亚式附魔 - 客户端设置阶段完成");
-            LogUtil.separator();
-
-        } catch (Exception e) {
-            LogUtil.error("卡利亚式附魔 - 客户端设置阶段发生错误", e);
-            throw new RuntimeException("卡利亚式附魔客户端设置失败", e);
         }
     }
 }

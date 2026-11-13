@@ -12,9 +12,8 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
+import pers.roinflam.carianstyle.platform.Services;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
@@ -90,7 +89,6 @@ import pers.roinflam.carianstyle.event.client.ClientTickEvent;
  * @author RoinFlam
  * @version 6.0
  */
-@OnlyIn(Dist.CLIENT)
 @EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class ShieldWardRenderer {
 
@@ -462,7 +460,7 @@ public final class ShieldWardRenderer {
         try {
             // 与原版 ItemRenderer.render 的前两步完全一致（BEWLR 路径同样走这两步）。
             // translate(-0.5,-0.5,-0.5) 是把模型「居中到原点」
-            model.applyTransform(displayContext, poseStack, leftHand);
+            Services.client().applyItemTransform(model, displayContext, poseStack, leftHand);
             poseStack.translate(-0.5f, -0.5f, -0.5f);
             // 挪到物品自身的几何中心：烘焙出来的坐标都是相对这里的
             poseStack.translate(shape.centerX, shape.centerY, 0f);

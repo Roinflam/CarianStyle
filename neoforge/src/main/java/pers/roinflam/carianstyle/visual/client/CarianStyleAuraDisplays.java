@@ -1,7 +1,5 @@
 package pers.roinflam.carianstyle.visual.client;
 
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 /**
  * 光环显示注册入口（纯客户端，需在客户端初始化阶段调用一次 {@link #init()}）。
@@ -37,7 +35,6 @@ import net.neoforged.api.distmarker.OnlyIn;
  *
  * @author RoinFlam
  */
-@OnlyIn(Dist.CLIENT)
 public final class CarianStyleAuraDisplays {
 
     // ===== 序列号（新增光环在此追加）=====

@@ -3,7 +3,6 @@ package pers.roinflam.carianstyle.visual.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.logging.LogUtils;
-import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.model.BakedQuad;
@@ -13,9 +12,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
-import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
+import pers.roinflam.carianstyle.platform.Services;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -97,7 +94,6 @@ import javax.annotation.Nullable;
  * @author RoinFlam
  * @version 1.0
  */
-@OnlyIn(Dist.CLIENT)
 public final class ShieldWardShape {
 
     /**
@@ -705,20 +701,17 @@ public final class ShieldWardShape {
      * <b>PoseStack 传单位矩阵</b>，于是收到的就是绘制空间里的最终坐标，
      * BEWLR 自己做的一切变换（原版盾牌那句 {@code scale(1,-1,-1)}）都已包含在内。
      * </p>
+     * <p>
+     * 物品有没有自定义渲染器、怎么取，各加载器不一样，交给客户端平台接口；没有就返回 null。
+     * </p>
      */
     @Nullable
     private static TriSoup captureFromBewlr(ItemStack stack, ItemDisplayContext displayContext) {
-        IClientItemExtensions ext = IClientItemExtensions.of(stack);
-        if (ext == null) {
-            return null;
-        }
-        BlockEntityWithoutLevelRenderer renderer = ext.getCustomRenderer();
-        if (renderer == null) {
-            return null;
-        }
         CaptureBuffer capture = new CaptureBuffer();
-        renderer.renderByItem(stack, displayContext, new PoseStack(), capture,
-                DUMMY_LIGHT, OverlayTexture.NO_OVERLAY);
+        if (!Services.client().renderCustomItem(stack, displayContext, new PoseStack(), capture,
+                DUMMY_LIGHT, OverlayTexture.NO_OVERLAY)) {
+            return null;
+        }
         return capture.soup.count == 0 ? null : capture.soup;
     }
 

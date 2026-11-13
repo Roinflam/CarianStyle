@@ -7,8 +7,6 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.LayeredDraw;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.visual.CarianStyleConditionDisplay;
 import pers.roinflam.carianstyle.config.ClientVisualConfig;
 import pers.roinflam.carianstyle.visual.CarianStyleStackDisplays;
@@ -191,7 +189,6 @@ import java.util.Map;
  * @author RoinFlam
  * @version 3
  */
-@OnlyIn(Dist.CLIENT)
 public final class StackHudOverlay implements LayeredDraw.Layer {
 
     /** 单例 */

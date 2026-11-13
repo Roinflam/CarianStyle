@@ -1,8 +1,6 @@
 package pers.roinflam.carianstyle.dynamicattr.clientsync;
 
 import net.minecraft.client.Minecraft;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
@@ -18,7 +16,6 @@ import pers.roinflam.carianstyle.event.PlayerTickEvent;
  * 这里查序列号 20，在玩家 tick 开头（{@code aiStep} 之前）把本地玩家的跳跃冷却顶住。
  * </p>
  */
-@OnlyIn(Dist.CLIENT)
 @EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class ClientSyncCragbladeJumpLock {
 

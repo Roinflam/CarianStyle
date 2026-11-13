@@ -79,8 +79,8 @@ import pers.roinflam.carianstyle.visual.client.ShieldWardRenderer;
  * 两边保持一致。
  * </p>
  * <p>
- * 注入点上的 {@code remap = false} 是 1.20.1 留下来的写法（那时 {@code com.mojang.blaze3d}
- * 下的类不参与混淆映射）。NeoForge 1.21.1 运行期就是 Mojmap、不做任何重映射，写不写都一样，保留不动。
+ * 注入点不写 {@code remap = false}：{@code PoseStack#popPose} 在 Fabric 上同样要经 intermediary 重映射，
+ * 标了不重映射，运行期名字对不上会直接起不来。NeoForge 运行期就是 Mojmap，写不写都一样。
  * </p>
  *
  * <h3>为什么不注入 HEAD</h3>
@@ -150,8 +150,7 @@ public abstract class MixinItemInHandLayer {
                     + "Lnet/minecraft/client/renderer/MultiBufferSource;I)V",
             at = @At(
                     value = "INVOKE",
-                    target = "Lcom/mojang/blaze3d/vertex/PoseStack;popPose()V",
-                    remap = false
+                    target = "Lcom/mojang/blaze3d/vertex/PoseStack;popPose()V"
             )
     )
     private void carianstyle$renderShieldWard(LivingEntity entity, ItemStack stack,

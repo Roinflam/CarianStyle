@@ -5,8 +5,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.TextColor;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
@@ -72,7 +70,6 @@ import java.util.regex.Pattern;
  * @author RoinFlam
  * @version 2.0
  */
-@OnlyIn(Dist.CLIENT)
 public final class DescriptionText {
 
     /** 表示「显示原始公式、不代入等级」 */

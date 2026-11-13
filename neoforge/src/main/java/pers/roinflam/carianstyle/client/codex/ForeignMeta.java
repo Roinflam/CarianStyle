@@ -1,4 +1,4 @@
-package pers.roinflam.carianstyle.codex;
+package pers.roinflam.carianstyle.client.codex;
 
 import net.minecraft.Util;
 import net.minecraft.client.resources.language.I18n;
@@ -9,7 +9,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.neoforged.fml.ModList;
+import pers.roinflam.carianstyle.codex.CodexEntry;
+import pers.roinflam.carianstyle.codex.ItemProbe;
 import pers.roinflam.carianstyle.platform.Services;
 
 import javax.annotation.Nonnull;
@@ -120,7 +121,7 @@ public final class ForeignMeta implements CodexEntry {
      */
     private static final Pattern FORMAT_ARG = Pattern.compile("%(?:(\\d+)\\$)?s");
 
-    ForeignMeta(@Nonnull Holder.Reference<Enchantment> enchantment) {
+    public ForeignMeta(@Nonnull Holder.Reference<Enchantment> enchantment) {
         this.enchantment = enchantment;
         this.registryName = enchantment.key().location();
         this.key = registryName.toString();
@@ -157,7 +158,7 @@ public final class ForeignMeta implements CodexEntry {
     /**
      * 构建搜索索引。必须在语言表就绪后调用。
      */
-    void buildSearchIndex() {
+    public void buildSearchIndex() {
         this.searchIndex = (getDisplayName().getString() + '\u0000' + key)
                 .toLowerCase(Locale.ROOT);
     }
@@ -167,7 +168,7 @@ public final class ForeignMeta implements CodexEntry {
      *
      * @param otherKey 对方的唯一键
      */
-    void addForeignConflict(@Nonnull String otherKey) {
+    public void addForeignConflict(@Nonnull String otherKey) {
         if (!otherKey.equals(key) && !foreignConflicts.contains(otherKey)) {
             foreignConflicts.add(otherKey);
         }
@@ -178,7 +179,7 @@ public final class ForeignMeta implements CodexEntry {
      *
      * @param carianId 本模组附魔的裸 id
      */
-    void addCarianConflict(@Nonnull String carianId) {
+    public void addCarianConflict(@Nonnull String carianId) {
         if (!carianConflicts.contains(carianId)) {
             carianConflicts.add(carianId);
         }
@@ -447,9 +448,7 @@ public final class ForeignMeta implements CodexEntry {
         }
         // 优先显示模组的正式名称，拿不到再退回命名空间——
         // 正式名称比命名空间好读，但后者至少不会显示成空白
-        return ModList.get().getModContainerById(namespace)
-                .map(c -> Component.literal(c.getModInfo().getDisplayName()))
-                .orElseGet(() -> Component.literal(namespace));
+        return Component.literal(Services.client().modDisplayName(namespace).orElse(namespace));
     }
 
     @Override

@@ -4,8 +4,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
 
 import javax.annotation.Nonnull;
@@ -75,7 +73,6 @@ import java.util.List;
  * @author RoinFlam
  * @version 2.0
  */
-@OnlyIn(Dist.CLIENT)
 public final class SharedEntityQuery {
 
     /**

@@ -10,8 +10,6 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.joml.Matrix4f;
@@ -167,7 +165,6 @@ import pers.roinflam.carianstyle.bus.EventBusSubscriber;
  * @author RoinFlam
  * @version 4
  */
-@OnlyIn(Dist.CLIENT)
 @EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class IncisionRenderer {
 

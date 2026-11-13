@@ -12,8 +12,6 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.event.client.RenderHandEvent;
 import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
 import pers.roinflam.carianstyle.event.client.RenderLivingEvent;
@@ -243,7 +241,6 @@ import pers.roinflam.carianstyle.bus.EventBusSubscriber;
  * @author RoinFlam
  * @version 3.0
  */
-@OnlyIn(Dist.CLIENT)
 @EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public class ClientSyncFlameRenderer {
 

@@ -41,8 +41,8 @@ class ScanIndexScannerTest {
         write(root, spec("fix.c.SubClient").subscriber("CLIENT").listener("onRender", CLIENT_EVENT, true));
         write(root, spec("fix.c.Holder$ClientOnly").subscriber("CLIENT"));
         write(root, spec("fix.c.Both").enchantment().subscriber(null)); // 两种注解都有，两张表都进
-        // 两端订阅类里普通方法的签名带原版客户端类：只警告，照样进清单
-        write(root, spec("fix.c.SubHelper").subscriber(null).listener("helper", MC_CLIENT_TYPE, false));
+        // 只在客户端登记的订阅类，普通方法的签名带原版客户端类：允许
+        write(root, spec("fix.c.SubHelper").subscriber("CLIENT").listener("helper", MC_CLIENT_TYPE, false));
         ClassFixtures.writeText(root, "fix/package-info.class", "不是类文件，按文件名跳过");
         ClassFixtures.writeText(root, "module-info.class", "不是类文件，按文件名跳过");
         ClassFixtures.writeText(root, "fix/readme.txt", "不是类文件");
@@ -61,9 +61,8 @@ class ScanIndexScannerTest {
                 new ScanIndex.Subscriber(SubscriberSide.BOTH, "fix.c.SubBoth"),
                 new ScanIndex.Subscriber(SubscriberSide.CLIENT, "fix.c.SubClient"),
                 new ScanIndex.Subscriber(SubscriberSide.BOTH, "fix.c.SubDefault"),
-                new ScanIndex.Subscriber(SubscriberSide.BOTH, "fix.c.SubHelper")), r.subscribers());
-        assertEquals(1, r.warnings().size(), r.warnings().toString());
-        assertTrue(r.warnings().get(0).contains("fix.c.SubHelper#helper(" + MC_CLIENT_TYPE + ")"), r.warnings().toString());
+                new ScanIndex.Subscriber(SubscriberSide.CLIENT, "fix.c.SubHelper")), r.subscribers());
+        assertTrue(r.warnings().isEmpty(), r.warnings().toString());
 
         // 写出来的文件逐字核对，再读回来
         Path out = tmp.resolve("out");
@@ -72,7 +71,7 @@ class ScanIndexScannerTest {
         assertEquals(ScanIndex.HEADER + "\nfix.Z\nfix.b.Outer$Inner\nfix.b.Outer2\nfix.b.OuterA\nfix.c.Both\n", ench);
         String subs = Files.readString(out.resolve("META-INF/carianstyle/subscribers.list"), StandardCharsets.UTF_8);
         assertEquals(ScanIndex.HEADER + "\nBOTH\tfix.c.Both\nCLIENT\tfix.c.Holder$ClientOnly\nBOTH\tfix.c.SubBoth\n"
-                + "CLIENT\tfix.c.SubClient\nBOTH\tfix.c.SubDefault\nBOTH\tfix.c.SubHelper\n", subs);
+                + "CLIENT\tfix.c.SubClient\nBOTH\tfix.c.SubDefault\nCLIENT\tfix.c.SubHelper\n", subs);
         assertEquals(r.enchantments(), ScanIndex.parseEnchantments("t", List.of(ench.split("\n"))));
         assertEquals(r.subscribers(), ScanIndex.parseSubscribers("t", List.of(subs.split("\n"))));
     }
@@ -115,6 +114,18 @@ class ScanIndexScannerTest {
         IllegalStateException e = assertThrows(IllegalStateException.class, () -> ScanIndexScanner.scan(List.of(root)));
         assertTrue(e.getMessage().contains("fix.Bad#onRender"), e.getMessage());
         assertTrue(e.getMessage().contains("fix.Bad2#onRender"), e.getMessage());
+    }
+
+    @Test
+    void bothSideMethodSignatureWithVanillaClientTypeFailsBuild(@TempDir Path tmp) throws IOException {
+        Path root = tmp.resolve("classes");
+        write(root, spec("fix.Helper").subscriber(null).listener("helper", MC_CLIENT_TYPE, false));
+        write(root, spec("fix.Ret").subscriber("BOTH").method("make", "()L" + MC_CLIENT_TYPE + ";", false));
+        write(root, spec("fix.ClientOk").subscriber("CLIENT").listener("helper", MC_CLIENT_TYPE, false));
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> ScanIndexScanner.scan(List.of(root)));
+        assertTrue(e.getMessage().contains("fix.Helper#helper(" + MC_CLIENT_TYPE + ")"), e.getMessage());
+        assertTrue(e.getMessage().contains("fix.Ret#make"), e.getMessage());
+        assertFalse(e.getMessage().contains("fix.ClientOk"), e.getMessage());
     }
 
     @Test

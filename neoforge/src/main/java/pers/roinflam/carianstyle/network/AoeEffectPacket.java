@@ -309,7 +309,7 @@ public class AoeEffectPacket implements CustomPacketPayload {
      * {@link AoeEffectManager#spawn(int, double, double, double, float, int, int)}
      * ——该方法只操作普通列表、不引用任何客户端专有渲染类，双端加载安全，
      * 因此无需 {@code DistExecutor} 包裹。这样可避免在 Mohist 等混合端因
-     * 「服务端引用 {@code @OnlyIn(CLIENT)} 类」而引发的类加载问题。
+     * 「服务端引用仅客户端的类」而引发的类加载问题。
      * </p>
      * <p>
      * <b>v5.1 补充：</b>本包已在 {@link CarianNetwork} 里登记为只许服务端发往客户端，

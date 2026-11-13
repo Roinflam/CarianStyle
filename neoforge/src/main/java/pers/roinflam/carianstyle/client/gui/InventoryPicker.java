@@ -7,10 +7,10 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import javax.annotation.Nonnull;
+import pers.roinflam.carianstyle.platform.Services;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -42,7 +42,6 @@ import java.util.List;
  * @author RoinFlam
  * @version 1.0
  */
-@OnlyIn(Dist.CLIENT)
 final class InventoryPicker {
 
     /** {@link #mouseClicked} 的返回值：点在选择器里但没选中东西（或选择器没开） */
@@ -292,7 +291,7 @@ final class InventoryPicker {
                 : Component.translatable("carianstyle.codex.filter.tooltip_none")
                 .withStyle(style -> style.withColor(UiTheme.TEXT_DIM & 0xFFFFFF));
         lines.add(extra);
-        g.renderTooltip(font, lines, stack.getTooltipImage(), stack, mouseX, mouseY);
+        Services.client().renderItemTooltip(g, font, lines, stack.getTooltipImage(), stack, mouseX, mouseY);
     }
 
     /**

@@ -5,8 +5,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.joml.Matrix4f;
@@ -101,7 +99,6 @@ import pers.roinflam.carianstyle.bus.EventBusSubscriber;
  * @author RoinFlam
  * @version 1.0
  */
-@OnlyIn(Dist.CLIENT)
 @EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class HowlShabririRenderer {
 

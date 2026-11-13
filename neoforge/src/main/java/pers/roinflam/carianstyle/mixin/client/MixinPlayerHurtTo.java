@@ -142,7 +142,7 @@ public class MixinPlayerHurtTo {
      * 空安全的效果判定。
      * <p>
      * 1.21.1 的药水以 {@link Holder} 判定（{@code hasEffect} 收 {@code Holder<MobEffect>}），
-     * 注册表里的 {@code DeferredHolder} 可以直接传。注册表还没绑定（理论上进世界之前才会这样）时
+     * {@code CarianStylePotion} 里的效果字段本身就是 {@code Holder}，直接传。注册表还没绑定（理论上进世界之前才会这样）时
      * 视为没有该效果，对应 1.20.1 里「效果为 null」的那条兜底。
      * </p>
      *

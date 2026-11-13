@@ -29,7 +29,7 @@ import net.minecraft.server.level.ServerPlayer;
  * <p>
  * {@link AoeEffectPacket} 与 {@link CombatArtEffectPacket} 的类注释里已经解释过
  * 「为何不用 {@code DistExecutor} 包裹处理器」——为了避开 Mohist 等混合端上
- * 服务端引用 {@code @OnlyIn(CLIENT)} 类导致的类加载问题。<b>那个判断是对的</b>，
+ * 服务端引用仅客户端的类导致的类加载问题。<b>那个判断是对的</b>，
  * 而声明方向恰好是这个问题的正解：包在分发入口就被方向校验拦下，
  * 服务端连处理器都不会进，自然也谈不上加载客户端类。
  * </p>

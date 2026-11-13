@@ -28,8 +28,17 @@ import java.util.Optional;
  * 专用服上去取会直接抛异常，不会去加载实现类（实现类引用的客户端类在专用服上不存在）。
  * </p>
  * <p>
- * 前四个是登记类：NeoForge 上实体渲染器、渲染层、按键、HUD 层都要在各自的注册事件里登记，
- * 这里先记下，到了对应事件再照记下的登记；Fabric 上当场登记。所以调用时机只要求在客户端初始化阶段。
+ * 前四个是登记类，两类调用时机不一样：
+ * </p>
+ * <ul>
+ *   <li>按键、HUD 层：NeoForge 只认各自注册事件里的登记，实现先记下、到事件里再交出去，而这两个事件发得比
+ *       客户端初始化早，所以<b>必须在客户端入口构造时调</b>（NeoForge 上是客户端入口的构造器），
+ *       事件发过之后再调会抛异常。</li>
+ *   <li>实体渲染器、渲染层：当场登记，在客户端初始化阶段的主线程里调（NeoForge 上是
+ *       {@code FMLClientSetupEvent} 的 {@code enqueueWork}）。</li>
+ * </ul>
+ * <p>
+ * Fabric 上四个都当场登记，上面的时机两边都满足。
  * </p>
  * <p>
  * {@link #applyItemTransform}、{@link #renderItemTooltip}、{@link #renderCustomItem} 在 NeoForge 上保留平台行为

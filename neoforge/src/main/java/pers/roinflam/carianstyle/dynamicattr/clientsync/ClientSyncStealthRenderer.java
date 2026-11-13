@@ -1,7 +1,5 @@
 package pers.roinflam.carianstyle.dynamicattr.clientsync;
 
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.event.client.RenderPlayerEvent;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
@@ -41,7 +39,6 @@ import pers.roinflam.carianstyle.bus.EventBusSubscriber;
  * @author RoinFlam
  * @version 1.0
  */
-@OnlyIn(Dist.CLIENT)
 @EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class ClientSyncStealthRenderer {
 

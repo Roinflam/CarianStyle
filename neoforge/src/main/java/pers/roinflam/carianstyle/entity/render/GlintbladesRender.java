@@ -17,8 +17,6 @@ import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
 
 import javax.annotation.Nonnull;
@@ -112,7 +110,6 @@ import javax.annotation.Nonnull;
  * @author RoinFlam
  * @version 3.0
  */
-@OnlyIn(Dist.CLIENT)
 public class GlintbladesRender extends EntityRenderer<EntityGlintblades> {
 
     /**

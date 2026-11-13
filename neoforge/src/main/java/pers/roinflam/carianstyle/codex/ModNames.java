@@ -1,7 +1,7 @@
 package pers.roinflam.carianstyle.codex;
 
 import net.minecraft.network.chat.Component;
-import net.neoforged.fml.ModList;
+import pers.roinflam.carianstyle.platform.Services;
 
 import javax.annotation.Nonnull;
 import java.util.HashMap;
@@ -20,8 +20,13 @@ import java.util.Map;
  *
  * <h3>缓存</h3>
  * <p>
- * {@link ModList#getModContainerById} 每次都要遍历模组列表，而排序会对同一个
+ * 按命名空间查模组显示名每次都要遍历模组列表，而排序会对同一个
  * 命名空间反复求名。缓存一次就够——模组列表在运行期不会变。
+ * </p>
+ *
+ * <h3>只在客户端调</h3>
+ * <p>
+ * 模组显示名经 {@code Services.client()} 取，专用服上调会抛异常。现在的调用方都在百科界面里。
  * </p>
  *
  * @author RoinFlam
@@ -46,10 +51,7 @@ public final class ModNames {
      */
     @Nonnull
     public static String displayName(@Nonnull String namespace) {
-        return CACHE.computeIfAbsent(namespace, ns -> ModList.get()
-                .getModContainerById(ns)
-                .map(c -> c.getModInfo().getDisplayName())
-                .orElse(ns));
+        return CACHE.computeIfAbsent(namespace, ns -> Services.client().modDisplayName(ns).orElse(ns));
     }
 
     /**

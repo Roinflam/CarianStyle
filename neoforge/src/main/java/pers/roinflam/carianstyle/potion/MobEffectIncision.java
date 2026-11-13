@@ -10,8 +10,6 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import pers.roinflam.carianstyle.event.LivingHealEvent;
 import pers.roinflam.carianstyle.bus.EventPriority;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
@@ -332,12 +330,5 @@ public class MobEffectIncision extends IconBase {
     @Override
     public boolean shouldApplyEffectTickThisTick(int duration, int amplifier) {
         return true;
-    }
-
-    @Nonnull
-    @Override
-    @OnlyIn(Dist.CLIENT)
-    protected ResourceLocation getIconTexture() {
-        return ResourceLocation.fromNamespaceAndPath(Reference.MOD_ID, "textures/mob_effect/incision.png");
     }
 }

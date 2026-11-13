@@ -8,12 +8,11 @@ import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.codex.CodexTheme;
-import pers.roinflam.carianstyle.codex.EnchantmentCodex;
+import pers.roinflam.carianstyle.mixin.client.ScreenAccessor;
+import pers.roinflam.carianstyle.client.codex.EnchantmentCodex;
 import pers.roinflam.carianstyle.codex.ForeignCodex;
-import pers.roinflam.carianstyle.codex.ForeignMeta;
+import pers.roinflam.carianstyle.client.codex.ForeignMeta;
 import pers.roinflam.carianstyle.codex.EnchantmentMeta;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
@@ -62,7 +61,6 @@ import java.util.List;
  * @author RoinFlam
  * @version 1.0
  */
-@OnlyIn(Dist.CLIENT)
 public final class CodexScreen extends Screen {
 
     /** 顶栏高度 */
@@ -802,7 +800,7 @@ public final class CodexScreen extends Screen {
 
         // 控件（搜索框、按钮）。不调 super.render：1.21.1 的 Screen.render 会先画一遍 renderBackground，
         // 而这里背景已经在面板之前画过了，再画一遍会把遮罩盖在面板上
-        for (Renderable renderable : this.renderables) {
+        for (Renderable renderable : ((ScreenAccessor) (Object) this).carianstyle$getRenderables()) {
             renderable.render(g, underX, underY, partialTick);
         }
 

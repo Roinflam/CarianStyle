@@ -3,8 +3,6 @@ package pers.roinflam.carianstyle.visual.client;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.renderer.RenderType;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 /**
  * 本模组自定义的 {@link RenderType}（纯客户端）。
@@ -57,7 +55,6 @@ import net.neoforged.api.distmarker.OnlyIn;
  * @author RoinFlam
  * @version 1.0
  */
-@OnlyIn(Dist.CLIENT)
 public final class CarianStyleRenderTypes extends RenderType {
 
     /**

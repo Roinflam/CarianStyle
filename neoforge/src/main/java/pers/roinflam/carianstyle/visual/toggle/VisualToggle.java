@@ -4,9 +4,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
-import net.neoforged.fml.loading.FMLPaths;
+import pers.roinflam.carianstyle.platform.Services;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.config.ClientVisualConfig;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
@@ -52,7 +50,6 @@ import java.util.Arrays;
  * @author RoinFlam
  * @version 1.0
  */
-@OnlyIn(Dist.CLIENT)
 public final class VisualToggle {
 
     /** 配置文件名 */
@@ -164,7 +161,7 @@ public final class VisualToggle {
      */
     @Nonnull
     private static Path resolvePath() {
-        Path dir = FMLPaths.CONFIGDIR.get().resolve(Reference.MOD_ID);
+        Path dir = Services.platform().configDir().resolve(Reference.MOD_ID);
         try {
             Files.createDirectories(dir);
         } catch (IOException e) {
