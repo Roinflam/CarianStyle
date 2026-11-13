@@ -3,7 +3,13 @@
   "minVersion": "0.8",
   "package": "pers.roinflam.carianstyle.fabric.mixin",
   "compatibilityLevel": "JAVA_21",
-  "client": [],
+  "client": [
+    "client.ItemRendererAccessor",
+    "client.MixinItemInHandRendererHands",
+    "client.MixinLevelRendererStages",
+    "client.MixinLivingEntityRendererPost",
+    "client.MixinPlayerRendererPre"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

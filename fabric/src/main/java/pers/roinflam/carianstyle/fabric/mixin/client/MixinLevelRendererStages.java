@@ -1,0 +1,55 @@
+package pers.roinflam.carianstyle.fabric.mixin.client;
+
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.RenderType;
+import org.joml.Matrix4f;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import pers.roinflam.carianstyle.fabric.FabricClientEvents;
+
+/**
+ * 世界渲染的「半透明方块之后」阶段。
+ * <p>
+ * 主发出点在 {@code renderSectionLayer} 里唯一一次 {@code RenderType#clearRenderState} 之前，层是半透明时才发：
+ * 和 NeoForge 发这个阶段的位置是同一句，此时半透明层的渲染状态还生效、模型视图栈里带着相机旋转，
+ * 特效批量绘制按单位矩阵画就是对的，画面和 NeoForge 逐像素一致。
+ * 这个方法可能被大改渲染的模组整段替换，所以这里 {@code require = 0}，找不到注入点不报错。
+ * </p>
+ * <p>
+ * 回退点包住 {@code renderLevel} 里全部对 {@code renderSectionLayer} 的调用（原版 7 处，半透明的两处分别在
+ * 极佳画质和其它画质两支里），半透明那次返回后主发出点还没发，就补发一次；这时还在模型视图栈压入相机旋转的范围内。
+ * </p>
+ */
+@Mixin(LevelRenderer.class)
+public abstract class MixinLevelRendererStages {
+
+    @Inject(method = "renderSectionLayer",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/RenderType;clearRenderState()V"),
+            require = 0)
+    private void carianstyle$beforeClearRenderState(RenderType renderType, double camX, double camY, double camZ,
+                                                    Matrix4f frustumMatrix, Matrix4f projectionMatrix,
+                                                    CallbackInfo ci) {
+        if (renderType == RenderType.translucent()) {
+            FabricClientEvents.onTranslucentLayerDrawn();
+        }
+    }
+
+    @WrapOperation(method = "renderLevel",
+            at = @At(value = "INVOKE",
+                    target = "Lnet/minecraft/client/renderer/LevelRenderer;renderSectionLayer(Lnet/minecraft/client/renderer/RenderType;DDDLorg/joml/Matrix4f;Lorg/joml/Matrix4f;)V"))
+    private void carianstyle$wrapSectionLayer(LevelRenderer self, RenderType renderType, double camX, double camY,
+                                              double camZ, Matrix4f frustumMatrix, Matrix4f projectionMatrix,
+                                              Operation<Void> original) {
+        if (renderType != RenderType.translucent()) {
+            original.call(self, renderType, camX, camY, camZ, frustumMatrix, projectionMatrix);
+            return;
+        }
+        FabricClientEvents.beginTranslucentLayer();
+        original.call(self, renderType, camX, camY, camZ, frustumMatrix, projectionMatrix);
+        FabricClientEvents.endTranslucentLayer();
+    }
+}
