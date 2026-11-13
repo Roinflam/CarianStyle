@@ -36,6 +36,8 @@ dependencies {
     testImplementation platform('org.junit:junit-bom:5.10.5')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // 原版自带的 Guava 只在编译类路径上，总线的转发表（弱键并发表）要在单测里真跑；版本跟 1.21.1 原版一致
+    testRuntimeOnly 'com.google.guava:guava:32.1.2-jre'
 }
 
 test {

@@ -34,6 +34,9 @@ public class CarianStyle {
     public CarianStyle(IEventBus modEventBus, ModContainer container) {
         instance = this;
 
+        // 平台事件转发进本模组总线，要在任何本模组监听登记之前装好（见 NeoForwarding）
+        pers.roinflam.carianstyle.neoforge.forward.NeoForwarding.install(net.neoforged.fml.loading.FMLEnvironment.dist, modEventBus);
+
         LogUtil.separator();
         LogUtil.info("卡利亚式附魔 - 开始加载模组");
 
