@@ -64,6 +64,9 @@ public final class FabricClientEvents {
     /** 这一帧世界渲染里半透明阶段发过没有（主发出点或回退点都算）。只在渲染线程读写。 */
     private static boolean translucentReachedThisFrame;
 
+    /** 回退点第一次补发时打过日志没有，整局只打一次（看日志就分得出这局走的是主发出点还是回退点）。 */
+    private static boolean fallbackUsedLogged;
+
     /** 「半透明阶段没发出」的警告打过没有，整局只打一次。 */
     private static boolean translucentMissWarned;
 
@@ -151,6 +154,11 @@ public final class FabricClientEvents {
         if (!translucentStageFired) {
             translucentStageFired = true;
             translucentReachedThisFrame = true;
+            if (!fallbackUsedLogged) {
+                fallbackUsedLogged = true;
+                LOGGER.info("[CarianStyle] 半透明方块层内的注入点没有挂上（LevelRenderer 可能被别的渲染模组改写过），"
+                        + "半透明阶段改在这一层画完之后发出。");
+            }
             postStage(RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS);
         }
     }
