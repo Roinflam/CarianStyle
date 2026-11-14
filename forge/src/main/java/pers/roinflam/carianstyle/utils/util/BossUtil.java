@@ -6,7 +6,6 @@ import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraftforge.common.Tags;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
@@ -22,9 +21,9 @@ import java.util.List;
  * </p>
  * <ol>
  *     <li>实体标签 {@code carianstyle:not_bosses}：服主用数据包排除误判，命中就不算；</li>
- *     <li>实体标签 {@code forge:bosses}（Forge 自带末影龙、凋灵，
- *     大多数 BOSS 模组也往里加）或 {@code carianstyle:bosses}（本模组自带的这份只引用
- *     {@code c:bosses}，服主可用数据包追加）；</li>
+ *     <li>实体标签 {@code carianstyle:bosses}：本模组自带的这份引用 {@code forge:bosses}（Forge 自带末影龙、凋灵，
+ *     大多数 BOSS 模组也往里加）和 {@code c:bosses}（Fabric 的惯例标签），两个都可以不存在，
+ *     服主可用数据包追加。代码只看这一个标签，两个加载器上写法一样；</li>
  *     <li>身上有没有<b>正在显示</b>的服务端 BOSS 血条（{@link ServerBossEvent} 类型的实例字段，含父类）。
  *     兜住没打标签、或标签放错路径的模组——例如有的模组把标签放在 1.21 才认的 {@code tags/entity_type/}，
  *     在 1.20.1 上不生效，但它的 BOSS 都挂着血条。</li>
@@ -96,7 +95,7 @@ public final class BossUtil {
         if (type.is(NOT_BOSSES)) {
             return false;
         }
-        if (type.is(Tags.EntityTypes.BOSSES) || type.is(BOSSES)) {
+        if (type.is(BOSSES)) {
             return true;
         }
         return hasVisibleBossBar(entity);

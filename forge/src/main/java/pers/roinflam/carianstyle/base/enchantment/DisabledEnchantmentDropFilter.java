@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.base.enchantment;
 
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -12,7 +13,6 @@ import net.minecraft.world.item.enchantment.Enchantment;
 import pers.roinflam.carianstyle.event.EntityJoinLevelEvent;
 import pers.roinflam.carianstyle.bus.EventPriority;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
-import net.minecraftforge.registries.ForgeRegistries;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.utils.Reference;
 
@@ -157,7 +157,7 @@ public final class DisabledEnchantmentDropFilter {
         if (key == null) {
             return false;
         }
-        Enchantment enchantment = ForgeRegistries.ENCHANTMENTS.getValue(key);
+        Enchantment enchantment = BuiltInRegistries.ENCHANTMENT.get(key);
         return enchantment instanceof EnchantmentBase base && base.isDisabled();
     }
 }

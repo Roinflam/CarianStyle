@@ -4,7 +4,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import pers.roinflam.carianstyle.event.PlayerEvent;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
-import net.minecraftforge.server.ServerLifecycleHooks;
 import net.minecraft.world.item.ItemStack;
 import pers.roinflam.carianstyle.base.enchantment.EquipmentStamp;
 import pers.roinflam.carianstyle.visual.EquipmentEnchantContext;
@@ -124,7 +123,7 @@ public final class StackDisplayManager {
         }
         tickCounter = 0;
 
-        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        MinecraftServer server = event.getServer();
         if (server == null) {
             return;
         }

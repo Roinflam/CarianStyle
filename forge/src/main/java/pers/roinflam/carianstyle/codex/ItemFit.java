@@ -6,6 +6,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.EnchantmentInstance;
+import pers.roinflam.carianstyle.platform.Services;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
 import javax.annotation.Nonnull;
@@ -239,7 +240,7 @@ public final class ItemFit {
         }
         // Forge 在铁砧结算末尾补的一刀：物品可以按「右边是哪本书」整体拒收
         ItemStack book = EnchantedBookItem.createForEnchantment(new EnchantmentInstance(enchantment, 1));
-        return guard(enchantment, () -> stack.isBookEnchantable(book));
+        return guard(enchantment, () -> Services.platform().isBookEnchantable(stack, book));
     }
 
     /**
@@ -501,7 +502,7 @@ public final class ItemFit {
             try {
                 // 附魔台格子的门槛：isEnchantable()（可附魔且还没附过）、附魔能力大于 0——
                 // 能力为 0 时三档消耗全是 0，一个选项都不会出
-                int value = copy.getEnchantmentValue();
+                int value = Services.platform().getEnchantmentValue(copy);
                 accepts = copy.isEnchantable() && value > 0;
                 if (accepts) {
                     reach = Math.round((31 + 2 * (value / 4)) * 1.15f);

@@ -2,9 +2,11 @@ package pers.roinflam.carianstyle.platform;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
@@ -52,7 +54,8 @@ public interface Platform {
      * 按「玩家破坏」移除一格方块，返回是否真的移除了。
      * <p>
      * <b>不含 {@code playerWillDestroy}</b>：破坏前的那一步（粒子、音效、方块自己的善后）由调用方先调原版的
-     * {@code Block#playerWillDestroy}，两个平台一样；这里只做真正移除那一步（Forge 上是 {@code onDestroyedByPlayer}）。
+     * {@code Block#playerWillDestroy}，两个平台一样；这里只做真正移除那一步（Forge 上是 {@code onDestroyedByPlayer}，
+     * 1.20.1 Forge 的默认实现里还会再调一次 {@code playerWillDestroy}，以前就是这样，没改）。
      * 移除后的 {@code destroy}、掉落也由调用方照旧做。
      * </p>
      *
@@ -61,4 +64,20 @@ public interface Platform {
      */
     boolean destroyByPlayer(BlockState state, Level level, BlockPos pos, Player player,
                             boolean willHarvest, FluidState fluid);
+
+    /**
+     * 碎岩连带挖的一格掉完落物后补放经验（中心那一格不调）。
+     * <p>
+     * Forge 上 {@code playerDestroy} 不放经验，这里按 {@code getExpDrop} 放一半（精准采集按 0 算），和以前一样；
+     * Fabric 上原版 {@code playerDestroy} 已经放过全额，减半由 {@code popExperience} 的 mixin 按标记做，这里什么也不做。
+     * 只有 1.20.1 有这个方法，1.21.1 两个平台都走 {@code BlockDropsEvent}。
+     * </p>
+     */
+    void popChainBreakExperience(BlockState state, ServerLevel level, BlockPos pos, int fortuneLevel);
+
+    /** 左边的物品收不收这本附魔书（铁砧合书时问）。Forge 调物品自己的判断，Fabric 一律收。 */
+    boolean isBookEnchantable(ItemStack stack, ItemStack book);
+
+    /** 物品的附魔能力。Forge 调按物品堆的版本（模组物品可以覆写），Fabric 读物品上的值。 */
+    int getEnchantmentValue(ItemStack stack);
 }

@@ -2,9 +2,11 @@ package pers.roinflam.carianstyle.forge.platform;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
@@ -20,7 +22,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.nio.file.Path;
 
-// 附魔适用的几个查询（GE 加）还没进接口
 public final class ForgePlatform implements Platform {
 
     @Override
@@ -66,5 +67,23 @@ public final class ForgePlatform implements Platform {
     public boolean destroyByPlayer(@Nonnull BlockState state, @Nonnull Level level, @Nonnull BlockPos pos,
                                    @Nonnull Player player, boolean willHarvest, @Nonnull FluidState fluid) {
         return state.getBlock().onDestroyedByPlayer(state, level, pos, player, willHarvest, fluid);
+    }
+
+    @Override
+    public void popChainBreakExperience(@Nonnull BlockState state, @Nonnull ServerLevel level, @Nonnull BlockPos pos,
+                                        int fortuneLevel) {
+        // 精准采集参数写死 0：以前就是这样算的，Forge 版行为不变
+        state.getBlock().popExperience(level, pos,
+                state.getBlock().getExpDrop(state, level, level.random, pos, fortuneLevel, 0) / 2);
+    }
+
+    @Override
+    public boolean isBookEnchantable(@Nonnull ItemStack stack, @Nonnull ItemStack book) {
+        return stack.isBookEnchantable(book);
+    }
+
+    @Override
+    public int getEnchantmentValue(@Nonnull ItemStack stack) {
+        return stack.getEnchantmentValue();
     }
 }

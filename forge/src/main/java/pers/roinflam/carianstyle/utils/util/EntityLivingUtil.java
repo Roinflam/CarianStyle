@@ -5,15 +5,14 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
+import pers.roinflam.carianstyle.mixin.accessor.SynchedEntityDataAccessor;
 import pers.roinflam.carianstyle.source.NewDamageSource;
 import pers.roinflam.carianstyle.utils.ReflectionCache;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -345,7 +344,7 @@ public class EntityLivingUtil {
     /**
      * 暴力查找实体真正的血量字段
      *
-     * 反射拿到SynchedEntityData内部的itemsById映射，
+     * 经访问器拿到SynchedEntityData内部的itemsById映射，
      * 遍历所有Float/Double类型字段，匹配当前血量值，
      * 再通过临时赋值验证getHealth()是否同步，确认后缓存该accessor
      * <p>
@@ -358,19 +357,12 @@ public class EntityLivingUtil {
      * @param currentHealth 当前血量
      * @return 血量处理信息，失败返回null
      */
-    @SuppressWarnings("unchecked")
     private static HealthFieldInfo bruteForceFindHealthField(LivingEntity entity, float currentHealth) {
         try {
             SynchedEntityData entityData = entity.getEntityData();
 
-            // 反射获取itemsById字段
-            Field itemsByIdField = ObfuscationReflectionHelper.findField(
-                    SynchedEntityData.class,
-                    "f_135345_"
-            );
-            itemsByIdField.setAccessible(true);
             Map<Integer, SynchedEntityData.DataItem<?>> itemsById =
-                    (Map<Integer, SynchedEntityData.DataItem<?>>) itemsByIdField.get(entityData);
+                    ((SynchedEntityDataAccessor) entityData).carianstyle$getItemsById();
 
             float tolerance = probeTolerance(currentHealth);
 

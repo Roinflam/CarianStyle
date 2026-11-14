@@ -2,6 +2,10 @@
   "replace": false,
   "values": [
     {
+      "id": "#forge:bosses",
+      "required": false
+    },
+    {
       "id": "#c:bosses",
       "required": false
     }

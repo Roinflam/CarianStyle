@@ -10,7 +10,7 @@ import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.loading.FMLPaths;
+import pers.roinflam.carianstyle.platform.Services;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
@@ -450,7 +450,7 @@ public final class EnchantmentValues {
      */
     @Nonnull
     private static Path resolvePath() {
-        Path dir = FMLPaths.CONFIGDIR.get().resolve(Reference.MOD_ID);
+        Path dir = Services.platform().configDir().resolve(Reference.MOD_ID);
         try {
             Files.createDirectories(dir);
         } catch (IOException e) {

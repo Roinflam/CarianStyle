@@ -4,7 +4,10 @@
   "compatibilityLevel": "JAVA_17",
   "mixins": [
     "MixinEffectModifier",
-    "helper.DamageSourceMixin"
+    "helper.DamageSourceMixin",
+    "accessor.DamageSourceInvoker",
+    "accessor.LivingEntityAccessor",
+    "accessor.SynchedEntityDataAccessor"
   ],
   "client": [
     "client.MixinPlayerHurtTo",
