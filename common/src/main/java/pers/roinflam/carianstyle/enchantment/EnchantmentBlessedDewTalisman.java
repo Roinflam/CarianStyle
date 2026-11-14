@@ -8,6 +8,7 @@ import net.minecraft.world.item.enchantment.Enchantments;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
@@ -33,7 +34,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.UNCOMMON,
         type = EnchantTarget.ARMOR_CHEST,
-        slots = {EquipmentSlot.CHEST},
+        slots = {EnchantSlot.CHEST},
         baseEnchantability = 5,
         levelMultiplier = 10
 )

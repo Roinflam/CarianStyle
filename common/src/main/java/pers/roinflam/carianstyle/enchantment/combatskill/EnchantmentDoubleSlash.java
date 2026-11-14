@@ -9,6 +9,7 @@ import net.minecraft.world.entity.player.Player;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
@@ -39,7 +40,7 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
         rarity = EnchantmentRarity.RARE,
         type = EnchantTarget.WEAPON,
-        slots = {EquipmentSlot.MAINHAND},
+        slots = {EnchantSlot.MAINHAND},
         baseEnchantability = 20,
         levelMultiplier = 8
 )

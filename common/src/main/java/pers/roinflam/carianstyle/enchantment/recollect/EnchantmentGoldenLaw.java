@@ -16,6 +16,7 @@ import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
@@ -52,7 +53,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
  *
  * @version 2.3
  */
-@AutoRegisterEnchantment(id = "golden_law", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantTarget.WEAPON, slots = {EquipmentSlot.MAINHAND}, baseEnchantability = 35, levelMultiplier = 0)
+@AutoRegisterEnchantment(id = "golden_law", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantTarget.WEAPON, slots = {EnchantSlot.MAINHAND}, baseEnchantability = 35, levelMultiplier = 0)
 @EventBusSubscriber
 public class EnchantmentGoldenLaw extends EnchantmentBase {
 

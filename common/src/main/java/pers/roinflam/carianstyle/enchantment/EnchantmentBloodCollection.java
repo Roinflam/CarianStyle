@@ -9,6 +9,7 @@ import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
@@ -17,7 +18,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 
 /** 血的收藏附魔 - 修复: BloodSlash联动检查getUsedItemHand -> InteractionHand.MAIN_HAND @version 2.1 */
-@AutoRegisterEnchantment(id = "blood_collection", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.RARE, type = EnchantTarget.WEAPON, slots = {EquipmentSlot.MAINHAND}, conflictsWith = {EnchantmentScarletCorruption.class, EnchantmentFireGivesPower.class, EnchantmentFireDevoured.class, EnchantmentVicDragonThunder.class, EnchantmentDarkMoon.class}, baseEnchantability = 25, levelMultiplier = 15)
+@AutoRegisterEnchantment(id = "blood_collection", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.RARE, type = EnchantTarget.WEAPON, slots = {EnchantSlot.MAINHAND}, conflictsWith = {EnchantmentScarletCorruption.class, EnchantmentFireGivesPower.class, EnchantmentFireDevoured.class, EnchantmentVicDragonThunder.class, EnchantmentDarkMoon.class}, baseEnchantability = 25, levelMultiplier = 15)
 public class EnchantmentBloodCollection extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================

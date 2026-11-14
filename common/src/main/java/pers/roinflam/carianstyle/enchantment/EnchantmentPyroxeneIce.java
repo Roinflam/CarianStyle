@@ -10,6 +10,7 @@ import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.Enchantments;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
@@ -42,7 +43,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.UNCOMMON,
         type = EnchantTarget.BOW,
-        slots = {EquipmentSlot.MAINHAND},
+        slots = {EnchantSlot.MAINHAND},
         baseEnchantability = 15,
         levelMultiplier = 10
         // v2.1修复：移除 conflictsWith = {Enchantments.class}，该配置无效

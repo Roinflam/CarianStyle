@@ -15,6 +15,7 @@ import pers.roinflam.carianstyle.event.PlayerEvent;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.enchantment.EnchantmentBlackFlameBlade;
@@ -125,7 +126,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
         rarity = EnchantmentRarity.UNCOMMON,
         type = EnchantTarget.WEAPON,
-        slots = {EquipmentSlot.MAINHAND},
+        slots = {EnchantSlot.MAINHAND},
         conflictsWith = {
                 EnchantmentScarletCorruption.class,
                 EnchantmentDeathBlade.class,

@@ -12,6 +12,7 @@ import pers.roinflam.carianstyle.event.ProjectileImpactEvent;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
@@ -37,7 +38,7 @@ import pers.roinflam.carianstyle.bus.EventBusSubscriber;
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.RARE,
         type = EnchantTarget.BOW,
-        slots = {EquipmentSlot.MAINHAND},
+        slots = {EnchantSlot.MAINHAND},
         baseEnchantability = 5,
         levelMultiplier = 10
 )

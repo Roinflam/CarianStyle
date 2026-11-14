@@ -17,6 +17,7 @@ import pers.roinflam.carianstyle.bus.EventPriority;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
@@ -66,7 +67,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
  *
  * @version 2.5
  */
-@AutoRegisterEnchantment(id = "full_moon", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantTarget.ARMOR_CHEST, slots = {EquipmentSlot.CHEST}, conflictsWith = {EnchantmentHealingByFire.class, EnchantmentShelterOfFire.class}, baseEnchantability = 35, levelMultiplier = 0)
+@AutoRegisterEnchantment(id = "full_moon", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantTarget.ARMOR_CHEST, slots = {EnchantSlot.CHEST}, conflictsWith = {EnchantmentHealingByFire.class, EnchantmentShelterOfFire.class}, baseEnchantability = 35, levelMultiplier = 0)
 @EventBusSubscriber
 public class EnchantmentFullMoon extends EnchantmentBase {
     private static final String FULL_MOON_STATE_KEY = "full_moon_state";

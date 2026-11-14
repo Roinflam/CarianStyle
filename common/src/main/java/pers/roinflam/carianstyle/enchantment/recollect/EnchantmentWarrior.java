@@ -13,6 +13,7 @@ import pers.roinflam.carianstyle.bus.EventPriority;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
@@ -81,7 +82,7 @@ import pers.roinflam.carianstyle.bus.EventBusSubscriber;
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT,
         rarity = EnchantmentRarity.VERY_RARE,
         type = EnchantTarget.WEAPON,
-        slots = {EquipmentSlot.MAINHAND},
+        slots = {EnchantSlot.MAINHAND},
         baseEnchantability = 35,
         levelMultiplier = 0
 )

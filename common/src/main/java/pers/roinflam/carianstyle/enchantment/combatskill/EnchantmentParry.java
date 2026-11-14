@@ -11,6 +11,7 @@ import pers.roinflam.carianstyle.bus.EventPriority;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
@@ -78,7 +79,7 @@ import pers.roinflam.carianstyle.annotation.EnchantTarget;
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
         rarity = EnchantmentRarity.UNCOMMON,
         type = EnchantTarget.SHIELD,
-        slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND},
+        slots = {EnchantSlot.MAINHAND, EnchantSlot.OFFHAND},
         baseEnchantability = 10,
         levelMultiplier = 10
         // v2.3：type = BREAKABLE → customType = "SHIELD"，与下方构造函数保持一致

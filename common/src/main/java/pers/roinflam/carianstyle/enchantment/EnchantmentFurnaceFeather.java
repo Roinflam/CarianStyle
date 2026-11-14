@@ -11,6 +11,7 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
@@ -42,7 +43,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.RARE,
         type = EnchantTarget.ARMOR,
-        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET},
+        slots = {EnchantSlot.HEAD, EnchantSlot.CHEST, EnchantSlot.LEGS, EnchantSlot.FEET},
         forceTreasure = true,
         baseEnchantability = 10,
         levelMultiplier = 10

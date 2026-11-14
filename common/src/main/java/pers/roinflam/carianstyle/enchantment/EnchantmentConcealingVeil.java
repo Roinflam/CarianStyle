@@ -6,6 +6,7 @@ import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.Enchantments;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
@@ -47,7 +48,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.VERY_RARE,
         type = EnchantTarget.ARMOR,
-        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET},
+        slots = {EnchantSlot.HEAD, EnchantSlot.CHEST, EnchantSlot.LEGS, EnchantSlot.FEET},
         baseEnchantability = 30,
         levelMultiplier = 0
 )

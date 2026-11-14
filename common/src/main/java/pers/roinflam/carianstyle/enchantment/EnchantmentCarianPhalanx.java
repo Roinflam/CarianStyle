@@ -15,6 +15,7 @@ import pers.roinflam.carianstyle.bus.EventPriority;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
@@ -62,7 +63,7 @@ import pers.roinflam.carianstyle.bus.EventBusSubscriber;
  *
  * @version 3.0
  */
-@AutoRegisterEnchantment(id = "carian_phalanx", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.RARE, type = EnchantTarget.BOW, slots = {EquipmentSlot.MAINHAND}, conflictsWith = {EnchantmentPyroxeneIce.class}, baseEnchantability = 20, levelMultiplier = 10)
+@AutoRegisterEnchantment(id = "carian_phalanx", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.RARE, type = EnchantTarget.BOW, slots = {EnchantSlot.MAINHAND}, conflictsWith = {EnchantmentPyroxeneIce.class}, baseEnchantability = 20, levelMultiplier = 10)
 @EventBusSubscriber
 public class EnchantmentCarianPhalanx extends EnchantmentBase {
 

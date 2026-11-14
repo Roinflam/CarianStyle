@@ -1,6 +1,5 @@
 package pers.roinflam.carianstyle.annotation;
 
-import net.minecraft.world.entity.EquipmentSlot;
 import pers.roinflam.carianstyle.bus.EventPriority;
 
 import java.lang.annotation.ElementType;
@@ -69,7 +68,7 @@ public @interface AutoRegisterEnchantment {
      * （主手 {@code mainhand}、主副手 {@code hand}、四个护甲槽 {@code armor} 等）。
      * </p>
      */
-    EquipmentSlot[] slots() default {EquipmentSlot.MAINHAND};
+    EnchantSlot[] slots() default {EnchantSlot.MAINHAND};
 
     /**
      * 与此附魔冲突的附魔类列表

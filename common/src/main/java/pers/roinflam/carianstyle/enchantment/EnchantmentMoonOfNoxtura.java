@@ -9,6 +9,7 @@ import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
@@ -30,7 +31,7 @@ import pers.roinflam.carianstyle.event.PlayerTickEvent;
  * </p>
  * @version 2.1
  */
-@AutoRegisterEnchantment(id = "moon_of_noxtura", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.VERY_RARE, type = EnchantTarget.ARMOR, slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}, conflictsWith = {EnchantmentHealingByFire.class, EnchantmentShelterOfFire.class, EnchantmentPreciseLightning.class, EnchantmentAncientDragonLightning.class}, forceTreasure = true, baseEnchantability = 35, levelMultiplier = 0)
+@AutoRegisterEnchantment(id = "moon_of_noxtura", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.VERY_RARE, type = EnchantTarget.ARMOR, slots = {EnchantSlot.HEAD, EnchantSlot.CHEST, EnchantSlot.LEGS, EnchantSlot.FEET}, conflictsWith = {EnchantmentHealingByFire.class, EnchantmentShelterOfFire.class, EnchantmentPreciseLightning.class, EnchantmentAncientDragonLightning.class}, forceTreasure = true, baseEnchantability = 35, levelMultiplier = 0)
 @EventBusSubscriber
 public class EnchantmentMoonOfNoxtura extends EnchantmentBase {
 

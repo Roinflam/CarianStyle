@@ -13,6 +13,7 @@ import pers.roinflam.carianstyle.event.PlayerEvent;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
@@ -105,7 +106,7 @@ import pers.roinflam.carianstyle.event.LivingTickEvent;
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.DEAD,
         rarity = EnchantmentRarity.RARE,
         type = EnchantTarget.ARMOR,
-        slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET},
+        slots = {EnchantSlot.HEAD, EnchantSlot.CHEST, EnchantSlot.LEGS, EnchantSlot.FEET},
         baseEnchantability = 36,
         levelMultiplier = 20
 )

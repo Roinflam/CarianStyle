@@ -8,6 +8,7 @@ import net.minecraft.world.item.enchantment.Enchantment;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
@@ -25,7 +26,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
  *
  * @version 2.1
  */
-@AutoRegisterEnchantment(id = "immutable_shield", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.RARE, type = EnchantTarget.SHIELD, slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND}, baseEnchantability = 5, levelMultiplier = 10)
+@AutoRegisterEnchantment(id = "immutable_shield", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.RARE, type = EnchantTarget.SHIELD, slots = {EnchantSlot.MAINHAND, EnchantSlot.OFFHAND}, baseEnchantability = 5, levelMultiplier = 10)
 public class EnchantmentImmutableShield extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================

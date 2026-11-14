@@ -5,6 +5,7 @@ import net.minecraft.world.entity.LivingEntity;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.enchantment.EnchantmentFireDevoured;
@@ -40,7 +41,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantKey;
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.LAW,
         rarity = EnchantmentRarity.VERY_RARE,
         type = EnchantTarget.WEAPON,
-        slots = {EquipmentSlot.MAINHAND},
+        slots = {EnchantSlot.MAINHAND},
         conflictsWith = {
                 EnchantmentScarletCorruption.class,
                 EnchantmentFireGivesPower.class,

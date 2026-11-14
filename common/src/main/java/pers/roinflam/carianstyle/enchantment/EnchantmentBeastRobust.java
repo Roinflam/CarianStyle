@@ -11,6 +11,7 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.api.IEffectModifier;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
@@ -35,7 +36,7 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.VERY_RARE,
         type = EnchantTarget.ARMOR_CHEST,
-        slots = {EquipmentSlot.CHEST},
+        slots = {EnchantSlot.CHEST},
         forceTreasure = true,
         baseEnchantability = 35,
         levelMultiplier = 0

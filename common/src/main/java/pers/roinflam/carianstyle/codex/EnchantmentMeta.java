@@ -7,6 +7,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.enchantment.Enchantment;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.pack.DisabledCreativeFilter;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
@@ -160,7 +161,9 @@ public final class EnchantmentMeta implements CodexEntry {
 
         // 槽位：注解数组转不可变列表，避免调用方误改
         List<EquipmentSlot> slotList = new ArrayList<>(annotation.slots().length);
-        Collections.addAll(slotList, annotation.slots());
+        for (EnchantSlot slot : annotation.slots()) {
+            slotList.add(slot.vanilla());
+        }
         this.slots = Collections.unmodifiableList(slotList);
 
         // 适用物品：实测探测（构建期一次，之后复用）

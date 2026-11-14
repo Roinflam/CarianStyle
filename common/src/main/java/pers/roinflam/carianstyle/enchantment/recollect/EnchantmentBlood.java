@@ -10,6 +10,7 @@ import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.enchantment.EnchantmentBloodCollection;
@@ -24,7 +25,7 @@ import java.util.UUID;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentLevels;
 
 /** 血附魔 - 修复: getUsedItemHand -> InteractionHand.MAIN_HAND @version 2.1 */
-@AutoRegisterEnchantment(id = "blood", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantTarget.WEAPON, slots = {EquipmentSlot.MAINHAND}, baseEnchantability = 35, levelMultiplier = 0)
+@AutoRegisterEnchantment(id = "blood", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantTarget.WEAPON, slots = {EnchantSlot.MAINHAND}, baseEnchantability = 35, levelMultiplier = 0)
 public class EnchantmentBlood extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================

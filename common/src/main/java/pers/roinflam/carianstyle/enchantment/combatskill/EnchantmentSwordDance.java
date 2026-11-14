@@ -6,6 +6,7 @@ import net.minecraft.world.entity.player.Player;
 import pers.roinflam.carianstyle.annotation.EnchantTarget;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.annotation.EnchantSlot;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
@@ -26,7 +27,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
         rarity = EnchantmentRarity.VERY_RARE,
         type = EnchantTarget.WEAPON,
-        slots = {EquipmentSlot.MAINHAND},
+        slots = {EnchantSlot.MAINHAND},
         forceTreasure = true,
         baseEnchantability = 35,
         levelMultiplier = 0
