@@ -18,6 +18,8 @@ import pers.roinflam.carianstyle.fabric.FabricClientEvents;
  * 和 NeoForge 发这个阶段的位置是同一句，此时半透明层的渲染状态还生效、模型视图栈里带着相机旋转，
  * 特效批量绘制按单位矩阵画就是对的，画面和 NeoForge 逐像素一致。
  * 这个方法可能被大改渲染的模组整段替换，所以这里 {@code require = 0}，找不到注入点不报错。
+ * Sodium 用 {@code @Overwrite} 整段替换了它（默认优先级 1000），而 Mixin 只许优先级更高的 mixin 往被别人合并过的方法里注入，
+ * 否则不管 {@code require} 直接报错、客户端启动即崩，所以本类优先级要高于 1000。
  * </p>
  * <p>
  * 回退点包住 {@code renderLevel} 里全部对 {@code renderSectionLayer} 的调用（原版 7 处，半透明的两处分别在
@@ -27,7 +29,7 @@ import pers.roinflam.carianstyle.fabric.FabricClientEvents;
  * {@code mixin.debug.countInjections} 时检查，开发时用来发现少挂了几处。
  * </p>
  */
-@Mixin(LevelRenderer.class)
+@Mixin(value = LevelRenderer.class, priority = 1500)
 public abstract class MixinLevelRendererStages {
 
     @Inject(method = "renderSectionLayer",
