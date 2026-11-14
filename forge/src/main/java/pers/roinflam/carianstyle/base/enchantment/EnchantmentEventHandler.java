@@ -157,6 +157,8 @@ public class EnchantmentEventHandler {
         private final List<TickEnchantmentEntry>[] slotEntries = new List[ALL_SLOTS.length];
         private List<TickEnchantmentEntry> tickEntries = Collections.emptyList();
         private int ticksSinceForceRescan = 0;
+        /** 上次整扫时的配置版本号（{@link ConfigLoader#bakeGeneration()}），变了就整扫 */
+        private int configGeneration = Integer.MIN_VALUE;
 
         /**
          * 上次重扫时玩家的 {@code tickCount}；-1 表示尚未扫过。
@@ -194,6 +196,14 @@ public class EnchantmentEventHandler {
             boolean forceRescan = ticksSinceForceRescan >= FORCE_RESCAN_INTERVAL;
             if (forceRescan) {
                 ticksSinceForceRescan = 0;
+            }
+            // 条目里的结果还取决于配置（禁用名单、levelLimit、等级衰减）：配置重载过就整扫一遍。
+            // 以前耐久一变就六个槽位全按新配置重扫，改成按槽位判变后不跟一下，没变的槽位要等强制重扫才换成新配置。
+            // 不动强制重扫的计数，节奏和原来一样
+            int generation = ConfigLoader.bakeGeneration();
+            if (generation != configGeneration) {
+                configGeneration = generation;
+                forceRescan = true;
             }
 
             boolean anyChanged = false;
