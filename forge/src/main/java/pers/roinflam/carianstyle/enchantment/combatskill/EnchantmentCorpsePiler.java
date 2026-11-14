@@ -7,10 +7,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.LivingDeathEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -28,6 +27,7 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 import java.util.UUID;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 尸山血海附魔
@@ -54,7 +54,7 @@ import java.util.UUID;
                 EnchantmentDarkMoon.class
         }
 )
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentCorpsePiler extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================

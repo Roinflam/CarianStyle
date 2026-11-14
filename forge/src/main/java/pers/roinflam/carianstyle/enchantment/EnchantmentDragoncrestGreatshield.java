@@ -8,10 +8,9 @@ import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -23,6 +22,7 @@ import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 龙徽大盾附魔
@@ -38,7 +38,7 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
         type = EnchantmentCategory.ARMOR,
         slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}
 )
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentDragoncrestGreatshield extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================

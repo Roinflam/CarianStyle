@@ -5,9 +5,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -20,6 +18,8 @@ import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.PlayerTickEvent;
 
 /**
  * 回归法则附魔
@@ -51,7 +51,7 @@ import java.util.List;
         slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET},
         forceTreasure = true
 )
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentRegressivePrinciple extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
@@ -104,21 +104,18 @@ public class EnchantmentRegressivePrinciple extends EnchantmentBase {
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
-        if (evt.player.level().isClientSide) {
+    public static void onPlayerTick(@NotNull PlayerTickEvent.Pre evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (evt.phase != TickEvent.Phase.START) {
-            return;
-        }
 
         // 5%概率触发
         if (!RandomUtil.percentageChance(TRIGGER_CHANCE.get())) {
             return;
         }
 
-        Player player = evt.player;
+        Player player = evt.getEntity();
         if (!player.isAlive()) {
             return;
         }

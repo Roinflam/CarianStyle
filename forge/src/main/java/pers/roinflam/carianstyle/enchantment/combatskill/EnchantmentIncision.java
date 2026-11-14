@@ -8,10 +8,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.LivingDeathEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -28,6 +27,7 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 切割附魔
@@ -51,7 +51,7 @@ import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
                 EnchantmentDarkMoon.class
         }
 )
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentIncision extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
@@ -162,7 +162,8 @@ public class EnchantmentIncision extends EnchantmentBase {
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
+    // order = -1：排在鲜血斩击之前：这里按已损生命回血，鲜血斩击先回的话这里回得少
+    @SubscribeEvent(priority = EventPriority.LOWEST, order = -1)
     public static void onLivingDeath(@NotNull LivingDeathEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;

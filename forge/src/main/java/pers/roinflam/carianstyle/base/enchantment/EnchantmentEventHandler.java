@@ -7,23 +7,27 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.*;
-import net.minecraftforge.event.entity.player.CriticalHitEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.event.server.ServerStoppedEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.LivingDeathEvent;
+import pers.roinflam.carianstyle.event.LivingHealEvent;
+import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
+import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
+import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
+import pers.roinflam.carianstyle.event.CriticalHitEvent;
+import pers.roinflam.carianstyle.event.PlayerEvent;
+import pers.roinflam.carianstyle.event.ServerStoppedEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.PlayerTickEvent;
+import pers.roinflam.carianstyle.event.ServerTickEvent;
 
 /**
  * 附魔事件处理器
@@ -89,7 +93,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * @version 3.2
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@EventBusSubscriber
 public class EnchantmentEventHandler {
 
     // ==================== 伤害事件扫描缓存（v2.x已有，未修改） ====================
@@ -664,8 +668,7 @@ public class EnchantmentEventHandler {
     private static final Map<LivingEntity, DamageScan> DAMAGE_SCAN = new IdentityHashMap<>();
 
     @SubscribeEvent
-    public static void clearDamageScanEachTick(@Nonnull TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.START) return;
+    public static void clearDamageScanEachTick(@Nonnull ServerTickEvent.Pre event) {
         synchronized (DAMAGE_SCAN) {
             if (!DAMAGE_SCAN.isEmpty()) {
                 DAMAGE_SCAN.clear();
@@ -836,7 +839,8 @@ public class EnchantmentEventHandler {
         dispatchFromCache(System.identityHashCode(event), event, EventPriority.LOW, event.getSource(), event.getEntity());
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
+    // order = -1：本档有钉到前面的监听，中央分发仍排在本档最前（和原来一样）
+    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true, order = -1)
     public static void handleLivingAttackLowest(@Nonnull LivingAttackEvent event) {
         if (event.getEntity().level().isClientSide) return;
         int key = System.identityHashCode(event);
@@ -870,7 +874,8 @@ public class EnchantmentEventHandler {
         dispatchFromCache(System.identityHashCode(event), event, EventPriority.NORMAL, event.getSource(), event.getEntity());
     }
 
-    @SubscribeEvent(priority = EventPriority.LOW)
+    // order = -1：本档有钉到前面的监听，中央分发仍排在本档最前（和原来一样）
+    @SubscribeEvent(priority = EventPriority.LOW, order = -1)
     public static void handleLivingHurtLow(@Nonnull LivingHurtEvent event) {
         if (event.getEntity().level().isClientSide) return;
         dispatchFromCache(System.identityHashCode(event), event, EventPriority.LOW, event.getSource(), event.getEntity());
@@ -916,7 +921,8 @@ public class EnchantmentEventHandler {
         dispatchFromCache(System.identityHashCode(event), event, EventPriority.LOW, event.getSource(), event.getEntity());
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
+    // order = -1：本档有钉到前面的监听，中央分发仍排在本档最前（和原来一样）
+    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true, order = -1)
     public static void handleLivingDamageLowest(@Nonnull LivingDamageEvent event) {
         if (event.getEntity().level().isClientSide) return;
         int key = System.identityHashCode(event);
@@ -1014,11 +1020,12 @@ public class EnchantmentEventHandler {
      * 不受怪物附魔触发开关影响（怪物本来就不会进入此方法）。
      * </p>
      */
-    @SubscribeEvent
-    public static void handlePlayerTick(@Nonnull TickEvent.PlayerTickEvent event) {
-        if (event.player.level().isClientSide || event.phase != TickEvent.Phase.START) return;
+    // order = -1：本档有钉到前面的监听，中央分发仍排在本档最前（和原来一样）
+    @SubscribeEvent(order = -1)
+    public static void handlePlayerTick(@Nonnull PlayerTickEvent.Pre event) {
+        if (event.getEntity().level().isClientSide) return;
 
-        Player player = event.player;
+        Player player = event.getEntity();
 
         if (!player.isAlive()) return;
 

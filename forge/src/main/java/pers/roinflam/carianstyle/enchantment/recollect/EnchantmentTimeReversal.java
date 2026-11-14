@@ -6,11 +6,10 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.event.entity.living.LivingAttackEvent;
-import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
+import pers.roinflam.carianstyle.event.LivingDeathEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -26,6 +25,7 @@ import pers.roinflam.carianstyle.utils.helper.task.SynchronizationTask;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 时间逆转附魔
@@ -96,7 +96,7 @@ import java.util.concurrent.ConcurrentHashMap;
         type = EnchantmentCategory.ARMOR_CHEST,
         slots = {EquipmentSlot.CHEST}
 )
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentTimeReversal extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================

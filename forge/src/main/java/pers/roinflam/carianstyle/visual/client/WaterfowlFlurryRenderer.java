@@ -5,16 +5,15 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.network.CombatArtEffectPacket;
-import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
 import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 
 import java.util.List;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 水鸟乱舞「连斩」客户端渲染器（纯客户端自绘）。
@@ -113,7 +112,7 @@ import java.util.List;
  * @version 1.0
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class WaterfowlFlurryRenderer {
 
     /** 距离裁剪（格） */

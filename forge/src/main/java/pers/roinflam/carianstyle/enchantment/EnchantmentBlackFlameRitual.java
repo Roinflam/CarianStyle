@@ -9,11 +9,9 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.Enchantments;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -24,6 +22,8 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.PlayerTickEvent;
 
 /**
  * 黑焰仪式附魔
@@ -33,7 +33,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * @version 2.2
  */
 @AutoRegisterEnchantment(id = "black_flame_ritual", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL, rarity = EnchantmentRarity.VERY_RARE, type = EnchantmentCategory.ARMOR_CHEST, slots = {EquipmentSlot.CHEST}, conflictsWith = {EnchantmentShelterOfFire.class, EnchantmentHealingByFire.class})
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentBlackFlameRitual extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
@@ -111,10 +111,10 @@ public class EnchantmentBlackFlameRitual extends EnchantmentBase {
      * 持续燃烧自损（PlayerTickEvent 玩家专属，无需开关检查）
      */
     @SubscribeEvent
-    public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
-        if (evt.player.level().isClientSide || evt.phase != TickEvent.Phase.START) return;
-        if (evt.player.tickCount % TICK_INTERVAL.getInt() != 0) return;
-        Player holder = evt.player;
+    public static void onPlayerTick(@NotNull PlayerTickEvent.Pre evt) {
+        if (evt.getEntity().level().isClientSide) return;
+        if (evt.getEntity().tickCount % TICK_INTERVAL.getInt() != 0) return;
+        Player holder = evt.getEntity();
         Enchantment blackFlameRitual = EnchantmentRegistry.getEnchantmentByClass(EnchantmentBlackFlameRitual.class);
         if (blackFlameRitual == null) return;
         // v-cache：走中央装备缓存

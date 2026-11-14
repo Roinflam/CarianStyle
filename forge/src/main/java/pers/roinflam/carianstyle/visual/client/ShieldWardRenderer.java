@@ -16,9 +16,7 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.utils.Reference;
@@ -29,6 +27,8 @@ import javax.annotation.Nullable;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.client.ClientTickEvent;
 
 /**
  * 护盾类附魔的<b>物品局部空间</b>特效渲染器（纯客户端自绘）。
@@ -92,7 +92,7 @@ import java.util.Map;
  * @version 6.0
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class ShieldWardRenderer {
 
     /** 魔力盾牌附魔的注册 id */
@@ -984,10 +984,7 @@ public final class ShieldWardRenderer {
      * 都不会再触发渲染，其条目会永远留在表里，故需要这条兜底清理。</p>
      */
     @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) {
-            return;
-        }
+    public static void onClientTick(ClientTickEvent.Post event) {
         if (Minecraft.getInstance().level == null) {
             STATE.clear();
             ShieldWardShape.clearCache();

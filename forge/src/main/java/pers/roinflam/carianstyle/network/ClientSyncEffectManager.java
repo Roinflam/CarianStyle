@@ -7,15 +7,15 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import net.minecraftforge.fml.loading.FMLEnvironment;
 import net.minecraftforge.network.PacketDistributor;
 
 import javax.annotation.Nonnull;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.ServerTickEvent;
 
 /**
  * 客户端同步效果管理器
@@ -160,7 +160,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * @version 3.2
  */
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class ClientSyncEffectManager {
 
     /** 服务端：维度 -> 序列号 -> 实体ID集合 */
@@ -417,8 +417,7 @@ public class ClientSyncEffectManager {
      * @param event 服务端 tick 事件
      */
     @SubscribeEvent
-    public static void onServerTick(@Nonnull TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
+    public static void onServerTick(@Nonnull ServerTickEvent.Post event) {
         if (++resyncCounter < RESYNC_INTERVAL) return;
         resyncCounter = 0;
 

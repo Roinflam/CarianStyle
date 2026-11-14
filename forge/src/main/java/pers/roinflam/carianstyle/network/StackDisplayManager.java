@@ -2,14 +2,11 @@ package pers.roinflam.carianstyle.network;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.PlayerEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import net.minecraftforge.server.ServerLifecycleHooks;
 import net.minecraft.world.item.ItemStack;
 import pers.roinflam.carianstyle.base.enchantment.EquipmentStamp;
-import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.EquipmentEnchantContext;
 import pers.roinflam.carianstyle.visual.StackDisplayRegistry;
 
@@ -18,6 +15,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.ServerTickEvent;
 
 /**
  * 叠层显示服务端管理器：定期轮询每个在线玩家的叠层读取器，
@@ -91,7 +90,7 @@ import java.util.UUID;
  * @author RoinFlam
  * @version 3
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID)
+@EventBusSubscriber
 public final class StackDisplayManager {
 
     /**
@@ -119,10 +118,7 @@ public final class StackDisplayManager {
      * @param event tick 事件
      */
     @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) {
-            return;
-        }
+    public static void onServerTick(ServerTickEvent.Post event) {
         if (++tickCounter < POLL_INTERVAL) {
             return;
         }

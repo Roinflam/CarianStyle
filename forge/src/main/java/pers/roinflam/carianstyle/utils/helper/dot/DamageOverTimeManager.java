@@ -6,13 +6,10 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.LivingDeathEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
-import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
@@ -22,6 +19,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.BiFunction;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.ServerTickEvent;
 
 /**
  * 持续伤害（DoT）集中管理器
@@ -150,7 +149,7 @@ import java.util.function.BiFunction;
  * @author RoinFlam
  * @version 1.4
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@EventBusSubscriber
 public class DamageOverTimeManager {
 
     /**
@@ -424,10 +423,7 @@ public class DamageOverTimeManager {
      * 每tick处理所有活跃的持续伤害效果
      */
     @SubscribeEvent
-    public static void onServerTick(@Nonnull TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.START) {
-            return;
-        }
+    public static void onServerTick(@Nonnull ServerTickEvent.Pre event) {
 
         if (ACTIVE_DOTS.isEmpty() && PENDING.isEmpty()) {
             return;

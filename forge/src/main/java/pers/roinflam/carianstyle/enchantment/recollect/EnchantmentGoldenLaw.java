@@ -9,11 +9,10 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.event.entity.living.LivingAttackEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
+import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
@@ -27,6 +26,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 import java.util.UUID;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 黄金律法附魔
@@ -52,7 +52,7 @@ import java.util.UUID;
  * @version 2.3
  */
 @AutoRegisterEnchantment(id = "golden_law", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantmentCategory.WEAPON, slots = {EquipmentSlot.MAINHAND})
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentGoldenLaw extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================

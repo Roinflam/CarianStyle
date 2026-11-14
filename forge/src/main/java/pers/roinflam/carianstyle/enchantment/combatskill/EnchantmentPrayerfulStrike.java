@@ -13,13 +13,11 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
+import pers.roinflam.carianstyle.event.LivingDeathEvent;
+import pers.roinflam.carianstyle.event.PlayerEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -33,6 +31,8 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 import java.util.UUID;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.PlayerTickEvent;
 
 /**
  * 祈祷一击附魔
@@ -58,7 +58,7 @@ import java.util.UUID;
         forceTreasure = true,
         conflictsWith = {EnchantmentScarletCorruption.class}
 )
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentPrayerfulStrike extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
@@ -143,7 +143,8 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
         super(EnchantmentCategory.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
+    // order = -1：排在顶层附魔之前：维克的龙雷会减掉或免掉这一下，战技在它之前结算
+    @SubscribeEvent(priority = EventPriority.LOWEST, order = -1)
     public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;
@@ -286,13 +287,14 @@ public class EnchantmentPrayerfulStrike extends EnchantmentBase {
         EnchantmentDataManager.clearCooldown(NOT_READY_COOLDOWN_KEY, uuid);
     }
 
-    @SubscribeEvent
-    public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
-        if (evt.player.level().isClientSide || evt.phase != TickEvent.Phase.START
-                || evt.player.tickCount % TICK_INTERVAL.getInt() != 0) {
+    // order = -1：和同档其它战技一起排在顶层附魔之前，战技之间保持原来的先后
+    @SubscribeEvent(order = -1)
+    public static void onPlayerTick(@NotNull PlayerTickEvent.Pre evt) {
+        if (evt.getEntity().level().isClientSide
+                || evt.getEntity().tickCount % TICK_INTERVAL.getInt() != 0) {
             return;
         }
-        Player player = evt.player;
+        Player player = evt.getEntity();
         if (!player.isAlive()) {
             return;
         }

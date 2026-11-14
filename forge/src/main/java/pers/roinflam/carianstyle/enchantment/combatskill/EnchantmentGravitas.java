@@ -10,13 +10,11 @@ import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
+import pers.roinflam.carianstyle.event.LivingDeathEvent;
+import pers.roinflam.carianstyle.event.PlayerEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -34,6 +32,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.PlayerTickEvent;
 
 /**
  * 重力附魔
@@ -71,7 +71,7 @@ import java.util.concurrent.ConcurrentHashMap;
         type = EnchantmentCategory.WEAPON,
         slots = {EquipmentSlot.MAINHAND}
 )
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentGravitas extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
@@ -155,7 +155,8 @@ public class EnchantmentGravitas extends EnchantmentBase {
     /**
      * 攻击时激活重力场并给敌人施加重力效果
      */
-    @SubscribeEvent(priority = EventPriority.LOWEST)
+    // order = -1：排在顶层附魔之前：维克的龙雷会减掉或免掉这一下，战技在它之前结算
+    @SubscribeEvent(priority = EventPriority.LOWEST, order = -1)
     public static void onLivingDamage(@NotNull LivingDamageEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;
@@ -238,13 +239,14 @@ public class EnchantmentGravitas extends EnchantmentBase {
      * 驱动 {@code GravitasDistortionRenderer} 绘制以自身为中心的地面范围圈。
      * <p>PlayerTickEvent 仅玩家触发，无需开关检查</p>
      */
-    @SubscribeEvent
-    public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
-        if (evt.player.level().isClientSide || evt.phase != TickEvent.Phase.START) {
+    // order = -1：排在回归性原理之前：这里给周围上的重力效果，回归性原理触发时会一并清掉
+    @SubscribeEvent(order = -1)
+    public static void onPlayerTick(@NotNull PlayerTickEvent.Pre evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        Player holder = evt.player;
+        Player holder = evt.getEntity();
         if (!holder.isAlive()) {
             return;
         }

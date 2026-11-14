@@ -8,11 +8,9 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -28,6 +26,8 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.PlayerTickEvent;
 
 /**
  * 暗弃子附魔
@@ -45,7 +45,7 @@ import java.util.List;
         type = EnchantmentCategory.WEAPON,
         slots = {EquipmentSlot.MAINHAND}
 )
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
@@ -167,16 +167,13 @@ public class EnchantmentDarkAbandonedChild extends EnchantmentBase {
      * 夜晚持续回血（PlayerTickEvent玩家专属，无需开关检查）
      */
     @SubscribeEvent
-    public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
-        if (evt.player.level().isClientSide || evt.player.level().isDay()) {
+    public static void onPlayerTick(@NotNull PlayerTickEvent.Pre evt) {
+        if (evt.getEntity().level().isClientSide || evt.getEntity().level().isDay()) {
             return;
         }
 
-        if (evt.phase != TickEvent.Phase.START) {
-            return;
-        }
 
-        Player player = evt.player;
+        Player player = evt.getEntity();
         if (!player.isAlive()) {
             return;
         }

@@ -11,15 +11,14 @@ import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
-import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nullable;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 统一世界渲染批次（纯客户端）——把本模组全部世界自绘特效合并进<b>一次</b> GL 状态设置与<b>一次</b>顶点提交。
@@ -79,7 +78,7 @@ import javax.annotation.Nullable;
  * @version 1.1
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class VisualBatch {
 
     /**

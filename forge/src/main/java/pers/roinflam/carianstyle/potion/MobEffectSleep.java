@@ -10,19 +10,19 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.event.entity.living.LivingAttackEvent;
-import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.event.entity.living.LivingEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
+import pers.roinflam.carianstyle.event.LivingChangeTargetEvent;
+import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.LivingTickEvent;
 
 /**
  * 睡眠药水效果
@@ -139,7 +139,7 @@ import javax.annotation.Nonnull;
  * @author RoinFlam
  * @version 1.2
  */
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class MobEffectSleep extends IconBase {
 
     /**
@@ -177,7 +177,7 @@ public class MobEffectSleep extends IconBase {
             return;
         }
 
-        if (evt.getNewTarget() == null) {
+        if (evt.getNewAboutToBeSetTarget() == null) {
             return;
         }
 
@@ -240,7 +240,7 @@ public class MobEffectSleep extends IconBase {
      * </p>
      */
     @SubscribeEvent
-    public static void onLivingUpdate(@Nonnull LivingEvent.LivingTickEvent evt) {
+    public static void onLivingUpdate(@Nonnull LivingTickEvent evt) {
         LivingEntity entityLiving = evt.getEntity();
         if (entityLiving.hasEffect(CarianStylePotion.SLEEP.get())) {
             EntityLivingUtil.setJumped(entityLiving);

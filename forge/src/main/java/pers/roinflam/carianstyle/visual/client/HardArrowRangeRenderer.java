@@ -11,15 +11,15 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
 import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.client.ClientTickEvent;
 
 /**
  * 硬箭「12 格参考距离」指示圈（纯客户端，<b>只有持有者自己看得见</b>）。
@@ -122,7 +122,7 @@ import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
  * @version 3.1
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class HardArrowRangeRenderer {
 
     /** 硬箭附魔的注册名（取自 {@code @AutoRegisterEnchantment(id = "hard_arrow")}） */
@@ -271,10 +271,7 @@ public final class HardArrowRangeRenderer {
      * @param event tick 事件
      */
     @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) {
-            return;
-        }
+    public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
         if (mc.level == null || player == null) {

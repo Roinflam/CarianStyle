@@ -12,11 +12,9 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
-import net.minecraftforge.event.entity.ProjectileImpactEvent;
-import net.minecraftforge.event.entity.living.LivingEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.ProjectileImpactEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -26,6 +24,8 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.LivingTickEvent;
 
 /**
  * 连射附魔
@@ -41,7 +41,7 @@ import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
         type = EnchantmentCategory.BOW,
         slots = {EquipmentSlot.MAINHAND}
 )
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentContinuousShooting extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
@@ -84,7 +84,8 @@ public class EnchantmentContinuousShooting extends EnchantmentBase {
         return cachedEnchantment;
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    // order = -1：和对空射击一起排在硬箭之前：箭伤倍率的先后不同，伤害和硬箭命中特效的估值都不同
+    @SubscribeEvent(priority = EventPriority.HIGHEST, order = -1)
     public static void onProjectileImpact(@NotNull ProjectileImpactEvent evt) {
         if (!(evt.getProjectile() instanceof AbstractArrow arrow)) {
             return;
@@ -124,7 +125,7 @@ public class EnchantmentContinuousShooting extends EnchantmentBase {
     }
 
     @SubscribeEvent
-    public static void onLivingUpdate(@NotNull LivingEvent.LivingTickEvent evt) {
+    public static void onLivingUpdate(@NotNull LivingTickEvent evt) {
         LivingEntity entity = evt.getEntity();
 
         if (!entity.isUsingItem()) {

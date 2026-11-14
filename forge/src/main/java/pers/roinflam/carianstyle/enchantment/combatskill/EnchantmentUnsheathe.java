@@ -8,9 +8,8 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
-import net.minecraftforge.event.entity.EntityJoinLevelEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.EntityJoinLevelEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -25,6 +24,7 @@ import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 import java.util.UUID;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 居合附魔
@@ -56,7 +56,7 @@ import java.util.UUID;
         type = EnchantmentCategory.WEAPON,
         slots = {EquipmentSlot.MAINHAND}
 )
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentUnsheathe extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================

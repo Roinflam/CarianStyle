@@ -9,15 +9,15 @@ import net.minecraft.world.item.EnchantedBookItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraftforge.event.entity.EntityJoinLevelEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.EntityJoinLevelEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 被禁用附魔的掉落物兜底清洗
@@ -63,7 +63,7 @@ import javax.annotation.Nonnull;
  *
  * @author RoinFlam
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@EventBusSubscriber
 public final class DisabledEnchantmentDropFilter {
 
     private static final String TAG_ENCHANTMENTS = "Enchantments";

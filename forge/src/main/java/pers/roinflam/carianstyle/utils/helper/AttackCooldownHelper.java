@@ -2,18 +2,17 @@ package pers.roinflam.carianstyle.utils.helper;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.event.server.ServerStoppedEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.event.PlayerEvent;
+import pers.roinflam.carianstyle.event.ServerStoppedEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 
 import javax.annotation.Nonnull;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.ServerTickEvent;
 
 /**
  * 攻击冷却（蓄力）的延后清零
@@ -66,7 +65,7 @@ import java.util.Set;
  * 普通换维度沿用同一个玩家对象，清零照常生效。
  * </p>
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@EventBusSubscriber
 public final class AttackCooldownHelper {
 
     /** 等待清零的玩家，按对象身份去重；只在服务端主线程读写 */
@@ -132,10 +131,7 @@ public final class AttackCooldownHelper {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onServerTick(@Nonnull TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.START) {
-            return;
-        }
+    public static void onServerTick(@Nonnull ServerTickEvent.Pre event) {
         SPENT.clear();
         if (PENDING.isEmpty()) {
             return;

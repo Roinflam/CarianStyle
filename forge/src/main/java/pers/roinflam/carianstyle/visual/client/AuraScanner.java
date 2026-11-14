@@ -7,16 +7,15 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
-import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.StackHudManager;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.client.ClientTickEvent;
 
 /**
  * 光环客户端扫描器：定期扫描玩家附近的生物，判断各自激活了哪些光环，
@@ -38,7 +37,7 @@ import java.util.List;
  * @author RoinFlam
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class AuraScanner {
 
     /**
@@ -89,10 +88,7 @@ public final class AuraScanner {
      * @param event tick 事件
      */
     @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) {
-            return;
-        }
+    public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) {
             // 离开世界：清空光环与叠层 HUD，避免残留

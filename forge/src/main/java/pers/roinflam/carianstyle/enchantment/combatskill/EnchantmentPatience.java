@@ -7,11 +7,10 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
+import pers.roinflam.carianstyle.event.LivingDeathEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -24,6 +23,7 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 import java.util.UUID;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 忍耐附魔
@@ -41,7 +41,7 @@ import java.util.UUID;
         type = EnchantmentCategory.WEAPON,
         slots = {EquipmentSlot.MAINHAND}
 )
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentPatience extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
@@ -90,7 +90,8 @@ public class EnchantmentPatience extends EnchantmentBase {
     /**
      * 受击时累积能量
      */
-    @SubscribeEvent(priority = EventPriority.LOWEST)
+    // order = -1：排在顶层附魔之前：这里按伤害累积，读的是维克的龙雷减免之前的值
+    @SubscribeEvent(priority = EventPriority.LOWEST, order = -1)
     public static void onLivingDamageStatic(@NotNull LivingDamageEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;

@@ -4,15 +4,15 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 黄金誓约药水效果
@@ -22,7 +22,7 @@ import javax.annotation.Nonnull;
  * - 造成伤害时增加15%×(等级+1)
  * </p>
  */
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class MobEffectGoldenVow extends IconBase {
 
     public MobEffectGoldenVow(boolean isBadEffectIn, int liquidColorIn) {

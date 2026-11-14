@@ -8,10 +8,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -24,6 +22,8 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.PlayerTickEvent;
 
 /**
  * 圣地附魔
@@ -40,7 +40,7 @@ import java.util.List;
         customType = "SHIELD",
         slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND}
 )
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentHolyGround extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
@@ -139,17 +139,18 @@ public class EnchantmentHolyGround extends EnchantmentBase {
     /**
      * 治疗/护盾光环（PlayerTickEvent，玩家专属）
      */
-    @SubscribeEvent
-    public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
-        if (evt.player.level().isClientSide || evt.phase != TickEvent.Phase.START) {
+    // order = -1：排在黑焰仪式之前：这里回血，黑焰仪式按比例扣血，先后颠倒剩下的血不同
+    @SubscribeEvent(order = -1)
+    public static void onPlayerTick(@NotNull PlayerTickEvent.Pre evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (evt.player.tickCount % PULSE_INTERVAL_TICKS.getInt() != 0) {
+        if (evt.getEntity().tickCount % PULSE_INTERVAL_TICKS.getInt() != 0) {
             return;
         }
 
-        Player holder = evt.player;
+        Player holder = evt.getEntity();
         if (!holder.isAlive()) {
             return;
         }

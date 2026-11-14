@@ -15,10 +15,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.level.BlockEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.BlockEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
@@ -30,6 +29,7 @@ import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 
 import java.util.*;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 岩石爆破附魔
@@ -76,7 +76,7 @@ import java.util.*;
         forceTreasure = true,
         conflictsWith = {}
 )
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentRockBlaster extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================

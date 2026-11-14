@@ -2,7 +2,7 @@ package pers.roinflam.carianstyle.annotation;
 
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
-import net.minecraftforge.eventbus.api.EventPriority;
+import pers.roinflam.carianstyle.bus.EventPriority;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

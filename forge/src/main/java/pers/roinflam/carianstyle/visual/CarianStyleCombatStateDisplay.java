@@ -4,7 +4,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraftforge.event.entity.player.PlayerEvent;
+import pers.roinflam.carianstyle.event.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -488,7 +488,7 @@ public final class CarianStyleCombatStateDisplay {
      * {@code @Mod.EventBusSubscriber}。
      * </p>
      */
-    @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+    @pers.roinflam.carianstyle.bus.EventBusSubscriber
     public static final class CacheCleanup {
 
         private CacheCleanup() {
@@ -501,7 +501,7 @@ public final class CarianStyleCombatStateDisplay {
          *
          * @param event 登出事件
          */
-        @SubscribeEvent
+        @pers.roinflam.carianstyle.bus.SubscribeEvent
         public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
             NEARBY_CACHE.remove(event.getEntity().getUUID());
         }

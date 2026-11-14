@@ -9,10 +9,8 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
-import net.minecraftforge.event.entity.living.LivingEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.PlayerEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -33,6 +31,8 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleEffects;
 
 import java.util.ArrayList;
 import java.util.List;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.LivingTickEvent;
 
 /**
  * 癫火蔓延附魔
@@ -392,7 +392,7 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
     /**
      * 客户端：拉取无敌期间压制跳跃，避免本地预测导致的抖动。
      */
-    @Mod.EventBusSubscriber
+    @EventBusSubscriber
     public static class ClientEventHandler {
 
         /**
@@ -401,7 +401,7 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
          * @param evt 生物 tick 事件
          */
         @SubscribeEvent
-        public static void onLivingUpdate(@NotNull LivingEvent.LivingTickEvent evt) {
+        public static void onLivingUpdate(@NotNull LivingTickEvent evt) {
             if (evt.getEntity().level().isClientSide) {
                 LivingEntity entityLiving = evt.getEntity();
                 Boolean isActive = EnchantmentDataManager.getData(
@@ -418,7 +418,7 @@ public class EnchantmentEpilepsySpread extends EnchantmentBase {
      * 服务端：处理「演出期间登出逃掉死亡」的补刀（v3.1 新增）。
      * <p>详见类注释「v3.1 修复」小节。</p>
      */
-    @Mod.EventBusSubscriber
+    @EventBusSubscriber
     public static class ServerEventHandler {
 
         /**

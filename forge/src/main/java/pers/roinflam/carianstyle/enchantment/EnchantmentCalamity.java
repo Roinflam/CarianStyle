@@ -6,11 +6,9 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -23,6 +21,8 @@ import pers.roinflam.carianstyle.utils.java.random.RandomUtil;
 import pers.roinflam.carianstyle.utils.util.EntityUtil;
 
 import java.util.List;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.PlayerTickEvent;
 
 /**
  * 灾厄附魔（诅咒）
@@ -40,7 +40,7 @@ import java.util.List;
         slots = {EquipmentSlot.CHEST},
         isCurse = true
 )
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentCalamity extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
@@ -123,20 +123,17 @@ public class EnchantmentCalamity extends EnchantmentBase {
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
-        if (evt.player.level().isClientSide) {
+    public static void onPlayerTick(@NotNull PlayerTickEvent.Pre evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
-        if (evt.phase != TickEvent.Phase.START) {
-            return;
-        }
 
         if (!RandomUtil.percentageChance(TRIGGER_CHANCE.get())) {
             return;
         }
 
-        Player player = evt.player;
+        Player player = evt.getEntity();
         if (!player.isAlive()) {
             return;
         }

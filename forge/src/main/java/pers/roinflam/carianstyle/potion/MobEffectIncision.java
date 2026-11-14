@@ -7,10 +7,9 @@ import net.minecraft.world.entity.ai.attributes.AttributeMap;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
-import net.minecraftforge.event.entity.living.LivingHealEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.LivingHealEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
@@ -21,6 +20,7 @@ import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
 import java.util.UUID;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 切割药水效果
@@ -138,7 +138,7 @@ import java.util.UUID;
  * @author RoinFlam
  * @version 3.2
  */
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class MobEffectIncision extends IconBase {
 
     /** 移动速度修改器UUID */

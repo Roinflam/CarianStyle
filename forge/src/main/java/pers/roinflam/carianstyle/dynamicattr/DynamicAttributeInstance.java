@@ -1,9 +1,9 @@
 package pers.roinflam.carianstyle.dynamicattr;
 
-import net.minecraftforge.common.MinecraftForge;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import pers.roinflam.carianstyle.bus.CarianBus;
 
 /**
  * 动态属性实例
@@ -102,7 +102,7 @@ public class DynamicAttributeInstance {
     public void setEventHandler(@Nullable Object handler) {
         if (handler != null) {
             this.eventHandler = handler;
-            MinecraftForge.EVENT_BUS.register(handler);
+            CarianBus.register(handler);
         }
     }
 
@@ -111,7 +111,7 @@ public class DynamicAttributeInstance {
      */
     public void unregisterEventHandler() {
         if (eventHandler != null) {
-            MinecraftForge.EVENT_BUS.unregister(eventHandler);
+            CarianBus.unregister(eventHandler);
             eventHandler = null;
         }
     }

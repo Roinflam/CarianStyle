@@ -11,9 +11,8 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.utils.Reference;
@@ -23,6 +22,7 @@ import pers.roinflam.carianstyle.utils.util.DayNightUtil;
 
 import javax.annotation.Nullable;
 import java.util.List;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 暗月「月华」客户端渲染器（纯客户端自绘，<b>零网络包</b>）。
@@ -170,7 +170,7 @@ import java.util.List;
  * @version 3.0
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class DarkMoonRenderer {
 
     /** 暗月附魔的注册 id（按 {@code carianstyle:<id>} 解析） */

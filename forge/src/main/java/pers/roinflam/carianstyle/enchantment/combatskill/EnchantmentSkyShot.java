@@ -11,10 +11,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.event.entity.ProjectileImpactEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.ProjectileImpactEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -24,6 +23,7 @@ import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 对空射击附魔
@@ -43,7 +43,7 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
         type = EnchantmentCategory.BOW,
         slots = {EquipmentSlot.MAINHAND}
 )
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentSkyShot extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
@@ -82,7 +82,8 @@ public class EnchantmentSkyShot extends EnchantmentBase {
         super(EnchantmentCategory.BOW, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    // order = -1：排在硬箭之前：这里的箭伤有加法项，和硬箭的乘法先后颠倒伤害不同
+    @SubscribeEvent(priority = EventPriority.HIGHEST, order = -1)
     public static void onProjectileImpact_Arrow(@NotNull ProjectileImpactEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;

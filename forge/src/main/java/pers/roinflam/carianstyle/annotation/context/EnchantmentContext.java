@@ -10,9 +10,12 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.*;
-import net.minecraftforge.event.entity.player.CriticalHitEvent;
+import pers.roinflam.carianstyle.event.LivingDeathEvent;
+import pers.roinflam.carianstyle.event.LivingHealEvent;
+import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
+import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
+import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
+import pers.roinflam.carianstyle.event.CriticalHitEvent;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -666,7 +669,7 @@ public class EnchantmentContext {
      */
     public void setCriticalDamageModifier(float modifier) {
         if (originalEvent instanceof CriticalHitEvent) {
-            ((CriticalHitEvent) originalEvent).setDamageModifier(modifier);
+            ((CriticalHitEvent) originalEvent).setDamageMultiplier(modifier);
         }
     }
 
@@ -677,7 +680,7 @@ public class EnchantmentContext {
      */
     public float getCriticalDamageModifier() {
         if (originalEvent instanceof CriticalHitEvent) {
-            return ((CriticalHitEvent) originalEvent).getDamageModifier();
+            return ((CriticalHitEvent) originalEvent).getDamageMultiplier();
         }
         return 1.0f;
     }

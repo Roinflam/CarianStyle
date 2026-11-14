@@ -2,18 +2,16 @@ package pers.roinflam.carianstyle.tuning;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.client.ClientPlayerNetworkEvent;
+import pers.roinflam.carianstyle.event.PlayerEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import net.minecraftforge.network.PacketDistributor;
 import pers.roinflam.carianstyle.network.EnchantmentValuesPacket;
 import pers.roinflam.carianstyle.network.NetworkHandler;
-import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
 import javax.annotation.Nonnull;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 共享数值的同步收发。
@@ -45,7 +43,7 @@ import javax.annotation.Nonnull;
  * @author RoinFlam
  * @version 1.0
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@EventBusSubscriber
 public final class ValueSyncHandler {
 
     private ValueSyncHandler() {
@@ -98,8 +96,7 @@ public final class ValueSyncHandler {
     /**
      * 客户端侧：断开连接时清空服务端下发的覆盖值。
      */
-    @Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE,
-            value = Dist.CLIENT)
+    @EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
     public static final class ClientSide {
 
         private ClientSide() {

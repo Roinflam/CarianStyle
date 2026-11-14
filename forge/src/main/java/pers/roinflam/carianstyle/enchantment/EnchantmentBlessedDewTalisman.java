@@ -5,9 +5,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.item.enchantment.Enchantments;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -17,6 +15,8 @@ import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.PlayerTickEvent;
 
 /**
  * 祝福露水护符附魔
@@ -35,7 +35,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         type = EnchantmentCategory.ARMOR_CHEST,
         slots = {EquipmentSlot.CHEST}
 )
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
@@ -86,18 +86,15 @@ public class EnchantmentBlessedDewTalisman extends EnchantmentBase {
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
+    public static void onPlayerTick(@NotNull PlayerTickEvent.Pre evt) {
         // 只在服务端执行
-        if (evt.player.level().isClientSide) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
         // 只在START阶段执行
-        if (evt.phase != TickEvent.Phase.START) {
-            return;
-        }
 
-        Player player = evt.player;
+        Player player = evt.getEntity();
 
         // 优化1: 使用计数器控制执行频率,每20tick(1秒)执行一次
         int tickCounter = EnchantmentDataManager.incrementCounter(COUNTER_ID, player.getUUID());

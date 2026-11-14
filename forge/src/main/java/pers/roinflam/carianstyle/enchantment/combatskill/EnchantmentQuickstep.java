@@ -4,9 +4,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -17,6 +15,8 @@ import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.dynamicattr.DynamicAttributeManager;
 import pers.roinflam.carianstyle.dynamicattr.dynamiceffect.DynamicAttributes;
 import pers.roinflam.carianstyle.tuning.EnchantmentValues;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.PlayerTickEvent;
 
 /**
  * 快步附魔
@@ -41,7 +41,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         type = EnchantmentCategory.ARMOR_FEET,
         slots = {EquipmentSlot.FEET}
 )
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentQuickstep extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
@@ -92,18 +92,19 @@ public class EnchantmentQuickstep extends EnchantmentBase {
      * 血量变化不需要逐tick精确跟踪，4tick的延迟对玩家体验几乎无感知
      * </p>
      */
-    @SubscribeEvent
-    public static void onPlayerTick(@NotNull TickEvent.PlayerTickEvent evt) {
-        if (evt.player.level().isClientSide || evt.phase != TickEvent.Phase.START) {
+    // order = -1：排在黑焰仪式、恩惠露滴之前：这里按当前已损生命算加速
+    @SubscribeEvent(order = -1)
+    public static void onPlayerTick(@NotNull PlayerTickEvent.Pre evt) {
+        if (evt.getEntity().level().isClientSide) {
             return;
         }
 
         // 优化：每4tick检测一次
-        if (evt.player.tickCount % CHECK_INTERVAL_TICKS.getInt() != 0) {
+        if (evt.getEntity().tickCount % CHECK_INTERVAL_TICKS.getInt() != 0) {
             return;
         }
 
-        Player player = evt.player;
+        Player player = evt.getEntity();
         if (!player.isAlive()) {
             return;
         }

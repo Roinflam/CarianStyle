@@ -5,9 +5,7 @@ import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraftforge.event.entity.living.LivingEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
@@ -16,6 +14,8 @@ import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.EntityLivingUtil;
 
 import javax.annotation.Nonnull;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.LivingTickEvent;
 
 /**
  * 重力药水效果
@@ -27,7 +27,7 @@ import javax.annotation.Nonnull;
  * - 无法跳跃
  * </p>
  */
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class MobEffectGravitas extends IconBase {
 
     public MobEffectGravitas(boolean isBadEffectIn, int liquidColorIn) {
@@ -57,7 +57,7 @@ public class MobEffectGravitas extends IconBase {
      * 重力状态下无法跳跃
      */
     @SubscribeEvent
-    public static void onLivingUpdate(@Nonnull LivingEvent.LivingTickEvent evt) {
+    public static void onLivingUpdate(@Nonnull LivingTickEvent evt) {
         LivingEntity entityLiving = evt.getEntity();
         if (entityLiving.hasEffect(CarianStylePotion.GRAVITAS.get())) {
             EntityLivingUtil.setJumped(entityLiving);

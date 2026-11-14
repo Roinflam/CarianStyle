@@ -14,11 +14,10 @@ import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderHandEvent;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.client.event.RenderLivingEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.client.RenderHandEvent;
+import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
+import pers.roinflam.carianstyle.event.client.RenderLivingEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.slf4j.Logger;
@@ -29,6 +28,7 @@ import pers.roinflam.carianstyle.config.ClientVisualConfig;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 客户端火焰渲染处理器
@@ -245,7 +245,7 @@ import javax.annotation.Nullable;
  * @version 3.0
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public class ClientSyncFlameRenderer {
 
     /** 日志器：仅用于兜底熔断，正常运行不产生任何输出 */

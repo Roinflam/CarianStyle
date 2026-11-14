@@ -15,10 +15,13 @@ import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * 构建时生成的类清单：哪些类是附魔、哪些类是事件订阅类。
@@ -104,7 +107,12 @@ public final class ScanIndex {
     private static List<String> readResource(String name) {
         // 用类相对的绝对路径。NeoForge 上模组在命名模块里，会先在本模组里找；Fabric 上是整个类路径里第一个，
         // 靠目录名 META-INF/carianstyle/ 只有本模组用来避免撞名
-        try (InputStream in = ScanIndex.class.getResourceAsStream("/" + DIR + name)) {
+        InputStream found = ScanIndex.class.getResourceAsStream("/" + DIR + name);
+        if (found == null) {
+            // 1.20.1 开发环境里 common 是单独一个模块，清单在平台模块的资源里，按类相对找不到，再问类加载器
+            found = ScanIndex.class.getClassLoader().getResourceAsStream(DIR + name);
+        }
+        try (InputStream in = found) {
             if (in == null) {
                 throw new IllegalStateException("找不到类清单 " + DIR + name + "：构建没有生成，或者打包漏了");
             }
@@ -235,8 +243,39 @@ public final class ScanIndex {
         }
         // 两个文件都按原始行比，不经解析：一个清单本来就该是空的时候（还没有订阅类），不妨碍核另一个。
         // 通过了才记下，没通过的下次再取还会再核、再抛
-        verifyFreshLines(locateRoot(ScanIndex.class), readResource(ENCHANTMENTS), readResource(SUBSCRIBERS));
+        List<String> enchantmentLines = readResource(ENCHANTMENTS);
+        List<String> subscriberLines = readResource(SUBSCRIBERS);
+        verifyFreshLines(developmentRoots(enchantmentLines, subscriberLines), enchantmentLines, subscriberLines);
         devChecked = true;
+    }
+
+    /**
+     * 本类所在的根，加上清单里每个类所在的根。1.20.1 开发环境里附魔类、订阅类还在平台模块的编译输出里，
+     * 和 common 不在同一个根，只扫本类的根会把整份清单都判成多出来的。找不到类文件的跳过，重扫时自然报出来。
+     */
+    private static List<Path> developmentRoots(List<String> enchantmentLines, List<String> subscriberLines) {
+        Set<Path> roots = new LinkedHashSet<>();
+        roots.add(locateRoot(ScanIndex.class));
+        List<String> names = new ArrayList<>();
+        for (String line : enchantmentLines) {
+            names.add(stripCr(line));
+        }
+        for (String line : subscriberLines) {
+            String s = stripCr(line);
+            names.add(s.substring(s.indexOf('\t') + 1));
+        }
+        ClassLoader loader = ScanIndex.class.getClassLoader();
+        for (String name : names) {
+            if (name.isEmpty() || name.startsWith("#")) {
+                continue;
+            }
+            String entry = name.replace('.', '/') + ".class";
+            URL url = loader.getResource(entry);
+            if (url != null) {
+                roots.add(rootOf(entry, url));
+            }
+        }
+        return new ArrayList<>(roots);
     }
 
     /**
@@ -249,17 +288,22 @@ public final class ScanIndex {
 
     /** 同上，给的是清单文件的原始行（含首行）。 */
     static void verifyFreshLines(Path root, List<String> enchantmentLines, List<String> subscriberLines) {
+        verifyFreshLines(List.of(root), enchantmentLines, subscriberLines);
+    }
+
+    static void verifyFreshLines(List<Path> roots, List<String> enchantmentLines, List<String> subscriberLines) {
         ScanIndexScanner.Result actual;
+        String where = roots.stream().map(p -> p.toUri().toString()).collect(Collectors.joining("、"));
         try {
-            actual = ScanIndexScanner.scan(List.of(root));
+            actual = ScanIndexScanner.scan(roots);
         } catch (IOException e) {
-            throw new IllegalStateException("开发环境重扫模组目录 " + root.toUri() + " 出错", e);
+            throw new IllegalStateException("开发环境重扫模组目录 " + where + " 出错", e);
         }
         List<String> problems = new ArrayList<>();
         diff(problems, ENCHANTMENTS, enchantmentLines, renderEnchantments(actual.enchantments()).lines().toList());
         diff(problems, SUBSCRIBERS, subscriberLines, renderSubscribers(actual.subscribers()).lines().toList());
         if (!problems.isEmpty()) {
-            throw new IllegalStateException("类清单过期（和 " + root.toUri() + " 下的类对不上），重新经 Gradle 构建：\n  "
+            throw new IllegalStateException("类清单过期（和 " + where + " 下的类对不上），重新经 Gradle 构建：\n  "
                     + String.join("\n  ", problems));
         }
     }
@@ -294,6 +338,10 @@ public final class ScanIndex {
         if (url == null) {
             throw new IllegalStateException("开发环境自检找不到 " + entry + " 所在位置");
         }
+        return rootOf(entry, url);
+    }
+
+    private static Path rootOf(String entry, URL url) {
         Path classFile;
         try {
             URI uri = url.toURI();

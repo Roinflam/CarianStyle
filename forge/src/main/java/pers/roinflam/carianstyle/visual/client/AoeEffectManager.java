@@ -3,16 +3,14 @@ package pers.roinflam.carianstyle.visual.client;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.network.AoeEffectPacket;
-import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.client.ClientTickEvent;
 
 /**
  * 定点 AOE 自绘特效管理器（纯客户端）。
@@ -178,7 +176,7 @@ import java.util.List;
  * @author RoinFlam
  * @version 6.6
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class AoeEffectManager {
 
     /**
@@ -678,10 +676,7 @@ public final class AoeEffectManager {
      * @param event tick 事件
      */
     @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) {
-            return;
-        }
+    public static void onClientTick(ClientTickEvent.Post event) {
         Level level = Minecraft.getInstance().level;
         if (level == null) {
             ACTIVE.clear();

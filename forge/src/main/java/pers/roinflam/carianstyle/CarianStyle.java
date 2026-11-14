@@ -3,7 +3,6 @@ package pers.roinflam.carianstyle;
 import net.minecraft.client.renderer.entity.EntityRenderers;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.client.ConfigScreenHandler;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
@@ -14,11 +13,14 @@ import net.minecraftforge.fml.loading.FMLEnvironment;
 import net.minecraftforge.registries.ForgeRegistries;
 import pers.roinflam.carianstyle.config.ClothConfigScreen;
 import pers.roinflam.carianstyle.config.ConfigLoader;
-import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
+import pers.roinflam.carianstyle.bus.CarianBus;
 import pers.roinflam.carianstyle.entity.render.GlintbladesRender;
 import pers.roinflam.carianstyle.forge.forward.ForgeForwarding;
 import pers.roinflam.carianstyle.init.*;
+import pers.roinflam.carianstyle.platform.Services;
+import pers.roinflam.carianstyle.scan.CarianSubscribers;
+import pers.roinflam.carianstyle.scan.SubscriberSide;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
@@ -104,6 +106,15 @@ public class CarianStyle {
                     )
             );
 
+            // 照构建时生成的订阅清单把订阅类登记到本模组总线：先两端的，客户端再登记仅客户端的。
+            // 放在构造器最后，和平台自动登记订阅类的时机一样（模组实例建好之后），订阅类的静态初始化照旧晚于内容注册
+            LogUtil.info("卡利亚式附魔 - 正在登记事件订阅类");
+            int subscribers = CarianSubscribers.register(SubscriberSide.BOTH, CarianBus::register).size();
+            if (Services.platform().isClient()) {
+                subscribers += CarianSubscribers.register(SubscriberSide.CLIENT, CarianBus::register).size();
+            }
+            LogUtil.info("卡利亚式附魔 - 事件订阅类登记完成，共 %d 个", subscribers);
+
             LogUtil.separator();
 
         } catch (Exception e) {
@@ -121,11 +132,6 @@ public class CarianStyle {
 
         try {
             event.enqueueWork(() -> {
-                // 注册数据管理器到事件总线
-                LogUtil.info("卡利亚式附魔 - 正在注册数据管理器");
-                MinecraftForge.EVENT_BUS.register(EnchantmentDataManager.class);
-                LogUtil.debug("卡利亚式附魔 - 数据管理器注册成功");
-
                 // 注册叠层显示读取器（HUD 数据源，双端都需要；默认无读取器，接入后才显示）
                 LogUtil.info("卡利亚式附魔 - 正在注册叠层显示");
                 pers.roinflam.carianstyle.visual.CarianStyleStackDisplays.init();

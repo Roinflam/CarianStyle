@@ -5,15 +5,12 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.server.ServerStoppedEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.ServerStoppedEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
 import pers.roinflam.carianstyle.base.enchantment.EquipmentStamp;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.api.IEffectModifier;
-import pers.roinflam.carianstyle.utils.Reference;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -21,6 +18,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
+import pers.roinflam.carianstyle.event.ServerTickEvent;
 
 /**
  * 药水效果修改处理器
@@ -75,7 +74,7 @@ import java.util.WeakHashMap;
  *
  * @author RoinFlam
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@EventBusSubscriber
 public class EffectModifierHandler {
 
     /** 快照最多用这么多个服务端 tick，到了强制重扫（兜底看不出来的原地改动） */
@@ -236,10 +235,7 @@ public class EffectModifierHandler {
     }
 
     @SubscribeEvent
-    public static void onServerTick(@NotNull TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.START) {
-            return;
-        }
+    public static void onServerTick(@NotNull ServerTickEvent.Pre event) {
         long now = ++serverTick;
         if (now % MAX_AGE_TICKS == 0) {
             synchronized (CACHE_LOCK) {

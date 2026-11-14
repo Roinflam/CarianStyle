@@ -7,11 +7,10 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.event.entity.living.LivingAttackEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
+import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
+import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
@@ -25,6 +24,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
 import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
 
 import java.util.UUID;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 招架附魔
@@ -82,7 +82,7 @@ import java.util.UUID;
         customType = "SHIELD",
         slots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND}
 )
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class EnchantmentParry extends EnchantmentBase {
 
     // ==================== 可调数值（config/carianstyle/enchantment_values.json）====================
@@ -187,7 +187,8 @@ public class EnchantmentParry extends EnchantmentBase {
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.LOW)
+    // order = -1：排在顶层附魔之前：格挡反击加成先乘，暗月有加法项，先后颠倒伤害不同
+    @SubscribeEvent(priority = EventPriority.LOW, order = -1)
     public static void onLivingHurt(@NotNull LivingHurtEvent evt) {
         if (evt.getEntity().level().isClientSide) {
             return;

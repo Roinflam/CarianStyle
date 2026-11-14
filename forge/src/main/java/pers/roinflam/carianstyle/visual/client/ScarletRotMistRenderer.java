@@ -12,9 +12,8 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
+import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
@@ -26,6 +25,7 @@ import pers.roinflam.carianstyle.visual.toggle.VisualToggle;
 
 import javax.annotation.Nullable;
 import java.util.List;
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 
 /**
  * 猩红腐败「红雾」客户端渲染器（纯客户端自绘，还原艾尔登法环猩红沼泽弥漫的红色孢子雾）。
@@ -91,7 +91,7 @@ import java.util.List;
  * @author RoinFlam
  */
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, value = Dist.CLIENT)
+@EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class ScarletRotMistRenderer {
 
     /** 腐败女神附魔注册 id（与 {@code AuraDisplayRegistry} 一致，按 {@code carianstyle:<id>} 解析） */
