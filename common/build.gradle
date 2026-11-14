@@ -7,6 +7,15 @@ repositories {
     maven { url 'https://raw.githubusercontent.com/Fuzss/modresources/main/maven/' } // Forge Config API Port
 }
 
+// 构建时跑类清单扫描用的类路径（只有 ASM，扫描代码本身取 common 的编译输出）
+def asm_version = '9.7.1'
+configurations {
+    scanIndexTool {
+        canBeResolved = true
+        canBeConsumed = false
+    }
+}
+
 dependencies {
     // 不依赖 Fabric Loader 和 Architectury API：common 的编译类路径上只有原版和下面几个只给编译用的库，
     // 写了 Forge / Fabric 的类当场编译不过，平台代码漏进 common 能马上发现
@@ -26,12 +35,60 @@ dependencies {
     compileOnly "com.google.code.findbugs:jsr305:3.0.2"
     compileOnly "org.jetbrains:annotations:24.1.0"
 
+    // 类清单的扫描（scan/ScanIndexScanner）用 ASM 读类文件；两个加载器运行期都自带 ASM（Mixin 要用），只在编译时要
+    compileOnly "org.ow2.asm:asm:${asm_version}"
+    scanIndexTool "org.ow2.asm:asm:${asm_version}"
+    testImplementation "org.ow2.asm:asm:${asm_version}"
+
     // 纯逻辑的单元测试（总线、清单读取这类不碰游戏的代码）
     testImplementation platform('org.junit:junit-bom:5.10.5')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // 原版的 Guava 只在编译类路径上，总线的转发表（弱键并发表）要在单测里真跑；版本跟 1.20.1 原版一致
+    testRuntimeOnly 'com.google.guava:guava:31.1-jre'
 }
 
 test {
     useJUnitPlatform()
+}
+
+// 类清单（附魔类、事件订阅类）：用 ASM 扫编译输出，把带 @AutoRegisterEnchantment 的类和带总线订阅注解的类写成
+// META-INF/carianstyle/enchantments.list、subscribers.list，运行期照清单加载（格式见 scan/ScanIndex）。
+// 业务代码还在 forge 模块里，先扫 forge 的编译输出；整体挪进 common 那一批改成扫 common 自己的输出，
+// 那时清单可以直接进 common 的资源（Architectury 下 common 只编一次、经 shadow 打进两个平台的 jar）。
+// common 的 processResources 现在不能依赖这个任务：forge 编译要 common 的 jar，会成环。
+def scanIndexDir = layout.buildDirectory.dir('generated/scanindex')
+def scanIndexInput = project(':forge').layout.buildDirectory.dir('classes/java/main')
+
+def generateScanIndex = tasks.register('generateScanIndex', JavaExec) {
+    group = 'build'
+    description = '扫编译输出，生成附魔类、事件订阅类清单'
+    // common 先于 forge 配置，拿不到 forge 的任务对象，只能按路径写依赖
+    dependsOn ':forge:compileJava'
+
+    // 输入是整个编译输出目录：加类、删类、改名、改注解都会让任务重跑
+    inputs.dir(scanIndexInput).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName('classes')
+    outputs.dir(scanIndexDir).withPropertyName('scanIndex')
+
+    classpath = files(sourceSets.main.output.classesDirs, configurations.scanIndexTool)
+    mainClass = 'pers.roinflam.carianstyle.scan.ScanIndexScanner'
+    // 每次先清空，删掉的类不会因为旧文件留着而残留
+    doFirst {
+        scanIndexDir.get().asFile.deleteDir()
+    }
+    argumentProviders.add({
+        [scanIndexDir.get().asFile.absolutePath, scanIndexInput.get().asFile.absolutePath]
+    } as CommandLineArgumentProvider)
+}
+
+configurations {
+    scanIndexElements {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+}
+artifacts {
+    scanIndexElements(scanIndexDir) {
+        builtBy generateScanIndex
+    }
 }

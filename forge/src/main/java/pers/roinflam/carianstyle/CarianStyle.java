@@ -10,12 +10,14 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.fml.loading.FMLEnvironment;
 import net.minecraftforge.registries.ForgeRegistries;
 import pers.roinflam.carianstyle.config.ClothConfigScreen;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.entity.render.GlintbladesRender;
+import pers.roinflam.carianstyle.forge.forward.ForgeForwarding;
 import pers.roinflam.carianstyle.init.*;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
@@ -47,6 +49,7 @@ public class CarianStyle {
 
             // 获取模组事件总线
             IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+            ForgeForwarding.install(FMLEnvironment.dist, modEventBus);
 
             // 注册配置
             ModLoadingContext.get().registerConfig(

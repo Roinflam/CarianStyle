@@ -63,6 +63,20 @@ dependencies {
 
 }
 
+// 类清单（附魔类、事件订阅类）由 common 的 generateScanIndex 扫本模块的编译输出生成，打进本模块的资源
+configurations {
+    commonScanIndex {
+        canBeResolved = true
+        canBeConsumed = false
+    }
+}
+dependencies {
+    commonScanIndex project(path: ':common', configuration: 'scanIndexElements')
+}
+processResources {
+    from configurations.commonScanIndex
+}
+
 // 处理资源文件：将占位符替换为实际值
 processResources {
     // 声明输入属性，Gradle 用这些判断是否需要重新处理
