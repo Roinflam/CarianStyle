@@ -56,6 +56,9 @@ public final class FabricLogicEvents {
     /** 自测入口（只在开发运行的 selftest 源码集里，正式 jar 没有这个类）。 */
     private static final String SELFTEST_LOGIC = "pers.roinflam.carianstyle.fabric.selftest.logic.LogicSelfTest";
 
+    /** 内置数据包自测入口（同上，只在开发运行里有）。 */
+    private static final String SELFTEST_PACK = "pers.roinflam.carianstyle.fabric.selftest.pack.PackSelfTest";
+
     private FabricLogicEvents() {
     }
 
@@ -101,18 +104,29 @@ public final class FabricLogicEvents {
     }
 
     /**
-     * 开发运行带 {@code -Dcarianstyle.selftest=logic}（Gradle 用 {@code -Pcarianstyle.selftest=logic}）时挂上逻辑事件自测。
+     * 开发运行带 {@code -Dcarianstyle.selftest=<组>}（Gradle 用 {@code -Pcarianstyle.selftest=<组>}，逗号分隔）时挂上自测：
+     * {@code logic} 是逻辑事件自测，{@code pack} 是内置数据包自测。
      * 主代码编译期看不到 selftest 源码集，只能反射；不设开关时完全不碰它。
      */
     private static void installSelfTest() {
         String groups = System.getProperty("carianstyle.selftest");
-        if (groups == null || !Arrays.asList(groups.split(",")).contains("logic")) {
+        if (groups == null) {
             return;
         }
+        List<String> names = Arrays.asList(groups.split(","));
+        if (names.contains("logic")) {
+            installSelfTest("logic", SELFTEST_LOGIC);
+        }
+        if (names.contains("pack")) {
+            installSelfTest("pack", SELFTEST_PACK);
+        }
+    }
+
+    private static void installSelfTest(String group, String className) {
         try {
-            Class.forName(SELFTEST_LOGIC).getMethod("install").invoke(null);
+            Class.forName(className).getMethod("install").invoke(null);
         } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("carianstyle.selftest=logic 但找不到自测类（只在开发运行里有）", e);
+            throw new IllegalStateException("carianstyle.selftest=" + group + " 但找不到自测类（只在开发运行里有）", e);
         }
     }
 }

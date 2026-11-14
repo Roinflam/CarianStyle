@@ -48,7 +48,11 @@ import org.slf4j.LoggerFactory;
 import pers.roinflam.carianstyle.bus.CarianBus;
 import pers.roinflam.carianstyle.bus.Event;
 import pers.roinflam.carianstyle.bus.EventPriority;
+import pers.roinflam.carianstyle.base.entity.AbsorptionShield;
 import pers.roinflam.carianstyle.event.BlockDropsEvent;
+import pers.roinflam.carianstyle.event.LivingTickEvent;
+import pers.roinflam.carianstyle.platform.Platform;
+import pers.roinflam.carianstyle.platform.Services;
 import pers.roinflam.carianstyle.event.BlockEvent;
 import pers.roinflam.carianstyle.event.CriticalHitEvent;
 import pers.roinflam.carianstyle.event.EntityJoinLevelEvent;
@@ -150,6 +154,9 @@ public final class LogicSelfTest {
     private static final List<Integer> DRAGON_XP = new ArrayList<>();
     private static final StringBuilder TICK_SEQ = new StringBuilder();
     private static boolean recordTicks;
+    /** 盾上限每 tick 对账用的村民，和它这段时间收到的 LivingTickEvent 次数 */
+    private static Villager shieldTicker;
+    private static int shieldTickEvents;
 
     private LogicSelfTest() {
     }
@@ -169,6 +176,12 @@ public final class LogicSelfTest {
                 TICK_SEQ.append('>');
             }
             onTick(e.getServer());
+        });
+        // LivingTickEvent 在 Fabric 上由 common 的 MixinLivingEntityTick 发，这里只数对账村民的
+        CarianBus.on(LivingTickEvent.class, EventPriority.NORMAL, false, e -> {
+            if (shieldTicker != null && e.getEntity() == shieldTicker) {
+                shieldTickEvents++;
+            }
         });
         CarianBus.on(ServerStoppedEvent.class, EventPriority.NORMAL, false, e ->
                 OUT.info("[SELFTEST] server_stopped_event PASS server={}", e.getServer() != null));
@@ -343,6 +356,7 @@ public final class LogicSelfTest {
                 tickOrderCheck();
                 expiredCheck();
                 arrowCheck();
+                shieldTickCheck();
             } else if (tick == 90) {
                 dieFollowUp();
                 zoglinCheck();
@@ -461,7 +475,10 @@ public final class LogicSelfTest {
      */
     private static void injectionChecks() {
         Map<String, Integer> expect = new LinkedHashMap<>();
-        expect.put("net.minecraft.world.entity.LivingEntity", 12);
+        // LivingEntity：fabric 配置的 12 个，加 common 配置（carianstyle.mixins.json）合进来的 7 个：
+        // 注入 fireLivingTick、modifyEffect 两个，LivingEntityAccessor 的 5 个实例访问器
+        // （noJumpDelay、useItemRemaining 各一对读写，updatingUsingItem 调用器；静态的 DATA_HEALTH_ID 访问器不进目标类）
+        expect.put("net.minecraft.world.entity.LivingEntity", 19);
         expect.put("net.minecraft.world.entity.player.Player", 10);
         expect.put("net.minecraft.server.level.ServerPlayer", 2);
         expect.put("net.minecraft.server.players.PlayerList", 2);
@@ -478,6 +495,7 @@ public final class LogicSelfTest {
         boolean all = true;
         for (Map.Entry<String, Integer> en : expect.entrySet()) {
             int n;
+            List<String> names = new ArrayList<>();
             try {
                 Class<?> c = Class.forName(en.getKey(), true, LogicSelfTest.class.getClassLoader());
                 n = 0;
@@ -485,6 +503,7 @@ public final class LogicSelfTest {
                     // 处理器合进目标类后名字里保留原方法名；末影龙那份另有一个私有辅助方法
                     if (m.getName().contains("carianstyle$") && !m.getName().endsWith("carianstyle$post")) {
                         n++;
+                        names.add(m.getName());
                     }
                 }
             } catch (Throwable t) {
@@ -496,9 +515,14 @@ public final class LogicSelfTest {
             all &= good;
             detail.append(en.getKey().substring(en.getKey().lastIndexOf('.') + 1)).append('=').append(n)
                     .append('/').append(en.getValue()).append(' ');
+            if (!good && n >= 0) {
+                // 数对不上时把方法名列出来，方便核是多了哪几个
+                names.sort(null);
+                detail.append(names).append(' ');
+            }
         }
-        // 12 个类 25 个事件注入点 + 伤害三段和蓄力 10 个（含蓄力欠账兜底）
-        ok("injections_all_applied", all && total == 35, "total=" + total + " " + detail);
+        // 12 个类 25 个事件注入点 + 伤害三段和蓄力 10 个（含蓄力欠账兜底）+ common 配置在 LivingEntity 上的 7 个
+        ok("injections_all_applied", all && total == 42, "total=" + total + " " + detail);
     }
 
     private static void setup() {
@@ -510,6 +534,8 @@ public final class LogicSelfTest {
         }
         // 几十个测试村民叠在同一格，超过 24 个会被挤死，关掉
         level.getGameRules().getRule(GameRules.RULE_MAX_ENTITY_CRAMMING).set(0, server);
+        // spawn-npcs / spawn-animals 为 false 时，原版在第一次 tick 前就丢弃村民和猪，跨 tick 的几条会失败，先把这两项打出来
+        info("env_spawn_npcs_animals", "npcs=" + server.areNpcsEnabled() + " animals=" + server.isSpawningAnimals());
         armored = spawn(EntityType.ZOMBIE, "armored", 3);
         armored.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.DIAMOND_HELMET));
         armored.setItemSlot(EquipmentSlot.CHEST, new ItemStack(Items.DIAMOND_CHESTPLATE));
@@ -731,6 +757,47 @@ public final class LogicSelfTest {
             ok("player_absorb_zero_raised_to_5_vanilla", logHas("pl_abs_skip:damage:0.0") && eq(p.getHealth(), 15F) && eq(p.getAbsorptionAmount(), 1F),
                     log() + " hp=" + p.getHealth() + " abs=" + p.getAbsorptionAmount());
         }
+        // 伤害段之后调了 AbsorptionShield.afterAbsorb：本模组给的 10 点盾被打掉 3 点，本模组那份上限跟着缩成 7
+        {
+            reset();
+            Villager v = villager("abs_shield");
+            AbsorptionShield.grant(v, 10F);
+            v.hurt(generic(), 3F);
+            AttributeModifier shield = v.getAttribute(Attributes.MAX_ABSORPTION).getModifier(AbsorptionShield.ID);
+            double extra = shield == null ? -1.0 : shield.amount();
+            ok("absorb_shield_cap_follows_damage", logHas("abs_shield:damage:0.0") && eq(v.getHealth(), 20F)
+                            && eq(v.getAbsorptionAmount(), 7F) && Math.abs(extra - 7.0) < 1.0E-4,
+                    log() + " hp=" + v.getHealth() + " abs=" + v.getAbsorptionAmount() + " shieldCap=" + extra);
+        }
+        // 玩家走 FabricPlayerDamageMixin，伤害段之后同样要缩
+        {
+            reset();
+            TestPlayer p = player("pl_abs_shield");
+            AbsorptionShield.grant(p, 10F);
+            p.hurt(generic(), 3F);
+            AttributeModifier shield = p.getAttribute(Attributes.MAX_ABSORPTION).getModifier(AbsorptionShield.ID);
+            double extra = shield == null ? -1.0 : shield.amount();
+            ok("player_absorb_shield_cap_follows_damage", logHas("pl_abs_shield:damage:0.0") && eq(p.getHealth(), 20F)
+                            && eq(p.getAbsorptionAmount(), 7F) && Math.abs(extra - 7.0) < 1.0E-4,
+                    log() + " hp=" + p.getHealth() + " abs=" + p.getAbsorptionAmount() + " shieldCap=" + extra);
+        }
+        // 不经伤害直接把吸收改小：盾上限要靠 LivingTickEvent 的每 tick 对账缩回去，tick 40 时检查（shieldTickCheck）
+        shieldTicker = villager("abs_tick");
+        AbsorptionShield.grant(shieldTicker, 10F);
+        shieldTicker.setAbsorptionAmount(4F);
+        shieldTickEvents = 0;
+    }
+
+    /** tick 30 到 40 之间对账村民每 tick 收到一次 LivingTickEvent（不多发），盾上限已缩到当前吸收值 4 */
+    private static void shieldTickCheck() {
+        Villager v = shieldTicker;
+        AttributeModifier shield = v.getAttribute(Attributes.MAX_ABSORPTION).getModifier(AbsorptionShield.ID);
+        double extra = shield == null ? -1.0 : shield.amount();
+        int n = shieldTickEvents;
+        ok("absorb_shield_cap_follows_living_tick", n >= 5 && n <= 10 && eq(v.getAbsorptionAmount(), 4F)
+                        && Math.abs(extra - 4.0) < 1.0E-4,
+                "tickEvents=" + n + " abs=" + v.getAbsorptionAmount() + " shieldCap=" + extra + " removed=" + v.getRemovalReason()
+                        + " tickCount=" + v.tickCount);
     }
 
     // ==================== 死亡 ====================
@@ -827,7 +894,9 @@ public final class LogicSelfTest {
     private static void dieFollowUp() {
         Villager v = dieCancelled;
         ok("die_cancel_mob_still_alive_60_ticks_later", v != null && v.isAlive() && !v.isRemoved() && v.deathTime == 0,
-                v == null ? "null" : "alive=" + v.isAlive() + " removed=" + v.isRemoved() + " deathTime=" + v.deathTime + " hp=" + v.getHealth());
+                v == null ? "null" : "alive=" + v.isAlive() + " removed=" + v.isRemoved() + " reason=" + v.getRemovalReason()
+                        + " deathTime=" + v.deathTime + " hp=" + v.getHealth() + " pos=" + v.position()
+                        + " ticking=" + level.isPositionEntityTicking(v.blockPosition()) + " spawn=" + level.getSharedSpawnPos());
     }
 
     // ==================== 暴击 ====================
@@ -1028,7 +1097,32 @@ public final class LogicSelfTest {
         return 0;
     }
 
+    /**
+     * 附魔台主要物品的判定和 NeoForge 默认实现一致：书恒真；附魔书对没写主要物品的附魔（经验修补）为真，
+     * 对写了的（锋利只收剑）为假；斧头能上锋利但不是锋利的主要物品。
+     */
+    private static void primaryItemChecks() {
+        Registry<Enchantment> reg = server.registryAccess().registryOrThrow(Registries.ENCHANTMENT);
+        Holder<Enchantment> sharpness = reg.getHolderOrThrow(
+                ResourceKey.create(Registries.ENCHANTMENT, ResourceLocation.withDefaultNamespace("sharpness")));
+        Holder<Enchantment> mending = reg.getHolderOrThrow(
+                ResourceKey.create(Registries.ENCHANTMENT, ResourceLocation.withDefaultNamespace("mending")));
+        Platform platform = Services.platform();
+        boolean book = platform.isPrimaryItemFor(new ItemStack(Items.BOOK), sharpness);
+        boolean enchantedBookMending = platform.isPrimaryItemFor(new ItemStack(Items.ENCHANTED_BOOK), mending);
+        boolean enchantedBookSharpness = platform.isPrimaryItemFor(new ItemStack(Items.ENCHANTED_BOOK), sharpness);
+        boolean sword = platform.isPrimaryItemFor(new ItemStack(Items.IRON_SWORD), sharpness);
+        boolean axe = platform.isPrimaryItemFor(new ItemStack(Items.IRON_AXE), sharpness);
+        boolean axeSupported = platform.supportsEnchantment(new ItemStack(Items.IRON_AXE), sharpness);
+        ok("platform_primary_item_like_neoforge",
+                book && enchantedBookMending && !enchantedBookSharpness && sword && !axe && axeSupported,
+                "book=" + book + " enchantedBook.mending=" + enchantedBookMending
+                        + " enchantedBook.sharpness=" + enchantedBookSharpness + " sword=" + sword + " axe=" + axe
+                        + " axeSupported=" + axeSupported);
+    }
+
     private static void enchantLevelTests() {
+        primaryItemChecks();
         Registry<Enchantment> reg = server.registryAccess().registryOrThrow(Registries.ENCHANTMENT);
         ResourceKey<Enchantment> key = ResourceKey.create(Registries.ENCHANTMENT, ResourceLocation.withDefaultNamespace("sharpness"));
         Holder.Reference<Enchantment> h = reg.getHolderOrThrow(key);
@@ -1139,7 +1233,10 @@ public final class LogicSelfTest {
 
     private static void expiredCheck() {
         int n = count(MobEffectEvent.Expired.class, e -> e.getEntity() == expiring && e.getEffectInstance().is(MobEffects.MOVEMENT_SPEED));
-        ok("effect_expired_once", n == 1 && !expiring.hasEffect(MobEffects.MOVEMENT_SPEED), "events=" + n);
+        ok("effect_expired_once", n == 1 && !expiring.hasEffect(MobEffects.MOVEMENT_SPEED), "events=" + n
+                + " stillHas=" + expiring.hasEffect(MobEffects.MOVEMENT_SPEED) + " removed=" + expiring.isRemoved()
+                + " reason=" + expiring.getRemovalReason() + " tickCount=" + expiring.tickCount + " pos=" + expiring.position()
+                + " ticking=" + level.isPositionEntityTicking(expiring.blockPosition()));
     }
 
     private static void joinLeaveTests() {
@@ -1311,7 +1408,8 @@ public final class LogicSelfTest {
                         + " hp=" + arrowTarget.getHealth()
                         + " arrowPos=" + arrow.position() + " arrowRemoved=" + arrow.isRemoved()
                         + " arrowTicking=" + level.isPositionEntityTicking(arrow.blockPosition())
-                        + " targetPos=" + arrowTarget.position() + " log=" + log());
+                        + " targetPos=" + arrowTarget.position() + " targetRemoved=" + arrowTarget.getRemovalReason()
+                        + " targetTickCount=" + arrowTarget.tickCount + " log=" + log());
     }
 
     private static void zoglinCheck() {

@@ -16,6 +16,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import pers.roinflam.carianstyle.base.entity.AbsorptionShield;
 import pers.roinflam.carianstyle.bus.CarianBus;
 import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
 import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
@@ -58,13 +59,18 @@ public abstract class FabricPlayerDamageMixin {
         amount.set(event.getAmount());
     }
 
-    /** 伤害阶段：同 {@link FabricLivingEntityDamageMixin} 的伤害阶段（槽 4 存完时吸收已扣、统计已定）。 */
+    /**
+     * 伤害阶段：同 {@link FabricLivingEntityDamageMixin} 的伤害阶段（槽 4 存完时吸收已扣、统计已定），
+     * 发完同样调 {@link AbsorptionShield#afterAbsorb}。
+     */
     @ModifyVariable(method = "actuallyHurt", at = @At("STORE"), ordinal = 2)
     private float carianstyle$damageStage(float absorbed,
                                           @Local(argsOnly = true) DamageSource source,
                                           @Local(argsOnly = true) LocalFloatRef amount) {
-        LivingDamageEvent event = CarianBus.post(new LivingDamageEvent((Player) (Object) this, source, amount.get()));
+        Player self = (Player) (Object) this;
+        LivingDamageEvent event = CarianBus.post(new LivingDamageEvent(self, source, amount.get()));
         amount.set(event.isCanceled() ? 0.0F : event.getAmount());
+        AbsorptionShield.afterAbsorb(self);
         return absorbed;
     }
 

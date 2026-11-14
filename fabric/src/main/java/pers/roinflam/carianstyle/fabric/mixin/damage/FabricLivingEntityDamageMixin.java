@@ -12,6 +12,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import pers.roinflam.carianstyle.base.entity.AbsorptionShield;
 import pers.roinflam.carianstyle.bus.CarianBus;
 import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
 import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
@@ -73,16 +74,18 @@ public abstract class FabricLivingEntityDamageMixin {
      * 这时第一次 {@code setAbsorptionAmount}（偏移 45）已经扣过吸收、统计 {@code DAMAGE_DEALT_ABSORBED}
      * 按「槽 3 − 槽 2」已经定了，后面只剩「amount 为 0 就跳过」和扣血，改 amount 不会把统计带歪。
      * 全被吸收时照样发（值为 0）；取消 = 置 0，原版 {@code if (amount != 0)} 自然跳过扣血。
-     * 伤害段之后的吸收上限收尾（{@code AbsorptionShield.afterAbsorb}）不在这里调，由业务代码那一批接上。
+     * 发完调一次 {@link AbsorptionShield#afterAbsorb}：吸收被打掉一部分后，把本模组加的吸收上限缩回去
+     * （同 NeoForge 的 {@code DamageStages.damage}）。
      * </p>
      */
     @ModifyVariable(method = "actuallyHurt", at = @At("STORE"), ordinal = 2)
     private float carianstyle$damageStage(float absorbed,
                                           @Local(argsOnly = true) DamageSource source,
                                           @Local(argsOnly = true) LocalFloatRef amount) {
-        LivingDamageEvent event = CarianBus.post(
-                new LivingDamageEvent((LivingEntity) (Object) this, source, amount.get()));
+        LivingEntity self = (LivingEntity) (Object) this;
+        LivingDamageEvent event = CarianBus.post(new LivingDamageEvent(self, source, amount.get()));
         amount.set(event.isCanceled() ? 0.0F : event.getAmount());
+        AbsorptionShield.afterAbsorb(self);
         return absorbed;
     }
 

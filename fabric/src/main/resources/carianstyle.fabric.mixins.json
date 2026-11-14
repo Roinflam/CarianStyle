@@ -3,7 +3,12 @@
   "minVersion": "0.8",
   "package": "pers.roinflam.carianstyle.fabric.mixin",
   "compatibilityLevel": "JAVA_21",
-  "mixins": [],
+  "mixins": [
+    "entity.FabricEntityPersistentDataMixin",
+    "pack.FabricMinecraftServerReloadMixin",
+    "pack.FabricPackRepositoryMixin",
+    "pack.PackRepositoryInvoker"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
