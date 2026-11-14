@@ -87,7 +87,8 @@ processResources {
             mod_author            : rootProject.mod_author,
             mod_license           : rootProject.mod_license,
             minecraft_version     : rootProject.minecraft_version,
-            fabric_loader_version : rootProject.fabric_loader_version
+            fabric_loader_version : rootProject.fabric_loader_version,
+            fabric_api_version    : rootProject.fabric_api_version
     ]
     inputs.properties props
     filesMatching('fabric.mod.json') {

@@ -8,6 +8,7 @@
 [![Modrinth Downloads](https://img.shields.io/modrinth/dt/carianstyle?style=for-the-badge&logo=modrinth&label=Modrinth)](https://modrinth.com/mod/carianstyle)
 [![MC Version](https://img.shields.io/badge/Minecraft-1.21.1-brightgreen?style=for-the-badge&logo=minecraft)](https://minecraft.net)
 [![NeoForge](https://img.shields.io/badge/NeoForge-21.1.265+-orange?style=for-the-badge)](https://projects.neoforged.net/neoforged/neoforge)
+[![Fabric](https://img.shields.io/badge/Fabric-0.16.14+-dbd0b4?style=for-the-badge)](https://fabricmc.net)
 [![License](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey?style=for-the-badge)](LICENSE)
 
 [![GitHub](https://img.shields.io/badge/GitHub-Roinflam-181717?style=for-the-badge&logo=github)](https://github.com/Roinflam)
@@ -26,16 +27,24 @@ This is the **1.21.1** branch. The other Minecraft versions are on the [`1.20.1`
 
 ### Versions
 
-| | 1.21.1 | 1.20.1 | 1.12.2 |
-|---|---|---|---|
-| Loader / Java | NeoForge 21.1.265 or newer, Java 21 | Forge 47.x, Java 17 | Forge 14.23.5.2855 or newer, Java 8 |
-| Install on | Client and server | Client and server | Client and server |
-| Dependencies | None (Cloth Config API for the config screen is bundled) | None (Cloth Config API for the config screen is bundled) | None (uses Forge's built-in config screen) |
-| Enchantment Codex (`K`) | Yes | Yes | Yes |
+| | 1.21.1 NeoForge | 1.21.1 Fabric | 1.20.1 | 1.12.2 |
+|---|---|---|---|---|
+| Loader / Java | NeoForge 21.1.265 or newer, Java 21 | Fabric Loader 0.16.14 or newer, Java 21 | Forge 47.x, Java 17 | Forge 14.23.5.2855 or newer, Java 8 |
+| Install on | Client and server | Client and server | Client and server | Client and server |
+| Dependencies | None (Cloth Config API for the config screen is bundled) | Fabric API 0.116.18 or newer | None (Cloth Config API for the config screen is bundled) | None (uses Forge's built-in config screen) |
+| Enchantment Codex (`K`) | Yes | Yes | Yes | Yes |
 
 Config files: `config/carianstyle-common.toml` (`config/carianstyle-common.cfg` on 1.12.2), plus `config/carianstyle/enchantment_values.json` for every enchantment's numbers.
 
-All three versions have the same enchantments, numbers, effects and codex; on 1.21.1 and 1.12.2 a few edge cases follow that version's game rules.
+All versions have the same enchantments, numbers, effects and codex. On 1.21.1 and 1.12.2 a few edge cases follow that version's game rules.
+
+### Fabric version
+
+- Requires Fabric API. Forge Config API Port, which reads the config files, and Cloth Config API, which provides the config screen, are bundled and need no separate installation.
+- Mod Menu is optional. With Mod Menu installed, the config screen opens from its mod list. Without it, the mod works normally and the config files can be edited directly.
+- The config files have the same names and format as on NeoForge.
+- Fabric and NeoForge cannot connect to each other. Clients and servers must use the same loader.
+- A few behaviors differ from the NeoForge version. The full list is in the release notes.
 
 ### Enchantment types
 
@@ -271,7 +280,7 @@ Press `K` in game (rebindable in Controls) to open the codex:
 
 ### For server owners and modpack makers
 
-- **Config screen:** select CarianStyle in the Mods list and click *Config*, or edit `config/carianstyle-common.toml` directly.
+- **Config screen:** select CarianStyle in the Mods list and click *Config*, or edit `config/carianstyle-common.toml` directly. On Fabric, the Mods list is provided by Mod Menu.
 - **Disable enchantments:** add their IDs (e.g. `doomed_death`) to the disable list.
 - **Tune numbers:** `config/carianstyle/enchantment_values.json` lists every number of every enchantment with its allowed range. In single player, press *Reload values* in the codex to apply changes right away; on a server, restart it. Values the client needs for drawing (such as the size of a range circle) are synced to players when they join. Description texts do not change automatically, so update the language file if you want them to match.
 - **How hard they are to get:** turn a whole rarity tier into treasure enchantments, change the enchanting-table difficulty multiplier, choose whether rarity weights apply, and allow or block villager trades.
@@ -288,7 +297,7 @@ Press `K` for the in-game codex. MC百科 (mcmod.cn) also has a page for every e
 Most effects are percentage-based, so they stay balanced with modded weapons. Conflicts are shown in the in-game codex.
 
 **Do servers need it?**
-Yes, install it on both the client and the server.
+Yes, install it on both the client and the server. On Fabric, a client with the mod can still join a server without it, but the enchantments have no effect there.
 
 **Can I put it in a modpack?**
 Yes, no need to ask. Please credit the author; commercial use is not allowed (see the license below).
@@ -298,6 +307,7 @@ Yes, no need to ask. Please credit the author; commercial use is not allowed (se
 - Licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/): free to use, modify and include in modpacks; no commercial use; redistributed or modified versions must credit the original author (Roinflam), state what was changed, and use the same license.
 - ELDEN RING is a trademark of FromSoftware, Inc. / BANDAI NAMCO Entertainment Inc. The names, concepts and artwork from Elden Ring referenced in this mod belong to their respective owners. This is an unofficial fan-made mod and is not affiliated with or endorsed by them.
 - The 1.20.1 and 1.21.1 versions bundle [Cloth Config API](https://github.com/shedaniel/cloth-config) by shedaniel (GNU LGPLv3), unmodified, only for the config screen.
+- The 1.21.1 Fabric version also bundles [Forge Config API Port](https://github.com/Fuzss/forgeconfigapiport) by Fuzss, unmodified, to read the config files. It is licensed under MPL-2.0. The classes it takes from Forge / NeoForge are licensed under LGPL-2.1-only, and the [Night Config](https://github.com/TheElectronWill/night-config) library by TheElectronWill that it includes is licensed under LGPL-3.0.
 
 </details>
 
@@ -308,16 +318,24 @@ Yes, no need to ask. Please credit the author; commercial use is not allowed (se
 
 ### 版本须知
 
-| | 1.21.1 | 1.20.1 | 1.12.2 |
-|---|---|---|---|
-| 加载器与 Java | NeoForge 21.1.265 及以上，Java 21 | Forge 47.x，Java 17 | Forge 14.23.5.2855 及以上，Java 8 |
-| 安装位置 | 客户端和服务端都要装 | 客户端和服务端都要装 | 客户端和服务端都要装 |
-| 前置模组 | 无（配置界面用到的 Cloth Config API 已内置） | 无（配置界面用到的 Cloth Config API 已内置） | 无（配置界面用 Forge 自带的） |
-| 附魔百科（`K` 键） | 有 | 有 | 有 |
+| | 1.21.1 NeoForge | 1.21.1 Fabric | 1.20.1 | 1.12.2 |
+|---|---|---|---|---|
+| 加载器与 Java | NeoForge 21.1.265 及以上，Java 21 | Fabric Loader 0.16.14 及以上，Java 21 | Forge 47.x，Java 17 | Forge 14.23.5.2855 及以上，Java 8 |
+| 安装位置 | 客户端和服务端都要装 | 客户端和服务端都要装 | 客户端和服务端都要装 | 客户端和服务端都要装 |
+| 前置模组 | 无（配置界面用到的 Cloth Config API 已内置） | Fabric API 0.116.18 及以上 | 无（配置界面用到的 Cloth Config API 已内置） | 无（配置界面用 Forge 自带的） |
+| 附魔百科（`K` 键） | 有 | 有 | 有 | 有 |
 
 配置文件：`config/carianstyle-common.toml`（1.12.2 版是 `config/carianstyle-common.cfg`），各附魔数值在 `config/carianstyle/enchantment_values.json`。
 
-三个版本的附魔、数值、特效和附魔百科都相同；1.21.1 版和 1.12.2 版少数细节按各自版本的游戏规则处理。
+各版本的附魔、数值、特效和附魔百科都相同。1.21.1 版和 1.12.2 版少数细节按各自版本的游戏规则处理。
+
+### Fabric 版
+
+- 必须安装 Fabric API。读取配置文件用的 Forge Config API Port 和提供配置界面的 Cloth Config API 均已内置，无需另装。
+- Mod Menu 为可选前置。安装后可从其模组列表打开配置界面。不安装也能正常游戏，配置可直接修改配置文件。
+- 配置文件的名称和格式与 NeoForge 版相同。
+- Fabric 版与 NeoForge 版不能互相联机，客户端与服务端须使用同一加载器。
+- 少数行为与 NeoForge 版不同，完整列表见更新日志。
 
 ### 附魔分类
 
@@ -553,7 +571,7 @@ Yes, no need to ask. Please credit the author; commercial use is not allowed (se
 
 ### 给服主和整合包作者
 
-- **配置界面**：在「模组」列表中选中卡利亚式附魔，点「配置」打开；也可以直接改 `config/carianstyle-common.toml`；
+- **配置界面**：在「模组」列表中选中卡利亚式附魔，点「配置」打开；也可以直接改 `config/carianstyle-common.toml`。Fabric 版的模组列表由 Mod Menu 提供；
 - **禁用附魔**：在配置的禁用列表里填附魔 ID（如 `doomed_death`），对应附魔就不会再出现；
 - **调整数值**：`config/carianstyle/enchantment_values.json` 列出了每个附魔的全部数值和允许范围，单人游戏里改完在附魔百科点「重载数值」即可生效，服务器改完后重启生效；客户端绘制要用到的数值（如范围圈大小）会在玩家进服时自动同步。附魔说明文字不会跟着改，需要的话请同步修改语言文件；
 - **获取难度**：可以把某一档稀有度的附魔全部改成宝藏附魔，调整附魔台难度倍率，选择是否按稀有度加权，以及是否允许村民交易；
@@ -570,7 +588,7 @@ Yes, no need to ask. Please credit the author; commercial use is not allowed (se
 大部分效果按伤害或生命值的百分比计算，配合其他模组的武器也能保持平衡。冲突关系以游戏内百科显示的为准。
 
 **服务器要装吗？**
-客户端和服务端都要装。
+客户端和服务端都要装。Fabric 版客户端可以进入没有安装本模组的服务器，但附魔在该服务器上不生效。
 
 **可以加进整合包吗？**
 可以，无需另行询问；请注明原作者，不得用于商业用途（见下方许可协议）。
@@ -579,6 +597,7 @@ Yes, no need to ask. Please credit the author; commercial use is not allowed (se
 
 - 本模组采用 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans)（知识共享 署名-非商业性使用-相同方式共享 4.0 国际）协议：可以免费使用、修改、加入整合包；不得用于商业用途；转载或发布修改版需署名原作者 Roinflam、注明改动，并沿用同一协议；
 - 《艾尔登法环》相关名称、设定与美术素材的版权归 FromSoftware / BANDAI NAMCO 所有，本模组为非官方同人作品，与其无关联；
-- 1.20.1 和 1.21.1 版内置 shedaniel 的 [Cloth Config API](https://github.com/shedaniel/cloth-config)（GNU LGPLv3），未作修改，只用于配置界面。
+- 1.20.1 和 1.21.1 版内置 shedaniel 的 [Cloth Config API](https://github.com/shedaniel/cloth-config)（GNU LGPLv3），未作修改，只用于配置界面；
+- 1.21.1 Fabric 版另内置 Fuzss 的 [Forge Config API Port](https://github.com/Fuzss/forgeconfigapiport)，未作修改，用于读取配置文件。该库采用 MPL-2.0 许可，其中取自 Forge / NeoForge 的类采用 LGPL-2.1-only 许可，其附带的 TheElectronWill 的 [Night Config](https://github.com/TheElectronWill/night-config) 采用 LGPL-3.0 许可。
 
 </details>
