@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${version}",
+  "name": "${mod_name}",
+  "description": "Carian Style!",
+  "authors": ["${mod_author}"],
+  "contact": {
+    "homepage": "https://www.curseforge.com/minecraft/mc-mods/carianstyle"
+  },
+  "license": "${mod_license}",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["pers.roinflam.carianstyle.fabric.CarianStyleFabric"],
+    "client": ["pers.roinflam.carianstyle.fabric.CarianStyleFabricClient"],
+    "modmenu": ["pers.roinflam.carianstyle.fabric.ModMenuIntegration"]
+  },
+  "mixins": [
+    "carianstyle.fabric.mixins.json",
+    "carianstyle.fabric.logic.mixins.json",
+    "carianstyle.fabric.client.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${fabric_loader_version}",
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}",
+    "java": ">=17"
+  },
+  "suggests": {
+    "modmenu": "*"
+  }
+}

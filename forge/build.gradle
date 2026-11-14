@@ -3,11 +3,6 @@ plugins {
     id 'com.github.johnrengelman.shadow'
 }
 
-// ========== 额外的 Maven 仓库 ==========
-repositories {
-    maven { url 'https://maven.blamejared.com' }
-}
-
 // Loom 的 Forge 平台特有配置
 loom {
     forge {
@@ -51,10 +46,12 @@ dependencies {
     // ==================== API 依赖（按需启用） ====================
 
     //     Cloth Config：配置界面 API，用于创建游戏内配置菜单
-    modApi "me.shedaniel.cloth:cloth-config-forge:11.1.136"
-    include "me.shedaniel.cloth:cloth-config-forge:11.1.136"
+    modApi "me.shedaniel.cloth:cloth-config-forge:${rootProject.cloth_version}"
+    include "me.shedaniel.cloth:cloth-config-forge:${rootProject.cloth_version}"
 
-    modApi "net.darkhax.bookshelf:Bookshelf-Forge-1.20.1:20.2.13"
+    // Forge 47 不带 MixinExtras，以 jar-in-jar 内嵌（加载时自己初始化）
+    compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:${rootProject.mixinextras_version}"))
+    implementation(include("io.github.llamalad7:mixinextras-forge:${rootProject.mixinextras_version}"))
 
     // ==================== Common 模块（必需） ====================
 
@@ -63,14 +60,6 @@ dependencies {
 
     // 将 common 模块的代码打包进最终 jar
     shadowBundle project(path: ':common', configuration: 'transformProductionForge')
-
-    // ==================== 本地 jar 依赖（可选） ====================
-
-//     加载 forge/dependencies/ 文件夹里的所有 jar 文件
-//     适合放一些没有发布到 Maven 仓库的库
-    fileTree(dir: 'libs', include: '*.jar').each { File file ->
-        modApi(files(file))
-    }
 
 }
 

@@ -7,6 +7,14 @@ architectury {
     fabric()
 }
 
+// 自测代码单独一个源码集：开发环境运行时在类路径上（和主代码算同一个模组），不进 jar
+sourceSets {
+    selftest {
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    }
+}
+
 configurations {
     common {
         canBeResolved = true
@@ -16,30 +24,85 @@ configurations {
     runtimeClasspath.extendsFrom common
     developmentFabric.extendsFrom common
 
-    // Files in this configuration will be bundled into your mod using the Shadow plugin.
-    // Don't use the `shadow` configuration from the plugin itself as it's meant for excluding files.
+    // 打进 jar 的 common 代码走这里（插件自带的 shadow 配置是拿来排除文件的，别混用）
     shadowBundle {
         canBeResolved = true
         canBeConsumed = false
     }
 }
 
+repositories {
+    maven { url 'https://raw.githubusercontent.com/Fuzss/modresources/main/maven/' } // Forge Config API Port
+    maven { url 'https://maven.terraformersmc.com/releases/' }                        // Mod Menu
+}
+
 dependencies {
-    modImplementation "net.fabricmc:fabric-loader:$rootProject.fabric_loader_version"
+    modImplementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
 
-    modImplementation "net.fabricmc.fabric-api:fabric-api:$rootProject.fabric_api_version"
+    // Cloth Config：jar-in-jar 内嵌，玩家不用另装
+    modApi("me.shedaniel.cloth:cloth-config-fabric:${rootProject.cloth_version}") {
+        exclude group: 'net.fabricmc.fabric-api'
+    }
+    include "me.shedaniel.cloth:cloth-config-fabric:${rootProject.cloth_version}"
 
-    modImplementation "dev.architectury:architectury-fabric:$rootProject.architectury_api_version"
+    // Forge Config API Port：提供 net.minecraftforge.common.ForgeConfigSpec，jar-in-jar 内嵌
+    modImplementation("fuzs.forgeconfigapiport:forgeconfigapiport-fabric:${rootProject.fcap_version}") {
+        exclude group: 'net.fabricmc.fabric-api'
+    }
+    include "fuzs.forgeconfigapiport:forgeconfigapiport-fabric:${rootProject.fcap_version}"
+
+    // Mod Menu：只编译 ModMenuApi 入口，不打包、开发环境也不装
+    modCompileOnly("com.terraformersmc:modmenu:${rootProject.modmenu_version}") { transitive = false }
 
     common(project(path: ':common', configuration: 'namedElements')) { transitive false }
     shadowBundle project(path: ':common', configuration: 'transformProductionFabric')
 }
 
-processResources {
-    inputs.property 'version', project.version
+// loom 闭包里 rootProject 会被解析到别的对象上，先取成局部变量
+def modId = rootProject.mod_id
+// 开发运行时开自测：gradle :fabric:runServer -Pcarianstyle.selftest=<组>
+// （Gradle 命令行的 -D 只进 Gradle 自己的 JVM，传不到游戏进程，所以经项目属性转一道）
+def selftestGroup = project.findProperty('carianstyle.selftest')
 
+loom {
+    mods {
+        "${modId}" {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.selftest
+        }
+    }
+    runs {
+        if (selftestGroup) {
+            configureEach {
+                vmArg "-Dcarianstyle.selftest=${selftestGroup}"
+            }
+        }
+        client {
+            runDir 'run/client'
+            source sourceSets.selftest
+        }
+        server {
+            runDir 'run/server'
+            source sourceSets.selftest
+            programArgs '--nogui'
+        }
+    }
+}
+
+processResources {
+    var props = [
+            mod_id               : rootProject.mod_id,
+            mod_name             : rootProject.mod_name,
+            version              : project.version,
+            mod_author           : rootProject.mod_author,
+            mod_license          : rootProject.mod_license,
+            minecraft_version    : rootProject.minecraft_version,
+            fabric_loader_version: rootProject.fabric_loader_version
+    ]
+    inputs.properties props
     filesMatching('fabric.mod.json') {
-        expand version: project.version
+        expand props
     }
 }
 

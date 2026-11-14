@@ -2,11 +2,36 @@ architectury {
     common rootProject.enabled_platforms.split(',')
 }
 
-dependencies {
-    // We depend on Fabric Loader here to use the Fabric @Environment annotations,
-    // which get remapped to the correct annotations on each platform.
-    // Do NOT use other classes from Fabric Loader.
-    modImplementation "net.fabricmc:fabric-loader:$rootProject.fabric_loader_version"
+repositories {
+    maven { url 'https://repo.spongepowered.org/repository/maven-public/' }          // Mixin 注解
+    maven { url 'https://raw.githubusercontent.com/Fuzss/modresources/main/maven/' } // Forge Config API Port
+}
 
-    modImplementation "dev.architectury:architectury:$rootProject.architectury_api_version"
+dependencies {
+    // 不依赖 Fabric Loader 和 Architectury API：common 的编译类路径上只有原版和下面几个只给编译用的库，
+    // 写了 Forge / Fabric 的类当场编译不过，平台代码漏进 common 能马上发现
+
+    // Mixin、MixinExtras 只要注解；运行期 Fabric Loader 两个都自带，Forge 自带 Mixin、MixinExtras 由 forge 模块内嵌
+    compileOnly "org.spongepowered:mixin:${rootProject.mixin_version}"
+    compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:${rootProject.mixinextras_version}"))
+
+    // ForgeConfigSpec 两边类名相同（Forge 自带，Fabric 由 Forge Config API Port 提供）。
+    // FCAP 的 common 工件只带配置那几个类和 Night Config，Forge 的其他类照样不在类路径上
+    compileOnly "fuzs.forgeconfigapiport:forgeconfigapiport-common:${rootProject.fcap_version}"
+
+    // Cloth 的 common 工件是 intermediary 名，modCompileOnly 让 Loom 重映射成 Mojang 名；运行期由两个平台各自内嵌
+    modCompileOnly("me.shedaniel.cloth:cloth-config:${rootProject.cloth_version}") { transitive = false }
+
+    // @Nonnull / @Nullable 和 jetbrains 注解在代码里用得很多，原版类路径带不带不去赌，显式写上
+    compileOnly "com.google.code.findbugs:jsr305:3.0.2"
+    compileOnly "org.jetbrains:annotations:24.1.0"
+
+    // 纯逻辑的单元测试（总线、清单读取这类不碰游戏的代码）
+    testImplementation platform('org.junit:junit-bom:5.10.5')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
 }
