@@ -332,7 +332,7 @@ Yes, no need to ask. Please credit the author; commercial use is not allowed (se
 ### Fabric 版
 
 - 必须安装 Fabric API。读取配置文件用的 Forge Config API Port 和提供配置界面的 Cloth Config API 均已内置，无需另装。
-- Mod Menu 为可选前置。安装后可从其模组列表打开配置界面。不安装也能正常游戏，配置可直接修改配置文件。
+- Mod Menu 为可选前置。安装后可从其模组列表打开配置界面。不安装也能正常游戏，可直接修改配置文件。
 - 配置文件的名称和格式与 NeoForge 版相同。
 - Fabric 版与 NeoForge 版不能互相联机，客户端与服务端须使用同一加载器。
 - 少数行为与 NeoForge 版不同，完整列表见更新日志。
