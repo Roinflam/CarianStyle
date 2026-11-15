@@ -5,7 +5,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
@@ -733,7 +733,7 @@ public final class CarianStyleStackDisplays {
         if (cached != null) {
             return cached;
         }
-        Enchantment resolved = ForgeRegistries.ENCHANTMENTS.getValue(new ResourceLocation(Reference.MOD_ID, enchId));
+        Enchantment resolved = BuiltInRegistries.ENCHANTMENT.get(new ResourceLocation(Reference.MOD_ID, enchId));
         if (resolved != null) {
             ENCHANTMENT_ID_CACHE.put(enchId, resolved);
         }

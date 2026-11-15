@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.utils.helper.task;
 
+import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 
 import javax.annotation.Nonnull;
@@ -10,7 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import pers.roinflam.carianstyle.event.ServerTickEvent;
-import pers.roinflam.carianstyle.bus.CarianBus;
 
 /**
  * 同步任务调度器
@@ -55,8 +55,15 @@ import pers.roinflam.carianstyle.bus.CarianBus;
  * 3. 保留 v2.1 的 Iterator.remove() 优化。
  * </p>
  *
+ * <p>
+ * 服务器 tick 的监听是本类的静态方法，随订阅清单在启动时登记，转给内部的任务管理器。
+ * 以前是第一次加任务时才把管理器实例挂上总线；现在常驻，但第一次加任务之前一进来就返回，
+ * 什么都不做（见 {@link #onServerTick}）。
+ * </p>
+ *
  * @version 3.0
  */
+@EventBusSubscriber
 public abstract class SynchronizationTask implements Runnable {
 
     // ==================== 常量 ====================
@@ -237,6 +244,17 @@ public abstract class SynchronizationTask implements Runnable {
     }
 
     /**
+     * 服务器 tick 开头处理到期的任务（转给任务管理器）。
+     * <p>
+     * 同档排在本模组其它监听之后（类名排序在 {@code DamageOverTimeManager} 之后），和以前运行期挂上时的位置一样。
+     * </p>
+     */
+    @SubscribeEvent
+    public static void onServerTick(@Nonnull ServerTickEvent.Pre evt) {
+        MANAGER.onServerTick(evt);
+    }
+
+    /**
      * 全局任务管理器
      * <p>
      * v3.0核心优化：新增 nextTickQueue 快速通道
@@ -262,7 +280,10 @@ public abstract class SynchronizationTask implements Runnable {
          */
         private final Queue<SynchronizationTask> nextTickQueue = new ConcurrentLinkedQueue<>();
 
-        /** 是否已注册到事件总线 */
+        /**
+         * 加过任务没有。服务器 tick 的监听在启动时就登记了，这个标记为假时它直接返回，
+         * 和以前「第一次加任务才挂上总线」一样，之前的 tick 什么都不做。
+         */
         private volatile boolean registered = false;
 
         /** 累计处理的nextTick任务数（统计用） */
@@ -313,12 +334,11 @@ public abstract class SynchronizationTask implements Runnable {
         }
 
         /**
-         * 确保已注册到事件总线（只注册一次）
+         * 标记已经有过任务，之后的服务器 tick 开始处理
          */
-        private synchronized void ensureRegistered() {
+        private void ensureRegistered() {
             if (!registered) {
                 registered = true;
-                CarianBus.register(this);
             }
         }
 
@@ -329,8 +349,10 @@ public abstract class SynchronizationTask implements Runnable {
          * nextTickQueue中的任务执行后自动释放，不需要额外的remove操作。
          * </p>
          */
-        @SubscribeEvent
-        public void onServerTick(@Nonnull ServerTickEvent.Pre evt) {
+        void onServerTick(@Nonnull ServerTickEvent.Pre evt) {
+            if (!registered) {
+                return;
+            }
 
             // ========== 阶段1：处理 nextTickQueue 快速通道 ==========
             int nextTickCount = 0;

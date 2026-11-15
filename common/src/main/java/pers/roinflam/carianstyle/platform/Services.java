@@ -25,6 +25,7 @@ public final class Services {
 
     private static volatile Platform platform;
     private static volatile PlatformRegistry registry;
+    private static volatile PlatformNetwork network;
     private static volatile ClientPlatform client;
 
     private Services() {
@@ -54,6 +55,19 @@ public final class Services {
             }
         }
         return r;
+    }
+
+    public static PlatformNetwork network() {
+        PlatformNetwork n = network;
+        if (n == null) {
+            synchronized (Services.class) {
+                n = network;
+                if (n == null) {
+                    network = n = load(PlatformNetwork.class);
+                }
+            }
+        }
+        return n;
     }
 
     /**

@@ -1,9 +1,6 @@
 package pers.roinflam.carianstyle.config;
 
 import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.config.ModConfigEvent;
 import org.apache.commons.lang3.tuple.Pair;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.LevelDecay;
@@ -60,7 +57,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * @author RoinFlam
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class ConfigLoader {
 
     // ==================== 配置规范 ====================
@@ -680,25 +676,10 @@ public final class ConfigLoader {
     }
 
     /**
-     * 配置加载事件监听器
-     * Config loading event listener
+     * 配置文件加载或重载完成后由平台入口调用（Forge 的配置事件、Fabric 上 Forge Config API Port 的回调）。
      */
-    @SubscribeEvent
-    public static void onConfigLoading(ModConfigEvent.Loading event) {
-        if (event.getConfig().getModId().equals(Reference.MOD_ID)) {
-            bake();
-        }
-    }
-
-    /**
-     * 配置重载事件监听器
-     * Config reloading event listener
-     */
-    @SubscribeEvent
-    public static void onConfigReloading(ModConfigEvent.Reloading event) {
-        if (event.getConfig().getModId().equals(Reference.MOD_ID)) {
-            bake();
-        }
+    public static void onLoaded() {
+        bake();
     }
 
     // 私有构造函数，防止实例化

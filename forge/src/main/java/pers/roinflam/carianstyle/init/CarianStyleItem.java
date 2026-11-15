@@ -2,11 +2,11 @@ package pers.roinflam.carianstyle.init;
 
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Tiers;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
+import net.minecraft.core.registries.Registries;
+import pers.roinflam.carianstyle.CarianContent;
 import pers.roinflam.carianstyle.item.entity.ItemGlintblades;
-import pers.roinflam.carianstyle.utils.Reference;
+
+import java.util.function.Supplier;
 
 /**
  * 模组物品注册类
@@ -17,19 +17,13 @@ import pers.roinflam.carianstyle.utils.Reference;
 public class CarianStyleItem {
 
     /**
-     * 物品延迟注册器
-     */
-    public static final DeferredRegister<Item> ITEMS =
-            DeferredRegister.create(ForgeRegistries.ITEMS, Reference.MOD_ID);
-
-    /**
      * 魔法辉剑物品
      * <p>
      * 用于渲染 EntityGlintblades 实体
      * </p>
      */
-    public static final RegistryObject<ItemGlintblades> GLINTBLADES =
-            ITEMS.register("glintblades", () ->
+    public static final Supplier<ItemGlintblades> GLINTBLADES =
+            CarianContent.register(Registries.ITEM, "glintblades", () ->
                     new ItemGlintblades(
                             Tiers.DIAMOND,
                             new Item.Properties()

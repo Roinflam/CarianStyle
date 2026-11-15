@@ -1,10 +1,8 @@
 package pers.roinflam.carianstyle.network;
 
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.network.NetworkEvent;
 import pers.roinflam.carianstyle.visual.client.CombatArtEffectManager;
 
-import java.util.function.Supplier;
 
 /**
  * 战技（COMBAT_SKILL）自绘特效触发包（S2C，服务端 -> 客户端）。
@@ -89,8 +87,8 @@ import java.util.function.Supplier;
  * <b>线格式没有变化</b>，新旧端可互通；各上限取的都是正常游戏绝不可能触及的量级。
  * </p>
  * <p>
- * <b>方向声明：</b>本包已在 {@code VisualNetwork} 注册时声明为
- * {@code NetworkDirection.PLAY_TO_CLIENT}。服务端收到反向包会被 Forge 在分发入口
+ * <b>方向声明：</b>本包已在 {@link CarianNetwork} 里登记为只许服务端发往客户端
+ * （{@code NetworkDirection.PLAY_TO_CLIENT}）。服务端收到反向包会被 Forge 在分发入口
  * 直接拒绝，处理器根本不会进入——这从源头消除了下方 {@link #handle} 注释里提到的
  * 「服务端引用 {@code @OnlyIn(CLIENT)} 类」的顾虑，比 {@code DistExecutor} 更彻底。
  * </p>
@@ -427,12 +425,9 @@ public class CombatArtEffectPacket {
      * </p>
      *
      * @param packet 收到的包
-     * @param ctx    网络上下文
      */
-    public static void handle(CombatArtEffectPacket packet, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() ->
-                CombatArtEffectManager.spawn(packet.type, packet.x, packet.y, packet.z,
-                        packet.radius, packet.yaw));
-        ctx.get().setPacketHandled(true);
+    public static void handle(CombatArtEffectPacket packet) {
+        CombatArtEffectManager.spawn(packet.type, packet.x, packet.y, packet.z,
+                packet.radius, packet.yaw);
     }
 }

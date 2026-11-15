@@ -2,17 +2,16 @@ package pers.roinflam.carianstyle.init;
 
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
+import net.minecraft.core.registries.Registries;
+import pers.roinflam.carianstyle.CarianContent;
 import pers.roinflam.carianstyle.platform.CustomEnchantCategory;
 import pers.roinflam.carianstyle.platform.Services;
-import pers.roinflam.carianstyle.utils.Reference;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * 模组附魔注册类
@@ -48,17 +47,6 @@ import java.util.Set;
  */
 public class CarianStyleEnchantments {
 
-    // ==================== DeferredRegister ====================
-
-    /**
-     * 附魔注册器
-     * <p>
-     * 必须在模组主类中将此注册器挂载到事件总线
-     * </p>
-     */
-    public static final DeferredRegister<Enchantment> ENCHANTMENTS_REGISTER =
-            DeferredRegister.create(ForgeRegistries.ENCHANTMENTS, Reference.MOD_ID);
-
     // ==================== 自定义附魔类型 ====================
 
     // 判定在 CustomEnchantCategory 里；这里是挂到附魔 category 字段上的值，Forge 上是扩展枚举，Fabric 上是 BREAKABLE
@@ -87,7 +75,7 @@ public class CarianStyleEnchantments {
     /**
      * 所有附魔的总列表（用于分类管理）
      * <p>
-     * 注意：这个列表只用于逻辑分类，真正的注册由 ENCHANTMENTS_REGISTER 完成
+     * 注意：这个列表只用于逻辑分类，真正的注册由 {@link #registerEnchantment} 交给平台
      * </p>
      */
     public static final List<Enchantment> ENCHANTMENTS = new ArrayList<>();
@@ -133,27 +121,27 @@ public class CarianStyleEnchantments {
     /**
      * 存储所有动态注册的附魔
      * <p>
-     * 键：附魔ID，值：RegistryObject
+     * 按声明顺序，元素是平台注册返回的取值对象
      * </p>
      */
-    private static final List<RegistryObject<Enchantment>> REGISTERED_ENCHANTMENTS = new ArrayList<>();
+    private static final List<Supplier<Enchantment>> REGISTERED_ENCHANTMENTS = new ArrayList<>();
 
     // ==================== 注册方法 ====================
 
     /**
-     * 注册单个附魔到 DeferredRegister
+     * 把单个附魔声明给平台的注册实现
      * <p>
-     * 此方法由 EnchantmentRegistry 在扫描时调用
+     * 此方法由 EnchantmentRegistry 按附魔清单建对象时调用，要在平台的注册时机之前调完
      * </p>
      *
      * @param id 附魔ID
      * @param enchantment 附魔实例
-     * @return RegistryObject
+     * @return 注册完成后取值用的对象
      */
-    public static RegistryObject<Enchantment> registerEnchantment(String id, Enchantment enchantment) {
-        RegistryObject<Enchantment> registryObject = ENCHANTMENTS_REGISTER.register(id, () -> enchantment);
-        REGISTERED_ENCHANTMENTS.add(registryObject);
-        return registryObject;
+    public static Supplier<Enchantment> registerEnchantment(String id, Enchantment enchantment) {
+        Supplier<Enchantment> registered = CarianContent.register(Registries.ENCHANTMENT, id, () -> enchantment);
+        REGISTERED_ENCHANTMENTS.add(registered);
+        return registered;
     }
 
     /**

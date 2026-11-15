@@ -1,13 +1,9 @@
 package pers.roinflam.carianstyle.visual;
 
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentTimeReversal;
-import pers.roinflam.carianstyle.utils.Reference;
 
 /**
  * 时间逆转「储存伤害」的 HUD 叠层注册（双端通用）。
@@ -61,8 +57,8 @@ import pers.roinflam.carianstyle.utils.Reference;
  * <h3>为什么单开一个类而不是并进 CarianStyleStackDisplays</h3>
  * <p>
  * 那个类有七百余行、集中登记了 22 个显示项，为加一项而整体重写的风险
- * （抄错一个 key、漏掉一个常量）远大于收益。本类用
- * {@link FMLCommonSetupEvent} 自行注册，与那边互不干扰——
+ * （抄错一个 key、漏掉一个常量）远大于收益。本类在
+ * 通用设置阶段自行注册，与那边互不干扰——
  * {@code StackDisplayRegistry.register} 只是往一个列表里追加，
  * 两处注册的先后顺序不影响任何行为，serialId 不冲突即可。
  * </p>
@@ -76,7 +72,6 @@ import pers.roinflam.carianstyle.utils.Reference;
  * @author RoinFlam
  * @version 1.1
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class CarianStyleTimeReversalDisplay {
 
     /**
@@ -120,24 +115,10 @@ public final class CarianStyleTimeReversalDisplay {
     }
 
     /**
-     * 公共初始化阶段注册显示项。
-     * <p>
-     * 用 {@code enqueueWork} 而非直接注册：{@link FMLCommonSetupEvent} 的监听器
-     * 可能并行执行，而 {@code StackDisplayRegistry} 内部是普通 {@code ArrayList} /
-     * {@code HashMap}，并发写入会损坏结构。{@code enqueueWork} 保证在主线程串行执行。
-     * </p>
-     *
-     * @param event 公共初始化事件
+     * 通用设置阶段注册显示项，由入口在主线程上调：{@code StackDisplayRegistry} 内部是普通集合，不能并发写。
+     * 重复调用安全。
      */
-    @SubscribeEvent
-    public static void onCommonSetup(FMLCommonSetupEvent event) {
-        event.enqueueWork(CarianStyleTimeReversalDisplay::register);
-    }
-
-    /**
-     * 实际注册逻辑。重复调用安全。
-     */
-    private static void register() {
+    public static void register() {
         if (initialized) {
             return;
         }

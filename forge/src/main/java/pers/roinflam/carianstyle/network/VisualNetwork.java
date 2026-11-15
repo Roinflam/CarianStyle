@@ -1,25 +1,17 @@
 package pers.roinflam.carianstyle.network;
 
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkDirection;
-import net.minecraftforge.network.NetworkRegistry;
-import net.minecraftforge.network.PacketDistributor;
-import net.minecraftforge.network.simple.SimpleChannel;
-import pers.roinflam.carianstyle.utils.Reference;
-
-import java.util.Optional;
 
 /**
- * 可视化系统专用网络通道（与现有 {@code NetworkHandler} 完全独立）。
+ * 可视化系统专用网络通道（与主通道完全独立）。
  * <p>
- * 单独建一条 SimpleChannel，避免改动现有 NetworkHandler，
+ * 单独建一条通道 {@code carianstyle:visual}，避免改动主通道，
  * 因而不会影响已经在工作的火焰/隐身同步逻辑。本通道承载：叠层显示包、定点 AOE 自绘特效包、
  * 战技自绘特效包。
  * <p>
- * 注意：{@link #register()} 必须在 mod 加载阶段（如主类构造或 FMLCommonSetupEvent）
- * 于双端各调用一次——客户端需要注册解码/处理器才能接收 S2C 包。
+ * 三个包的登记信息（包类、编解码、所属通道、客户端处理器）在 {@link CarianNetwork#PACKETS}，
+ * 由各加载器的入口照表登记，两端都要登记；这里只剩发包的几个便捷方法，发送走 {@link PayloadSend}。
  * <p>
  * <b>v2 新增：</b>{@link CombatArtEffectPacket}（战技特效，带朝向 yaw）。
  * 包 ID 追加在既有两个包之后，<b>不改动既有包的注册顺序</b>——SimpleChannel 的包 ID 由
@@ -28,7 +20,7 @@ import java.util.Optional;
  *
  * <h3>v3：三个包全部补上方向声明</h3>
  * <p>
- * 本通道的三个包<b>都是纯 S2C</b>，但此前用的是不带 {@link NetworkDirection} 的
+ * 本通道的三个包<b>都是纯 S2C</b>，但此前用的是不带 {@code NetworkDirection} 的
  * 五参 {@code registerMessage} 重载，Forge 因此会放行两个方向。
  * 结果是任意客户端都能反向发包给服务端，让服务端去执行
  * {@code StackHudManager} / {@code AoeEffectManager} / {@code CombatArtEffectManager}
@@ -46,71 +38,11 @@ import java.util.Optional;
  * </p>
  *
  * @author RoinFlam
- * @version 3
+ * @version 4
  */
 public final class VisualNetwork {
 
-    /** 协议版本（双端一致即可） */
-    private static final String PROTOCOL_VERSION = "1";
-
-    /** 专用通道（命名空间用 mod id，路径 "visual"） */
-    public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
-            new ResourceLocation(Reference.MOD_ID, "visual"),
-            () -> PROTOCOL_VERSION,
-            PROTOCOL_VERSION::equals,
-            PROTOCOL_VERSION::equals
-    );
-
-    /**
-     * 本通道全部包共用的方向：服务端 -> 客户端。
-     * <p>抽成常量而非每处写一遍，是为了让「本通道只有 S2C 包」这条约束一眼可见；
-     * 将来若真要加 C2S 包，改动会集中暴露在这里而不是散落在三处注册调用里。</p>
-     */
-    private static final Optional<NetworkDirection> S2C = Optional.of(NetworkDirection.PLAY_TO_CLIENT);
-
-    /** 包 ID 自增计数 */
-    private static int packetId = 0;
-
-    private static boolean registered = false;
-
     private VisualNetwork() {
-    }
-
-    /**
-     * 注册全部包。双端各调用一次，重复调用安全。
-     * <p><b>注册顺序即包 ID，新增包务必追加在末尾</b>（详见类注释）。</p>
-     */
-    public static void register() {
-        if (registered) {
-            return;
-        }
-        registered = true;
-        CHANNEL.registerMessage(
-                packetId++,
-                StackDisplayPacket.class,
-                StackDisplayPacket::encode,
-                StackDisplayPacket::decode,
-                StackDisplayPacket::handle,
-                S2C
-        );
-        // 定点 AOE 自绘特效包（S2C）
-        CHANNEL.registerMessage(
-                packetId++,
-                AoeEffectPacket.class,
-                AoeEffectPacket::encode,
-                AoeEffectPacket::decode,
-                AoeEffectPacket::handle,
-                S2C
-        );
-        // v2：战技自绘特效包（S2C，带朝向）
-        CHANNEL.registerMessage(
-                packetId++,
-                CombatArtEffectPacket.class,
-                CombatArtEffectPacket::encode,
-                CombatArtEffectPacket::decode,
-                CombatArtEffectPacket::handle,
-                S2C
-        );
     }
 
     /**
@@ -120,14 +52,14 @@ public final class VisualNetwork {
      * @param packet 叠层显示包
      */
     public static void sendToPlayer(ServerPlayer player, StackDisplayPacket packet) {
-        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
+        PayloadSend.toPlayer(player, packet);
     }
 
     /**
      * 把包广播给某点附近一定范围内的玩家（用于定点 AOE 自绘特效）。
      * <p>
-     * 使用 {@link PacketDistributor#NEAR}，原版只会发给该维度内距 (x,y,z) 在 {@code range} 格内、
-     * 且正在追踪该区域的玩家，因此带宽随近场玩家数自然受限。
+     * 范围同 Forge 的 {@code PacketDistributor.NEAR}：只发给该维度内距 (x,y,z) 在 {@code range} 格内的玩家，
+     * 因此带宽随近场玩家数自然受限。
      * </p>
      *
      * @param level  服务端世界（取其维度键）
@@ -139,8 +71,7 @@ public final class VisualNetwork {
      */
     public static void sendToNearby(ServerLevel level, double x, double y, double z,
                                     double range, AoeEffectPacket packet) {
-        CHANNEL.send(PacketDistributor.NEAR.with(
-                () -> new PacketDistributor.TargetPoint(x, y, z, range, level.dimension())), packet);
+        PayloadSend.toNear(level, x, y, z, range, packet);
     }
 
     /**
@@ -157,7 +88,6 @@ public final class VisualNetwork {
      */
     public static void sendToNearby(ServerLevel level, double x, double y, double z,
                                     double range, CombatArtEffectPacket packet) {
-        CHANNEL.send(PacketDistributor.NEAR.with(
-                () -> new PacketDistributor.TargetPoint(x, y, z, range, level.dimension())), packet);
+        PayloadSend.toNear(level, x, y, z, range, packet);
     }
 }

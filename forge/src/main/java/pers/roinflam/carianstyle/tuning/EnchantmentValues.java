@@ -6,10 +6,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import pers.roinflam.carianstyle.platform.Services;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
@@ -118,7 +114,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author RoinFlam
  * @version 1.0
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class EnchantmentValues {
 
     /** 配置文件名 */
@@ -371,23 +366,11 @@ public final class EnchantmentValues {
     // ==================== 加载与写回 ====================
 
     /**
-     * 在通用初始化阶段加载配置。
-     * <p>
-     * 用 {@link EventPriority#LOWEST} 是为了确保排在附魔注册之后——
-     * 注册过程会 {@code Class.forName} 每个附魔类，触发它们的静态块，
-     * 数值声明必须先于加载完成，否则生成的文件会缺键。
-     * </p>
-     *
-     * @param event 通用初始化事件
-     */
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onCommonSetup(@Nonnull FMLCommonSetupEvent event) {
-        event.enqueueWork(EnchantmentValues::reload);
-    }
-
-    /**
      * 重新加载配置文件并写回合并结果。
-     * <p>可由百科界面的「重载数值」按钮调用。</p>
+     * <p>
+     * 入口在通用设置阶段调一次，排在附魔注册之后：注册时会加载每个附魔类、跑它们的静态初始化，
+     * 数值声明必须先于第一次加载做完，否则写回的文件会缺键。也可由百科界面的「重载数值」按钮调用。
+     * </p>
      *
      * @return 是否成功
      */

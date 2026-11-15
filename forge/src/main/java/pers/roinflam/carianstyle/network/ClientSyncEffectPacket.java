@@ -1,11 +1,9 @@
 package pers.roinflam.carianstyle.network;
 
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.network.NetworkEvent;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Supplier;
 
 /**
  * 客户端同步效果数据包
@@ -140,18 +138,14 @@ public class ClientSyncEffectPacket {
     /**
      * 处理数据包（客户端）
      * <p>
-     * 本包已在 {@code NetworkHandler} 注册时声明为
-     * {@code NetworkDirection.PLAY_TO_CLIENT}，服务端收到反向包会被 Forge
+     * 本包已在 {@link CarianNetwork} 里登记为只许服务端发往客户端（{@code NetworkDirection.PLAY_TO_CLIENT}），
+     * 服务端收到反向包会被 Forge
      * 在分发入口直接拒绝，因此这里无需再做端侧判断。
      * </p>
      *
      * @param packet 收到的包
-     * @param ctx    网络上下文
      */
-    public static void handle(ClientSyncEffectPacket packet, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            ClientSyncEffectManager.handlePacket(packet.serialNumber, packet.action, packet.entityIds);
-        });
-        ctx.get().setPacketHandled(true);
+    public static void handle(ClientSyncEffectPacket packet) {
+        ClientSyncEffectManager.handlePacket(packet.serialNumber, packet.action, packet.entityIds);
     }
 }

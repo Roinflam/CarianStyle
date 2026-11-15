@@ -5,10 +5,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.Enchantment;
 import pers.roinflam.carianstyle.event.PlayerEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 import pers.roinflam.carianstyle.enchantment.recollect.EnchantmentWarrior;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
@@ -49,7 +46,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <h3>为什么单开一个类</h3>
  * <p>
  * 与 {@link CarianStyleFireStyleDisplay} 同理：{@code CarianStyleStackDisplays} 七百余行、
- * 集中登记 22 项，为加七项而整体重写的风险大于收益。本类用 {@link FMLCommonSetupEvent}
+ * 集中登记 22 项，为加七项而整体重写的风险大于收益。本类在通用设置阶段
  * 自行注册，{@code StackDisplayRegistry.register} 只是往列表里追加，注册先后不影响任何行为。
  * </p>
  *
@@ -98,7 +95,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author RoinFlam
  * @version 1.0
  */
-@Mod.EventBusSubscriber(modid = Reference.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class CarianStyleCombatStateDisplay {
 
     // ===== 序列号（1~22 见 CarianStyleStackDisplays，23 回溯，24 火焰流派）=====
@@ -233,24 +229,10 @@ public final class CarianStyleCombatStateDisplay {
     }
 
     /**
-     * 公共初始化阶段注册显示项。
-     * <p>
-     * 用 {@code enqueueWork} 而非直接注册：{@link FMLCommonSetupEvent} 的监听器
-     * 可能并行执行，而 {@code StackDisplayRegistry} 内部是普通集合，
-     * 并发写入会损坏结构。{@code enqueueWork} 保证在主线程串行执行。
-     * </p>
-     *
-     * @param event 公共初始化事件
+     * 通用设置阶段注册显示项，由入口在主线程上调：{@code StackDisplayRegistry} 内部是普通集合，不能并发写。
+     * 重复调用安全。
      */
-    @SubscribeEvent
-    public static void onCommonSetup(FMLCommonSetupEvent event) {
-        event.enqueueWork(CarianStyleCombatStateDisplay::register);
-    }
-
-    /**
-     * 实际注册逻辑。重复调用安全。
-     */
-    private static void register() {
+    public static void register() {
         if (initialized) {
             return;
         }
@@ -472,7 +454,7 @@ public final class CarianStyleCombatStateDisplay {
         if (cached != null) {
             return cached;
         }
-        Enchantment resolved = ForgeRegistries.ENCHANTMENTS.getValue(
+        Enchantment resolved = BuiltInRegistries.ENCHANTMENT.get(
                 new ResourceLocation(Reference.MOD_ID, enchId));
         if (resolved != null) {
             ENCHANTMENT_ID_CACHE.put(enchId, resolved);

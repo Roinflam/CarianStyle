@@ -9,7 +9,6 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.platform.Services;
-import net.minecraftforge.network.PacketDistributor;
 
 import javax.annotation.Nonnull;
 import java.util.*;
@@ -113,6 +112,15 @@ import pers.roinflam.carianstyle.event.ServerTickEvent;
  * 且从未启用过的序列号不会产生无意义的空包。
  * </p>
  *
+ * <h3>多加载器：发送改走 {@link PayloadSend}</h3>
+ * <p>
+ * 按维度广播用 {@link PayloadSend#toDimension}（范围同 Forge 的 {@code PacketDistributor.DIMENSION}，
+ * 即 {@code server.getPlayerList().broadcastAll(packet, dimension)}，包只编码一次），单发用 {@link PayloadSend#toPlayer}；
+ * 没协商过本模组通道的假人跳过（见 {@link PayloadSend}）。
+ * 不再有 {@code PacketTarget} 对象，下面 v3.2 里「复用 / 惰性创建 PacketTarget」的那部分随之取消，
+ * 「按维度一次发送」的结论不变。
+ * </p>
+ *
  * <h3>v3.2 性能：广播由「逐玩家发送」改为「按维度一次发送」（行为完全等价）</h3>
  * <p>
  * <b>问题：</b>本类此前所有的广播都是这个形状——
@@ -135,7 +143,7 @@ import pers.roinflam.carianstyle.event.ServerTickEvent;
  * 而这一切只是为了发同一个包。
  * </p>
  * <p>
- * <b>修复方式：</b>改用 {@link PacketDistributor#DIMENSION}——它接收一个
+ * <b>修复方式：</b>改用 {@code PacketDistributor.DIMENSION}——它接收一个
  * {@code Supplier<ResourceKey<Level>>}，内部走
  * {@code server.getPlayerList().broadcastAll(packet, dimension)}，
  * 语义与「遍历 {@code level.players()} 逐个发送」<b>完全一致</b>
@@ -297,38 +305,12 @@ public class ClientSyncEffectManager {
         ServerLevel level = (ServerLevel) entity.level();
         int entityId = entity.getId();
 
-        // v3.2：惰性创建，命中零个序列号时（最常见）不产生任何分配
-        PacketDistributor.PacketTarget target = null;
-
         for (Map.Entry<Integer, Set<Integer>> entry : dimMap.entrySet()) {
             if (entry.getValue().remove(entityId)) {
-                if (target == null) {
-                    target = dimensionTarget(level);
-                }
-                NetworkHandler.CHANNEL.send(target, ClientSyncEffectPacket.delta(
+                PayloadSend.toDimension(level, ClientSyncEffectPacket.delta(
                         entry.getKey(), ClientSyncEffectPacket.Action.REMOVE, entityId));
             }
         }
-    }
-
-    /**
-     * 构建「该维度全部玩家」的广播目标（v3.2 新增）。
-     * <p>
-     * 取代此前「遍历 {@code level.players()} 逐个 {@code PacketDistributor.PLAYER.with(...)}」
-     * 的写法：Forge 内部同样是筛出该维度玩家逐个发包，行为完全等价，
-     * 但调用方的临时对象分配从 {@code 2 × 在线人数} 降为 2 个（详见类注释「v3.2 性能」小节）。
-     * </p>
-     * <p>
-     * 先把 {@code dimension} 取出为局部变量再由 lambda 捕获，避免 lambda 捕获整个
-     * {@code level} 引用（那会让一个短命的 PacketTarget 意外持有 ServerLevel）。
-     * </p>
-     *
-     * @param level 服务端世界
-     * @return 该维度全部玩家的广播目标
-     */
-    private static PacketDistributor.PacketTarget dimensionTarget(@Nonnull ServerLevel level) {
-        ResourceKey<Level> dimension = level.dimension();
-        return PacketDistributor.DIMENSION.with(() -> dimension);
     }
 
     /**
@@ -343,7 +325,7 @@ public class ClientSyncEffectManager {
     private static void broadcastDelta(@Nonnull ServerLevel level, int serialNumber,
                                        ClientSyncEffectPacket.Action action, int entityId) {
         ClientSyncEffectPacket packet = ClientSyncEffectPacket.delta(serialNumber, action, entityId);
-        NetworkHandler.CHANNEL.send(dimensionTarget(level), packet);
+        PayloadSend.toDimension(level, packet);
     }
 
     /**
@@ -369,9 +351,6 @@ public class ClientSyncEffectManager {
         ResourceKey<Level> dimension = player.level().dimension();
         Map<Integer, Set<Integer>> dimMap = SERVER_ACTIVATED_ENTITIES.get(dimension);
 
-        // v3.2：全部包都发给同一名玩家，target 只建一次
-        PacketDistributor.PacketTarget target = PacketDistributor.PLAYER.with(() -> player);
-
         for (int serialNumber : KNOWN_SERIALS) {
             Set<Integer> entityIds = (dimMap == null) ? null : dimMap.get(serialNumber);
 
@@ -389,7 +368,7 @@ public class ClientSyncEffectManager {
             }
 
             ClientSyncEffectPacket packet = ClientSyncEffectPacket.fullSync(serialNumber, payload);
-            NetworkHandler.CHANNEL.send(target, packet);
+            PayloadSend.toPlayer(player, packet);
         }
     }
 
@@ -437,10 +416,6 @@ public class ClientSyncEffectManager {
             Set<Integer> lastNonEmpty = LAST_NON_EMPTY
                     .computeIfAbsent(dimEntry.getKey(), k -> ConcurrentHashMap.newKeySet());
 
-            // v3.2：本维度本轮的广播目标，惰性创建一次后复用；
-            // 若本轮该维度一个包都不发（和平时期的常态），则完全不分配
-            PacketDistributor.PacketTarget target = null;
-
             Map<Integer, Set<Integer>> serialMap = dimEntry.getValue();
             for (Map.Entry<Integer, Set<Integer>> entry : serialMap.entrySet()) {
                 int serialNumber = entry.getKey();
@@ -464,12 +439,9 @@ public class ClientSyncEffectManager {
                     lastNonEmpty.add(serialNumber);
                 }
 
-                if (target == null) {
-                    target = dimensionTarget(level);
-                }
                 ClientSyncEffectPacket packet = ClientSyncEffectPacket.fullSync(
                         serialNumber, new ArrayList<>(entityIds));
-                NetworkHandler.CHANNEL.send(target, packet);
+                PayloadSend.toDimension(level, packet);
             }
         }
     }

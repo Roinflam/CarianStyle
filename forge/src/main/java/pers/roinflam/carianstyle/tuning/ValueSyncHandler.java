@@ -5,9 +5,8 @@ import net.minecraft.server.level.ServerPlayer;
 import pers.roinflam.carianstyle.event.client.ClientPlayerNetworkEvent;
 import pers.roinflam.carianstyle.event.PlayerEvent;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
-import net.minecraftforge.network.PacketDistributor;
 import pers.roinflam.carianstyle.network.EnchantmentValuesPacket;
-import pers.roinflam.carianstyle.network.NetworkHandler;
+import pers.roinflam.carianstyle.network.PayloadSend;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
 import javax.annotation.Nonnull;
@@ -71,9 +70,7 @@ public final class ValueSyncHandler {
         if (EnchantmentValues.sharedHandles().isEmpty()) {
             return;
         }
-        NetworkHandler.CHANNEL.send(
-                PacketDistributor.PLAYER.with(() -> player),
-                EnchantmentValuesPacket.ofCurrent());
+        PayloadSend.toPlayer(player, EnchantmentValuesPacket.ofCurrent());
     }
 
     /**
@@ -87,8 +84,7 @@ public final class ValueSyncHandler {
         if (EnchantmentValues.sharedHandles().isEmpty()) {
             return;
         }
-        NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(),
-                EnchantmentValuesPacket.ofCurrent());
+        PayloadSend.toAll(server, EnchantmentValuesPacket.ofCurrent());
         LogUtil.info("卡利亚式附魔 - 已向 %d 名在线玩家重发共享数值",
                 server.getPlayerList().getPlayerCount());
     }

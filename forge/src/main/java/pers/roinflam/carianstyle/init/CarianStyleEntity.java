@@ -2,11 +2,11 @@ package pers.roinflam.carianstyle.init;
 
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
+import net.minecraft.core.registries.Registries;
+import pers.roinflam.carianstyle.CarianContent;
 import pers.roinflam.carianstyle.entity.projectile.EntityGlintblades;
-import pers.roinflam.carianstyle.utils.Reference;
+
+import java.util.function.Supplier;
 
 /**
  * 模组实体注册类
@@ -17,16 +17,10 @@ import pers.roinflam.carianstyle.utils.Reference;
 public class CarianStyleEntity {
 
     /**
-     * 实体类型延迟注册器
-     */
-    public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
-            DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, Reference.MOD_ID);
-
-    /**
      * 魔法辉剑实体类型
      */
-    public static final RegistryObject<EntityType<EntityGlintblades>> GLINTBLADES =
-            ENTITY_TYPES.register("glintblades", () ->
+    public static final Supplier<EntityType<EntityGlintblades>> GLINTBLADES =
+            CarianContent.register(Registries.ENTITY_TYPE, "glintblades", () ->
                     EntityType.Builder.<EntityGlintblades>of(
                                     EntityGlintblades::new,
                                     MobCategory.MISC

@@ -1,13 +1,11 @@
 package pers.roinflam.carianstyle.network;
 
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.network.NetworkEvent;
 import pers.roinflam.carianstyle.visual.StackDisplayRegistry;
 import pers.roinflam.carianstyle.visual.StackHudManager;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Supplier;
 
 /**
  * 叠层显示同步包（S2C，服务端 -> 客户端）。
@@ -121,15 +119,13 @@ public class StackDisplayPacket {
     /**
      * 处理（仅客户端执行：本包为 S2C）。
      * <p>
-     * 本包已在 {@code VisualNetwork} 注册时声明为
-     * {@code NetworkDirection.PLAY_TO_CLIENT}，反向包会被 Forge 在分发入口拒绝。
+     * 本包已在 {@link CarianNetwork} 里登记为只许服务端发往客户端（{@code NetworkDirection.PLAY_TO_CLIENT}），
+     * 反向包会被 Forge 在分发入口拒绝。
      * </p>
      *
      * @param packet 收到的包
-     * @param ctx    网络上下文
      */
-    public static void handle(StackDisplayPacket packet, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> StackHudManager.accept(packet.stacks));
-        ctx.get().setPacketHandled(true);
+    public static void handle(StackDisplayPacket packet) {
+        StackHudManager.accept(packet.stacks);
     }
 }

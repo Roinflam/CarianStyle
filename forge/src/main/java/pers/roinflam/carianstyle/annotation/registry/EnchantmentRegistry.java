@@ -2,15 +2,12 @@ package pers.roinflam.carianstyle.annotation.registry;
 
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.forgespi.language.ModFileScanData;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.objectweb.asm.Type;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
-import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.scan.ScanIndex;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
 import java.lang.reflect.Constructor;
@@ -18,10 +15,10 @@ import java.util.*;
 
 /**
  * 附魔注册管理器
- * 使用Forge的ModFileScanData进行注解扫描
+ * 照构建时生成的附魔清单建对象并声明注册
  *
  * @author RoinFlam
- * @version 2.0
+ * @version 3.0
  */
 public class EnchantmentRegistry {
 
@@ -30,36 +27,27 @@ public class EnchantmentRegistry {
     private static final List<EnchantmentRegistration> ALL_REGISTRATIONS = new ArrayList<>();
 
     /**
-     * 使用Forge的ModFileScanData扫描并注册所有附魔
-     *
-     * @param packageName 要扫描的包名（实际上这里会扫描整个mod）
+     * 照构建时生成的附魔清单建立并注册所有附魔。
+     * <p>
+     * 清单由构建从编译输出里收集带 {@link AutoRegisterEnchantment} 的类，按类名排好序；缺文件、格式不对直接抛异常。
+     * 注册顺序就是清单顺序，附魔的数字 id 跟着它走（存档和网络都按字符串 id，不受影响）。
+     * 要在平台的注册时机之前调完。
+     * </p>
      */
-    public static void scanAndRegister(@NotNull String packageName) {
-        LogUtil.info("卡利亚式附魔 - 开始扫描包：%s", packageName);
+    public static void loadFromIndex() {
+        LogUtil.info("卡利亚式附魔 - 开始按附魔清单注册附魔");
         long startTime = System.currentTimeMillis();
 
         try {
-            // 获取ModFileScanData
-            ModFileScanData scanData = ModList.get()
-                    .getModFileById(Reference.MOD_ID)
-                    .getFile()
-                    .getScanResult();
+            List<String> classNames = ScanIndex.enchantmentClasses();
 
-            // 获取所有带有AutoRegisterEnchantment注解的类
-            Type annotationType = Type.getType(AutoRegisterEnchantment.class);
-            List<ModFileScanData.AnnotationData> annotations = scanData.getAnnotations().stream()
-                    .filter(a -> annotationType.equals(a.annotationType()))
-                    .toList();
-
-            int scannedCount = annotations.size();
+            int scannedCount = classNames.size();
             int registeredCount = 0;
 
             LogUtil.debug("卡利亚式附魔 - 找到 %d 个带注解的类", scannedCount);
 
-            for (ModFileScanData.AnnotationData annotationData : annotations) {
+            for (String className : classNames) {
                 try {
-                    // 获取类名
-                    String className = annotationData.memberName();
                     LogUtil.debug("卡利亚式附魔 - 处理类：%s", className);
 
                     // 加载类
@@ -85,14 +73,14 @@ public class EnchantmentRegistry {
                     }
 
                 } catch (ClassNotFoundException e) {
-                    LogUtil.error("卡利亚式附魔 - 无法加载类：%s", e, annotationData.memberName());
+                    LogUtil.error("卡利亚式附魔 - 无法加载类：%s", e, className);
                 } catch (Exception e) {
-                    LogUtil.error("卡利亚式附魔 - 处理类时出错：%s", e, annotationData.memberName());
+                    LogUtil.error("卡利亚式附魔 - 处理类时出错：%s", e, className);
                 }
             }
 
             long endTime = System.currentTimeMillis();
-            LogUtil.info("卡利亚式附魔 - 扫描完成，扫描了 %d 个类，注册了 %d 个附魔，耗时 %d 毫秒",
+            LogUtil.info("卡利亚式附魔 - 清单读取完成，清单里 %d 个类，注册了 %d 个附魔，耗时 %d 毫秒",
                     scannedCount, registeredCount, endTime - startTime);
 
         } catch (Exception e) {
