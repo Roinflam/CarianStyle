@@ -302,8 +302,8 @@ public final class ItemFit {
                 return false;
             }
             ItemStack clean = context.clean;
-            boolean accepts = enchantment.canApplyAtEnchantingTable(clean)
-                    || (clean.is(Items.BOOK) && enchantment.isAllowedOnBooks());
+            boolean accepts = Services.platform().canApplyAtEnchantingTable(enchantment, clean)
+                    || (clean.is(Items.BOOK) && Services.platform().isAllowedOnBooks(enchantment));
             if (!accepts) {
                 return false;
             }

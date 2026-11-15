@@ -21,6 +21,8 @@ import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.platform.CustomEnchantCategory;
+import pers.roinflam.carianstyle.platform.Services;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
 import javax.annotation.Nonnull;
@@ -133,6 +135,10 @@ public abstract class EnchantmentBase extends Enchantment {
     /** 按 {@link EquipmentSlot#ordinal()} 记哪些槽位上的物品算数，见 {@link #worksIn} */
     private final boolean[] activeSlots;
 
+    /** 注解 {@code customType} 声明的类型，没有就是 null；Fabric 上 category 字段只是 BREAKABLE，附魔台按它判 */
+    @Nullable
+    private final CustomEnchantCategory customCategory;
+
     /**
      * 主构造函数（注解注册方式）
      *
@@ -146,6 +152,7 @@ public abstract class EnchantmentBase extends Enchantment {
         this.activeSlots = activeSlotsOf(slots);
 
         this.annotation = this.getClass().getAnnotation(AutoRegisterEnchantment.class);
+        this.customCategory = annotation != null ? CustomEnchantCategory.byName(annotation.customType()) : null;
 
         if (annotation != null) {
             this.enchantmentRarity = annotation.rarity();
@@ -207,6 +214,7 @@ public abstract class EnchantmentBase extends Enchantment {
         super(rarityIn, category, slots);
         this.activeSlots = activeSlotsOf(slots);
         this.annotation = null;
+        this.customCategory = null;
 
         switch (rarityIn) {
             case RARE:
@@ -351,23 +359,21 @@ public abstract class EnchantmentBase extends Enchantment {
     /**
      * 被禁用的附魔无法从附魔台获得
      */
-    @Override
+    // 这两个方法不能加 @Override：原版没有它们（是 Forge 补丁加的），代码挪进只对原版编译的 common 后，
+    // 在 Forge 上靠同名同签名覆写补丁方法，在 Fabric 上由附魔台、canEnchant 的 mixin 调。测试台有反射断言盯着覆写是否生效。
     public boolean canApplyAtEnchantingTable(@Nonnull ItemStack stack) {
         if (isDisabled()) {
             return false;
         }
-        return super.canApplyAtEnchantingTable(stack);
+        return Services.platform().defaultTableCheck(this, stack, customCategory);
     }
 
     /**
      * 被禁用的附魔无法附在书上
      */
-    @Override
     public boolean isAllowedOnBooks() {
-        if (isDisabled()) {
-            return false;
-        }
-        return super.isAllowedOnBooks();
+        // Forge 补丁里的默认实现恒为 true
+        return !isDisabled();
     }
 
     /**

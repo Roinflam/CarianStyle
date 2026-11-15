@@ -6,7 +6,7 @@ import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
-import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
+import pers.roinflam.carianstyle.platform.CustomEnchantCategory;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
 import javax.annotation.Nonnull;
@@ -14,6 +14,7 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Predicate;
 
 /**
  * 「这个附魔能附在什么物品上」的实测探测器。
@@ -22,9 +23,8 @@ import java.util.List;
  * <p>
  * 直觉做法是按 {@code EnchantmentCategory} 的名字硬编码一张
  * 「ARMOR_FEET → 各种靴子」的对照表。但本模组有三个<b>自定义分类</b>
- * （{@code SHIELD} / {@code ARMS} / {@code PICKAXE}），它们由
- * {@code EnchantmentCategory.create(...)} 在运行期构造，判定逻辑写在
- * {@code CarianStyleEnchantments} 里的 lambda 中，查表方式无法覆盖，
+ * （{@code SHIELD} / {@code ARMS} / {@code PICKAXE}），判定逻辑写在
+ * {@code CustomEnchantCategory} 里的 lambda 中，查表方式无法覆盖，
  * 而且以后加新分类必然忘记同步这张表。
  * </p>
  * <p>
@@ -94,7 +94,7 @@ public final class ItemProbe {
      */
     @Nonnull
     public static List<Item> probe(@Nonnull AutoRegisterEnchantment annotation) {
-        EnchantmentCategory category = resolveCategory(annotation);
+        Predicate<Item> category = resolveCategory(annotation);
         if (category == null) {
             return Collections.emptyList();
         }
@@ -102,7 +102,7 @@ public final class ItemProbe {
         List<Item> result = new ArrayList<>(4);
         for (Item item : PROBE_ITEMS) {
             try {
-                if (category.canEnchant(item)) {
+                if (category.test(item)) {
                     result.add(item);
                 }
             } catch (Exception e) {
@@ -162,16 +162,19 @@ public final class ItemProbe {
      * @return 解析出的分类；customType 填了但无法识别时返回 null
      */
     @Nullable
-    private static EnchantmentCategory resolveCategory(@Nonnull AutoRegisterEnchantment annotation) {
+    private static Predicate<Item> resolveCategory(@Nonnull AutoRegisterEnchantment annotation) {
         String customType = annotation.customType();
         if (customType != null && !customType.isEmpty()) {
-            EnchantmentCategory custom = CarianStyleEnchantments.getCustomEnchantmentCategory(customType);
+            // 直接用自定义类型自己的判定：Fabric 上挂在 category 字段上的只是 BREAKABLE
+            CustomEnchantCategory custom = CustomEnchantCategory.byName(customType);
             if (custom == null) {
                 LogUtil.warn("卡利亚式附魔 - 附魔 %s 声明了无法识别的 customType：%s",
                         annotation.id(), customType);
+                return null;
             }
-            return custom;
+            return custom::canEnchant;
         }
-        return annotation.type();
+        EnchantmentCategory type = annotation.type();
+        return type::canEnchant;
     }
 }

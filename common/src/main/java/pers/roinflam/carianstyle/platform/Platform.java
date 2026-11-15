@@ -7,6 +7,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
@@ -80,4 +82,34 @@ public interface Platform {
 
     /** 物品的附魔能力。Forge 调按物品堆的版本（模组物品可以覆写），Fabric 读物品上的值。 */
     int getEnchantmentValue(ItemStack stack);
+
+    /**
+     * 自定义附魔类型挂到 {@code Enchantment.category} 上的值，同一类型每次返回同一个对象。
+     * <p>
+     * Forge 上是按 {@link CustomEnchantCategory#hostName()} 扩展出来的枚举常量，判定就是这个类型自己的；
+     * Fabric 上原版枚举扩展不了，一律给 {@code BREAKABLE}（三种类型都是可损耗物品的子集），
+     * 真正的判定由本模组附魔的 {@code canApplyAtEnchantingTable} 做。
+     * </p>
+     */
+    EnchantmentCategory hostCategory(CustomEnchantCategory type);
+
+    /**
+     * 本模组附魔在不另加条件时，附魔台怎么判这件物品。
+     * <p>
+     * Forge 照补丁里的默认实现交给物品判断（别的模组的物品可以覆写），{@code custom} 不用看：
+     * {@code category} 字段已经是扩展出来的枚举。Fabric 上 {@code custom} 不为 null 就按它判，否则按 {@code category}。
+     * </p>
+     *
+     * @param custom 附魔注解声明的自定义类型，没有就是 null
+     */
+    boolean defaultTableCheck(Enchantment enchantment, ItemStack stack, CustomEnchantCategory custom);
+
+    /**
+     * 任意附魔（包括原版和别的模组的）在附魔台上能不能出现在这件物品上。
+     * Forge 调附魔自己的同名方法，别的模组覆写的照旧算；Fabric 对其余附魔按 {@code category} 判。
+     */
+    boolean canApplyAtEnchantingTable(Enchantment enchantment, ItemStack stack);
+
+    /** 任意附魔能不能出现在附魔台的书上。Forge 调附魔自己的同名方法，Fabric 上其余附魔一律可以。 */
+    boolean isAllowedOnBooks(Enchantment enchantment);
 }

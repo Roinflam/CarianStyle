@@ -5,13 +5,14 @@ import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
+import pers.roinflam.carianstyle.platform.CustomEnchantCategory;
+import pers.roinflam.carianstyle.platform.Services;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import net.minecraft.world.item.*;
 
 /**
  * 模组附魔注册类
@@ -60,42 +61,16 @@ public class CarianStyleEnchantments {
 
     // ==================== 自定义附魔类型 ====================
 
-    /**
-     * 盾牌附魔类型
-     * <p>
-     * 1.20.1 中无法使用 EnumHelper，改为直接创建 EnchantmentCategory
-     * </p>
-     */
-    public static final EnchantmentCategory SHIELD = EnchantmentCategory.create(
-            "cs_shield",
-            item -> item instanceof ShieldItem
-    );
+    // 判定在 CustomEnchantCategory 里；这里是挂到附魔 category 字段上的值，Forge 上是扩展枚举，Fabric 上是 BREAKABLE
 
-    /**
-     * 武器附魔类型（剑+弓）
-     */
-    public static final EnchantmentCategory ARMS = EnchantmentCategory.create(
-            "cs_arms",
-            item -> item instanceof SwordItem || item instanceof BowItem || item instanceof CrossbowItem
-    );
+    /** 盾牌 */
+    public static final EnchantmentCategory SHIELD = Services.platform().hostCategory(CustomEnchantCategory.SHIELD);
 
-    /**
-     * 镐子附魔类型（v1.1 新增）
-     * <p>
-     * 与原版 {@code EnchantmentCategory.DIGGER} 的区别：
-     * DIGGER 的判定是 {@code item instanceof DiggerItem}，
-     * 会同时命中<b>镐、斧、锹、锄</b>四类工具；
-     * 而本类型只命中镐子。
-     * </p>
-     * <p>
-     * 用于那些逻辑上只对镐子生效的附魔（如岩石爆破），
-     * 避免附魔台把它们刷到斧 / 锹 / 锄上却毫无效果。
-     * </p>
-     */
-    public static final EnchantmentCategory PICKAXE = EnchantmentCategory.create(
-            "cs_pickaxe",
-            item -> item instanceof PickaxeItem
-    );
+    /** 武器（剑、弓、弩） */
+    public static final EnchantmentCategory ARMS = Services.platform().hostCategory(CustomEnchantCategory.ARMS);
+
+    /** 只有镐子，原版 DIGGER 连斧、锹、锄也算 */
+    public static final EnchantmentCategory PICKAXE = Services.platform().hostCategory(CustomEnchantCategory.PICKAXE);
 
     // ==================== 附魔能力常量 ====================
 
@@ -208,24 +183,14 @@ public class CarianStyleEnchantments {
      * @return 对应的 EnchantmentCategory 对象，如果标识符无效或为空则返回 null
      */
     public static EnchantmentCategory getCustomEnchantmentCategory(String customType) {
-        // 空字符串或 null 表示不使用自定义类型
-        if (customType == null || customType.isEmpty()) {
+        CustomEnchantCategory type = CustomEnchantCategory.byName(customType);
+        if (type == null) {
             return null;
         }
-
-        // 转换为大写进行匹配（大小写不敏感）
-        switch (customType.toUpperCase()) {
-            case "SHIELD":
-                return SHIELD;
-            case "ARMS":
-                return ARMS;
-            case "PICKAXE":
-                // v1.1：补上此前只写在文档里、从未实现的分支
-                return PICKAXE;
-            default:
-                // 未知的自定义类型，返回 null
-                // 调用者应该处理这种情况（抛出异常或使用默认值）
-                return null;
-        }
+        return switch (type) {
+            case SHIELD -> SHIELD;
+            case ARMS -> ARMS;
+            case PICKAXE -> PICKAXE;
+        };
     }
 }
