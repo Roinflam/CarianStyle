@@ -10,6 +10,7 @@
     "sources": "https://github.com/Roinflam/CarianStyle"
   },
   "license": "${mod_license}",
+  "icon": "logo.png",
   "environment": "*",
   "entrypoints": {
     "main": ["pers.roinflam.carianstyle.fabric.CarianStyleFabric"],
