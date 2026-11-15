@@ -16,6 +16,7 @@
     "modmenu": ["pers.roinflam.carianstyle.fabric.ModMenuIntegration"]
   },
   "mixins": [
+    "carianstyle.mixins.json",
     "carianstyle.fabric.mixins.json",
     "carianstyle.fabric.logic.mixins.json",
     "carianstyle.fabric.client.mixins.json"

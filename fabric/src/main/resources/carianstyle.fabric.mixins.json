@@ -3,7 +3,12 @@
   "minVersion": "0.8",
   "package": "pers.roinflam.carianstyle.fabric.mixin",
   "compatibilityLevel": "JAVA_17",
-  "mixins": [],
+  "mixins": [
+    "enchant.FabricEnchantmentHelperMixin",
+    "enchant.FabricEnchantmentMixin",
+    "entity.FabricEntityPersistentDataMixin",
+    "network.ServerLoginPacketListenerAccessor"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

@@ -62,7 +62,11 @@ import pers.roinflam.carianstyle.event.ServerTickEvent;
 import pers.roinflam.carianstyle.event.damage.LivingAttackEvent;
 import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
 import pers.roinflam.carianstyle.event.damage.LivingHurtEvent;
+import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.fabric.RockBlasterExperience;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -332,6 +336,7 @@ public final class LogicSelfTest {
         try {
             if (tick == 20) {
                 injectionChecks();
+                enchantCategoryChecks();
                 setup();
             } else if (tick == 30) {
                 damageTests();
@@ -465,7 +470,8 @@ public final class LogicSelfTest {
      */
     private static void injectionChecks() {
         Map<String, Integer> expect = new LinkedHashMap<>();
-        expect.put("net.minecraft.world.entity.LivingEntity", 12);
+        // 12 个事件 / 伤害注入点，另有 common 的 addEffect 参数改写 1 个、访问器 5 个（静态访问器不合进目标类）
+        expect.put("net.minecraft.world.entity.LivingEntity", 18);
         expect.put("net.minecraft.world.entity.player.Player", 10);
         expect.put("net.minecraft.server.level.ServerPlayer", 2);
         expect.put("net.minecraft.server.players.PlayerList", 2);
@@ -477,6 +483,12 @@ public final class LogicSelfTest {
         expect.put("net.minecraft.world.level.entity.PersistentEntitySectionManager", 1);
         expect.put("net.minecraft.server.level.ServerLevel$EntityCallbacks", 1);
         expect.put("net.minecraft.world.level.block.Block", 1);
+        // 主 mixin 配置：持久数据（取、存、读）、附魔台和 canEnchant 两处改问本模组附魔、登录握手的访问器
+        expect.put("net.minecraft.world.entity.Entity", 3);
+        // @WrapOperation 合进去两个方法：处理器和包住原调用的那个
+        expect.put("net.minecraft.world.item.enchantment.EnchantmentHelper", 2);
+        expect.put("net.minecraft.world.item.enchantment.Enchantment", 1);
+        expect.put("net.minecraft.server.network.ServerLoginPacketListenerImpl", 1);
         int total = 0;
         StringBuilder detail = new StringBuilder();
         boolean all = true;
@@ -485,12 +497,15 @@ public final class LogicSelfTest {
             try {
                 Class<?> c = Class.forName(en.getKey(), true, LogicSelfTest.class.getClassLoader());
                 n = 0;
+                List<String> names = new ArrayList<>();
                 for (Method m : c.getDeclaredMethods()) {
                     // 处理器合进目标类后名字里保留原方法名；末影龙那份另有一个私有辅助方法
                     if (m.getName().contains("carianstyle$") && !m.getName().endsWith("carianstyle$post")) {
                         n++;
+                        names.add(m.getName());
                     }
                 }
+                detail.append(names).append(' ');
             } catch (Throwable t) {
                 n = -1;
                 detail.append(en.getKey()).append(" load failed: ").append(t).append("; ");
@@ -501,8 +516,57 @@ public final class LogicSelfTest {
             detail.append(en.getKey().substring(en.getKey().lastIndexOf('.') + 1)).append('=').append(n)
                     .append('/').append(en.getValue()).append(' ');
         }
-        // 12 个类 26 个事件注入点（含生物 tick）+ 伤害三段和蓄力 9 个（含蓄力欠账兜底）
-        ok("injections_all_applied", all && total == 35, "total=" + total + " " + detail);
+        // 逻辑类 12 个类 26 个事件注入点（含生物 tick）+ 伤害三段和蓄力 9 个（含蓄力欠账兜底），另加上面 common 6 个、主配置 7 个
+        ok("injections_all_applied", all && total == 48, "total=" + total + " " + detail);
+    }
+
+    /**
+     * Fabric 上本模组附魔的 category 都是 BREAKABLE，真正的判定靠附魔台和 canEnchant 两个 mixin 改问附魔自己。
+     * 没生效的话，挂 BREAKABLE 的附魔会按「可损耗物品」刷到镐、盾上，抽到的数比各附魔自己认的多。
+     */
+    private static void enchantCategoryChecks() {
+        ItemStack[] items = {new ItemStack(Items.SHIELD), new ItemStack(Items.DIAMOND_PICKAXE),
+                new ItemStack(Items.DIAMOND_SWORD), new ItemStack(Items.DIAMOND_CHESTPLATE), new ItemStack(Items.BOW)};
+        int mods = 0;
+        int breakableHosted = 0;
+        int canEnchantMismatch = 0;
+        int tableMismatch = 0;
+        int tableMod = 0;
+        int breakableLoose = 0;
+        for (Enchantment e : BuiltInRegistries.ENCHANTMENT) {
+            if (!(e instanceof EnchantmentBase base)) {
+                continue;
+            }
+            mods++;
+            if (e.category == EnchantmentCategory.BREAKABLE) {
+                breakableHosted++;
+            }
+            for (ItemStack stack : items) {
+                if (e.canEnchant(stack) != base.canApplyAtEnchantingTable(stack)) {
+                    canEnchantMismatch++;
+                }
+                if (e.category == EnchantmentCategory.BREAKABLE && EnchantmentCategory.BREAKABLE.canEnchant(stack.getItem())
+                        && !base.canApplyAtEnchantingTable(stack)) {
+                    breakableLoose++;
+                }
+            }
+        }
+        for (ItemStack stack : items) {
+            for (EnchantmentInstance inst : EnchantmentHelper.getAvailableEnchantmentResults(30, stack, true)) {
+                if (inst.enchantment instanceof EnchantmentBase base) {
+                    tableMod++;
+                    if (!base.canApplyAtEnchantingTable(stack)) {
+                        tableMismatch++;
+                    }
+                }
+            }
+        }
+        // breakableLoose > 0 说明这组物品里确实有「只看 BREAKABLE 会放行、附魔自己不认」的组合，下面两项才有区分力
+        ok("enchant_can_enchant_asks_mod", mods > 100 && breakableLoose > 0 && canEnchantMismatch == 0,
+                "mods=" + mods + " breakableHosted=" + breakableHosted + " breakableLoose=" + breakableLoose
+                        + " mismatch=" + canEnchantMismatch);
+        ok("enchant_table_asks_mod", tableMod > 0 && tableMismatch == 0,
+                "tableMod=" + tableMod + " mismatch=" + tableMismatch);
     }
 
     private static void setup() {
