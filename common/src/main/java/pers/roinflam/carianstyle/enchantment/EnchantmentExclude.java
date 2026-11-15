@@ -13,6 +13,7 @@ import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantSlot;
+import pers.roinflam.carianstyle.annotation.EnchantType;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
@@ -59,7 +60,7 @@ import pers.roinflam.carianstyle.bus.EventBusSubscriber;
         id = "exclude",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.RARE,
-        type = EnchantmentCategory.ARMOR_LEGS,
+        type = EnchantType.ARMOR_LEGS,
         slots = {EnchantSlot.LEGS}
 )
 @EventBusSubscriber

@@ -1,6 +1,5 @@
 package pers.roinflam.carianstyle.annotation;
 
-import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import pers.roinflam.carianstyle.bus.EventPriority;
 
 import java.lang.annotation.ElementType;
@@ -40,7 +39,7 @@ public @interface AutoRegisterEnchantment {
     /**
      * 附魔可应用的附魔类型（原版）
      * <p>
-     * 1.20.1使用原版的EnchantmentCategory
+     * 用模组自己的 {@link EnchantType}，常量和原版 EnchantmentCategory 一一对应（不直接写原版枚举的原因见该类）。
      * 默认值为 BREAKABLE，适用于大多数可损坏物品
      * </p>
      * <p>
@@ -48,7 +47,7 @@ public @interface AutoRegisterEnchantment {
      * 请使用 customType() 参数，不要使用此参数
      * </p>
      */
-    EnchantmentCategory type() default EnchantmentCategory.BREAKABLE;
+    EnchantType type() default EnchantType.BREAKABLE;
 
     /**
      * 自定义附魔类型的字符串标识符

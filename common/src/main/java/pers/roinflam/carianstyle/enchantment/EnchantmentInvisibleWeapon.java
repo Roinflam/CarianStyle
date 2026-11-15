@@ -8,6 +8,7 @@ import net.minecraft.world.item.enchantment.Enchantment;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantSlot;
+import pers.roinflam.carianstyle.annotation.EnchantType;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -45,7 +46,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
  * <p>
  * <b>注意：</b>这是一次<b>扩大</b>适用范围的改动——修复后弓也会进入本附魔的
  * 附魔台候选池。若你的服务器不希望弓能附隐形武器，
- * 应当反向修改（把注解的 customType 改成 {@code type = EnchantmentCategory.WEAPON}）
+ * 应当反向修改（把注解的 customType 改成 {@code type = EnchantType.WEAPON}）
  * 并同步删掉上面那段箭矢倍率逻辑。
  * </p>
  *

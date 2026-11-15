@@ -12,6 +12,7 @@ import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantSlot;
+import pers.roinflam.carianstyle.annotation.EnchantType;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
@@ -30,7 +31,7 @@ import pers.roinflam.carianstyle.bus.EventBusSubscriber;
  *
  * @version 2.3
  */
-@AutoRegisterEnchantment(id = "mikaela_blade", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantmentCategory.WEAPON, slots = {EnchantSlot.MAINHAND})
+@AutoRegisterEnchantment(id = "mikaela_blade", category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.RECOLLECT, rarity = EnchantmentRarity.VERY_RARE, type = EnchantType.WEAPON, slots = {EnchantSlot.MAINHAND})
 @EventBusSubscriber
 public class EnchantmentMikaelaBlade extends EnchantmentBase {
 

@@ -14,6 +14,7 @@ import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantSlot;
+import pers.roinflam.carianstyle.annotation.EnchantType;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
@@ -106,7 +107,7 @@ import pers.roinflam.carianstyle.event.LivingTickEvent;
         id = "epilepsy_spread",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.DEAD,
         rarity = EnchantmentRarity.RARE,
-        type = EnchantmentCategory.ARMOR,
+        type = EnchantType.ARMOR,
         slots = {EnchantSlot.HEAD, EnchantSlot.CHEST, EnchantSlot.LEGS, EnchantSlot.FEET}
 )
 public class EnchantmentEpilepsySpread extends EnchantmentBase {

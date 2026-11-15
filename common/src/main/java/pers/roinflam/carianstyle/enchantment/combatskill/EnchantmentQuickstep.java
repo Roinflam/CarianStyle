@@ -8,6 +8,7 @@ import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantSlot;
+import pers.roinflam.carianstyle.annotation.EnchantType;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
@@ -39,7 +40,7 @@ import pers.roinflam.carianstyle.event.PlayerTickEvent;
         id = "quickstep",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
         rarity = EnchantmentRarity.UNCOMMON,
-        type = EnchantmentCategory.ARMOR_FEET,
+        type = EnchantType.ARMOR_FEET,
         slots = {EnchantSlot.FEET}
 )
 @EventBusSubscriber

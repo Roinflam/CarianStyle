@@ -166,7 +166,7 @@ public class EnchantmentRegistry {
         }
 
         // 情况2：使用原版类型（customType 为空）
-        EnchantmentCategory category = annotation.type();
+        EnchantmentCategory category = annotation.type().vanilla();
         LogUtil.debug("卡利亚式附魔 - 使用原版类型：%s", category);
         return category;
     }

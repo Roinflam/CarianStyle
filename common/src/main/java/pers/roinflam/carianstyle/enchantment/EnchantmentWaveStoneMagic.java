@@ -7,6 +7,7 @@ import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantSlot;
+import pers.roinflam.carianstyle.annotation.EnchantType;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -41,7 +42,7 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
         id = "wave_stone_magic",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.VERY_RARE,
-        type = EnchantmentCategory.WEAPON,
+        type = EnchantType.WEAPON,
         slots = {EnchantSlot.MAINHAND},
         conflictsWith = {EnchantmentDoomedDeath.class, EnchantmentDeathBlade.class}
 )

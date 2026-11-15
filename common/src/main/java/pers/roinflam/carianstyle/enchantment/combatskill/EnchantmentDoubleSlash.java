@@ -10,6 +10,7 @@ import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantSlot;
+import pers.roinflam.carianstyle.annotation.EnchantType;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -40,7 +41,7 @@ import pers.roinflam.carianstyle.visual.effect.CarianStyleCombatArtEffects;
         id = "double_slash",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.COMBAT_SKILL,
         rarity = EnchantmentRarity.RARE,
-        type = EnchantmentCategory.WEAPON,
+        type = EnchantType.WEAPON,
         slots = {EnchantSlot.MAINHAND}
 )
 public class EnchantmentDoubleSlash extends EnchantmentBase {

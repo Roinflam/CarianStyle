@@ -11,6 +11,7 @@ import net.minecraft.world.item.enchantment.Enchantments;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantSlot;
+import pers.roinflam.carianstyle.annotation.EnchantType;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -42,7 +43,7 @@ import pers.roinflam.carianstyle.utils.util.DamageSourceUtil;
         id = "pyroxene_ice",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.UNCOMMON,
-        type = EnchantmentCategory.BOW,
+        type = EnchantType.BOW,
         slots = {EnchantSlot.MAINHAND}
         // v2.1修复：移除 conflictsWith = {Enchantments.class}，该配置无效
         // 与火矢(FLAMING_ARROWS)的互斥通过下方 checkCompatibility 方法实现

@@ -9,6 +9,7 @@ import org.apache.commons.lang3.RandomUtils;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantSlot;
+import pers.roinflam.carianstyle.annotation.EnchantType;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.annotation.context.EnchantmentContext;
 import pers.roinflam.carianstyle.annotation.data.EnchantmentDataManager;
@@ -126,7 +127,7 @@ import java.util.List;
         id = "ancient_dragon_lightning",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.DEAD,
         rarity = EnchantmentRarity.RARE,
-        type = EnchantmentCategory.ARMOR_CHEST,
+        type = EnchantType.ARMOR_CHEST,
         slots = {EnchantSlot.CHEST}
 )
 public class EnchantmentAncientDragonLightning extends EnchantmentBase {

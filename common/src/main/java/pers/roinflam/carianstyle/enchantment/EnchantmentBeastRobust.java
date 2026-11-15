@@ -11,6 +11,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantSlot;
+import pers.roinflam.carianstyle.annotation.EnchantType;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.api.IEffectModifier;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
@@ -34,7 +35,7 @@ import pers.roinflam.carianstyle.tuning.EnchantmentValues;
         id = "beast_robust",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.VERY_RARE,
-        type = EnchantmentCategory.ARMOR_CHEST,
+        type = EnchantType.ARMOR_CHEST,
         slots = {EnchantSlot.CHEST},
         forceTreasure = true
 )

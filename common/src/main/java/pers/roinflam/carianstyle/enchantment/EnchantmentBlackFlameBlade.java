@@ -6,6 +6,7 @@ import net.minecraft.world.item.enchantment.EnchantmentCategory;
 import org.jetbrains.annotations.NotNull;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
 import pers.roinflam.carianstyle.annotation.EnchantSlot;
+import pers.roinflam.carianstyle.annotation.EnchantType;
 import pers.roinflam.carianstyle.annotation.EnchantmentRarity;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.config.ConfigLoader;
@@ -33,7 +34,7 @@ import pers.roinflam.carianstyle.utils.helper.dot.DamageOverTimeManager;
         id = "black_flame_blade",
         category = pers.roinflam.carianstyle.annotation.EnchantmentCategory.GENERAL,
         rarity = EnchantmentRarity.RARE,
-        type = EnchantmentCategory.WEAPON,
+        type = EnchantType.WEAPON,
         slots = {EnchantSlot.MAINHAND},
         forceTreasure = true,
         conflictsWith = {

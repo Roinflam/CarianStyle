@@ -22,8 +22,8 @@
     "carianstyle.fabric.client.mixins.json"
   ],
   "depends": {
-    "fabricloader": ">=${fabric_loader_version}",
-    "fabric-api": "*",
+    "fabricloader": ">=${fabric_loader_min}",
+    "fabric-api": ">=${fabric_api_version}",
     "minecraft": "${minecraft_version}",
     "java": ">=17"
   },

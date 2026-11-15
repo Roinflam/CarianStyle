@@ -174,7 +174,7 @@ public final class ItemProbe {
             }
             return custom::canEnchant;
         }
-        EnchantmentCategory type = annotation.type();
+        EnchantmentCategory type = annotation.type().vanilla();
         return type::canEnchant;
     }
 }
