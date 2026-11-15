@@ -80,8 +80,8 @@ import pers.roinflam.carianstyle.visual.client.ShieldWardRenderer;
  * 两边保持一致。
  * </p>
  * <p>
- * <b>{@code remap = false} 是必需的</b>：{@code com.mojang.blaze3d} 下的类
- * 不参与混淆映射，标记 remap 会让 Mixin 去查一个不存在的映射项。
+ * 注入点不写 {@code remap = false}：{@code PoseStack#popPose} 在 Forge 上要换成 SRG 名、在 Fabric 上要换成
+ * intermediary 名，标了不重映射，Fabric 运行期名字对不上会直接起不来。
  * </p>
  *
  * <h3>为什么不注入 HEAD</h3>
@@ -151,8 +151,7 @@ public abstract class MixinItemInHandLayer {
                     + "Lnet/minecraft/client/renderer/MultiBufferSource;I)V",
             at = @At(
                     value = "INVOKE",
-                    target = "Lcom/mojang/blaze3d/vertex/PoseStack;popPose()V",
-                    remap = false
+                    target = "Lcom/mojang/blaze3d/vertex/PoseStack;popPose()V"
             )
     )
     private void carianstyle$renderShieldWard(LivingEntity entity, ItemStack stack,

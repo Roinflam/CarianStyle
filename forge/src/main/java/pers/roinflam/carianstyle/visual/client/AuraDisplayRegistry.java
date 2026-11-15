@@ -7,9 +7,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentEventHandler;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import java.util.ArrayList;
@@ -46,7 +44,6 @@ import java.util.Map;
  *
  * @author RoinFlam
  */
-@OnlyIn(Dist.CLIENT)
 public final class AuraDisplayRegistry {
 
     /**
@@ -239,7 +236,7 @@ public final class AuraDisplayRegistry {
          */
         private Enchantment resolve() {
             if (!resolved) {
-                cached = ForgeRegistries.ENCHANTMENTS.getValue(new ResourceLocation(Reference.MOD_ID, enchantId));
+                cached = BuiltInRegistries.ENCHANTMENT.get(new ResourceLocation(Reference.MOD_ID, enchantId));
                 // 仅在成功解析后才标记完成，否则下次重试
                 resolved = (cached != null);
             }

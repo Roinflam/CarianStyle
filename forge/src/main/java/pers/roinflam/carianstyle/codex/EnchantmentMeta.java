@@ -18,7 +18,7 @@ import java.util.Locale;
 /**
  * 单个附魔的元数据快照（百科界面的数据单元）。
  * <p>
- * 本类在 {@link EnchantmentCodex} 构建索引时创建一次，之后<b>只读</b>。
+ * 本类在 {@link pers.roinflam.carianstyle.client.codex.EnchantmentCodex} 构建索引时创建一次，之后<b>只读</b>。
  * 所有字段在构造期一次性算好，界面渲染时不做任何反射、不做任何字符串拼接，
  * 因为 GUI 的 render 方法是每帧调用的热路径。
  * </p>
@@ -86,7 +86,7 @@ public final class EnchantmentMeta implements CodexEntry {
 
     /**
      * 冲突的本模组附魔 id。
-     * <p>由 {@link EnchantmentCodex} 实测 {@code isCompatibleWith} 得出，
+     * <p>由 {@link pers.roinflam.carianstyle.client.codex.EnchantmentCodex} 实测 {@code isCompatibleWith} 得出，
      * 不只是注解里声明的那些——详见该类的说明。</p>
      */
     private final List<String> conflictIds = new ArrayList<>();
@@ -130,7 +130,7 @@ public final class EnchantmentMeta implements CodexEntry {
      * @param annotation  该附魔类上的自动注册注解
      * @param group       所属自定义分组
      */
-    EnchantmentMeta(@Nonnull Enchantment enchantment,
+    public EnchantmentMeta(@Nonnull Enchantment enchantment,
                     @Nonnull AutoRegisterEnchantment annotation,
                     @Nonnull CodexGroup group) {
         this.enchantment = enchantment;
@@ -169,7 +169,7 @@ public final class EnchantmentMeta implements CodexEntry {
      * 因为 {@code Component.translatable(...).getString()} 在语言表就绪前会返回原始键。
      * </p>
      */
-    void buildSearchIndex() {
+    public void buildSearchIndex() {
         String name = Component.translatable(nameKey).getString();
         String desc = Component.translatable(descKey).getString();
         this.searchIndex = (name + '\u0000' + desc + '\u0000' + id).toLowerCase(Locale.ROOT);
@@ -180,7 +180,7 @@ public final class EnchantmentMeta implements CodexEntry {
      *
      * @param otherId 冲突方的附魔 id
      */
-    void addConflict(@Nonnull String otherId) {
+    public void addConflict(@Nonnull String otherId) {
         if (!otherId.equals(this.id) && !conflictIds.contains(otherId)) {
             conflictIds.add(otherId);
         }
@@ -191,7 +191,7 @@ public final class EnchantmentMeta implements CodexEntry {
      *
      * @param other 冲突方
      */
-    void addForeignConflict(@Nonnull Enchantment other) {
+    public void addForeignConflict(@Nonnull Enchantment other) {
         if (!foreignConflicts.contains(other)) {
             foreignConflicts.add(other);
         }
@@ -203,7 +203,7 @@ public final class EnchantmentMeta implements CodexEntry {
      * @param whole       是否与同类全部其它成员互斥
      * @param memberCount 该分类的成员总数（含自己）
      */
-    void markGroupConflict(boolean whole, int memberCount) {
+    public void markGroupConflict(boolean whole, int memberCount) {
         this.conflictsWholeGroup = whole;
         this.groupMemberCount = memberCount;
     }

@@ -9,11 +9,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
@@ -121,7 +119,6 @@ import pers.roinflam.carianstyle.bus.EventBusSubscriber;
  * @author RoinFlam
  * @version 2.0
  */
-@OnlyIn(Dist.CLIENT)
 @EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class CalamityRenderer {
 
@@ -423,7 +420,7 @@ public final class CalamityRenderer {
     @Nullable
     private static Enchantment resolveCalamity() {
         if (!calamityResolved) {
-            calamityCache = ForgeRegistries.ENCHANTMENTS.getValue(
+            calamityCache = BuiltInRegistries.ENCHANTMENT.get(
                     new ResourceLocation(Reference.MOD_ID, CALAMITY_ID));
             calamityResolved = (calamityCache != null);
         }

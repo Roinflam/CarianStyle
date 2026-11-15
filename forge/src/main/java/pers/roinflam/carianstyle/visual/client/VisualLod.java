@@ -1,7 +1,5 @@
 package pers.roinflam.carianstyle.visual.client;
 
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
 
 /**
  * 世界特效细节层级（LOD）裁剪（纯客户端）。
@@ -51,7 +49,6 @@ import net.minecraftforge.api.distmarker.OnlyIn;
  * @author RoinFlam
  * @version 1.0
  */
-@OnlyIn(Dist.CLIENT)
 public final class VisualLod {
 
     // ==================== 距离维度 ====================

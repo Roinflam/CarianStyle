@@ -3,7 +3,9 @@ package pers.roinflam.carianstyle.codex;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
+import pers.roinflam.carianstyle.client.codex.EnchantmentCodex;
+import pers.roinflam.carianstyle.client.codex.ForeignMeta;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
@@ -147,7 +149,7 @@ public final class ForeignCodex {
         List<ForeignMeta> list = new ArrayList<>();
 
         for (Map.Entry<ResourceKey<Enchantment>, Enchantment> entry
-                : ForgeRegistries.ENCHANTMENTS.getEntries()) {
+                : BuiltInRegistries.ENCHANTMENT.entrySet()) {
 
             Enchantment enchantment = entry.getValue();
             ResourceLocation id = entry.getKey().location();

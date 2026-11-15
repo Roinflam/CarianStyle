@@ -1,7 +1,5 @@
 package pers.roinflam.carianstyle.visual.client;
 
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
 
 /**
  * 世界特效颜色工具（纯客户端）——<b>零堆分配</b>的颜色解包与插值。
@@ -83,7 +81,6 @@ import net.minecraftforge.api.distmarker.OnlyIn;
  * @author RoinFlam
  * @version 1.0
  */
-@OnlyIn(Dist.CLIENT)
 public final class VisualColor {
 
     /** 颜色分量数（R、G、B；alpha 一律由调用方单独传，不进本类） */

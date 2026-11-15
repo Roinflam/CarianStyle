@@ -36,7 +36,7 @@ import java.util.function.Predicate;
  * <h3>性能</h3>
  * <p>
  * 每个附魔探测一次，共 113 × {@link #PROBE_ITEMS}.length 次调用，
- * 只在 {@link EnchantmentCodex} 首次构建索引时执行一次（客户端首次打开界面），
+ * 只在 {@link pers.roinflam.carianstyle.client.codex.EnchantmentCodex} 首次构建索引时执行一次（客户端首次打开界面），
  * 结果固化进 {@link EnchantmentMeta}。不在任何 tick 或 render 路径上。
  * </p>
  *

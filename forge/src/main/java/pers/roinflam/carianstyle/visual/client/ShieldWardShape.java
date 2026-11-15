@@ -3,7 +3,6 @@ package pers.roinflam.carianstyle.visual.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.logging.LogUtils;
-import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.model.BakedQuad;
@@ -13,9 +12,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.extensions.common.IClientItemExtensions;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -24,6 +20,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import pers.roinflam.carianstyle.platform.Services;
 
 /**
  * 把一件物品的模型烘焙成「护鞘几何」：真实轮廓、按距离场分级的面片、以及轮廓边段。
@@ -97,7 +94,6 @@ import javax.annotation.Nullable;
  * @author RoinFlam
  * @version 1.0
  */
-@OnlyIn(Dist.CLIENT)
 public final class ShieldWardShape {
 
     /**
@@ -708,17 +704,11 @@ public final class ShieldWardShape {
      */
     @Nullable
     private static TriSoup captureFromBewlr(ItemStack stack, ItemDisplayContext displayContext) {
-        IClientItemExtensions ext = IClientItemExtensions.of(stack);
-        if (ext == null) {
-            return null;
-        }
-        BlockEntityWithoutLevelRenderer renderer = ext.getCustomRenderer();
-        if (renderer == null) {
-            return null;
-        }
         CaptureBuffer capture = new CaptureBuffer();
-        renderer.renderByItem(stack, displayContext, new PoseStack(), capture,
-                DUMMY_LIGHT, OverlayTexture.NO_OVERLAY);
+        if (!Services.client().renderCustomItem(stack, displayContext, new PoseStack(), capture,
+                DUMMY_LIGHT, OverlayTexture.NO_OVERLAY)) {
+            return null;
+        }
         return capture.soup.count == 0 ? null : capture.soup;
     }
 

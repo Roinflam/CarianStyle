@@ -3,8 +3,6 @@ package pers.roinflam.carianstyle.visual.client;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import org.joml.Matrix4f;
@@ -111,7 +109,6 @@ import pers.roinflam.carianstyle.bus.EventBusSubscriber;
  * @author RoinFlam
  * @version 1.0
  */
-@OnlyIn(Dist.CLIENT)
 @EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class WaterfowlFlurryRenderer {
 

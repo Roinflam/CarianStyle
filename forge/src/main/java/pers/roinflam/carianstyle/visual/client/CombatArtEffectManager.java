@@ -1,14 +1,10 @@
 package pers.roinflam.carianstyle.visual.client;
 
-import net.minecraft.client.Minecraft;
-import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.network.CombatArtEffectPacket;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
-import pers.roinflam.carianstyle.bus.EventBusSubscriber;
-import pers.roinflam.carianstyle.event.client.ClientTickEvent;
 
 /**
  * 战技自绘特效管理器（纯客户端）。
@@ -105,7 +101,6 @@ import pers.roinflam.carianstyle.event.client.ClientTickEvent;
  *
  * @version 1.4
  */
-@EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class CombatArtEffectManager {
 
     /**
@@ -388,11 +383,15 @@ public final class CombatArtEffectManager {
     /**
      * 客户端 tick 末尾：移除到期特效；离开世界时清空。
      *
-     * @param event tick 事件
+     * <p>
+     * 由 {@link CombatArtEffectClientTicker} 每个客户端 tick 调一次。本类只放数据和 {@link #spawn}，
+     * 不碰客户端专有的类，网络包类引用它时两端都能正常加载。
+     * </p>
+     *
+     * @param inWorld 客户端当前是否在世界里
      */
-    @SubscribeEvent
-    public static void onClientTick(ClientTickEvent.Post event) {
-        if (Minecraft.getInstance().level == null) {
+    static void tick(boolean inWorld) {
+        if (!inWorld) {
             ACTIVE.clear();
             return;
         }

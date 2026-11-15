@@ -141,7 +141,7 @@ public class EnchantmentTimeReversal extends EnchantmentBase {
      * <p>
      * <b>定义在附魔类而非渲染器里</b>，与
      * {@code EnchantmentGravitas.GRAVITY_FIELD_SERIAL} 的做法一致：
-     * 渲染器是 {@code @OnlyIn(Dist.CLIENT)} 的，服务端引用它会在
+     * 渲染器只在客户端用，服务端引用它会在
      * Mohist 等混合端引发类加载问题；反过来渲染器引用本类则完全安全。
      * </p>
      */

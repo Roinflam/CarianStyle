@@ -2,8 +2,6 @@ package pers.roinflam.carianstyle.client.gui;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraft.network.chat.Component;
 import pers.roinflam.carianstyle.codex.CodexEntry;
 
@@ -31,7 +29,6 @@ import java.util.List;
  * @author RoinFlam
  * @version 1.0
  */
-@OnlyIn(Dist.CLIENT)
 public final class CodexList {
 
     /** 条目行高 */

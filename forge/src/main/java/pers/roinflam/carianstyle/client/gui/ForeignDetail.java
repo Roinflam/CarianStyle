@@ -5,15 +5,13 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import pers.roinflam.carianstyle.codex.EnchantmentCodex;
+import pers.roinflam.carianstyle.client.codex.EnchantmentCodex;
 import pers.roinflam.carianstyle.codex.EnchantmentSlots;
 import pers.roinflam.carianstyle.codex.EnchantmentMeta;
 import pers.roinflam.carianstyle.codex.ForeignCodex;
 import pers.roinflam.carianstyle.codex.ItemCategoryNamer;
 import pers.roinflam.carianstyle.codex.ModNames;
-import pers.roinflam.carianstyle.codex.ForeignMeta;
+import pers.roinflam.carianstyle.client.codex.ForeignMeta;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -45,7 +43,6 @@ import java.util.List;
  * @author RoinFlam
  * @version 1.0
  */
-@OnlyIn(Dist.CLIENT)
 public final class ForeignDetail {
 
     /** 内容左右内边距 */

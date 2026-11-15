@@ -4,9 +4,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.fml.loading.FMLPaths;
+import pers.roinflam.carianstyle.platform.Services;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
@@ -21,7 +19,6 @@ import java.nio.file.Path;
  * 配置不联网同步，不改变伤害、实际范围或服务端存档；修改文件后重启客户端生效。
  * 缺失项使用默认值，非法项单独回退，损坏文件保留原样以便排查。
  */
-@OnlyIn(Dist.CLIENT)
 public final class ClientVisualConfig {
     /** 客户端特效总开关，关闭后隐藏本配置管理的所有特效及 HUD。 */
     public static boolean enabled = true;
@@ -79,7 +76,7 @@ public final class ClientVisualConfig {
      * 客户端启动时加载并补全配置说明；异常时保留文件并使用默认配置。
      */
     public static void load() {
-        Path path = FMLPaths.CONFIGDIR.get().resolve(Reference.MOD_ID).resolve("client_visual.json");
+        Path path = Services.platform().configDir().resolve(Reference.MOD_ID).resolve("client_visual.json");
         try {
             Files.createDirectories(path.getParent());
             JsonObject root = new JsonObject();

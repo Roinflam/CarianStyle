@@ -8,11 +8,9 @@ import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraft.core.registries.BuiltInRegistries;
 import pers.roinflam.carianstyle.base.enchantment.LevelDecay;
-import pers.roinflam.carianstyle.codex.EnchantmentCodex;
+import pers.roinflam.carianstyle.client.codex.EnchantmentCodex;
 import pers.roinflam.carianstyle.codex.ModNames;
 import pers.roinflam.carianstyle.codex.EnchantmentMeta;
 import pers.roinflam.carianstyle.base.enchantment.EnchantmentBase;
@@ -47,7 +45,6 @@ import java.util.Locale;
  * @author RoinFlam
  * @version 1.0
  */
-@OnlyIn(Dist.CLIENT)
 public final class CodexDetail {
 
     /** 内容左右内边距 */
@@ -729,8 +726,8 @@ public final class CodexDetail {
         // 不排的话是注册表遍历顺序——那个顺序对玩家毫无意义，看着就是乱的
         List<Enchantment> sortedForeign = new ArrayList<>(foreign);
         sortedForeign.sort((a, b) -> {
-            ResourceLocation ka = ForgeRegistries.ENCHANTMENTS.getKey(a);
-            ResourceLocation kb = ForgeRegistries.ENCHANTMENTS.getKey(b);
+            ResourceLocation ka = BuiltInRegistries.ENCHANTMENT.getKey(a);
+            ResourceLocation kb = BuiltInRegistries.ENCHANTMENT.getKey(b);
             if (ka == null || kb == null) {
                 return 0;
             }
@@ -743,7 +740,7 @@ public final class CodexDetail {
         });
 
         for (Enchantment other : sortedForeign) {
-            ResourceLocation id = ForgeRegistries.ENCHANTMENTS.getKey(other);
+            ResourceLocation id = BuiltInRegistries.ENCHANTMENT.getKey(other);
             if (id == null) {
                 continue;
             }

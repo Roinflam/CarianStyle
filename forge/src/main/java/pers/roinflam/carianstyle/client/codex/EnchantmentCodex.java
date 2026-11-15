@@ -1,8 +1,10 @@
-package pers.roinflam.carianstyle.codex;
+package pers.roinflam.carianstyle.client.codex;
 
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 import pers.roinflam.carianstyle.annotation.AutoRegisterEnchantment;
+import pers.roinflam.carianstyle.codex.CodexTheme;
+import pers.roinflam.carianstyle.codex.EnchantmentMeta;
 import pers.roinflam.carianstyle.init.CarianStyleEnchantments;
 import pers.roinflam.carianstyle.utils.util.LogUtil;
 
@@ -208,7 +210,7 @@ public final class EnchantmentCodex {
             }
 
             // 与原版及其它模组的附魔
-            for (Enchantment foreign : ForgeRegistries.ENCHANTMENTS) {
+            for (Enchantment foreign : BuiltInRegistries.ENCHANTMENT) {
                 if (foreign == self || classMap.containsKey(foreign.getClass())) {
                     continue;
                 }

@@ -5,12 +5,9 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.gui.overlay.ForgeGui;
-import net.minecraftforge.client.gui.overlay.IGuiOverlay;
 import pers.roinflam.carianstyle.visual.CarianStyleConditionDisplay;
 import pers.roinflam.carianstyle.config.ClientVisualConfig;
+import pers.roinflam.carianstyle.platform.ClientPlatform;
 import pers.roinflam.carianstyle.visual.CarianStyleStackDisplays;
 import pers.roinflam.carianstyle.visual.StackDisplayRegistry;
 import pers.roinflam.carianstyle.visual.StackHudManager;
@@ -191,8 +188,7 @@ import java.util.Map;
  * @author RoinFlam
  * @version 3
  */
-@OnlyIn(Dist.CLIENT)
-public final class StackHudOverlay implements IGuiOverlay {
+public final class StackHudOverlay implements ClientPlatform.HudLayer {
 
     /** 单例 */
     public static final StackHudOverlay INSTANCE = new StackHudOverlay();
@@ -463,7 +459,9 @@ public final class StackHudOverlay implements IGuiOverlay {
     }
 
     @Override
-    public void render(ForgeGui gui, GuiGraphics graphics, float partialTick, int width, int height) {
+    public void render(GuiGraphics graphics, float partialTick) {
+        int width = graphics.guiWidth();
+        int height = graphics.guiHeight();
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.options.hideGui) {
             return;

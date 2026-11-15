@@ -14,10 +14,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
@@ -29,6 +27,7 @@ import java.util.Iterator;
 import java.util.Map;
 import pers.roinflam.carianstyle.bus.EventBusSubscriber;
 import pers.roinflam.carianstyle.event.client.ClientTickEvent;
+import pers.roinflam.carianstyle.platform.Services;
 
 /**
  * 护盾类附魔的<b>物品局部空间</b>特效渲染器（纯客户端自绘）。
@@ -91,7 +90,6 @@ import pers.roinflam.carianstyle.event.client.ClientTickEvent;
  * @author RoinFlam
  * @version 6.0
  */
-@OnlyIn(Dist.CLIENT)
 @EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class ShieldWardRenderer {
 
@@ -463,7 +461,7 @@ public final class ShieldWardRenderer {
         try {
             // 与原版 ItemRenderer.render 的前两步完全一致（BEWLR 路径同样走这两步）。
             // translate(-0.5,-0.5,-0.5) 是把模型「居中到原点」
-            model.applyTransform(displayContext, poseStack, leftHand);
+            Services.client().applyItemTransform(model, displayContext, poseStack, leftHand);
             poseStack.translate(-0.5f, -0.5f, -0.5f);
             // 挪到物品自身的几何中心：烘焙出来的坐标都是相对这里的
             poseStack.translate(shape.centerX, shape.centerY, 0f);
@@ -1014,7 +1012,7 @@ public final class ShieldWardRenderer {
     @Nullable
     private static Enchantment resolveScholar() {
         if (!scholarResolved) {
-            scholarCache = ForgeRegistries.ENCHANTMENTS.getValue(
+            scholarCache = BuiltInRegistries.ENCHANTMENT.get(
                     new ResourceLocation(Reference.MOD_ID, SCHOLAR_SHIELD_ID));
             scholarResolved = (scholarCache != null);
         }
@@ -1029,7 +1027,7 @@ public final class ShieldWardRenderer {
     @Nullable
     private static Enchantment resolveImmutable() {
         if (!immutableResolved) {
-            immutableCache = ForgeRegistries.ENCHANTMENTS.getValue(
+            immutableCache = BuiltInRegistries.ENCHANTMENT.get(
                     new ResourceLocation(Reference.MOD_ID, IMMUTABLE_SHIELD_ID));
             immutableResolved = (immutableCache != null);
         }

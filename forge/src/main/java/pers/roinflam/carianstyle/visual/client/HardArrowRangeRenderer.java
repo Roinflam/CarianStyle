@@ -9,11 +9,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
@@ -121,7 +119,6 @@ import pers.roinflam.carianstyle.event.client.ClientTickEvent;
  * @author RoinFlam
  * @version 3.1
  */
-@OnlyIn(Dist.CLIENT)
 @EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class HardArrowRangeRenderer {
 
@@ -333,7 +330,7 @@ public final class HardArrowRangeRenderer {
     private static Enchantment resolveHardArrow() {
         if (!resolved) {
             resolved = true;
-            hardArrow = ForgeRegistries.ENCHANTMENTS.getValue(
+            hardArrow = BuiltInRegistries.ENCHANTMENT.get(
                     new ResourceLocation(Reference.MOD_ID, HARD_ARROW_ID));
         }
         return hardArrow;

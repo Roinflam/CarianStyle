@@ -6,13 +6,11 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.codex.CodexEntry;
-import pers.roinflam.carianstyle.codex.EnchantmentCodex;
+import pers.roinflam.carianstyle.client.codex.EnchantmentCodex;
 import pers.roinflam.carianstyle.codex.EnchantmentMeta;
 import pers.roinflam.carianstyle.codex.ForeignCodex;
-import pers.roinflam.carianstyle.codex.ForeignMeta;
+import pers.roinflam.carianstyle.client.codex.ForeignMeta;
 import pers.roinflam.carianstyle.codex.ItemFit;
 
 import javax.annotation.Nonnull;
@@ -50,7 +48,6 @@ import java.util.Map;
  * @author RoinFlam
  * @version 1.0
  */
-@OnlyIn(Dist.CLIENT)
 public final class ItemFilter {
 
     /** 上次放入物品的背包格（{@link Inventory#getItem} 的下标），-1 表示没有 */

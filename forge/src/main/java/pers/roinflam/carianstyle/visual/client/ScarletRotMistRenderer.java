@@ -10,11 +10,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.init.CarianStylePotion;
 import pers.roinflam.carianstyle.network.ClientSyncEffectManager;
@@ -90,7 +88,6 @@ import pers.roinflam.carianstyle.bus.EventBusSubscriber;
  *
  * @author RoinFlam
  */
-@OnlyIn(Dist.CLIENT)
 @EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class ScarletRotMistRenderer {
 
@@ -356,7 +353,7 @@ public final class ScarletRotMistRenderer {
     @Nullable
     private static Enchantment resolveAeonia() {
         if (!aeoniaResolved) {
-            aeoniaCache = ForgeRegistries.ENCHANTMENTS.getValue(
+            aeoniaCache = BuiltInRegistries.ENCHANTMENT.get(
                     new ResourceLocation(Reference.MOD_ID, AEONIA_ENCHANT_ID));
             // 仅在成功解析后才标记完成，否则下次重试
             aeoniaResolved = (aeoniaCache != null);

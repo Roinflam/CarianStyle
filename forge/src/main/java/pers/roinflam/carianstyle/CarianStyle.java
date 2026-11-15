@@ -1,17 +1,15 @@
 package pers.roinflam.carianstyle;
 
-import net.minecraftforge.client.ConfigScreenHandler;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.loading.FMLEnvironment;
-import pers.roinflam.carianstyle.config.ClothConfigScreen;
 import pers.roinflam.carianstyle.config.ConfigLoader;
 import pers.roinflam.carianstyle.annotation.registry.EnchantmentRegistry;
 import pers.roinflam.carianstyle.bus.CarianBus;
+import pers.roinflam.carianstyle.forge.ForgeClientEntry;
 import pers.roinflam.carianstyle.forge.ForgeModEvents;
 import pers.roinflam.carianstyle.forge.forward.ForgeForwarding;
 import pers.roinflam.carianstyle.forge.platform.ForgePlatformRegistry;
@@ -67,15 +65,6 @@ public class CarianStyle {
 
             // 注册设置事件
             modEventBus.addListener(this::commonSetup);
-            modEventBus.addListener(this::clientSetup);
-
-            // 注册配置屏幕
-            ModLoadingContext.get().registerExtensionPoint(
-                    ConfigScreenHandler.ConfigScreenFactory.class,
-                    () -> new ConfigScreenHandler.ConfigScreenFactory(
-                            (minecraft, screen) -> ClothConfigScreen.createConfigScreen(screen)
-                    )
-            );
 
             // 照构建时生成的订阅清单把订阅类登记到本模组总线：先两端的，客户端再登记仅客户端的。
             // 放在构造器最后，和平台自动登记订阅类的时机一样（模组实例建好之后），订阅类的静态初始化照旧晚于内容注册
@@ -85,6 +74,11 @@ public class CarianStyle {
                 subscribers += CarianSubscribers.register(SubscriberSide.CLIENT, CarianBus::register).size();
             }
             LogUtil.info("卡利亚式附魔 - 事件订阅类登记完成，共 %d 个", subscribers);
+
+            // 配置界面、按键、HUD 层和客户端设置阶段
+            if (Services.platform().isClient()) {
+                ForgeClientEntry.init(modEventBus);
+            }
 
             LogUtil.separator();
 
@@ -109,25 +103,6 @@ public class CarianStyle {
         } catch (Exception e) {
             LogUtil.error("卡利亚式附魔 - 通用设置阶段发生错误", e);
             throw new RuntimeException("卡利亚式附魔通用设置失败", e);
-        }
-    }
-
-    /**
-     * 客户端设置阶段
-     */
-    private void clientSetup(final FMLClientSetupEvent event) {
-        LogUtil.separator();
-        LogUtil.info("卡利亚式附魔 - 开始客户端设置阶段");
-
-        try {
-            // 使用客户端处理器处理客户端设置
-            ClientSetupHandler.onClientSetup(event);
-            LogUtil.info("卡利亚式附魔 - 客户端设置阶段完成");
-            LogUtil.separator();
-
-        } catch (Exception e) {
-            LogUtil.error("卡利亚式附魔 - 客户端设置阶段发生错误", e);
-            throw new RuntimeException("卡利亚式附魔客户端设置失败", e);
         }
     }
 }

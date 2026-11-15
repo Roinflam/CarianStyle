@@ -1,16 +1,12 @@
 package pers.roinflam.carianstyle.potion;
 
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.entity.LivingEntity;
 import pers.roinflam.carianstyle.event.damage.LivingDamageEvent;
 import pers.roinflam.carianstyle.bus.EventPriority;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.base.potion.icon.IconBase;
-import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
 import pers.roinflam.carianstyle.bus.EventBusSubscriber;
@@ -64,12 +60,5 @@ public class MobEffectProtectionOfTheErdtree extends IconBase {
     @Override
     public boolean isDurationEffectTick(int duration, int amplifier) {
         return true;
-    }
-
-    @Nonnull
-    @Override
-    @OnlyIn(Dist.CLIENT)
-    protected ResourceLocation getIconTexture() {
-        return new ResourceLocation(Reference.MOD_ID, "textures/mob_effect/protection_of_the_erdtree.png");
     }
 }

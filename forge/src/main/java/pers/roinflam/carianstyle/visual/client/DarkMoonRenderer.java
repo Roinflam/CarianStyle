@@ -9,11 +9,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.event.client.RenderLevelStageEvent;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 import org.joml.Matrix4f;
 import pers.roinflam.carianstyle.utils.Reference;
 import pers.roinflam.carianstyle.visual.toggle.VisualEffectType;
@@ -169,7 +167,6 @@ import pers.roinflam.carianstyle.bus.EventBusSubscriber;
  * @author RoinFlam
  * @version 3.0
  */
-@OnlyIn(Dist.CLIENT)
 @EventBusSubscriber(side = EventBusSubscriber.Side.CLIENT)
 public final class DarkMoonRenderer {
 
@@ -513,7 +510,7 @@ public final class DarkMoonRenderer {
     @Nullable
     private static Enchantment resolveDarkMoon() {
         if (!darkMoonResolved) {
-            darkMoonCache = ForgeRegistries.ENCHANTMENTS.getValue(
+            darkMoonCache = BuiltInRegistries.ENCHANTMENT.get(
                     new ResourceLocation(Reference.MOD_ID, DARK_MOON_ID));
             darkMoonResolved = (darkMoonCache != null);
         }
@@ -528,7 +525,7 @@ public final class DarkMoonRenderer {
     @Nullable
     private static Enchantment resolveFullMoon() {
         if (!fullMoonResolved) {
-            fullMoonCache = ForgeRegistries.ENCHANTMENTS.getValue(
+            fullMoonCache = BuiltInRegistries.ENCHANTMENT.get(
                     new ResourceLocation(Reference.MOD_ID, FULL_MOON_ID));
             fullMoonResolved = (fullMoonCache != null);
         }

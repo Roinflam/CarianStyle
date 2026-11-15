@@ -5,8 +5,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
 import pers.roinflam.carianstyle.bus.SubscribeEvent;
 import pers.roinflam.carianstyle.platform.Services;
 
@@ -503,7 +501,6 @@ public class ClientSyncEffectManager {
      * @param entityId     实体网络 ID
      * @return 应渲染返回 true
      */
-    @OnlyIn(Dist.CLIENT)
     public static boolean shouldRenderEffect(int serialNumber, int entityId) {
         return CLIENT_PROXY.shouldRenderEffect(serialNumber, entityId);
     }
@@ -532,7 +529,6 @@ public class ClientSyncEffectManager {
     }
 
     /** 客户端实现：使用 Set 保证 O(1) 查询 */
-    @OnlyIn(Dist.CLIENT)
     private static class ClientCacheProxyImpl implements IClientCacheProxy {
         private final Map<Integer, Set<Integer>> cache = new ConcurrentHashMap<>();
 

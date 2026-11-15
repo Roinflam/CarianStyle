@@ -90,7 +90,7 @@ import pers.roinflam.carianstyle.visual.client.CombatArtEffectManager;
  * <b>方向声明：</b>本包已在 {@link CarianNetwork} 里登记为只许服务端发往客户端
  * （{@code NetworkDirection.PLAY_TO_CLIENT}）。服务端收到反向包会被 Forge 在分发入口
  * 直接拒绝，处理器根本不会进入——这从源头消除了下方 {@link #handle} 注释里提到的
- * 「服务端引用 {@code @OnlyIn(CLIENT)} 类」的顾虑，比 {@code DistExecutor} 更彻底。
+ * 「服务端引用仅客户端的类」的顾虑，比 {@code DistExecutor} 更彻底。
  * </p>
  *
  * @version 1.5
@@ -421,7 +421,7 @@ public class CombatArtEffectPacket {
      * 直接在主线程任务里调用 {@link CombatArtEffectManager#spawn}——该方法只操作普通列表、
      * 不引用任何客户端专有渲染类，双端加载安全（与项目现有 {@code AoeEffectPacket} 一致），
      * 因此无需 {@code DistExecutor} 包裹。这样可避免在 Mohist 等混合端因
-     * 「服务端引用 {@code @OnlyIn(CLIENT)} 类」而引发的类加载问题。
+     * 「服务端引用仅客户端的类」而引发的类加载问题。
      * </p>
      *
      * @param packet 收到的包
