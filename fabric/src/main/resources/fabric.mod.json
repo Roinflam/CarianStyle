@@ -3,12 +3,14 @@
   "id": "${mod_id}",
   "version": "${version}",
   "name": "${mod_name}",
-  "description": "Carian Style!",
+  "description": "Carian Style! Two libraries are bundled unmodified as separate jar-in-jar files. Forge Config API Port by Fuzss reads the config files. It is licensed under MPL-2.0, its classes taken from Forge are licensed under LGPL-2.1-only, and the Night Config library it includes, by TheElectronWill, is licensed under LGPL-3.0. Source: https://github.com/Fuzss/forgeconfigapiport. Cloth Config API by shedaniel provides the config screen and is licensed under LGPL-3.0. Source: https://github.com/shedaniel/cloth-config. ELDEN RING is a trademark of FromSoftware / BANDAI NAMCO. This is an unofficial fan-made mod and is not affiliated with them. / 本模组内嵌以下两个库，均未作修改，以独立 jar-in-jar 形式提供。Forge Config API Port 由 Fuzss 编写，用于读取配置文件，采用 MPL-2.0 许可，其中取自 Forge 的类采用 LGPL-2.1-only 许可，其附带的 Night Config 由 TheElectronWill 编写，采用 LGPL-3.0 许可。源码：https://github.com/Fuzss/forgeconfigapiport 。Cloth Config API 由 shedaniel 编写，用于配置界面，采用 LGPL-3.0 许可。源码：https://github.com/shedaniel/cloth-config 。《艾尔登法环》相关名称与美术素材版权归 FromSoftware / BANDAI NAMCO 所有，本模组为非官方同人作品，与其无关联。",
   "authors": ["${mod_author}"],
   "contact": {
-    "homepage": "https://www.curseforge.com/minecraft/mc-mods/carianstyle"
+    "homepage": "https://www.curseforge.com/minecraft/mc-mods/carianstyle",
+    "sources": "https://github.com/Roinflam/CarianStyle"
   },
   "license": "${mod_license}",
+  "icon": "logo.png",
   "environment": "*",
   "entrypoints": {
     "main": ["pers.roinflam.carianstyle.fabric.CarianStyleFabric"],
