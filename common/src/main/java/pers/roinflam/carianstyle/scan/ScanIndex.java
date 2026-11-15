@@ -250,8 +250,8 @@ public final class ScanIndex {
     }
 
     /**
-     * 本类所在的根，加上清单里每个类所在的根。1.20.1 开发环境里附魔类、订阅类还在平台模块的编译输出里，
-     * 和 common 不在同一个根，只扫本类的根会把整份清单都判成多出来的。找不到类文件的跳过，重扫时自然报出来。
+     * 本类所在的根，加上清单里每个类所在的根。附魔类、订阅类现在和本类都在 common 的编译输出里，通常只有一个根；
+     * 收别的根是兜底：开发环境的类路径把类拆到别处时，只扫本类的根会把整份清单判成多出来的。找不到类文件的跳过，重扫时自然报出来。
      */
     private static List<Path> developmentRoots(List<String> enchantmentLines, List<String> subscriberLines) {
         Set<Path> roots = new LinkedHashSet<>();

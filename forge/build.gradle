@@ -9,6 +9,14 @@ loom {
         // 指定 Mixin 配置文件路径，文件名从 gradle.properties 读取
         mixinConfig "${rootProject.mod_id}.mixins.json"
     }
+    // 开发运行时 common 的输出和本模块算同一个模组。两边共用 pers.roinflam.carianstyle 等包（主类、
+    // RockBlasterProbeEvent 的全名不能改），分成两个模块的话 Forge 建模块层时报「两个模块导出同一个包」起不来
+    mods {
+        "${rootProject.mod_id}" {
+            sourceSet sourceSets.main
+            sourceSet 'main', project(':common')
+        }
+    }
 }
 
 // 声明这是 Forge 平台的子项目
@@ -28,7 +36,7 @@ configurations {
     // 让编译类路径和运行时类路径都包含 common 配置的内容
     compileClasspath.extendsFrom common
     runtimeClasspath.extendsFrom common
-    developmentForge.extendsFrom common
+    // 不进 developmentForge：进了的话 Architectury 会把 common 的开发 jar 另做成一个假模组，和上面的模组撞包
 
     // shadowBundle 配置：这里面的依赖会被打包进最终的 jar
     shadowBundle {
@@ -61,20 +69,6 @@ dependencies {
     // 将 common 模块的代码打包进最终 jar
     shadowBundle project(path: ':common', configuration: 'transformProductionForge')
 
-}
-
-// 类清单（附魔类、事件订阅类）由 common 的 generateScanIndex 扫本模块的编译输出生成，打进本模块的资源
-configurations {
-    commonScanIndex {
-        canBeResolved = true
-        canBeConsumed = false
-    }
-}
-dependencies {
-    commonScanIndex project(path: ':common', configuration: 'scanIndexElements')
-}
-processResources {
-    from configurations.commonScanIndex
 }
 
 // 处理资源文件：将占位符替换为实际值

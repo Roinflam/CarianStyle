@@ -2,6 +2,11 @@ architectury {
     common rootProject.enabled_platforms.split(',')
 }
 
+// 原版里两处 Forge、Fabric 都已替所有模组放开的成员，common 对纯原版编译时也照样放开（规矩写在文件开头）
+loom {
+    accessWidenerPath = file('compile.accesswidener')
+}
+
 repositories {
     maven { url 'https://repo.spongepowered.org/repository/maven-public/' }          // Mixin 注解
     maven { url 'https://raw.githubusercontent.com/Fuzss/modresources/main/maven/' } // Forge Config API Port
@@ -50,24 +55,24 @@ dependencies {
 
 test {
     useJUnitPlatform()
+    // 主资源里有生成的类清单，单测要验「缺清单就抛异常」，不把主资源放进单测类路径（单测都不碰游戏资源）
+    def mainResources = sourceSets.main.output.resourcesDir
+    classpath = classpath.filter { it != mainResources }
 }
 
-// 类清单（附魔类、事件订阅类）：用 ASM 扫编译输出，把带 @AutoRegisterEnchantment 的类和带总线订阅注解的类写成
+// 类清单（附魔类、事件订阅类）：用 ASM 扫 common 的编译输出，把带 @AutoRegisterEnchantment 的类和带总线订阅注解的类写成
 // META-INF/carianstyle/enchantments.list、subscribers.list，运行期照清单加载（格式见 scan/ScanIndex）。
-// 业务代码还在 forge 模块里，先扫 forge 的编译输出；整体挪进 common 那一批改成扫 common 自己的输出，
-// 那时清单可以直接进 common 的资源（Architectury 下 common 只编一次、经 shadow 打进两个平台的 jar）。
-// common 的 processResources 现在不能依赖这个任务：forge 编译要 common 的 jar，会成环。
+// 清单进 common 的资源，随 common 经 shadow 打进两个平台的 jar。
+// 只扫 common：平台模块里没有附魔类和自带总线的订阅类。以后要在平台模块放订阅类，得另扫平台的输出。
 def scanIndexDir = layout.buildDirectory.dir('generated/scanindex')
-def scanIndexInput = project(':forge').layout.buildDirectory.dir('classes/java/main')
+def scanIndexInput = sourceSets.main.output.classesDirs
 
 def generateScanIndex = tasks.register('generateScanIndex', JavaExec) {
     group = 'build'
     description = '扫编译输出，生成附魔类、事件订阅类清单'
-    // common 先于 forge 配置，拿不到 forge 的任务对象，只能按路径写依赖
-    dependsOn ':forge:compileJava'
 
     // 输入是整个编译输出目录：加类、删类、改名、改注解都会让任务重跑
-    inputs.dir(scanIndexInput).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName('classes')
+    inputs.files(scanIndexInput).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName('classes')
     outputs.dir(scanIndexDir).withPropertyName('scanIndex')
 
     classpath = files(sourceSets.main.output.classesDirs, configurations.scanIndexTool)
@@ -77,18 +82,134 @@ def generateScanIndex = tasks.register('generateScanIndex', JavaExec) {
         scanIndexDir.get().asFile.deleteDir()
     }
     argumentProviders.add({
-        [scanIndexDir.get().asFile.absolutePath, scanIndexInput.get().asFile.absolutePath]
+        [scanIndexDir.get().asFile.absolutePath] + scanIndexInput.files.findAll { it.exists() }.collect { it.absolutePath }
     } as CommandLineArgumentProvider)
 }
 
-configurations {
-    scanIndexElements {
-        canBeResolved = false
-        canBeConsumed = true
+processResources {
+    from(generateScanIndex)
+}
+
+// ==================== 源码规则检查 ====================
+// common 的源码在 Forge 客户端、Forge 专用服、Fabric 客户端、Fabric 专用服上都要能加载，下面四条编译器管不到，
+// 构建时逐个文件查（注释和字符串里的不算），违反就构建失败：
+// 1. 客户端类（net.minecraft.client.*、com.mojang.blaze3d.*，以及原版专用服上没有的 LWJGL、Realms、朗读库）
+//    只许出现在客户端包里。双端代码在专用服上照样加载，
+//    引用了客户端类，一解析到就 NoClassDefFoundError；客户端包里的类只从客户端入口加载。
+//    event/client/ 的事件类、platform/ClientPlatform 的签名本来就是客户端类型，也只在客户端取用，算客户端包；
+//    config/ClothConfigScreen 是配置界面，只从客户端入口打开。
+// 2. 配置库（ForgeConfigSpec 和它底下的 Night Config，Fabric 上由 Forge Config API Port 提供）和 Cloth Config 是
+//    common 编译类路径上仅有的两个非原版依赖：配置库只许出现在 config/，Cloth 是客户端界面库，只许 config/ClothConfigScreen 用；
+//    加载器自己的类（Forge、Fabric、Architectury）哪里都不许出现，
+//    平台差异一律走 platform/ 的接口。
+// 3. 不用 @OnlyIn / @Environment：客户端代码靠「只放在客户端包、只从客户端入口加载」隔开，不靠加载器剥方法
+//    （两个加载器的剥法不一样，Fabric 上根本没有 @OnlyIn）。
+// 4. 双端代码也不许经本模组的客户端包间接用到客户端类：非客户端包引用客户端包里的类同样算违规，
+//    已知安全的几处写在 clientPackageExceptions 里（新加一处要写明为什么在专用服上不会加载）。
+//    mixin 配置里 client. 开头的只许放在 "client" 组，其余不许放进 "client" 组；
+//    非客户端包的 @Mixin(targets = "...") 不许指向客户端类。
+// 同包里不写包名的引用、var 推出来的类型这类文本上看不出来的，这里查不到，靠第 4 条把双端调客户端包整体卡住。
+def sourceRulesRoot = file('src/main/java/pers/roinflam/carianstyle')
+def sourceRulesMixins = file('src/main/resources/carianstyle.mixins.json')
+def sourceRulesMarker = layout.buildDirectory.file('checkSourceRules/ok.txt')
+
+def checkSourceRules = tasks.register('checkSourceRules') {
+    group = 'verification'
+    description = '查 common 源码：客户端类只在客户端包、配置库只在 config/、不用 @OnlyIn'
+    inputs.dir(sourceRulesRoot).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName('sources')
+    inputs.file(sourceRulesMixins).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName('mixinConfig')
+    outputs.file(sourceRulesMarker).withPropertyName('marker')
+
+    doLast {
+        def clientDirs = ['client/', 'visual/client/', 'dynamicattr/clientsync/', 'entity/render/', 'mixin/client/', 'event/client/']
+        def clientFiles = ['config/ClothConfigScreen.java', 'platform/ClientPlatform.java']
+        def configDirs = ['config/']
+        // 配置库在 config/ 里可以用的包（两个平台上类名相同：Forge 自带，Fabric 由 Forge Config API Port 提供；
+        // Night Config 是它们底下的文件格式库，两个平台运行期都有）
+        def configPrefixes = ['net.minecraftforge.common.ForgeConfigSpec', 'net.minecraftforge.fml.config.',
+                              'com.electronwill.nightconfig.']
+        // Cloth Config 是客户端界面库，只许配置界面用
+        def clothPrefix = 'me.shedaniel.'
+        def clothFiles = ['config/ClothConfigScreen.java']
+        // 非客户端包引用客户端包的已知安全处：文件 -> 被引用的类
+        def clientPackageExceptions = [
+                // 双端的特效管理器，本身不引用客户端类；收包后的处理只在客户端执行
+                'network/AoeEffectPacket.java'      : ['pers.roinflam.carianstyle.visual.client.AoeEffectManager'],
+                'network/CombatArtEffectPacket.java': ['pers.roinflam.carianstyle.visual.client.CombatArtEffectManager'],
+                // 只用在 side = CLIENT 的内部订阅类里，专用服上不登记、不加载
+                'tuning/ValueSyncHandler.java'      : ['pers.roinflam.carianstyle.event.client.ClientPlayerNetworkEvent'],
+        ]
+
+        // 注释、文本块、字符串、字符字面量整段换成空格（保留换行，行号不变）；文本块要在普通字符串之前匹配
+        def stripper = ~/(?s)\/\*.*?\*\/|\/\/[^\n]*|"""(?:\\.|(?!""").)*?"""|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'/
+        // 原版专用服上没有的：客户端类、渲染、LWJGL、Realms、朗读
+        def clientNs = /(?:net\.minecraft\.client|com\.mojang\.blaze3d|com\.mojang\.realmsclient|com\.mojang\.text2speech|org\.lwjgl)/
+        def clientRef = ~/\b${clientNs}\.[\w.]*/
+        def clientTarget = ~/\btargets\s*=\s*\{?\s*"(${clientNs}[\w.\/]*)/
+        def projectClientRef = ~/\bpers\.roinflam\.carianstyle\.(?:client|visual\.client|dynamicattr\.clientsync|entity\.render|mixin\.client|event\.client|config\.ClothConfigScreen|platform\.ClientPlatform)\b[\w.]*/
+        def loaderRef = ~/\b(?:net\.neoforged|net\.minecraftforge|net\.fabricmc|dev\.architectury|cpw\.mods|me\.shedaniel|fuzs\.forgeconfigapiport|com\.electronwill\.nightconfig)\.[\w.]*/
+        def sideAnnotation = ~/@\s*(?:[\w.]+\.)?(?:OnlyIn|Environment)\b/
+
+        def problems = []
+        def lineOf = { String text, int index -> text.substring(0, index).count('\n') + 1 }
+        sourceRulesRoot.eachFileRecurse(groovy.io.FileType.FILES) { File f ->
+            if (!f.name.endsWith('.java')) return
+            def rel = sourceRulesRoot.toPath().relativize(f.toPath()).toString().replace('\\', '/')
+            def raw = f.getText('UTF-8')
+            def code = raw.replaceAll(stripper) { String s -> s.replaceAll(/[^\n]/, ' ') }
+
+            boolean clientOk = clientDirs.any { rel.startsWith(it) } || clientFiles.contains(rel)
+            boolean configOk = configDirs.any { rel.startsWith(it) }
+
+            if (!clientOk) {
+                def m = clientRef.matcher(code)
+                while (m.find()) problems << "${rel}:${lineOf(code, m.start())}: 客户端类只许在客户端包里用：${m.group()}"
+                def mp = projectClientRef.matcher(code)
+                while (mp.find()) {
+                    def name = mp.group()
+                    if (clientPackageExceptions[rel]?.any { name == it || name.startsWith(it + '.') }) continue
+                    problems << "${rel}:${lineOf(code, mp.start())}: 双端代码不许引用客户端包里的类：${name}"
+                }
+                // 字符串在 code 里已经抹掉，@Mixin(targets = "...") 要看原文
+                def mt = clientTarget.matcher(raw)
+                while (mt.find()) problems << "${rel}:${lineOf(raw, mt.start())}: 指向客户端类的 mixin 只许放在 mixin/client/：${mt.group(1)}"
+            }
+            def m2 = loaderRef.matcher(code)
+            while (m2.find()) {
+                def name = m2.group()
+                if (name.startsWith(clothPrefix)) {
+                    if (clothFiles.contains(rel)) continue
+                    problems << "${rel}:${lineOf(code, m2.start())}: Cloth Config 只许在配置界面（config/ClothConfigScreen）里用：" + name
+                    continue
+                }
+                if (configOk && configPrefixes.any { name.startsWith(it) }) continue
+                problems << "${rel}:${lineOf(code, m2.start())}: " +
+                        (configPrefixes.any { name.startsWith(it) } ? "配置库只许在 config/ 里用：" : "common 里不许引用加载器的类，走 platform/ 接口：") + name
+            }
+            def m3 = sideAnnotation.matcher(code)
+            while (m3.find()) problems << "${rel}:${lineOf(code, m3.start())}: 不用 @OnlyIn / @Environment，客户端代码放客户端包"
+        }
+
+        // mixin 配置：客户端 mixin 放错组，专用服上一加载目标类就崩
+        def mixinConfig = new groovy.json.JsonSlurper().parse(sourceRulesMixins, 'UTF-8')
+        ['mixins', 'server', 'client'].each { group ->
+            (mixinConfig[group] ?: []).each { String name ->
+                boolean isClient = name.startsWith('client.')
+                if (group == 'client' && !isClient) problems << "carianstyle.mixins.json: \"client\" 组里只放 mixin/client/ 下的类：${name}"
+                if (group != 'client' && isClient) problems << "carianstyle.mixins.json: mixin/client/ 下的类只许放进 \"client\" 组：${name}（现在在 \"${group}\"）"
+            }
+        }
+
+        def out = sourceRulesMarker.get().asFile
+        out.parentFile.mkdirs()
+        if (!problems.isEmpty()) {
+            out.delete()
+            problems.sort().each { logger.error(it) }
+            throw new GradleException("common 源码规则检查没过，共 ${problems.size()} 处（见上面每一行；规则写在 common/build.gradle 的 checkSourceRules 上方）")
+        }
+        out.text = 'ok\n'
     }
 }
-artifacts {
-    scanIndexElements(scanIndexDir) {
-        builtBy generateScanIndex
-    }
-}
+
+tasks.named('check') { dependsOn checkSourceRules }
+tasks.named('classes') { dependsOn checkSourceRules }
