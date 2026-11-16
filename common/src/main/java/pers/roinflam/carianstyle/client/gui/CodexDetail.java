@@ -191,7 +191,6 @@ public final class CodexDetail {
      */
     public void render(@Nonnull GuiGraphics g, @Nonnull Font font, int mouseX, int mouseY) {
         UiTheme.panel(g, x, y, width, height, UiTheme.PANEL);
-        UiTheme.corners(g, x, y, width, height, 8, UiTheme.tint());
         conflictHits.clear();
         levelHits.clear();
 
@@ -256,7 +255,7 @@ public final class CodexDetail {
         // enchantment_values.json 和 uninstallEnchantment 用的机器名，不是名字的一部分。
         // 现在压到同一行的右端并加上「ID」前缀：需要它的人一眼能抄走，
         // 不需要它的人视线会直接掠过去。
-        g.drawString(font, meta.getDisplayName(), left, cursorY, UiTheme.tint(), false);
+        g.drawString(font, meta.getDisplayName(), left, cursorY, UiTheme.ACCENT, false);
         DetailSections.idChip(g, font, meta.getId(), left, cursorY, innerWidth,
                 left + font.width(meta.getDisplayName()) + 16);
         cursorY += font.lineHeight + 8;
@@ -952,5 +951,17 @@ public final class CodexDetail {
             this.height = height;
             this.targetId = targetId;
         }
+    }
+
+    public void setLarge(boolean large) {
+    }
+
+    public void playOpen(long start) {
+    }
+
+    public void playSelect() {
+    }
+
+    public void pulse() {
     }
 }

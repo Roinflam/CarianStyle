@@ -129,7 +129,6 @@ public final class ForeignDetail {
      */
     public void render(@Nonnull GuiGraphics g, @Nonnull Font font, int mouseX, int mouseY) {
         UiTheme.panel(g, x, y, width, height, UiTheme.PANEL);
-        UiTheme.corners(g, x, y, width, height, 8, UiTheme.tint());
         hits.clear();
         levelHits.clear();
 
@@ -180,7 +179,7 @@ public final class ForeignDetail {
     private int renderTitle(@Nonnull GuiGraphics g, @Nonnull Font font, int cursorY, int innerWidth) {
         int left = x + PADDING;
 
-        g.drawString(font, meta.getDisplayName(), left, cursorY, UiTheme.tint(), false);
+        g.drawString(font, meta.getDisplayName(), left, cursorY, UiTheme.ACCENT, false);
         DetailSections.idChip(g, font, meta.getKey(), left, cursorY, innerWidth,
                 left + font.width(meta.getDisplayName()) + 16);
         cursorY += font.lineHeight + 8;
@@ -661,5 +660,17 @@ public final class ForeignDetail {
             this.height = height;
             this.targetKey = targetKey;
         }
+    }
+
+    public void setLarge(boolean large) {
+    }
+
+    public void playOpen(long start) {
+    }
+
+    public void playSelect() {
+    }
+
+    public void pulse() {
     }
 }

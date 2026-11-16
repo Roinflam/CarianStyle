@@ -152,7 +152,6 @@ public final class CodexList {
      */
     public void render(@Nonnull GuiGraphics g, @Nonnull Font font, int mouseX, int mouseY) {
         UiTheme.panel(g, x, y, width, height, UiTheme.PANEL);
-        UiTheme.corners(g, x, y, width, height, 8, UiTheme.ACCENT);
 
         boolean mouseInside = UiTheme.hit(mouseX, mouseY, x, y, width, height);
 
@@ -235,10 +234,10 @@ public final class CodexList {
             // 选中行的竖条以 2.4 秒为周期轻微呼吸：在一屏 20 行里，
             // 这是唯一还在动的元素，视线离开又回来时能立刻找回选中项
             g.fill(x + 1, rowY, x + 3, rowY + ROW_HEIGHT,
-                    UiTheme.withAlpha(UiTheme.ACCENT, UiTheme.breathe(UiTheme.time(), 2.4f, 0.55f)));
+                    UiTheme.ACCENT);
         } else if (hovered) {
             // 渐变而非纯色：像一道光从左扫过这一行，不会把文字压暗
-            UiTheme.gradientRow(g, x + 1, rowY, width - 5, ROW_HEIGHT, UiTheme.PANEL_HOVER);
+            g.fill(x + 1, rowY, x + width - 4, rowY + ROW_HEIGHT, UiTheme.PANEL_HOVER);
         }
 
         int nameColor = selected ? UiTheme.ACCENT : (meta.isRowDimmed() ? UiTheme.TEXT_DIM : UiTheme.TEXT);
@@ -275,7 +274,7 @@ public final class CodexList {
         }
 
         // 右侧稀有度圆点：颜色即稀有度，不占宽度，也不需要玩家解读缩写
-        UiTheme.dot(g, x + width - 11, rowY + ROW_HEIGHT / 2, meta.getRarityColor());
+        UiTheme.phase(g, UiTheme.phaseOf(meta), x + width - 15, rowY + ROW_HEIGHT / 2 - 4, 1f, 0f);
     }
 
 

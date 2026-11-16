@@ -176,7 +176,6 @@ final class InventoryPicker {
         // 投影：选择器浮在内容之上，给一圈暗边让它和底下的列表分开
         g.fill(x - 2, y - 2, x + width + 2, y + height + 2, 0x66000000);
         UiTheme.panel(g, x, y, width, height, UiTheme.PANEL);
-        UiTheme.corners(g, x, y, width, height, 6, UiTheme.ACCENT);
 
         g.drawString(font, Component.translatable("carianstyle.codex.filter.picker_title"),
                 x + PAD, y + PAD, UiTheme.ACCENT, false);
