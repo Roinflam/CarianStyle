@@ -4,6 +4,7 @@
   "compatibilityLevel": "JAVA_17",
   "mixins": [
     "MixinEffectModifier",
+    "ServerPlayerGameModeMixin",
     "helper.DamageSourceMixin",
     "accessor.DamageSourceInvoker",
     "accessor.LivingEntityAccessor",

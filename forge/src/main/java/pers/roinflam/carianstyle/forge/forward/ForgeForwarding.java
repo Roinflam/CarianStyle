@@ -53,9 +53,9 @@ public final class ForgeForwarding {
     public static <P extends net.minecraftforge.eventbus.api.Event, W extends Event> void forward(
             Class<P> platformType, Class<? extends Event> busType, Class<W> wrapperType, Function<P, W> wrap) {
         Target<P> target = target(busType, wrapperType, wrap);
-        EventPriority[] mine = EventPriority.values();
-        for (net.minecraftforge.eventbus.api.EventPriority p : net.minecraftforge.eventbus.api.EventPriority.values()) {
-            EventPriority phase = mine[p.ordinal()];
+        // 有的服务端的事件总线在五档之外另加优先级，按名字对，多出来的不挂
+        for (EventPriority phase : EventPriority.values()) {
+            net.minecraftforge.eventbus.api.EventPriority p = net.minecraftforge.eventbus.api.EventPriority.valueOf(phase.name());
             MinecraftForge.EVENT_BUS.addListener(p, true, platformType, e -> target.forwarder.phase(e, phase));
         }
         CarianBus.provide(busType);
@@ -66,9 +66,8 @@ public final class ForgeForwarding {
      * 没有对应模组事件的那一相位传 null，不转发。START 和 END 是两个不同的事件对象，各走各的 {@link PhasedForwarder}。
      */
     public static <P extends TickEvent> void forwardTick(Class<P> platformType, @Nullable Target<P> start, @Nullable Target<P> end) {
-        EventPriority[] mine = EventPriority.values();
-        for (net.minecraftforge.eventbus.api.EventPriority p : net.minecraftforge.eventbus.api.EventPriority.values()) {
-            EventPriority phase = mine[p.ordinal()];
+        for (EventPriority phase : EventPriority.values()) {
+            net.minecraftforge.eventbus.api.EventPriority p = net.minecraftforge.eventbus.api.EventPriority.valueOf(phase.name());
             MinecraftForge.EVENT_BUS.addListener(p, true, platformType, e -> {
                 Target<P> t = e.phase == TickEvent.Phase.START ? start : end;
                 if (t != null) {

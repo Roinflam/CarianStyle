@@ -298,6 +298,8 @@
   "config.carianstyle.enableTrueDamage.tooltip": "启用后使用复杂的字段检测来绕过护甲和保护\n这可以让真伤对所有生物（包括模组生物）都有效\n§7true§r = 使用高级检测（推荐，默认）\n§7false§r = 使用简单的setHealth方法\n\n§c注意：§r禁用后某些模组生物可能无法受到真伤\n但性能会稍微提升一些",
   "config.carianstyle.rockBlasterSuppressCommonDrops": "碎岩者：抑制常见石头掉落物",
   "config.carianstyle.rockBlasterSuppressCommonDrops.tooltip": "启用后，碎岩者破坏常见石头类方块时不会产生掉落物\n受影响方块：石头、圆石、深板岩、粗深板岩、花岗岩、\n闪长岩、安山岩、凝灰岩、方解石、平滑玄武岩、\n沙砾、地狱岩、玄武岩、黑石、末地石\n可有效防止大量掉落物导致的卡顿\n§7false§r = 正常掉落(默认)\n§7true§r = 常见石头不掉落",
+  "config.carianstyle.rockBlasterDirectDigOnly": "碎岩者：仅响应亲手挖掘",
+  "config.carianstyle.rockBlasterDirectDigOnly.tooltip": "启用后，只有玩家亲手挖掉的那一格方块会触发碎岩者的连带挖掘\n其他模组的范围挖掘工具、连锁挖掘功能或机器破坏的方块\n不再各自触发连带挖掘，以免挖掘量成倍叠加造成卡顿\n§7true§r = 仅响应亲手挖掘(默认)\n§7false§r = 任何方块破坏均可触发",
   "config.carianstyle.allowMobTriggerEnchantments": "允许怪物触发附魔",
   "config.carianstyle.allowMobTriggerEnchantments.tooltip": "是否允许非玩家生物（如怪物）触发卡利亚式附魔\n§7true§r = 允许（默认，与原版行为一致）\n§7false§r = 禁止（怪物身上的附魔不触发）\n\n§e性能提示：§r\n服务器存在大量附魔怪物时，禁用此项可显著降低开销\n因为会跳过对怪物装备槽位的附魔扫描和NBT解析\n\n§c注意：§r\n仅拦截走中央事件处理器的附魔触发路径\n少数使用独立 @SubscribeEvent 监听器的附魔不受此开关影响",
   "config.carianstyle.allowMobTriggerDeathEnchantments": "允许怪物触发死亡/濒死类附魔",
