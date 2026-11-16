@@ -214,10 +214,22 @@ public final class DetailHead {
     }
 
     private int pointer(long t) {
-        int to = current * 4;
+        int to = stepOf(current);
         int span = Math.abs(to - ptrFrom);
         int done = t < ptrStart ? 0 : (int) Math.min(span, (t - ptrStart) / 26L);
         return ptrFrom + Integer.signum(to - ptrFrom) * done;
+    }
+
+    /**
+     * 一级 4 步，环上 12 格。别的模组有最高十几级甚至上百级的附魔，照 4 步一级指针要绕好几圈、
+     * 走几十秒，所以最高级超过 11 时按比例落在前 11 格上。
+     */
+    private int stepOf(int level) {
+        int last = levels.length == 0 ? 0 : levels[levels.length - 1];
+        if (last <= 11) {
+            return level * 4;
+        }
+        return Math.round(Math.max(0, Math.min(level, last)) * 44f / last);
     }
 
     private float glow(long t) {
@@ -277,7 +289,7 @@ public final class DetailHead {
         MoonDisc.drawMoon(g, mx, top + rise, n, frame(t), catColor, glow(t));
         int q = pointer(t);
         MoonDisc.drawRing(g, mx, top, n, catColor, q, UiTheme.steps(t - riseStart - ringDelay, 300, 4));
-        if (sparkPending && t >= ptrStart && q == current * 4) {
+        if (sparkPending && t >= ptrStart && q == stepOf(current)) {
             sparkPending = false;
             int[] c = MoonDisc.pointerCenter(mx, top, n, q);
             UiTheme.burst(c[0], c[1], 4);
