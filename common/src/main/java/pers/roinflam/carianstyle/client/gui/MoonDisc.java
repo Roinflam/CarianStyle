@@ -22,7 +22,6 @@ public final class MoonDisc {
     private MoonDisc() {
     }
 
-    /** 月相 1~4 停在第 0、3、6、9 帧 */
     public static int frameOf(int phase) {
         return (Math.max(1, Math.min(4, phase)) - 1) * 3;
     }
@@ -35,13 +34,21 @@ public final class MoonDisc {
         return UiTheme.mix(0xFFDFE9FF, catColor, 0.55f);
     }
 
-    /** 月晕 + 月面；glow 是乘在月相上限上的系数（呼吸、脉冲） */
     public static void drawMoon(@Nonnull GuiGraphics g, int x, int y, int n, int frame, int catColor, float glow) {
+        drawMoon(g, x, y, n, frame, catColor, glow, 1f);
+    }
+
+    public static void drawMoon(@Nonnull GuiGraphics g, int x, int y, int n, int frame, int catColor, float glow,
+                                float alpha) {
         boolean large = n >= LARGE;
         int f = Math.max(0, Math.min(FRAMES - 1, frame));
         UiTheme.spriteTinted(g, large ? "glow_l" : "glow_s", x, y, n, n, 0, 0, n, n,
-                glowTint(catColor), glowCap(f) * glow);
-        UiTheme.sprite(g, large ? "moonph_l" : "moonph_s", x, y, n, n, f * n, 0, n, n, n * FRAMES, n);
+                glowTint(catColor), glowCap(f) * glow * alpha);
+        if (alpha < 1f) {
+            UiTheme.spriteAlpha(g, large ? "moonph_l" : "moonph_s", x, y, n, n, f * n, 0, n, n, n * FRAMES, n, alpha);
+        } else {
+            UiTheme.sprite(g, large ? "moonph_l" : "moonph_s", x, y, n, n, f * n, 0, n, n, n * FRAMES, n);
+        }
     }
 
     /** 刻度环、走过的刻度、指针星；q 是指针所在的步数（0 在正上方，顺时针） */
@@ -64,7 +71,6 @@ public final class MoonDisc {
         com.mojang.blaze3d.systems.RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
     }
 
-    /** 指针星正中的界面坐标（迸星点用） */
     public static int[] pointerCenter(int x, int y, int n, int q) {
         double r = n / 2.0 - 2;
         double c = (n - 1) / 2.0;

@@ -45,14 +45,12 @@ final class InventoryPicker {
     /** 左右内边距 8：页框 2 像素 + 四角花饰 8 像素宽，格子从花饰里侧开始，两边不压 */
     private static final int PAD = 8;
     private static final int TITLE_Y = 6;
-    /** 标题行与按钮同高 */
     private static final int TITLE_H = 14;
     private static final int GRID_Y = TITLE_Y + TITLE_H + 5;
     private static final int GAP = 4;
     private static final int WIDTH = PAD * 2 + CELL * COLS;
     private static final int HEIGHT = GRID_Y + CELL + GAP + CELL * 3 + GAP + CELL + PAD;
 
-    /** 弹出：分 4 档，每档 45 毫秒，从上方 4 像素落到位并淡入 */
     private static final int OPEN_MS = 180;
     private static final int OPEN_STEPS = 4;
     private static final int OPEN_DROP = 4;
@@ -347,7 +345,6 @@ final class InventoryPicker {
         return CONSUMED;
     }
 
-    /** 反查鼠标下的格子，和 {@link #cellX} / {@link #cellY} 同一套排布 */
     private int slotAt(double mouseX, double mouseY) {
         int col = (int) Math.floor((mouseX - (x + PAD)) / CELL);
         if (col < 0 || col >= COLS) {

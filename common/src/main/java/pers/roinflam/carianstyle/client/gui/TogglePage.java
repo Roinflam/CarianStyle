@@ -20,6 +20,7 @@ final class TogglePage {
     private static final int ROW = 25;
     private static final int HEAD = 20;
     private static final int GROUP_GAP = 3;
+    // 卷尾纹饰：上空 12，纹饰高 7，下留 8
     private static final int TAIL = 12 + 7 + 8;
     private static final int CAT = 0xFF9FC2FF;
     private static final int GEM_MS = 55;
@@ -44,7 +45,6 @@ final class TogglePage {
         split();
     }
 
-    /** 按行数切成两半，前后顺序不变，两边最高的那页尽量矮 */
     private void split() {
         VisualEffectType.Category[] cats = VisualEffectType.Category.values();
         int[] heights = new int[cats.length];
@@ -106,11 +106,6 @@ final class TogglePage {
         return h + (large ? TAIL : 0);
     }
 
-    void resetScroll() {
-        left.scroll = 0;
-        right.scroll = 0;
-    }
-
     void renderLeft(@Nonnull GuiGraphics g, @Nonnull Font font, int mouseX, int mouseY) {
         render(g, font, left, mouseX, mouseY);
     }
@@ -138,11 +133,13 @@ final class TogglePage {
         if (large) {
             int tx = side.x + Math.max(0, (vw - 97) / 2);
             int ty = cy + 12;
-            for (int i = 0; i < 40; i++) {
-                int c = UiTheme.withAlpha(0xFF55679F, i / 39f);
-                g.fill(tx + i, ty + 3, tx + i + 1, ty + 4, c);
-                g.fill(tx + 96 - i, ty + 3, tx + 97 - i, ty + 4, c);
-            }
+            g.drawManaged(() -> {
+                for (int i = 0; i < 40; i++) {
+                    int c = UiTheme.withAlpha(0xFF55679F, i / 39f);
+                    g.fill(tx + i, ty + 3, tx + i + 1, ty + 4, c);
+                    g.fill(tx + 96 - i, ty + 3, tx + 97 - i, ty + 4, c);
+                }
+            });
             UiTheme.sprite(g, "orn", tx + 45, ty, 7, 7);
         }
         g.disableScissor();
@@ -153,7 +150,6 @@ final class TogglePage {
     private int renderGroup(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Side side,
                             @Nonnull VisualEffectType.Category category, int x, int y, int w, int mx, int my) {
         spine(g, x, y, w, HEAD, CAT);
-        UiTheme.constellation(g, UiTheme.CONST_FX + category.ordinal(), x + 13, y + 4, CAT);
 
         boolean all = true;
         boolean none = true;
@@ -175,8 +171,15 @@ final class TogglePage {
         side.hits.add(new Object[]{onX, y + 3, onW, 14, category, Boolean.TRUE});
         side.hits.add(new Object[]{offX, y + 3, offW, 14, category, Boolean.FALSE});
 
+        // 组名放不下时先让出星座的位置，还放不下再截断
+        String name = category.getDisplayName().getString();
         int nameX = x + 40;
-        UiTheme.text(g, font, UiTheme.trim(font, category.getDisplayName().getString(), onX - 6 - nameX), nameX, y + 6, CAT);
+        if (font.width(name) > onX - 6 - nameX) {
+            nameX = x + 13;
+        } else {
+            UiTheme.constellation(g, UiTheme.CONST_FX + category.ordinal(), x + 13, y + 4, CAT);
+        }
+        UiTheme.text(g, font, UiTheme.trim(font, name, Math.max(0, onX - 6 - nameX)), nameX, y + 6, CAT);
 
         int cy = y + HEAD;
         for (VisualEffectType type : VisualEffectType.values()) {
@@ -189,7 +192,6 @@ final class TogglePage {
         return cy;
     }
 
-    /** 书脊式分组头：两头各两道棱 */
     static void spine(@Nonnull GuiGraphics g, int x, int y, int w, int h, int cat) {
         g.fill(x, y, x + w, y + h, UiTheme.mix(0xFF0B1030, cat, 0.22f));
         g.fill(x, y, x + w, y + 1, UiTheme.mix(0xFF0B1030, cat, 0.46f));
@@ -225,7 +227,10 @@ final class TogglePage {
                 int k = (int) (e / GEM_MS);
                 if (k > 3) {
                     wax.remove(type);
-                    if (anim[1] == 1L) {
+                    // 切走过的页回来时别补迸；滚出书页的行也不迸，星点不受裁剪会画到页外
+                    boolean late = e > 4 * GEM_MS + 150;
+                    boolean visible = y + 12 >= side.y && y + 12 < side.y + side.h;
+                    if (anim[1] == 1L && !late && visible) {
                         UiTheme.burst(x + 16, y + 12, 5);
                     }
                 } else {
@@ -239,20 +244,33 @@ final class TogglePage {
 
         int textX = x + 31;
         int textW = w - 31 - 6;
-        int nameW = textW;
+        String name = type.getDisplayName().getString();
+        int descW = textW;
         if (type.isInformational() && !on) {
-            Component warn = Component.translatable("carianstyle.codex.effects.info_warning");
+            // 警告和名字同一行放得下就放名字右边；放不下挪到描述那行右端，描述让位，挤到不足 30 就不画描述
+            String warn = Component.translatable("carianstyle.codex.effects.info_warning").getString();
             int warnW = font.width(warn);
-            g.drawString(font, warn, x + w - 6 - warnW, y + 3, UiTheme.WARN, false);
-            nameW = textW - warnW - 6;
+            if (font.width(name) + 6 + warnW <= textW) {
+                g.drawString(font, warn, x + w - 6 - warnW, y + 3, UiTheme.WARN, false);
+            } else {
+                warn = UiTheme.trim(font, warn, textW);
+                warnW = font.width(warn);
+                g.drawString(font, warn, x + w - 6 - warnW, y + 14, UiTheme.WARN, false);
+                descW = textW - warnW - 6;
+                if (descW < 30) {
+                    descW = 0;
+                }
+            }
         }
-        String name = UiTheme.trim(font, type.getDisplayName().getString(), nameW);
+        name = UiTheme.trim(font, name, textW);
         if (on) {
             UiTheme.text(g, font, name, textX, y + 3, UiTheme.MOON);
         } else {
             g.drawString(font, name, textX, y + 3, UiTheme.OFF, false);
         }
-        UiTheme.trimmed(g, font, type.getDescription(), textX, y + 14, textW, on ? UiTheme.TEXT_DIM : 0xFF48527A);
+        if (descW > 0) {
+            UiTheme.trimmed(g, font, type.getDescription(), textX, y + 14, descW, on ? UiTheme.TEXT_DIM : 0xFF48527A);
+        }
         side.hits.add(new Object[]{x, y, w, ROW, type, null});
     }
 

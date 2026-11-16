@@ -13,6 +13,7 @@ import javax.annotation.Nonnull;
  */
 final class MoonriseIntro {
 
+    // 各段时间点按先后接着走，挪动一个要顺着把后面的一起挪
     static final int RISE_AT = 180;
     static final int FULL_AT = 1050;
     static final int PATH_AT = 1080;
@@ -28,13 +29,13 @@ final class MoonriseIntro {
     /** 光路、光尘、书页压暗都在这之前收完；指针走位跟卷首自己的时序，可能比这稍晚 */
     static final int END = 2100;
 
-    /** 大月的几档尺寸，从大往小逐档换着收拢；80 和 48 就是卷首那两号 */
+    /** 大月的几档尺寸，从大往小逐档换着收拢；80 和 48 就是卷首那两号。每一档都得有同尺寸的月相和月晕贴图 */
     private static final int[] SIZES = {128, 112, 96, 80, 64, 48};
     private static final int NIGHT = 0xFF02040D;
     /** moonpre_* 里蛾眉之前的几帧（朔到细牙），只有开场用 */
     private static final int PRE = 4;
     private static final int DUST = 26;
-    /** 盖在书和物品图标上面，物品图标画在 z 150 往上 */
+    /** 要高过书页上的物品图标（z 150 起）和物品选择器整体抬高的 200，改小会被压住 */
     private static final float Z = 350f;
 
     private long start;
@@ -46,7 +47,6 @@ final class MoonriseIntro {
         landed = false;
     }
 
-    /** 直接跳到播完的样子 */
     void finish(long t) {
         start = t - END - 1000L;
         landed = true;
@@ -70,7 +70,6 @@ final class MoonriseIntro {
         return t - start < END;
     }
 
-    /** 落位那一下只报一次，用来迸星点 */
     boolean takeLanding(long e) {
         if (landed || e < LAND_AT) {
             return false;
@@ -78,8 +77,6 @@ final class MoonriseIntro {
         landed = true;
         return e < LAND_AT + 200;
     }
-
-    // ---------------- 各段进度 ----------------
 
     private static float clamp(float v) {
         return Math.max(0f, Math.min(1f, v));
@@ -94,7 +91,6 @@ final class MoonriseIntro {
         return (float) Math.pow(rise(e), 1.7);
     }
 
-    /** 背景上压的夜色 */
     float night(long e) {
         if (e < FULL_AT) {
             return 0.86f - 0.08f * wax(e);
@@ -102,17 +98,14 @@ final class MoonriseIntro {
         return 0.78f * (1f - UiTheme.easeOutCubic((e - FULL_AT) / 300f));
     }
 
-    /** 夜里的星一颗颗亮起来 */
     int starLimit(long e) {
         return e >= FULL_AT ? Integer.MAX_VALUE : (int) Math.max(0L, (e - 40L) / 26L);
     }
 
-    /** 书从书缝往两边被照出来的比例 */
     float reveal(long e) {
         return e <= UNFOLD_AT ? 0f : UiTheme.easeOutCubic((e - UNFOLD_AT) / (float) UNFOLD_DUR);
     }
 
-    /** 刚照出来的书先暗后亮 */
     float bookShade(long e) {
         return 0.7f * (1f - clamp((e - UNFOLD_AT) / (float) (UNFOLD_DUR + 260)));
     }
@@ -127,7 +120,7 @@ final class MoonriseIntro {
         return n;
     }
 
-    /** 月面半径，和贴图脚本里那几档一致 */
+    /** 月面半径，和 moonph_* / glow_* 各档贴图里画的一致 */
     private static int radius(int size) {
         return switch (size) {
             case 128 -> 43;
@@ -147,9 +140,6 @@ final class MoonriseIntro {
         return size == MoonDisc.LARGE ? "glow_l" : size == MoonDisc.SMALL ? "glow_s" : "glow_" + size;
     }
 
-    // ---------------- 画 ----------------
-
-    /** 盈到位那一下全屏闪一层月白 */
     void renderWash(@Nonnull GuiGraphics g, long e, int gw, int gh) {
         long d = e - FULL_AT;
         if (d < 0 || d >= 240) {
@@ -197,7 +187,6 @@ final class MoonriseIntro {
         });
     }
 
-    /** 一道银线顺着书缝从上划到下，书页展开时淡掉 */
     void renderSeam(@Nonnull GuiGraphics g, long e, int x, int top, int bottom) {
         if (e < SEAM_AT || e >= UNFOLD_AT + 260) {
             return;
@@ -247,13 +236,6 @@ final class MoonriseIntro {
     /**
      * 大月：升起、盈到位时的月晕外扩和光尘、收拢。收拢的锚点是月盒的下沿正中，
      * 所以大月和卷首月亮共用一条月心竖线，逐档换小就是「落进」月盒。
-     *
-     * @param cx          月心那一列（卷首月盒 / 湖上那轮的正中）
-     * @param hzy         湖岸线，月盒下沿在它上面 5 像素
-     * @param n           落位后的尺寸
-     * @param big         升起时的尺寸，见 {@link #bigSize}
-     * @param tint        月晕着色（选中附魔的分类色）
-     * @param fade        没有地方落，收拢时一起淡掉
      */
     void renderMoon(@Nonnull GuiGraphics g, long e, int cx, int hzy, int n, int big, int tint, boolean fade) {
         if (e < RISE_AT || e >= LAND_AT) {
@@ -305,7 +287,6 @@ final class MoonriseIntro {
             }
         }
         int x = cx - size / 2;
-        int cy = y + size / 2;
 
         g.pose().pushPose();
         g.pose().translate(0f, 0f, Z);
@@ -331,12 +312,12 @@ final class MoonriseIntro {
             g.disableScissor();
         }
         if (e >= FULL_AT) {
-            renderDust(g, e, cx, cy, radius(big), tint);
+            // 光尘绕着盈满时的月心飞，不跟着收拢的大月一档档往下跳
+            renderDust(g, e, cx, hzy - 5 - big / 2, radius(big), tint);
         }
         g.pose().popPose();
     }
 
-    /** 盈到位：月晕放大两倍、三倍涨开再退，两圈光环往外扩；月相越满越重，蛾眉的光环小一圈 */
     private void renderBloom(@Nonnull GuiGraphics g, long e, int cx, int cy, int big, int tint) {
         long d = e - FULL_AT;
         if (d >= 700) {
@@ -405,16 +386,16 @@ final class MoonriseIntro {
         }
     }
 
-    /** 光尘：从月缘迸出去，往上飘一点，四档淡出 */
+    // 寿命最长 740：大月在 LAND_AT 落位，光尘得在那之前淡完
     private void renderDust(@Nonnull GuiGraphics g, long e, int cx, int cy, int r, int tint) {
         long d = e - FULL_AT;
-        if (d >= 1100) {
+        if (d >= LAND_AT - FULL_AT) {
             return;
         }
         int color = UiTheme.mix(0xFFFFFFFF, tint | 0xFF000000, 0.25f);
         for (int i = 0; i < DUST; i++) {
             int h = hash(i + 17);
-            float life = 650f + (h & 0xFF) / 255f * 420f;
+            float life = 520f + (h & 0xFF) / 255f * 220f;
             float q = d / life;
             if (q >= 1f) {
                 continue;

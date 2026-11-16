@@ -24,6 +24,9 @@ public final class DetailHead {
     private static final int WRAP_GAP = 3;
     private static final int NAME_ID_GAP = 6;
     private static final int LEVEL_MIN_W = 15;
+    // 外部附魔最高级可能上百，等级牌全摆出来会把卷首撑得老高；超过两行就只留首尾和当前级附近，中间收成省略号
+    private static final int LEVEL_ROWS = 2;
+    private static final int ELLIPSIS = Integer.MAX_VALUE;
 
     public static final class Tag {
         final Component text;
@@ -55,6 +58,10 @@ public final class DetailHead {
     private List<Tag> tags = Collections.emptyList();
     private int catColor = UiTheme.ACCENT;
     private int[] levels = new int[0];
+    private int[] shown = new int[0];
+    private int[] shownFrom;
+    private int shownCurrent;
+    private int shownWidth = -1;
     private boolean levelsVisible;
     private int current = 1;
 
@@ -98,7 +105,6 @@ public final class DetailHead {
         return large ? 14 : 8;
     }
 
-    /** 上一次 render 量出的卷首高度 */
     public int height() {
         return height;
     }
@@ -106,9 +112,6 @@ public final class DetailHead {
     /**
      * 换条目。key 和上一条不同才播换条目的动画（月亮重升、月相逐帧过渡、指针从公式重走）；
      * 同一条重设（重载数值、窗口改尺寸）只换内容。
-     *
-     * @param phase    稀有度月相 1~4，见 {@link UiTheme#phaseOf}
-     * @param catColor 分类色，月晕和刻度环按它着色
      */
     public void setEntry(@Nonnull String key, @Nonnull Component name, @Nonnull String id,
                          @Nonnull List<Tag> tags, int phase, int catColor) {
@@ -135,16 +138,10 @@ public final class DetailHead {
         this.catColor = catColor;
     }
 
-    /** 清空（详情没有条目时），下一次 setEntry 不播过渡 */
     public void clear() {
         key = null;
     }
 
-    /**
-     * @param maxLevel 最高等级
-     * @param formula  有没有「公式」档（指针正上方那格）
-     * @param visible  画不画等级牌；不画时指针仍指着当前级
-     */
     public void setLevels(int maxLevel, boolean formula, boolean visible) {
         int count = Math.max(0, maxLevel) + (formula ? 1 : 0);
         if (levels.length != count || (count > 0 && levels[0] != (formula ? DescriptionText.FORMULA : 1))) {
@@ -187,7 +184,6 @@ public final class DetailHead {
         sparkPending = false;
     }
 
-    /** 开场被跳过或关掉：直接是播完的样子 */
     public void skipIntro() {
         hiddenUntil = Long.MIN_VALUE / 4;
         riseStart = Long.MIN_VALUE / 4;
@@ -197,7 +193,6 @@ public final class DetailHead {
         sparkPending = false;
     }
 
-    /** 开场大月要盈到的月相帧 */
     public int frameAt(long t) {
         return frame(t);
     }
@@ -206,7 +201,6 @@ public final class DetailHead {
         return catColor;
     }
 
-    /** 切回这一页：月亮重升，指针重走 */
     public void playSelect() {
         long t = UiTheme.now();
         rise(t, 0, 500, 12, 200);
@@ -215,7 +209,6 @@ public final class DetailHead {
         sparkPending = false;
     }
 
-    /** 月晕闪一下（重载数值、切等级） */
     public void pulse() {
         long t = UiTheme.now();
         pulseStart = t;
@@ -268,9 +261,6 @@ public final class DetailHead {
     /**
      * 画卷首，返回卷首高度。坐标是已经减过滚动量的；外面该有的视口 scissor 由调用方开，
      * 这里再套一层卷首自己的（月亮升起时裁在下沿）。
-     *
-     * @param width  卷首宽度（视口宽，不含滚动条那一列）
-     * @param hover  鼠标在视口里，等级牌才响应悬停
      */
     public int render(@Nonnull GuiGraphics g, @Nonnull Font font, int x, int y, int width,
                       int mouseX, int mouseY, boolean hover) {
@@ -296,9 +286,10 @@ public final class DetailHead {
         int tagsH = flow(tagW, hmX, tagsY, hmW, tagPos);
 
         int lvY = tagsY + tagsH + gap;
-        int[] lvW = new int[levelsVisible ? levels.length : 0];
+        int[] plates = levelsVisible ? shownLevels(font, hmW) : new int[0];
+        int[] lvW = new int[plates.length];
         for (int i = 0; i < lvW.length; i++) {
-            lvW[i] = Math.min(hmW, Math.max(LEVEL_MIN_W, font.width(levelLabel(levels[i])) + 8));
+            lvW[i] = plateWidth(font, plates[i], hmW);
         }
         int[][] lvPos = new int[lvW.length][];
         int lvH = Math.max(ROW, flow(lvW, hmX, lvY, hmW, lvPos));
@@ -339,7 +330,11 @@ public final class DetailHead {
             int lx = lvPos[i][0];
             int ly = lvPos[i][1];
             int w = lvW[i];
-            int level = levels[i];
+            int level = plates[i];
+            if (level == ELLIPSIS) {
+                g.drawString(font, "…", lx, ly + 3, UiTheme.TEXT_DIM, false);
+                continue;
+            }
             boolean on = level == current;
             boolean hovered = hover && UiTheme.hit(mouseX, mouseY, lx, ly, w, ROW);
             int fill;
@@ -417,7 +412,85 @@ public final class DetailHead {
         return DescriptionText.chipLabel(level);
     }
 
-    /** 从左往右排，放不下折行；返回总高度，out 里是各块左上角 */
+    private static int plateWidth(@Nonnull Font font, int level, int maxW) {
+        if (level == ELLIPSIS) {
+            return font.width("…");
+        }
+        return Math.min(maxW, Math.max(LEVEL_MIN_W, font.width(levelLabel(level)) + 8));
+    }
+
+    @Nonnull
+    private int[] shownLevels(@Nonnull Font font, int maxW) {
+        if (shownFrom == levels && shownCurrent == current && shownWidth == maxW) {
+            return shown;
+        }
+        shownFrom = levels;
+        shownCurrent = current;
+        shownWidth = maxW;
+        shown = levels;
+        int n = levels.length;
+        if (n == 0 || rows(font, levels, maxW) <= LEVEL_ROWS) {
+            return shown;
+        }
+        int cur = 0;
+        for (int i = 0; i < n; i++) {
+            if (levels[i] == current) {
+                cur = i;
+                break;
+            }
+        }
+        boolean[] keep = new boolean[n];
+        keep[0] = true;
+        keep[n - 1] = true;
+        keep[cur] = true;
+        if (levels[0] == DescriptionText.FORMULA && n > 1) {
+            keep[1] = true;
+        }
+        shown = pick(keep);
+        for (int d = 1; cur - d >= 0 || cur + d < n; d++) {
+            for (int i : new int[]{cur - d, cur + d}) {
+                if (i < 0 || i >= n || keep[i]) {
+                    continue;
+                }
+                keep[i] = true;
+                int[] next = pick(keep);
+                if (rows(font, next, maxW) > LEVEL_ROWS) {
+                    return shown;
+                }
+                shown = next;
+            }
+        }
+        return shown;
+    }
+
+    @Nonnull
+    private int[] pick(boolean[] keep) {
+        List<Integer> out = new ArrayList<>();
+        for (int i = 0; i < keep.length; i++) {
+            if (!keep[i]) {
+                continue;
+            }
+            if (i > 0 && !keep[i - 1]) {
+                out.add(ELLIPSIS);
+            }
+            out.add(levels[i]);
+        }
+        int[] r = new int[out.size()];
+        for (int i = 0; i < r.length; i++) {
+            r[i] = out.get(i);
+        }
+        return r;
+    }
+
+    private static int rows(@Nonnull Font font, int[] plates, int maxW) {
+        int[] w = new int[plates.length];
+        for (int i = 0; i < w.length; i++) {
+            w[i] = plateWidth(font, plates[i], maxW);
+        }
+        int h = flow(w, 0, 0, maxW, new int[w.length][]);
+        return (h + WRAP_GAP) / (ROW + WRAP_GAP);
+    }
+
     private static int flow(int[] widths, int x0, int y0, int maxW, int[][] out) {
         if (widths.length == 0) {
             return 0;

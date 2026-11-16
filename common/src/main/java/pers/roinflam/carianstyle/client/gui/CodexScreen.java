@@ -40,6 +40,10 @@ public final class CodexScreen extends Screen {
     private static final int BAND = 44;
     private static final int BAND_TOGGLES = 24;
     private static final int TAB_W = 44;
+    // 开关页要透出身后的游戏世界，好边点开关边看特效：背景画和玻璃各剩这么多不透明度
+    private static final float SEE_SCENE = 0.4f;
+    private static final float SEE_GLASS = 0.72f;
+    private static final int SEE_MS = 300;
 
     private enum Tab {
         CODEX("carianstyle.codex.tab.codex"),
@@ -73,7 +77,6 @@ public final class CodexScreen extends Screen {
     private final InventoryPicker picker = new InventoryPicker();
     private EditBox searchBox;
 
-    // 书的几何，init 里按窗口算
     private boolean large;
     private int bx;
     private int by;
@@ -107,6 +110,9 @@ public final class CodexScreen extends Screen {
     private long tabDroppedAt;
     private int droppedTab = -1;
     private long railAt;
+    private float seeFrom;
+    private float seeTo;
+    private long seeAt;
 
     public CodexScreen() {
         super(Component.translatable("carianstyle.codex.title"));
@@ -121,8 +127,13 @@ public final class CodexScreen extends Screen {
             long t = UiTheme.now();
             intro.begin(t);
             railAt = t + MoonriseIntro.UNFOLD_AT;
+            // 停在开关页打开时，月出照常在不透明的湖夜上演，演完才淡开
+            seeFrom = 0f;
+            seeTo = tab == Tab.EFFECTS ? 1f : 0f;
+            seeAt = intro.start() + MoonriseIntro.END;
         }
         picker.close();
+        CodexScene.reload();
         detail.setFilter(filter);
         foreignDetail.setFilter(filter);
 
@@ -192,7 +203,6 @@ public final class CodexScreen extends Screen {
         updateWidgetVisibility();
     }
 
-    /** 书的几何：书最大 780×600 居中，窗口宽不到 600 时月亮换小号、页边收窄 */
     private void layout() {
         int gw = this.width;
         int gh = this.height;
@@ -382,6 +392,9 @@ public final class CodexScreen extends Screen {
         turnedAt = t;
         tabDroppedAt = t;
         droppedTab = target.ordinal();
+        seeFrom = see(t);
+        seeTo = target == Tab.EFFECTS ? 1f : 0f;
+        seeAt = t;
         if (wasToggles || target == Tab.EFFECTS) {
             layout();
         }
@@ -389,8 +402,6 @@ public final class CodexScreen extends Screen {
             detail.playSelect();
         } else if (target == Tab.OTHERS) {
             foreignDetail.playSelect();
-        } else {
-            togglePage.resetScroll();
         }
         updateWidgetVisibility();
     }
@@ -403,7 +414,6 @@ public final class CodexScreen extends Screen {
         updateWidgetVisibility();
     }
 
-    /** 服主改完数值表后不重启就能看到新值 */
     private void reloadAll() {
         EnchantmentValues.reload();
         EnchantmentCodex.invalidate();
@@ -459,8 +469,9 @@ public final class CodexScreen extends Screen {
         int revL = seam - Math.round((seam - bx) * reveal);
         int revR = seam + Math.round((bx + bw - seam) * reveal);
         boolean veiled = reveal < 1f;
+        float see = see(t);
         CodexScene.render(g, this.width, this.height, bgx, hzy, intro.night(e), intro.starLimit(e), open,
-                veiled ? (x, y) -> x < revL || x >= revR || open.test(x, y) : open);
+                veiled ? (x, y) -> x < revL || x >= revR || open.test(x, y) : open, 1f - (1f - SEE_SCENE) * see);
         int moonX = bgx + CodexScene.moonColumn();
         if (intro.running(t)) {
             intro.aim(introFrame(t));
@@ -468,7 +479,7 @@ public final class CodexScreen extends Screen {
         intro.renderPath(g, e, moonX, hzy, this.height);
         intro.renderWash(g, e, this.width, this.height);
         if (tab == Tab.EFFECTS && panoMoon > 0) {
-            renderPanoMoon(g, t);
+            renderPanoMoon(g, t, 1f - (1f - SEE_SCENE) * see);
         }
 
         filterHovered = false;
@@ -476,7 +487,7 @@ public final class CodexScreen extends Screen {
             g.enableScissor(revL, 0, revR, this.height);
         }
         renderBand(g, underX, underY, t);
-        renderSpread(g, underX, underY, t, e);
+        renderSpread(g, underX, underY, t, e, 1f - (1f - SEE_GLASS) * see);
 
         super.render(g, underX, underY, partialTick);
         if (searchBox != null && searchBox.visible && searchBox.getValue().isEmpty() && !searchBox.isFocused()) {
@@ -502,7 +513,7 @@ public final class CodexScreen extends Screen {
     }
 
     /** 开关页湖上那轮月亮没有对应的条目，一直是满月，配卡利亚王室的蓝 */
-    private void renderPanoMoon(@Nonnull GuiGraphics g, long t) {
+    private void renderPanoMoon(@Nonnull GuiGraphics g, long t, float alpha) {
         int n = panoMoon;
         int mx = bgx + CodexScene.moonColumn() - n / 2;
         int my = hzy - 5 - n;
@@ -521,7 +532,7 @@ public final class CodexScreen extends Screen {
             breath = UiTheme.breathe(Math.max(0, e - 400), 4800, 8, 0.4f);
         }
         g.enableScissor(mx, my, mx + n, hzy);
-        MoonDisc.drawMoon(g, mx, my + rise, n, MoonDisc.FRAMES - 1, CodexTheme.CARIAN_ROYALTY.getAccentColor(), breath);
+        MoonDisc.drawMoon(g, mx, my + rise, n, MoonDisc.FRAMES - 1, CodexTheme.CARIAN_ROYALTY.getAccentColor(), breath, alpha);
         g.disableScissor();
     }
 
@@ -556,12 +567,20 @@ public final class CodexScreen extends Screen {
         }
     }
 
+    /** 开关页透出世界的程度：0 是背景画和玻璃原样，1 是调到最透 */
+    private float see(long t) {
+        return seeFrom + (seeTo - seeFrom) * UiTheme.steps(t - seeAt, SEE_MS, 12);
+    }
+
     /** 开场播到一半被点了或按了键：直接到播完的样子，这一下操作照常处理 */
     private void skipIntro() {
         long t = UiTheme.now();
         intro.finish(t);
         if (railAt > t - 700) {
             railAt = t - 1000;
+        }
+        if (seeAt > t) {
+            seeAt = intro.start() + MoonriseIntro.END;
         }
         detail.skipIntro();
         foreignDetail.skipIntro();
@@ -643,7 +662,6 @@ public final class CodexScreen extends Screen {
         return new int[]{reloadRect[0] + reloadRect[2] - backRect[2], reloadRect[1], backRect[2], 14};
     }
 
-    /** 丝带落下：-12 落到 +2 再回到 0，三条依次错开 60 毫秒 */
     private int tabDrop(long t, int index) {
         long e;
         float dur;
@@ -695,7 +713,7 @@ public final class CodexScreen extends Screen {
         return Component.literal(String.valueOf(value)).withStyle(s -> s.withColor(color & 0xFFFFFF));
     }
 
-    private void renderSpread(@Nonnull GuiGraphics g, int mouseX, int mouseY, long t, long e) {
+    private void renderSpread(@Nonnull GuiGraphics g, int mouseX, int mouseY, long t, long e, float glass) {
         int top = spreadTop;
         int h = spreadH;
         boolean toggles = tab == Tab.EFFECTS;
@@ -708,11 +726,14 @@ public final class CodexScreen extends Screen {
         int lVisible = Math.round(lw * unfold);
         int rVisible = Math.round(rightW * unfold);
 
-        renderGutter(g, bx + lw, top, h, e - MoonriseIntro.UNFOLD_AT - 60);
+        if (!toggles) {
+            glass = 1f;
+        }
+        renderGutter(g, bx + lw, top, h, e - MoonriseIntro.UNFOLD_AT - 60, glass);
 
         // 没展开的页也照画（裁成零宽）：开关、等级牌的点击位置是画的时候记的，开场中途点下去也要点得中
         g.enableScissor(bx + lw - lVisible, top, bx + lw, top + h);
-        UiTheme.page(g, bx, top, lw, h, true);
+        UiTheme.page(g, bx, top, lw, h, glass);
         if (toggles) {
             togglePage.renderLeft(g, this.font, mouseX, mouseY);
         } else if (tab == Tab.CODEX) {
@@ -724,7 +745,7 @@ public final class CodexScreen extends Screen {
         g.disableScissor();
 
         g.enableScissor(rightX, top, rightX + rVisible, top + h);
-        UiTheme.page(g, rightX, top, rightW, h, toggles);
+        UiTheme.page(g, rightX, top, rightW, h, toggles ? glass : 0f);
         if (toggles) {
             togglePage.renderRight(g, this.font, mouseX, mouseY);
         } else if (tab == Tab.CODEX) {
@@ -736,14 +757,13 @@ public final class CodexScreen extends Screen {
         g.disableScissor();
     }
 
-    /** 书缝：左右暗到中间，上面垂一条淡金书签带 */
-    private void renderGutter(@Nonnull GuiGraphics g, int x, int top, int h, long dropElapsed) {
+    private void renderGutter(@Nonnull GuiGraphics g, int x, int top, int h, long dropElapsed, float glass) {
         for (int i = 0; i < GUT; i++) {
             float p = (i + 0.5f) / GUT;
             float k = p < 0.45f ? p / 0.45f : p > 0.55f ? (1f - p) / 0.45f : 1f;
             int edge = 0xE60C122C;
             int mid = 0xF203050C;
-            int a = Math.round(0xE6 + (0xF2 - 0xE6) * k);
+            int a = Math.round((0xE6 + (0xF2 - 0xE6) * k) * glass);
             g.fill(x + i, top, x + i + 1, top + h, (a << 24) | (UiTheme.mix(edge, mid, k) & 0xFFFFFF));
         }
         int gh = large ? 26 : 18;
@@ -810,7 +830,6 @@ public final class CodexScreen extends Screen {
         }
     }
 
-    /** 顶栏那一行合计；colored 时数字分色（可附绿、被挡红、过贵黄） */
     @Nonnull
     private Component filterSummary(boolean colored) {
         Object fit = colored ? num(filter.getFitCount(), UiTheme.ON) : filter.getFitCount();

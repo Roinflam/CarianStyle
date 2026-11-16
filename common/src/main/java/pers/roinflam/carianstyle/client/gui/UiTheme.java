@@ -74,8 +74,6 @@ public final class UiTheme {
     private UiTheme() {
     }
 
-    // ---------------- 时间 ----------------
-
     public static long now() {
         return Util.getMillis();
     }
@@ -107,14 +105,11 @@ public final class UiTheme {
         return 1f - inv * inv * inv;
     }
 
-    // ---------------- 颜色 ----------------
-
     public static int withAlpha(int argb, float scale) {
         int a = Math.round(((argb >>> 24) & 0xFF) * Math.max(0f, Math.min(1f, scale)));
         return (a << 24) | (argb & 0xFFFFFF);
     }
 
-    /** 按 t 从 a 混到 b，透明度取 a 的 */
     public static int mix(int a, int b, float t) {
         int r = Math.round(((a >> 16) & 0xFF) + (((b >> 16) & 0xFF) - ((a >> 16) & 0xFF)) * t);
         int gg = Math.round(((a >> 8) & 0xFF) + (((b >> 8) & 0xFF) - ((a >> 8) & 0xFF)) * t);
@@ -141,15 +136,12 @@ public final class UiTheme {
         return theme.ordinal();
     }
 
-    // ---------------- 贴图 ----------------
-
     @Nonnull
     public static ResourceLocation tex(@Nonnull String name) {
         return TEXTURES.computeIfAbsent(name,
                 n -> new ResourceLocation(Reference.MOD_ID, "textures/gui/codex/" + n + ".png"));
     }
 
-    /** 整张贴图 1:1 画上去 */
     public static void sprite(@Nonnull GuiGraphics g, @Nonnull String name, int x, int y, int w, int h) {
         sprite(g, name, x, y, w, h, 0, 0, w, h, w, h);
     }
@@ -169,6 +161,16 @@ public final class UiTheme {
         }
         RenderSystem.setShaderColor(1f, 1f, 1f, Math.min(1f, alpha));
         sprite(g, name, x, y, w, h);
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+    }
+
+    public static void spriteAlpha(@Nonnull GuiGraphics g, @Nonnull String name, int x, int y, int w, int h,
+                                   float u, float v, int uw, int vh, int texW, int texH, float alpha) {
+        if (alpha <= 0f) {
+            return;
+        }
+        RenderSystem.setShaderColor(1f, 1f, 1f, Math.min(1f, alpha));
+        sprite(g, name, x, y, w, h, u, v, uw, vh, texW, texH);
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
     }
 
@@ -200,8 +202,6 @@ public final class UiTheme {
         spriteAlpha(g, "phase_" + p, x, y, 9, 9, alpha);
     }
 
-    // ---------------- 底与框 ----------------
-
     public static void border(@Nonnull GuiGraphics g, int x, int y, int width, int height, int color) {
         g.fill(x, y, x + width, y + 1, color);
         g.fill(x, y + height - 1, x + width, y + height, color);
@@ -215,15 +215,23 @@ public final class UiTheme {
     }
 
     public static void glass(@Nonnull GuiGraphics g, int x, int y, int width, int height) {
+        glass(g, x, y, width, height, 1f);
+    }
+
+    public static void glass(@Nonnull GuiGraphics g, int x, int y, int width, int height, float thickness) {
         if (width > 0 && height > 0) {
-            g.fillGradient(x, y, x + width, y + height, GLASS_TOP, GLASS_BOTTOM);
+            g.fillGradient(x, y, x + width, y + height, withAlpha(GLASS_TOP, thickness), withAlpha(GLASS_BOTTOM, thickness));
         }
     }
 
     /** 书页：外圈一道暗边，里面一道银边；glass 为 true 时铺玻璃底。四角另由 {@link #pageCorners} 压在内容上面 */
     public static void page(@Nonnull GuiGraphics g, int x, int y, int width, int height, boolean glass) {
-        if (glass) {
-            glass(g, x, y, width, height);
+        page(g, x, y, width, height, glass ? 1f : 0f);
+    }
+
+    public static void page(@Nonnull GuiGraphics g, int x, int y, int width, int height, float glass) {
+        if (glass > 0f) {
+            glass(g, x, y, width, height, glass);
         }
         border(g, x, y, width, height, 0xD905081A);
         border(g, x + 1, y + 1, width - 2, height - 2, EDGE);
@@ -262,7 +270,6 @@ public final class UiTheme {
         return w;
     }
 
-    /** 旧接口：描边小徽章，返回宽度加 3 像素间距 */
     public static int badge(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component text,
                             int x, int y, int color, boolean hovered) {
         int w = font.width(text) + 10;
@@ -309,16 +316,21 @@ public final class UiTheme {
         return font.width(label) + 14;
     }
 
-    // ---------------- 正文件 ----------------
-
     /** 节头：分节星 + 银字 + 一道线 + 收尾小菱，高 10，返回下一行的 y（已含下面 3 像素） */
     public static int sectionHeader(@Nonnull GuiGraphics g, @Nonnull Font font,
                                     @Nonnull Component title, int x, int y, int innerWidth) {
         sprite(g, "orn", x, y + 1, 7, 7);
         int tx = x + 12;
-        text(g, font, title, tx, y + 1, SILVER);
-        int lineLeft = tx + font.width(title) + 5;
         int endX = x + innerWidth - 5;
+        int titleW = font.width(title);
+        if (titleW <= endX - 5 - tx) {
+            text(g, font, title, tx, y + 1, SILVER);
+        } else {
+            String cut = trim(font, title.getString(), endX - 5 - tx);
+            text(g, font, cut, tx, y + 1, SILVER);
+            titleW = font.width(cut);
+        }
+        int lineLeft = tx + titleW + 5;
         if (lineLeft < endX - 5) {
             g.fill(lineLeft, y + 4, endX - 5, y + 5, LINE);
         }
@@ -339,11 +351,16 @@ public final class UiTheme {
         return y + 11;
     }
 
-    /** 3 格一点的点线 */
     public static void dots(@Nonnull GuiGraphics g, int x0, int x1, int y) {
-        for (int x = x0; x < x1; x += 3) {
-            g.fill(x, y, x + 1, y + 1, DOTS);
+        if (x0 >= x1) {
+            return;
         }
+        // fill 不在 drawManaged 里时一次一提交，一行点线合成一批
+        g.drawManaged(() -> {
+            for (int x = x0; x < x1; x += 3) {
+                g.fill(x, y, x + 1, y + 1, DOTS);
+            }
+        });
     }
 
     /** 刻度尺滚动条，宽 7：每 20 一长刻、每 4 一短刻、中轴一道，游标框里穿一颗月珠。内容放得下时什么都不画 */
@@ -352,18 +369,21 @@ public final class UiTheme {
         if (contentHeight <= height || height <= 0) {
             return;
         }
-        g.fill(x + 3, y, x + 4, y + height, 0xFF232F5C);
-        for (int i = 0; i < height; i += 4) {
-            g.fill(x + 2, y + i, x + 5, y + i + 1, 0xFF3D4F8A);
-        }
-        for (int i = 0; i < height; i += 20) {
-            g.fill(x + 1, y + i, x + 6, y + i + 1, 0xFF6C7FB8);
-        }
         int th = thumbHeight(height, contentHeight);
         int max = contentHeight - height;
         int ty = y + (max <= 0 ? 0 : Math.round((float) (height - th) * Math.min(scroll, max) / max));
-        g.fill(x + 1, ty, x + 6, ty + th, hot ? 0xF528387A : 0xF5101839);
-        border(g, x + 1, ty, 5, th, hot ? 0xFFFFFFFF : EDGE);
+        // 刻度和游标框合成一批提交；月珠是贴图，得等这批画完再盖上去
+        g.drawManaged(() -> {
+            g.fill(x + 3, y, x + 4, y + height, 0xFF232F5C);
+            for (int i = 0; i < height; i += 4) {
+                g.fill(x + 2, y + i, x + 5, y + i + 1, 0xFF3D4F8A);
+            }
+            for (int i = 0; i < height; i += 20) {
+                g.fill(x + 1, y + i, x + 6, y + i + 1, 0xFF6C7FB8);
+            }
+            g.fill(x + 1, ty, x + 6, ty + th, hot ? 0xF528387A : 0xF5101839);
+            border(g, x + 1, ty, 5, th, hot ? 0xFFFFFFFF : EDGE);
+        });
         sprite(g, "bead", x + 1, ty + th / 2 - 2, 5, 5);
     }
 
@@ -375,10 +395,9 @@ public final class UiTheme {
     /** 游标高度取奇数，月珠才落在正中 */
     public static int thumbHeight(int height, int contentHeight) {
         int h = Math.max(13, Math.round((float) height * height / Math.max(1, contentHeight)));
-        return (h & 1) == 0 ? h + 1 : h;
+        h = (h & 1) == 0 ? h + 1 : h;
+        return Math.max(1, Math.min(height, h));
     }
-
-    // ---------------- 字 ----------------
 
     /** 带投影的字：投影是右下 1 像素的深蓝，不走原版那种按字色压暗的投影 */
     public static void text(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component text,
@@ -398,7 +417,6 @@ public final class UiTheme {
         g.drawString(font, text, x, y, color, false);
     }
 
-    /** 把一段带样式的字统一换成一种颜色（给投影用） */
     @Nonnull
     public static FormattedCharSequence recolor(@Nonnull FormattedCharSequence seq, int color) {
         TextColor c = TextColor.fromRgb(color & 0xFFFFFF);
@@ -439,7 +457,6 @@ public final class UiTheme {
         }
     }
 
-    /** 放不下就截断加省略号 */
     @Nonnull
     public static String trim(@Nonnull Font font, @Nonnull String raw, int maxWidth) {
         if (font.width(raw) <= maxWidth) {
@@ -471,8 +488,6 @@ public final class UiTheme {
     public static boolean hit(double mouseX, double mouseY, int x, int y, int width, int height) {
         return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
     }
-
-    // ---------------- 星点 ----------------
 
     private static final int[][] DIRS = {{1, 0}, {1, -1}, {0, -1}, {-1, -1}, {-1, 0}, {-1, 1}, {0, 1}, {1, 1}};
     private static final List<long[]> SPARKS = new ArrayList<>();

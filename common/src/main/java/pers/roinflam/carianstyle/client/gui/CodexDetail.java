@@ -78,6 +78,7 @@ public final class CodexDetail {
 
     /** 描述排版缓存，键是 附魔 id + 等级 + 宽度：每帧重排要建上百个短命对象，排一次就够 */
     private String layoutKey;
+    private final DetailSections.SectionCache sections = new DetailSections.SectionCache(7);
     private List<DescriptionText.Line> layoutCache = Collections.emptyList();
     private long descLitAt = Long.MIN_VALUE / 4;
 
@@ -100,6 +101,7 @@ public final class CodexDetail {
     public void setMeta(@Nullable EnchantmentMeta meta) {
         this.meta = meta;
         this.scroll = 0;
+        sections.reset();
         if (meta == null) {
             head.clear();
             return;
@@ -152,13 +154,16 @@ public final class CodexDetail {
         UiTheme.glass(g, x, bodyTop, vpW, glassBottom - bodyTop);
 
         int cursorY = DetailSections.fitCard(g, font, filter, meta.getEnchantment(), left, bodyTop, innerWidth);
-        cursorY = renderDescription(g, font, left, cursorY, innerWidth);
-        cursorY = renderBasics(g, font, left, cursorY, innerWidth);
-        cursorY = renderItems(g, font, left, cursorY, innerWidth);
-        cursorY = renderAcquisition(g, font, left, cursorY, innerWidth);
-        cursorY = renderEnchantingData(g, font, left, cursorY, innerWidth);
-        cursorY = renderConflicts(g, font, left, cursorY, innerWidth, hx, hy);
-        cursorY = renderValues(g, font, left, cursorY, innerWidth);
+        sections.begin(meta.getId() + '#' + clampViewLevel(meta) + '#' + innerWidth);
+        int vt = y;
+        int vb = y + height;
+        cursorY = sections.draw(0, cursorY, vt, vb, c -> renderDescription(g, font, left, c, innerWidth));
+        cursorY = sections.draw(1, cursorY, vt, vb, c -> renderBasics(g, font, left, c, innerWidth));
+        cursorY = sections.draw(2, cursorY, vt, vb, c -> renderItems(g, font, left, c, innerWidth));
+        cursorY = sections.draw(3, cursorY, vt, vb, c -> renderAcquisition(g, font, left, c, innerWidth));
+        cursorY = sections.draw(4, cursorY, vt, vb, c -> renderEnchantingData(g, font, left, c, innerWidth));
+        cursorY = sections.draw(5, cursorY, vt, vb, c -> renderConflicts(g, font, left, c, innerWidth, hx, hy));
+        cursorY = sections.draw(6, cursorY, vt, vb, c -> renderValues(g, font, left, c, innerWidth));
         cursorY += large ? 12 : 10;
 
         g.disableScissor();
@@ -466,7 +471,6 @@ public final class CodexDetail {
         pos[0] += w + DetailSections.CHIP_GAP;
     }
 
-    /** 可调数值：每项两行，上行名字和当前生效值，下行默认值和允许范围；被改过的整项标成金色 */
     private int renderValues(@Nonnull GuiGraphics g, @Nonnull Font font, int left, int cursorY, int innerWidth) {
         cursorY = DetailSections.section(g, font, Component.translatable("carianstyle.codex.section.values"),
                 left, cursorY, innerWidth);
@@ -582,7 +586,6 @@ public final class CodexDetail {
         }
     }
 
-    /** 大窗口：月亮 80、卷首和正文内边距 14 */
     public void setLarge(boolean large) {
         this.large = large;
         head.setLarge(large);

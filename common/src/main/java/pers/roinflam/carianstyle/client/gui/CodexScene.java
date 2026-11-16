@@ -22,20 +22,24 @@ import java.util.Optional;
  */
 public final class CodexScene {
 
+    // night.png 的像素尺寸；scene.txt 里的岸线、月心列和星点坐标都是在这张图上量的，换图要一起改
     public static final int W = 1400;
     public static final int H = 1000;
+    // 星点按 scene.txt 里的先后取，表里排在前面的先画
     private static final int MAX_STARS = 18;
     private static final int MAX_GLINTS = 8;
     private static final int MAX_EXTRA_STARS = 24;
     private static final int NIGHT = 0xFF02040D;
 
+    private static final int DEFAULT_HORIZON = 440;
+    private static final int DEFAULT_MOON_COLUMN = 620;
+
     private static boolean loaded;
-    private static int horizon = 440;
-    private static int moonColumn = 620;
+    private static int horizon = DEFAULT_HORIZON;
+    private static int moonColumn = DEFAULT_MOON_COLUMN;
     private static final List<int[]> STARS = new ArrayList<>();
     private static final List<int[]> GLINTS = new ArrayList<>();
 
-    /** 某点有没有露在外面（不被书页挡住） */
     public interface Open {
         boolean test(int x, int y);
     }
@@ -53,11 +57,20 @@ public final class CodexScene {
         return moonColumn;
     }
 
+    /** 换过资源包后 scene.txt 可能变了；界面 init 时清掉重读，上次读坏了这次也能再试 */
+    public static void reload() {
+        loaded = false;
+    }
+
     private static void load() {
         if (loaded) {
             return;
         }
         loaded = true;
+        horizon = DEFAULT_HORIZON;
+        moonColumn = DEFAULT_MOON_COLUMN;
+        STARS.clear();
+        GLINTS.clear();
         ResourceLocation loc = new ResourceLocation(Reference.MOD_ID, "textures/gui/codex/scene.txt");
         try {
             Optional<Resource> res = Minecraft.getInstance().getResourceManager().getResource(loc);
@@ -86,21 +99,14 @@ public final class CodexScene {
         }
     }
 
-    /**
-     * @param bgx       画的左上角
-     * @param hzy       湖岸线落在哪一行（画的 y = hzy - 岸线）
-     * @param night     开场时压在画上的夜色，0 是不压
-     * @param starLimit 开场时星一颗颗亮起，只画前这么多颗
-     * @param open      播完后这一点露不露在外面
-     * @param uncovered 现在这一点有没有被书挡住（书还没照出来时，书后面的星也看得见）
-     */
     public static void render(@Nonnull GuiGraphics g, int gw, int gh, int bgx, int hzy, float night, int starLimit,
-                              @Nonnull Open open, @Nonnull Open uncovered) {
+                              @Nonnull Open open, @Nonnull Open uncovered, float alpha) {
         load();
         int bgy = hzy - horizon;
         String n = "night";
         int r = bgx + W;
         int b = bgy + H;
+        RenderSystem.setShaderColor(1f, 1f, 1f, alpha);
         UiTheme.sprite(g, n, bgx, bgy, W, H, 0, 0, W, H, W, H);
         if (bgy > 0) {
             UiTheme.sprite(g, n, bgx, 0, W, bgy, 0, 0, W, 1, W, H);
@@ -128,7 +134,7 @@ public final class CodexScene {
         }
 
         // 岸线上的薄雾倒过来贴，比卷首里那层淡
-        RenderSystem.setShaderColor(1f, 1f, 1f, 0.55f);
+        RenderSystem.setShaderColor(1f, 1f, 1f, 0.55f * alpha);
         int mist = mistOffset();
         for (int x = mist - 128; x < gw; x += 128) {
             UiTheme.sprite(g, "mist", x, hzy, 128, 14, 0, 14, 128, -14, 128, 14);
@@ -158,7 +164,7 @@ public final class CodexScene {
             } else {
                 extra++;
             }
-            float a = Math.max(twinkle(t, 2400 + (i % 5) * 500, (i % 7) * 600, 4), night * 0.7f);
+            float a = Math.max(twinkle(t, 2400 + (i % 5) * 500, (i % 7) * 600, 4), night * 0.7f) * alpha;
             if (i % 3 == 0) {
                 UiTheme.spriteAlpha(g, "spark", x - 1, y - 1, 3, 3, a);
             } else if (a > 0f) {
@@ -174,7 +180,7 @@ public final class CodexScene {
                 continue;
             }
             shown++;
-            float a = twinkle(t, 2200, (i % 5) * 500, 3) * (1f - night);
+            float a = twinkle(t, 2200, (i % 5) * 500, 3) * (1f - night) * alpha;
             if (a > 0f) {
                 g.fill(x, y, x + p[2], y + 1, UiTheme.withAlpha(UiTheme.MOON, a));
             }
@@ -186,7 +192,6 @@ public final class CodexScene {
         return (int) ((UiTheme.now() / 240L) % 128L);
     }
 
-    /** 透明度 0→1 分 n 档、来回走，period 是单程 */
     private static float twinkle(long t, int period, int lead, int n) {
         long x = t + lead;
         long cycle = x / period;

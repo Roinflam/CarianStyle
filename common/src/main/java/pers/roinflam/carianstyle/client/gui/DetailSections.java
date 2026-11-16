@@ -16,7 +16,9 @@ import pers.roinflam.carianstyle.codex.ItemFit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.function.IntUnaryOperator;
 
 /**
  * 两个详情页共用的正文件：节头间距、点线行、带符号的条目、冲突小牌、物品格、放入物品后的结论卡片。
@@ -24,11 +26,8 @@ import java.util.List;
  */
 public final class DetailSections {
 
-    /** 节与节之间空 10 */
     public static final int SECTION_GAP = 10;
-    /** 正文、条目、点线行的行高 */
     public static final int LINE = 11;
-    /** 说明小字（8 高）折行时的行距 */
     public static final int NOTE_STEP = 10;
     public static final int CHIP_H = 13;
     public static final int CHIP_GAP = 4;
@@ -37,10 +36,43 @@ public final class DetailSections {
 
     private static final int FOREIGN_CHIP = 0xFF8FB8E8;
 
+    private static List<Item> stacksOf;
+    private static List<ItemStack> stacks = List.of();
+
     private DetailSections() {
     }
 
-    /** 上空 10 再画节头，返回节头下面那一行的 y */
+    /** 各节上次画出来的高度，整节滚出视口时照这个高度跳过；条目、等级、宽度变了全部作废 */
+    static final class SectionCache {
+        private final int[] heights;
+        private String key;
+
+        SectionCache(int count) {
+            heights = new int[count];
+        }
+
+        void reset() {
+            key = null;
+        }
+
+        void begin(@Nonnull String key) {
+            if (!key.equals(this.key)) {
+                this.key = key;
+                Arrays.fill(heights, -1);
+            }
+        }
+
+        int draw(int index, int cursorY, int viewTop, int viewBottom, @Nonnull IntUnaryOperator section) {
+            int h = heights[index];
+            if (h >= 0 && (cursorY + h <= viewTop || cursorY >= viewBottom)) {
+                return cursorY + h;
+            }
+            int end = section.applyAsInt(cursorY);
+            heights[index] = end - cursorY;
+            return end;
+        }
+    }
+
     public static int section(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component title,
                               int left, int y, int innerWidth) {
         return UiTheme.sectionHeader(g, font, title, left, y + SECTION_GAP, innerWidth);
@@ -58,7 +90,7 @@ public final class DetailSections {
         if (valueW <= avail) {
             return UiTheme.keyValue(g, font, label, value, left, y, innerWidth, valueColor);
         }
-        g.drawString(font, label.getString(), left, y + 1, UiTheme.TEXT_DIM, false);
+        g.drawString(font, UiTheme.trim(font, label.getString(), innerWidth), left, y + 1, UiTheme.TEXT_DIM, false);
         List<FormattedCharSequence> lines;
         int lineY = y;
         if (avail < 40) {
@@ -124,7 +156,6 @@ public final class DetailSections {
         g.drawString(font, UiTheme.trim(font, text.getString(), width - 10), x + 5, y + 3, color, false);
     }
 
-    /** 18×18 物品格：1 像素描边，图标在里面 1 像素处 */
     public static void slot(@Nonnull GuiGraphics g, @Nonnull ItemStack stack, int x, int y) {
         g.fill(x, y, x + SLOT, y + SLOT, 0xB3060A1A);
         UiTheme.border(g, x, y, SLOT, SLOT, UiTheme.DOTS);
@@ -166,14 +197,22 @@ public final class DetailSections {
             return note(g, font, Component.translatable("carianstyle.codex.items.none"),
                     left, y + 5, innerWidth, UiTheme.OFF);
         }
+        if (stacksOf != items) {
+            List<ItemStack> built = new ArrayList<>(items.size());
+            for (Item item : items) {
+                built.add(new ItemStack(item));
+            }
+            stacksOf = items;
+            stacks = built;
+        }
         int sx = left;
         int rowY = y + 5;
-        for (Item item : items) {
+        for (ItemStack stack : stacks) {
             if (sx > left && sx + SLOT > left + innerWidth) {
                 sx = left;
                 rowY += SLOT + SLOT_GAP;
             }
-            slot(g, new ItemStack(item), sx, rowY);
+            slot(g, stack, sx, rowY);
             sx += SLOT + SLOT_GAP;
         }
         return note(g, font, Component.translatable("carianstyle.codex.items.hint"),
@@ -355,7 +394,6 @@ public final class DetailSections {
                 filter.getBaseRepairCost(), UiTheme.roman(resultLevel), fit.getAnvilCost());
     }
 
-    /** 挡路的附魔拼成「锋利 V、亡灵杀手 III」 */
     @Nonnull
     private static Component blockerNames(@Nonnull ItemFit fit) {
         MutableComponent names = Component.empty();

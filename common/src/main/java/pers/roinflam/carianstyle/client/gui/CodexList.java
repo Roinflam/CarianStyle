@@ -24,7 +24,6 @@ public final class CodexList {
 
     private static final int ROW_HEIGHT = 25;
     private static final int HEADER_HEIGHT = 14;
-    /** 条目后面紧跟分类头时，头上多空的距离 */
     private static final int HEADER_GAP = 3;
 
     /** 视口右边让给滚动条：1 像素空隙 + 7 宽刻度尺 */
@@ -209,8 +208,25 @@ public final class CodexList {
             g.drawString(font, count, nameRight - cw, textY, UiTheme.mix(0xFF0B1030, cat, 0.62f), false);
             nameRight -= cw + 6;
         }
-        UiTheme.trimmed(g, font, first.getGroupName(), x + SPINE_TEXT_X, textY,
-                nameRight - (x + SPINE_TEXT_X), cat, true);
+        int maxW = nameRight - (x + SPINE_TEXT_X);
+        UiTheme.text(g, font, keepCount(font, first.getGroupName().getString(), maxW), x + SPINE_TEXT_X, textY, cat);
+    }
+
+    /** 截组名时保住末尾括号里的条数，只截前面的字 */
+    @Nonnull
+    private static String keepCount(@Nonnull Font font, @Nonnull String name, int maxW) {
+        if (font.width(name) <= maxW) {
+            return name;
+        }
+        int cut = Math.max(name.lastIndexOf('('), name.lastIndexOf('（'));
+        if (cut <= 0) {
+            return UiTheme.trim(font, name, maxW);
+        }
+        String head = name.substring(0, cut);
+        String tail = name.substring(cut);
+        String sep = head.endsWith(" ") ? " " : "";
+        String cutHead = UiTheme.trim(font, head.stripTrailing(), maxW - font.width(sep + tail));
+        return cutHead.isEmpty() ? UiTheme.trim(font, tail, maxW) : cutHead + sep + tail;
     }
 
     private static int constellationOf(@Nonnull CodexEntry entry) {
@@ -273,11 +289,18 @@ public final class CodexList {
 
         CodexEntry base = ItemFilter.unwrap(meta);
         int phase = UiTheme.phaseOf(base);
-        String rarity = UiTheme.trim(font, meta.getRarityName().getString(), subRight - textX);
+        String rarity = meta.getRarityName().getString();
+        String level = Component.translatable("carianstyle.codex.list.max_level",
+                UiTheme.roman(meta.getMaxLevel())).getString();
+        int avail = subRight - textX;
+        int space = font.width(" ");
+        if (font.width(rarity) + space + font.width(level) > avail) {
+            // 挤不下先截稀有度：行尾的月相已经标了稀有度，最高等级只有这里写
+            rarity = UiTheme.trim(font, rarity, avail - space - Math.min(font.width(level), avail));
+            level = UiTheme.trim(font, level, avail - (rarity.isEmpty() ? 0 : font.width(rarity) + space));
+        }
         g.drawString(font, rarity, textX, subY, UiTheme.phaseColor(phase), false);
-        int levelX = textX + font.width(rarity) + font.width(" ");
-        String level = UiTheme.trim(font, Component.translatable("carianstyle.codex.list.max_level",
-                UiTheme.roman(meta.getMaxLevel())).getString(), subRight - levelX);
+        int levelX = rarity.isEmpty() ? textX : textX + font.width(rarity) + space;
         if (!level.isEmpty()) {
             g.drawString(font, level, levelX, subY, plainColor, false);
         }
@@ -377,9 +400,7 @@ public final class CodexList {
         private final CodexEntry meta;
         @Nullable
         private final CodexEntry group;
-        /** 行顶距内容顶的像素 */
         private final int top;
-        /** 分类头下面的条数 */
         private int count;
 
         private Row(@Nullable CodexEntry meta, @Nullable CodexEntry group, int top) {

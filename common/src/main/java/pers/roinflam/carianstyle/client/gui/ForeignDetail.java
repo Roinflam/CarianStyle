@@ -58,6 +58,7 @@ public final class ForeignDetail {
     private static int viewLevel = Integer.MAX_VALUE;
 
     private String layoutKey;
+    private final DetailSections.SectionCache sections = new DetailSections.SectionCache(6);
     private List<DescriptionText.Line> layoutCache = Collections.emptyList();
     private long descLitAt = Long.MIN_VALUE / 4;
 
@@ -80,6 +81,7 @@ public final class ForeignDetail {
     public void setMeta(@Nullable ForeignMeta meta) {
         this.meta = meta;
         this.scroll = 0;
+        sections.reset();
         if (meta == null) {
             head.clear();
             return;
@@ -142,13 +144,17 @@ public final class ForeignDetail {
         UiTheme.glass(g, x, bodyTop, vpW, glassBottom - bodyTop);
 
         int cursorY = DetailSections.fitCard(g, font, filter, meta.getEnchantment(), left, bodyTop, innerWidth);
-        cursorY = renderDescription(g, font, left, cursorY, innerWidth);
-        cursorY = renderBasics(g, font, left, cursorY, innerWidth);
-        cursorY = DetailSections.itemTypes(g, font, ItemCategoryNamer.describe(meta.getApplicableItems()),
-                meta.getApplicableItems(), left, cursorY + DetailSections.SECTION_GAP, innerWidth);
-        cursorY = renderAcquisition(g, font, left, cursorY, innerWidth);
-        cursorY = renderEnchantingData(g, font, left, cursorY, innerWidth);
-        cursorY = renderConflicts(g, font, left, cursorY, innerWidth, hx, hy);
+        sections.begin(meta.getKey() + '#' + shownLevel() + '#' + innerWidth);
+        int vt = y;
+        int vb = y + height;
+        cursorY = sections.draw(0, cursorY, vt, vb, c -> renderDescription(g, font, left, c, innerWidth));
+        cursorY = sections.draw(1, cursorY, vt, vb, c -> renderBasics(g, font, left, c, innerWidth));
+        cursorY = sections.draw(2, cursorY, vt, vb, c -> DetailSections.itemTypes(g, font,
+                ItemCategoryNamer.describe(meta.getApplicableItems()), meta.getApplicableItems(),
+                left, c + DetailSections.SECTION_GAP, innerWidth));
+        cursorY = sections.draw(3, cursorY, vt, vb, c -> renderAcquisition(g, font, left, c, innerWidth));
+        cursorY = sections.draw(4, cursorY, vt, vb, c -> renderEnchantingData(g, font, left, c, innerWidth));
+        cursorY = sections.draw(5, cursorY, vt, vb, c -> renderConflicts(g, font, left, c, innerWidth, hx, hy));
         cursorY += large ? 12 : 10;
 
         g.disableScissor();
@@ -431,7 +437,6 @@ public final class ForeignDetail {
         }
     }
 
-    /** 大窗口：月亮 80、卷首和正文内边距 14 */
     public void setLarge(boolean large) {
         this.large = large;
         head.setLarge(large);
