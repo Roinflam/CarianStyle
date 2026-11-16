@@ -381,18 +381,31 @@ public final class ItemFilter {
      * 筛选时的分组，声明顺序即列表顺序。
      */
     private enum Group {
-        FITS("carianstyle.codex.fit.group.fits", UiTheme.ON),
-        EXPENSIVE("carianstyle.codex.fit.group.expensive", UiTheme.WARN),
-        OWNED("carianstyle.codex.fit.group.owned", UiTheme.ACCENT),
-        BLOCKED("carianstyle.codex.fit.group.blocked", UiTheme.DANGER);
+        FITS("carianstyle.codex.fit.group.fits", UiTheme.ON, UiTheme.CONST_FIT_OK),
+        EXPENSIVE("carianstyle.codex.fit.group.expensive", UiTheme.WARN, UiTheme.CONST_FIT_EXPENSIVE),
+        OWNED("carianstyle.codex.fit.group.owned", UiTheme.ACCENT, UiTheme.CONST_FIT_OWNED),
+        BLOCKED("carianstyle.codex.fit.group.blocked", UiTheme.DANGER, UiTheme.CONST_FIT_BLOCKED);
 
         private final String langKey;
         private final int color;
+        private final int constellation;
 
-        Group(String langKey, int color) {
+        Group(String langKey, int color, int constellation) {
             this.langKey = langKey;
             this.color = color;
+            this.constellation = constellation;
         }
+    }
+
+    /** 列表分组头用的星座格；不是放入物品后的分组就返回 -1 */
+    static int constellationOf(@Nonnull CodexEntry entry) {
+        return entry instanceof FitEntry ? ((FitEntry) entry).group.constellation : -1;
+    }
+
+    /** 取被包住的原条目：月相要按原条目的类型认档（本模组三档、别的模组四档） */
+    @Nonnull
+    static CodexEntry unwrap(@Nonnull CodexEntry entry) {
+        return entry instanceof FitEntry ? ((FitEntry) entry).delegate : entry;
     }
 
     /**

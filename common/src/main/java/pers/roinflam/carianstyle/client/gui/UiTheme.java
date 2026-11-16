@@ -124,6 +124,8 @@ public final class UiTheme {
 
     /** 稀有度对应的月相：本模组三档对蛾眉 / 上弦 / 满月，原版四档一档一张 */
     public static int phaseOf(@Nonnull CodexEntry entry) {
+        // 放入物品后列表里的条目包了一层，要按原条目认档
+        entry = ItemFilter.unwrap(entry);
         int order = Math.max(0, entry.getRarityOrder());
         if (entry instanceof EnchantmentMeta) {
             return order >= 2 ? 4 : order + 1;

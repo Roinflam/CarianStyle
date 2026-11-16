@@ -1,5 +1,6 @@
 package pers.roinflam.carianstyle.client.gui;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -18,82 +19,130 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 两个详情面板共用的区块绘制。
- *
- * <h3>为什么要抽出来</h3>
- * <p>
- * {@link CodexDetail}（本模组附魔）与 {@link ForeignDetail}（原版及其它模组附魔）
- * 各自实现了「适用物品种类」这一块。两份代码<b>几乎</b>一样——同样的标题、同样的图标网格、
- * 同样的脚注——但因为是分两次写的，缩进、间距、颜色、种类名画不画，都出现过不一致。
- * </p>
- * <p>
- * 每修一次都是「把 B 改成和 A 一样」，而下次给其中一边加东西时又会再分叉。
- * 问题不在于某一次改漏了，在于同一块界面存在两份实现。
- * </p>
- * <p>
- * 抽到这里之后，两边传入各自的数据、共用同一段绘制代码，
- * <b>它们不可能再长得不一样</b>。两边信息量的差异（本模组读注解、外部靠实测反推）
- * 收敛成了「传进来的 {@code categoryName} 不同」，仅此而已。
- * </p>
- *
- * @author RoinFlam
- * @version 1.0
+ * 两个详情页共用的正文件：节头间距、点线行、带符号的条目、冲突小牌、物品格、放入物品后的结论卡片。
+ * 两页的同一块只留这一份画法，免得改一边忘一边又长得不一样。
  */
 public final class DetailSections {
 
-    /** 图标格子的边长（含间距） */
-    private static final int ICON_STRIDE = 20;
+    /** 节与节之间空 10 */
+    public static final int SECTION_GAP = 10;
+    /** 正文、条目、点线行的行高 */
+    public static final int LINE = 11;
+    /** 说明小字（8 高）折行时的行距 */
+    public static final int NOTE_STEP = 10;
+    public static final int CHIP_H = 13;
+    public static final int CHIP_GAP = 4;
+    public static final int SLOT = 18;
+    private static final int SLOT_GAP = 3;
 
-    /** 图标本身的边长 */
-    private static final int ICON_SIZE = 18;
+    private static final int FOREIGN_CHIP = 0xFF8FB8E8;
 
     private DetailSections() {
     }
 
+    /** 上空 10 再画节头，返回节头下面那一行的 y */
+    public static int section(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component title,
+                              int left, int y, int innerWidth) {
+        return UiTheme.sectionHeader(g, font, title, left, y + SECTION_GAP, innerWidth);
+    }
+
     /**
-     * 在标题行右端画注册 ID 的芯片。
-     *
-     * <h3>为什么做成芯片而不是一行小字</h3>
-     * <p>
-     * ID 最早是单独一行、字号与标题相同，看着像副标题；改成右端小字之后仍有点尴尬——
-     * 它和左边的附魔名在同一行同一种排版里，读起来像「名字的一部分」。
-     * </p>
-     * <p>
-     * 但它其实是<b>另一种东西</b>：给配置文件和命令用的机器名。
-     * 套一个深色底的胶囊之后，它在视觉上就从「文案」变成了「一段可以抄走的代码」，
-     * 不需要任何文字说明。
-     * </p>
-     * <p>
-     * 命名空间画得比路径更暗：{@code minecraft:} 那半截对读者几乎没有信息量，
-     * 真正要看的是冒号后面。
-     * </p>
-     *
-     * @param g          绘制上下文
-     * @param font       字体
-     * @param id         完整注册名；不含冒号时整体按路径处理
-     * @param left       内容左边界
-     * @param y          纵坐标
-     * @param innerWidth 可用宽度
-     * @param minLeft    芯片左边缘不得越过该坐标（避免压住标题）
+     * 标签 …… 值。值太长时在右边那一栏里折行、每行靠右；标签本身就占掉大半行时值整个挪到下一行。
+     * 返回下一行的 y。
      */
+    public static int kv(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component label,
+                         @Nonnull String value, int left, int y, int innerWidth, int valueColor) {
+        int labelW = font.width(label);
+        int valueW = font.width(value);
+        int avail = innerWidth - labelW - 14;
+        if (valueW <= avail) {
+            return UiTheme.keyValue(g, font, label, value, left, y, innerWidth, valueColor);
+        }
+        g.drawString(font, label.getString(), left, y + 1, UiTheme.TEXT_DIM, false);
+        List<FormattedCharSequence> lines;
+        int lineY = y;
+        if (avail < 40) {
+            lines = font.split(Component.literal(value), Math.max(1, innerWidth));
+            lineY += LINE;
+        } else {
+            lines = font.split(Component.literal(value), avail);
+        }
+        boolean first = true;
+        for (FormattedCharSequence line : lines) {
+            int w = font.width(line);
+            int vx = left + innerWidth - w;
+            g.drawString(font, line, vx, lineY + 1, valueColor, false);
+            if (first && avail >= 40) {
+                UiTheme.dots(g, left + labelW + 4, vx - 4, lineY + 7);
+            }
+            first = false;
+            lineY += LINE;
+        }
+        return Math.max(lineY, y + LINE);
+    }
+
+    /** 一条带符号的条目，超宽折行；符号跟着字色走（警示金、压暗灰、其余银星） */
+    public static int bullet(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component text,
+                             int left, int y, int innerWidth, int color) {
+        String mark = color == UiTheme.WARN || color == UiTheme.DANGER ? "bul_warn"
+                : color == UiTheme.OFF || color == UiTheme.TEXT_DIM ? "bul_dim" : "bul";
+        UiTheme.sprite(g, mark, left + 1, y + 3, 5, 5);
+        for (FormattedCharSequence line : font.split(text, Math.max(1, innerWidth - 10))) {
+            g.drawString(font, line, left + 10, y + 1, color, false);
+            y += LINE;
+        }
+        return y;
+    }
+
+    /** 8 高的说明小字，折行按 10 一行；返回最后一行字的下沿 */
+    public static int note(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component text,
+                           int left, int y, int innerWidth, int color) {
+        List<FormattedCharSequence> lines = font.split(text, Math.max(1, innerWidth));
+        if (lines.isEmpty()) {
+            return y;
+        }
+        for (int i = 0; i < lines.size(); i++) {
+            g.drawString(font, lines.get(i), left, y + i * NOTE_STEP, color, false);
+        }
+        return y + (lines.size() - 1) * NOTE_STEP + 8;
+    }
+
+    public static int chipWidth(@Nonnull Font font, @Nonnull Component text, int maxWidth) {
+        return Math.min(maxWidth, font.width(text) + 10);
+    }
+
+    /** 冲突小牌：本模组的红，外部附魔的灰蓝（点下去会换到「其他附魔」页） */
+    public static void chip(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component text,
+                            int x, int y, int width, boolean hovered, boolean foreign) {
+        boolean pressed = hovered && Minecraft.getInstance().mouseHandler.isLeftPressed();
+        int c = foreign ? FOREIGN_CHIP : 0xFFFF5A6E;
+        int fill = UiTheme.withAlpha(c, pressed ? 0.4f : hovered ? 0.24f : 0.08f);
+        int edge = hovered ? (foreign ? FOREIGN_CHIP : UiTheme.DANGER)
+                : foreign ? UiTheme.mix(0xFF0B1030, FOREIGN_CHIP, 0.55f) : 0xFF8F3F52;
+        int color = hovered ? 0xFFFFFFFF : foreign ? 0xFFB4CDEE : 0xFFFF9AA6;
+        UiTheme.plate(g, x, y, width, CHIP_H, fill, edge);
+        g.drawString(font, UiTheme.trim(font, text.getString(), width - 10), x + 5, y + 3, color, false);
+    }
+
+    /** 18×18 物品格：1 像素描边，图标在里面 1 像素处 */
+    public static void slot(@Nonnull GuiGraphics g, @Nonnull ItemStack stack, int x, int y) {
+        g.fill(x, y, x + SLOT, y + SLOT, 0xB3060A1A);
+        UiTheme.border(g, x, y, SLOT, SLOT, UiTheme.DOTS);
+        g.renderItem(stack, x + 1, y + 1);
+    }
+
+    /** 标题行右端的注册 id 牌；放不下（左边越过 minLeft）就不画 */
     public static void idChip(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull String id,
                               int left, int y, int innerWidth, int minLeft) {
         int colon = id.indexOf(':');
         String namespace = colon >= 0 ? id.substring(0, colon + 1) : "";
         String path = colon >= 0 ? id.substring(colon + 1) : id;
-
-        int textWidth = font.width(namespace) + font.width(path);
-        int chipW = textWidth + 10;
-        int chipH = font.lineHeight + 3;
+        int chipW = font.width(namespace) + font.width(path) + 10;
         int chipX = left + innerWidth - chipW;
         if (chipX < minLeft) {
-            // 放不下就不画：标题才是主角，挤成两行反而更乱
             return;
         }
-
-        g.fill(chipX, y - 2, chipX + chipW, y - 2 + chipH, UiTheme.PANEL_ALT);
-        UiTheme.border(g, chipX, y - 2, chipW, chipH, UiTheme.BORDER);
-
+        UiTheme.plate(g, chipX, y - 3, chipW, CHIP_H, UiTheme.PANEL, UiTheme.BORDER);
         int textX = chipX + 5;
         if (!namespace.isEmpty()) {
             g.drawString(font, namespace, textX, y, UiTheme.OFF, false);
@@ -103,70 +152,38 @@ public final class DetailSections {
     }
 
     /**
-     * 绘制「适用物品种类」区块。
-     *
-     * @param g            绘制上下文
-     * @param font         字体
-     * @param categoryName 种类名；本模组取自注解，外部附魔由实测结果反推
-     * @param items        代表性物品
-     * @param left         内容左边界
-     * @param cursorY      当前纵坐标
-     * @param innerWidth   可用宽度
-     * @return 绘制后的纵坐标
+     * 「适用物品种类」整节（含节头，节头上的 10 由调用方空）。种类名在上、物品格在下：
+     * 只看一把钻石剑，判断不出是只能附剑还是剑斧都行，种类名才是直接的回答。
+     * 返回最后一行字的下沿。
      */
     public static int itemTypes(@Nonnull GuiGraphics g, @Nonnull Font font,
                                 @Nonnull Component categoryName, @Nonnull List<Item> items,
                                 int left, int cursorY, int innerWidth) {
-        cursorY = UiTheme.sectionHeader(g, font,
-                Component.translatable("carianstyle.codex.section.items"),
+        int y = UiTheme.sectionHeader(g, font, Component.translatable("carianstyle.codex.section.items"),
                 left, cursorY, innerWidth);
-
-        // 种类名在上、图标在下。只画图标的话，玩家看到一把钻石剑也判断不出
-        // 「是只能附剑，还是剑斧都行」——种类名才是这个问题的直接回答
-        cursorY = UiTheme.wrapped(g, font, categoryName, left, cursorY, innerWidth, UiTheme.TEXT) + 5;
-
+        y = note(g, font, categoryName, left, y, innerWidth, UiTheme.TEXT);
         if (items.isEmpty()) {
-            return UiTheme.wrapped(g, font, Component.translatable("carianstyle.codex.items.none"),
-                    left, cursorY, innerWidth, UiTheme.TEXT_DIM) + 8;
+            return note(g, font, Component.translatable("carianstyle.codex.items.none"),
+                    left, y + 5, innerWidth, UiTheme.OFF);
         }
-
-        int iconX = left;
-        int rowTop = cursorY;
+        int sx = left;
+        int rowY = y + 5;
         for (Item item : items) {
-            if (iconX + ICON_SIZE > left + innerWidth) {
-                iconX = left;
-                rowTop += ICON_STRIDE;
+            if (sx > left && sx + SLOT > left + innerWidth) {
+                sx = left;
+                rowY += SLOT + SLOT_GAP;
             }
-            g.renderItem(new ItemStack(item), iconX, rowTop);
-            iconX += ICON_STRIDE;
+            slot(g, new ItemStack(item), sx, rowY);
+            sx += SLOT + SLOT_GAP;
         }
-        cursorY = rowTop + ICON_STRIDE + 3;
-
-        cursorY = UiTheme.wrapped(g, font, Component.translatable("carianstyle.codex.items.hint"),
-                left, cursorY, innerWidth, UiTheme.OFF);
-        return cursorY + 8;
+        return note(g, font, Component.translatable("carianstyle.codex.items.hint"),
+                left, rowY + SLOT + 5, innerWidth, UiTheme.OFF);
     }
 
     /**
-     * 放入物品后，在详情最上方画「这个附魔对这件东西怎么样」的结论卡片。
-     *
-     * <h3>为什么放在最上面</h3>
-     * <p>
-     * 玩家放物品进来就是为了问这一个问题，答案不该埋在描述和数值下面。
-     * 卡片边框用结论的颜色（绿 / 金 / 红 / 灰），不读字也能先看出个大概。
-     * </p>
-     * <p>
-     * 两个详情面板共用这一份，理由同 {@link #itemTypes}。
-     * </p>
-     *
-     * @param g           绘制上下文
-     * @param font        字体
-     * @param filter      放入物品筛选；未启用时不画
-     * @param enchantment 当前附魔
-     * @param left        内容左边界
-     * @param cursorY     当前纵坐标
-     * @param innerWidth  可用宽度
-     * @return 绘制后的纵坐标
+     * 放入物品后，详情最上面那张「这个附魔对这件东西怎么样」的卡片：玩家放物品进来就是要问这个，
+     * 答案不能埋在描述和数值下面。边框跟结论色，不读字也能先看出大概。
+     * 上空 7 再画；没启用筛选时什么都不画、原样返回。返回卡片下沿。
      */
     public static int fitCard(@Nonnull GuiGraphics g, @Nonnull Font font, @Nullable ItemFilter filter,
                               @Nonnull Enchantment enchantment, int left, int cursorY, int innerWidth) {
@@ -229,7 +246,7 @@ public final class DetailSections {
                 color = UiTheme.DANGER;
                 body.add(Component.translatable("carianstyle.codex.fit.card.blocked.detail",
                         blockerNames(fit)));
-                // 附魔书被砂轮洗掉非诅咒附魔后会变回普通书，而普通书在铁砧上合不了任何附魔书——
+                // 附魔书被砂轮洗掉非诅咒附魔后变回普通书，普通书在铁砧上合不了任何附魔书，
                 // 对附魔书说「洗掉再附」是把人往死路上引
                 body.add(Component.translatable(stack.is(Items.ENCHANTED_BOOK)
                         ? "carianstyle.codex.fit.card.blocked.tip_book"
@@ -245,58 +262,71 @@ public final class DetailSections {
                 break;
         }
 
-        // 先排版再画：背景得在文字之前画，而背景多高要看正文折成几行
+        // 先排版再画：底色要在字之前画，而卡片多高要看正文折成几行
         int pad = 6;
-        int textWidth = innerWidth - pad * 2;
+        int textWidth = Math.max(1, innerWidth - pad * 2);
         List<FormattedCharSequence> lines = new ArrayList<>();
         for (Component paragraph : body) {
-            lines.addAll(font.split(paragraph, Math.max(1, textWidth)));
+            lines.addAll(font.split(paragraph, textWidth));
         }
 
-        // 标题行：图标 + 物品名 + 靠右的结论。面板太窄、结论放不进图标右边时，
-        // 结论单独起一行放在图标下面——宁可卡片高一行，也不能让结论钻到图标底下或和名字叠在一起
+        // 窄到结论放不进名字右边时，结论单独起一行，宁可卡片高一行也不能和名字叠在一起
         int verdictWidth = font.width(verdict);
-        int nameX = left + pad + ICON_SIZE + 4;
+        int nameX = left + pad + 16 + 5;
         int verdictX = left + innerWidth - pad - verdictWidth;
         boolean verdictInline = verdictX >= nameX;
-        int headHeight = verdictInline ? ICON_SIZE : ICON_SIZE + font.lineHeight + 1;
-        int cardHeight = pad + headHeight + 3 + lines.size() * (font.lineHeight + 1) + pad - 1;
+        int top = cursorY + 7;
+        int headY = top + 4;
+        int linesTop = headY + 16 + 2 + (verdictInline ? 0 : NOTE_STEP);
+        int cardHeight = linesTop + lines.size() * NOTE_STEP + 5 - top;
 
-        g.fill(left, cursorY, left + innerWidth, cursorY + cardHeight, UiTheme.PANEL_ALT);
-        UiTheme.border(g, left, cursorY, innerWidth, cardHeight, UiTheme.withAlpha(color, 0.7f));
-        g.fill(left, cursorY, left + 2, cursorY + cardHeight, color);
+        g.fill(left, top, left + innerWidth, top + cardHeight, UiTheme.withAlpha(color, 0.07f));
+        UiTheme.border(g, left, top, innerWidth, cardHeight, verdictEdge(color));
 
-        int headY = cursorY + pad;
-        g.renderItem(stack, left + pad, headY - 1);
-
-        int textY = headY + (ICON_SIZE - font.lineHeight) / 2;
+        g.renderItem(stack, left + pad, headY);
+        int textY = headY + 4;
         int nameRight;
         if (verdictInline) {
             g.drawString(font, verdict, verdictX, textY, color, false);
             nameRight = verdictX - 8;
         } else {
-            g.drawString(font, verdict, left + pad, headY + ICON_SIZE + 1, color, false);
+            g.drawString(font, verdict, left + pad, headY + 16 + 3, color, false);
             nameRight = left + innerWidth - pad;
         }
-        // 名字放不下「...」就干脆不画：图标已经说明了是哪件东西
-        if (nameRight - nameX >= font.width("...") + 2) {
-            UiTheme.trimmed(g, font, stack.getHoverName(), nameX, textY, nameRight - nameX, UiTheme.TEXT);
+        // 名字连省略号都放不下就不画，图标已经说明了是哪件东西
+        if (nameRight - nameX >= font.width("…") + 2) {
+            UiTheme.trimmed(g, font, stack.getHoverName(), nameX, textY, nameRight - nameX, UiTheme.MOON, true);
         }
 
-        int lineY = headY + headHeight + 3;
+        int lineY = linesTop;
         for (FormattedCharSequence line : lines) {
-            g.drawString(font, line, left + pad, lineY, UiTheme.TEXT_DIM, false);
-            lineY += font.lineHeight + 1;
+            g.drawString(font, line, left + pad, lineY + 1, UiTheme.TEXT_DIM, false);
+            lineY += NOTE_STEP;
         }
-        return cursorY + cardHeight + 10;
+        return top + cardHeight;
     }
 
-    /**
-     * 「可以附上」时说走哪条路。按这一件现在实际能走的路说，与列表行备注的判断一致。
-     *
-     * @param fit 判定结果（FITS 且能实际附上）
-     * @return 说明
-     */
+    /** 卡片边框：结论色压暗一档，和冲突小牌、页框用的是同一组暗色 */
+    private static int verdictEdge(int color) {
+        if (color == UiTheme.ON) {
+            return 0xFF3F8F5C;
+        }
+        if (color == UiTheme.DANGER) {
+            return 0xFF8F3F52;
+        }
+        if (color == UiTheme.WARN) {
+            return 0xFF8F7238;
+        }
+        if (color == UiTheme.ACCENT) {
+            return 0xFF3F5F8F;
+        }
+        if (color == UiTheme.TEXT_DIM || color == UiTheme.OFF) {
+            return UiTheme.BORDER;
+        }
+        return UiTheme.mix(0xFF0B1030, color, 0.5f);
+    }
+
+    /** 「可以附上」时说走哪条路，按这一件现在实际能走的路说，和列表行的备注一致 */
     @Nonnull
     private static Component fitsText(@Nonnull ItemFit fit) {
         boolean table = fit.isViaTable() && !fit.isStackEnchanted();
@@ -316,14 +346,6 @@ public final class DetailSections {
                 : "carianstyle.codex.fit.card.fits.anvil");
     }
 
-    /**
-     * 「铁砧过于昂贵」的说明。
-     *
-     * @param filter      筛选（取累计惩罚、是否整组）
-     * @param fit         判定结果
-     * @param resultLevel 合完之后的等级
-     * @return 说明
-     */
     @Nonnull
     private static Component expensiveText(@Nonnull ItemFilter filter, @Nonnull ItemFit fit, int resultLevel) {
         if (filter.isStackMultiple()) {
@@ -333,12 +355,7 @@ public final class DetailSections {
                 filter.getBaseRepairCost(), UiTheme.roman(resultLevel), fit.getAnvilCost());
     }
 
-    /**
-     * 把挡路的附魔拼成一串「锋利 V、亡灵杀手 III」。
-     *
-     * @param fit 判定结果
-     * @return 拼好的名字
-     */
+    /** 挡路的附魔拼成「锋利 V、亡灵杀手 III」 */
     @Nonnull
     private static Component blockerNames(@Nonnull ItemFit fit) {
         MutableComponent names = Component.empty();
@@ -351,11 +368,11 @@ public final class DetailSections {
             first = false;
             Enchantment other = blocker.enchantment;
             MutableComponent name = Component.translatable(other.getDescriptionId());
-            // 与原版 getFullname 一致：只有一级的附魔不写等级
+            // 和原版 getFullname 一样：只有一级的附魔不写等级
             if (blocker.level != 1 || other.getMaxLevel() != 1) {
                 name.append(" ").append(UiTheme.roman(blocker.level));
             }
-            // 名字用正文亮色、诅咒用红色，从灰色的说明文字里跳出来
+            // 名字用正文亮色、诅咒用红，从灰色的说明里跳出来
             int nameColor = (other.isCurse() ? UiTheme.DANGER : UiTheme.TEXT) & 0xFFFFFF;
             names.append(name.withStyle(style -> style.withColor(nameColor)));
         }
