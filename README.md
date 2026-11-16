@@ -127,7 +127,7 @@ The same texts you see in game. `[Level]` means the enchantment level.
 | **Black Flame Ritual** | I | Chestplate | Damage dealt +10% for each buff you have (+20% for each debuff). Cost: while you have any status effect, burns 5% of your current HP per second. |
 | **Blade of Death** *(treasure)* | I | Sword | Base damage reduced to 50%. Fully charged attacks burn the target for 50% of the original damage over 5s and reduce its max HP by 10% for 45s. Burn damage halved against bosses. |
 | **Unseen Blade** *(treasure)* | III | Sword, bow, crossbow | After dealing damage, become invisible for [Level] x 1s (3x as long when hitting with an arrow). |
-| **Bedrock Blast** *(treasure)* | III | Pickaxe | Breaking a block with a pickaxe also breaks every connected block of the same type (within 3x3x3 at level I, 5x5x5 at level II, 7x7x7 at level III), costing 1 durability each. With 1 durability left the pickaxe refuses to mine, so it never breaks. |
+| **Bedrock Blast** *(treasure)* | III | Pickaxe | Breaking a block with a pickaxe also breaks every connected block of the same type (within 3x3x3 at level I, 5x5x5 at level II, 7x7x7 at level III), costing 1 durability each. With 1 durability left the pickaxe refuses to mine, so it never breaks. Only a block the player mines by hand starts a chain; blocks broken by other mods' area-mining tools or by machines do not (configurable). |
 | **Glintstone Fling** | I | Sword | Magic damage you deal is converted to physical damage, and damage +50%. (Also applies to damage converted by Adula's Moonblade or Forsaken Child of Darkness.) |
 | **Glintstone Icecrag** | V | Bow | Damage is converted to magic damage. Arrow hits inflict Frostbite [Level] for 10s: movement speed -[Level] x 7.5%, and [Level] x 0.25% of max HP as physical damage every 0.5s (+100% per level). |
 | **Scholar's Shield** | V | Shield | While guarding: damage negation +[Level] x 7.5% (not against environmental damage), and melee attacks reflect [Level] x 10% of their damage back at the attacker (even when blocked). |
@@ -420,7 +420,7 @@ Yes, no need to ask. Please credit the author; commercial use is not allowed (se
 | **黑焰庇护** | Ⅲ | 胸甲 | 物理伤害减免+[附魔等级]×12.5%（无视护甲的伤害可穿透）；代价：恢复效果-[附魔等级]×25% |
 | **挥石魔法** | Ⅰ | 剑 | 造成的魔法伤害转为物理伤害，伤害+50%（「亚杜拉的月光剑」「黑暗弃子」转出的魔法伤害同样生效） |
 | **星光** | Ⅴ | 盔甲 | 持续照亮所在位置，亮度为全身星光等级之和×3，最高15（所在位置有水等方块时不亮） |
-| **爆碎岩盘**（宝藏） | Ⅲ | 镐 | 用镐挖掘方块时连锁破坏与之相连的同种方块（Ⅰ级3×3×3、Ⅱ级5×5×5、Ⅲ级7×7×7范围内），每格消耗1点耐久；耐久只剩1点时无法挖掘，镐不会被挖坏 |
+| **爆碎岩盘**（宝藏） | Ⅲ | 镐 | 用镐挖掘方块时连锁破坏与之相连的同种方块（Ⅰ级3×3×3、Ⅱ级5×5×5、Ⅲ级7×7×7范围内），每格消耗1点耐久；耐久只剩1点时无法挖掘，镐不会被挖坏；只有玩家亲手挖掘的方块会引发连锁，其他模组的范围挖掘工具或机器破坏的方块不会（可在配置中关闭） |
 | **辉石冰块** | Ⅴ | 弓 | 伤害转为魔法伤害；箭矢命中后施加[附魔等级]级冻伤10秒：移速-[等级]×7.5%，每0.5秒受到[等级]×0.25%最大生命值物理伤害（每级+100%） |
 | **魔力盾牌** | Ⅴ | 盾牌 | 举盾时：伤害抗性+[附魔等级]×7.5%（环境伤害不算）；被近战攻击时反弹[附魔等级]×10%伤害给攻击者（盾牌挡下也会反弹） |
 | **亚杜拉的月光剑** | Ⅲ | 剑 | 满蓄力攻击时伤害转为魔法伤害，并对目标及其[附魔等级]格内的生物（不波及同类、队友和自己的宠物）施加1级冻伤10秒（已有则+1级，至多10级）：移速-[等级]×7.5%，每0.5秒受到[等级]×0.25%最大生命值物理伤害（每级+100%）（夜晚叠层效率翻倍） |

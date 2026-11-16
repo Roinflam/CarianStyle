@@ -91,6 +91,14 @@ public class ClothConfigScreen {
                 .setSaveConsumer(ConfigLoader.COMMON.rockBlasterSuppressCommonDrops::set)
                 .build());
 
+        enchantmentCategory.addEntry(entryBuilder.startBooleanToggle(
+                        Component.translatable("config.carianstyle.rockBlasterDirectDigOnly"),
+                        ConfigLoader.COMMON.rockBlasterDirectDigOnly.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.translatable("config.carianstyle.rockBlasterDirectDigOnly.tooltip"))
+                .setSaveConsumer(ConfigLoader.COMMON.rockBlasterDirectDigOnly::set)
+                .build());
+
         enchantmentCategory.addEntry(entryBuilder.startIntField(
                         Component.translatable("config.carianstyle.prayerfulStrikeMaxHealth"),
                         ConfigLoader.COMMON.prayerfulStrikeMaxHealth.get())

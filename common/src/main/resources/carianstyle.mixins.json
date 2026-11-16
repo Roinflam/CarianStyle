@@ -8,6 +8,7 @@
     "MixinEnchantRandomly",
     "MixinEnchantmentFullname",
     "MixinLivingEntityTick",
+    "ServerPlayerGameModeMixin",
     "accessor.LivingEntityAccessor",
     "accessor.DamageSourceInvoker",
     "accessor.SynchedEntityDataAccessor",

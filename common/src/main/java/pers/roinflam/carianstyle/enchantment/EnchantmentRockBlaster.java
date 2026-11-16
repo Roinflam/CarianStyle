@@ -269,11 +269,16 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
         }
 
         Player player = evt.getPlayer();
-        if (player.getUsedItemHand() == null) {
+        boolean handDig = RockBlasterDigScope.isHandDig(player, centerPos);
+        if (!handDig && ConfigLoader.rockBlasterDirectDigOnly) {
+            return;
+        }
+        InteractionHand hand = player.getUsedItemHand();
+        if (hand == null) {
             return;
         }
 
-        ItemStack tool = player.getItemInHand(player.getUsedItemHand());
+        ItemStack tool = player.getItemInHand(hand);
         if (tool.isEmpty() || !(tool.getItem() instanceof PickaxeItem)) {
             return;
         }
@@ -302,8 +307,37 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
         }
 
         int radius = Math.min(level, ConfigLoader.rockBlasterMaxRange);
+        if (handDig) {
+            // 同一格可能先收到别的模组的探测事件，方块种类以世界里那一格为准
+            Block targetBlock = player.level().getBlockState(centerPos).getBlock();
+            RockBlasterDigScope.defer(() -> breakConnected(player, hand, tool, centerPos, targetBlock, radius, true));
+        } else {
+            // 关掉「仅响应亲手挖掘」后，别处发来的破坏事件照旧当场连带
+            breakConnected(player, hand, tool, centerPos, evt.getState().getBlock(), radius, false);
+        }
+    }
 
+    /**
+     * 连带挖相连的同类方块。{@code afterCenter} 为 true 时中心那一格已经挖过、耐久也扣过了。
+     */
+    private static void breakConnected(Player player, InteractionHand hand, ItemStack tool, BlockPos centerPos,
+                                       Block targetBlock, int radius, boolean afterCenter) {
         Level world = player.level();
+        if (afterCenter) {
+            // 挖中心那一格时，别的模组可能把手上的镐换成了新的一份，按现在手上的算
+            tool = player.getItemInHand(hand);
+            if (tool.isEmpty() || !(tool.getItem() instanceof PickaxeItem)
+                    || EnchantmentLevels.get(cachedEnchantment, tool) <= 0) {
+                return;
+            }
+            // destroyBlock 在方块拒绝被移除时也返回 true
+            if (world.getBlockState(centerPos).is(targetBlock)) {
+                return;
+            }
+        }
+        boolean isDamageable = tool.isDamageableItem() && !player.getAbilities().instabuild;
+        // 中心那一格的耐久还没扣时多留 1 点给它
+        int reserve = afterCenter ? 1 : 2;
 
         // 提前提取 ServerLevel，非创造模式下必须是 ServerLevel 才能处理掉落
         ServerLevel serverLevel = null;
@@ -313,22 +347,24 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
             return;
         }
 
-        Block targetBlock = evt.getState().getBlock();
-
         // BFS 查找连通同类方块
-        List<BlockPos> targets = findConnectedBlocks(world, centerPos, targetBlock, radius);
+        List<BlockPos> targets = RockBlasterDigScope.limitPerTick(world.getServer(), player, ConfigLoader.rockBlasterMaxRange,
+                findConnectedBlocks(world, centerPos, targetBlock, radius));
 
         if (targets.isEmpty()) {
             return;
         }
 
+        ItemStack pick = tool;
+        EquipmentSlot slot = LivingEntity.getSlotForHand(hand);
+
         // 提前判断目标方块是否需要抑制掉落物（同一批 BFS 结果全是同类方块，只需判断一次）
         boolean suppressDrop = shouldSuppressDrop(targetBlock);
 
+        Set<Long> processing = processingBlocks.get();
         for (BlockPos pos : targets) {
 
-            // 耐久不足时立即终止整个范围挖掘，留 2 点：1 点给中心那一格，1 点保住工具
-            if (isDamageable && tool.getDamageValue() >= tool.getMaxDamage() - 2) {
+            if (isDamageable && pick.getDamageValue() >= pick.getMaxDamage() - reserve) {
                 return;
             }
 
@@ -360,13 +396,13 @@ public class EnchantmentRockBlaster extends EnchantmentBase {
                         if (!suppressDrop) {
                             // 非废石方块：正常产生掉落物，经验减半以避免范围挖掘获得过多经验
                             // 1.21.1 的 playerDestroy 连经验一起放（按镐子上的附魔算），减半在 onBlockDrops 里做
-                            block.playerDestroy(world, player, pos, blockState, world.getBlockEntity(pos), tool);
+                            block.playerDestroy(world, player, pos, blockState, world.getBlockEntity(pos), pick);
                         }
                         // 废石方块：跳过 playerDestroy 和 popExperience，方块直接消失，不产生掉落物和经验
 
                         // 无论是否抑制掉落物，耐久消耗照常
                         if (isDamageable) {
-                            tool.hurtAndBreak(1, player, LivingEntity.getSlotForHand(player.getUsedItemHand()));
+                            pick.hurtAndBreak(1, player, slot);
                         }
                     }
                 } else {

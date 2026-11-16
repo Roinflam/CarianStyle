@@ -1,6 +1,7 @@
 package pers.roinflam.carianstyle.enchantment;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
@@ -220,6 +221,9 @@ public class EnchantmentStarlight extends EnchantmentBase {
         int blockY = Mth.floor(entity.getY() - 0.2D);
         int blockZ = Mth.floor(entity.getZ());
         BlockPos blockPos = new BlockPos(blockX, blockY + 1, blockZ);
+        // 刚传送、刚上线时脚下区块可能还没加载完，这时 isEmptyBlock 会在主线程上同步加载（甚至生成）区块；先跳过，区块好了下个 tick 再放
+        if (world instanceof ServerLevel serverLevel && serverLevel.getServer().isSameThread()
+                && serverLevel.getChunkSource().getChunkNow(blockX >> 4, blockZ >> 4) == null) return;
         if (!world.isEmptyBlock(blockPos)) return;
         BlockState lightState = CarianStyleBlocks.HIDE_LIGHT.get().defaultBlockState().setValue(HideLight.LEVEL, brightness);
         if (world.getBlockEntity(blockPos) instanceof MoveLight moveLight) {

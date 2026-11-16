@@ -71,9 +71,9 @@ public final class NeoForwarding {
             throw new IllegalArgumentException(wrapperType.getName() + " 不是 " + busType.getName() + " 的子类");
         }
         PhasedForwarder<P, W> forwarder = new PhasedForwarder<>(CarianBus.get(), wrapperType, wrap);
-        EventPriority[] mine = EventPriority.values();
-        for (net.neoforged.bus.api.EventPriority p : net.neoforged.bus.api.EventPriority.values()) {
-            EventPriority phase = mine[p.ordinal()];
+        // 有的服务端的事件总线在五档之外另加优先级，按名字对，多出来的不挂
+        for (EventPriority phase : EventPriority.values()) {
+            net.neoforged.bus.api.EventPriority p = net.neoforged.bus.api.EventPriority.valueOf(phase.name());
             NeoForge.EVENT_BUS.addListener(p, true, platformType, e -> forwarder.phase(e, phase));
         }
         CarianBus.provide(busType);
