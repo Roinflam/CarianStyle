@@ -183,9 +183,8 @@ public final class CodexScreen extends Screen {
         }
         if (firstInit) {
             long land = intro.start() + MoonriseIntro.LAND_AT;
-            long wane = intro.start() + MoonriseIntro.GATHER_AT;
-            detail.playIntro(land, wane);
-            foreignDetail.playIntro(land, wane);
+            detail.playIntro(land);
+            foreignDetail.playIntro(land);
             if (!VisualToggle.isEnabled(VisualEffectType.CODEX_INTRO)) {
                 skipIntro();
             }
@@ -463,6 +462,9 @@ public final class CodexScreen extends Screen {
         CodexScene.render(g, this.width, this.height, bgx, hzy, intro.night(e), intro.starLimit(e), open,
                 veiled ? (x, y) -> x < revL || x >= revR || open.test(x, y) : open);
         int moonX = bgx + CodexScene.moonColumn();
+        if (intro.running(t)) {
+            intro.aim(introFrame(t));
+        }
         intro.renderPath(g, e, moonX, hzy, this.height);
         intro.renderWash(g, e, this.width, this.height);
         if (tab == Tab.EFFECTS && panoMoon > 0) {
@@ -523,24 +525,32 @@ public final class CodexScreen extends Screen {
         g.disableScissor();
     }
 
+    /** 大月要盈到的月相：卷首那一轮的月相，开关页是满月 */
+    private int introFrame(long t) {
+        if (tab == Tab.CODEX) {
+            return detail.introFrame(t);
+        }
+        if (tab == Tab.OTHERS) {
+            return foreignDetail.introFrame(t);
+        }
+        return MoonDisc.FRAMES - 1;
+    }
+
     /** 开场的大月最后落到哪：卷首月盒，开关页湖上那一轮，都没有就淡掉 */
     private void renderIntroMoon(@Nonnull GuiGraphics g, long t, long e, int moonX) {
         int n = moonSize;
-        int frame = MoonDisc.FRAMES - 1;
         int color = CodexTheme.CARIAN_ROYALTY.getAccentColor();
         boolean fade = false;
         if (tab == Tab.CODEX) {
-            frame = detail.introFrame(t);
             color = detail.moonColor();
         } else if (tab == Tab.OTHERS) {
-            frame = foreignDetail.introFrame(t);
             color = foreignDetail.moonColor();
         } else if (panoMoon > 0) {
             n = panoMoon;
         } else {
             fade = true;
         }
-        intro.renderMoon(g, e, moonX, hzy, n, MoonriseIntro.bigSize(n, hzy), color, frame, fade);
+        intro.renderMoon(g, e, moonX, hzy, n, MoonriseIntro.bigSize(n, hzy), color, fade);
         if (intro.takeLanding(e) && !fade) {
             UiTheme.burst(moonX, hzy - 5 - n / 2, 8);
         }

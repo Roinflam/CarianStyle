@@ -588,8 +588,8 @@ public final class CodexDetail {
         head.setLarge(large);
     }
 
-    public void playIntro(long handoff, long waneAt) {
-        head.playIntro(handoff, waneAt);
+    public void playIntro(long handoff) {
+        head.playIntro(handoff);
     }
 
     public void skipIntro() {

@@ -174,15 +174,14 @@ public final class DetailHead {
     }
 
     /**
-     * 开场月出：大月在 handoff 时落进月盒，这之前月盒里不画月亮；月相从满月起，waneAt 起逐帧亏回本条目的月相，
+     * 开场月出：大月在 handoff 时落进月盒，这之前月盒里不画月亮；大月升起时已经盈到本条目的月相，落位后不再变，
      * 环随后淡入，指针从公式走到当前级。
      */
-    public void playIntro(long handoff, long waneAt) {
+    public void playIntro(long handoff) {
         hiddenUntil = handoff;
         rise(handoff, 0, 1, 1, 60);
         breatheStart = handoff + 400;
-        frameFrom = MoonDisc.FRAMES - 1;
-        frameStart = waneAt;
+        frameFrom = frameTo;
         ptrFrom = 0;
         ptrStart = handoff + 160;
         sparkPending = false;
@@ -198,7 +197,7 @@ public final class DetailHead {
         sparkPending = false;
     }
 
-    /** 开场收拢时大月跟着卷首一起亏 */
+    /** 开场大月要盈到的月相帧 */
     public int frameAt(long t) {
         return frame(t);
     }

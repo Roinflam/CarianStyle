@@ -6,8 +6,8 @@ import net.minecraft.client.gui.GuiGraphics;
 import javax.annotation.Nonnull;
 
 /**
- * 打开百科时的「月出」：夜色里一弯细月从湖岸线后升起、边升边盈，盈满那一下月晕外扩、夜色褪去，
- * 月光沿湖面由远到近铺下来，再顺着书缝把书照出来；最后大月逐档收拢，落回卷首的月盒
+ * 打开百科时的「月出」：夜色里一轮朔月从湖岸线后升起、边升边盈，盈到所选附魔的月相那一下月晕外扩、夜色褪去，
+ * 月光沿湖面由远到近铺下来，再顺着书缝把书照出来；最后大月逐档收拢，落回卷首的月盒，月相不再变
  * （开关页没有月盒：湖上露出满月时落到那一轮上，露不出就淡掉）。
  * 时间轴全按打开后的真实毫秒算，帧率高低只影响细腻程度，不影响快慢。
  */
@@ -31,12 +31,15 @@ final class MoonriseIntro {
     /** 大月的几档尺寸，从大往小逐档换着收拢；80 和 48 就是卷首那两号 */
     private static final int[] SIZES = {128, 112, 96, 80, 64, 48};
     private static final int NIGHT = 0xFF02040D;
+    /** moonpre_* 里蛾眉之前的几帧（朔到细牙），只有开场用 */
+    private static final int PRE = 4;
     private static final int DUST = 26;
     /** 盖在书和物品图标上面，物品图标画在 z 150 往上 */
     private static final float Z = 350f;
 
     private long start;
     private boolean landed;
+    private int target = MoonDisc.FRAMES - 1;
 
     void begin(long t) {
         start = t;
@@ -51,6 +54,16 @@ final class MoonriseIntro {
 
     long start() {
         return start;
+    }
+
+    /** 大月盈到哪一帧为止（卷首那一轮的月相） */
+    void aim(int frame) {
+        target = Math.max(0, Math.min(MoonDisc.FRAMES - 1, frame));
+    }
+
+    /** 到位那一拍的分量：满月 1，蛾眉 0.65，再弱就像没放 */
+    private float weight() {
+        return 0.65f + 0.35f * target / (MoonDisc.FRAMES - 1);
     }
 
     boolean running(long t) {
@@ -76,7 +89,7 @@ final class MoonriseIntro {
         return clamp((e - RISE_AT) / (float) (FULL_AT - RISE_AT));
     }
 
-    /** 月相走得比位置慢：长时间停在细月，快到顶才盈满 */
+    /** 月相走得比位置慢：长时间停在细月，快到顶才盈到位 */
     private static float wax(long e) {
         return (float) Math.pow(rise(e), 1.7);
     }
@@ -136,14 +149,14 @@ final class MoonriseIntro {
 
     // ---------------- 画 ----------------
 
-    /** 盈满那一下全屏闪一层月白 */
+    /** 盈到位那一下全屏闪一层月白 */
     void renderWash(@Nonnull GuiGraphics g, long e, int gw, int gh) {
         long d = e - FULL_AT;
         if (d < 0 || d >= 240) {
             return;
         }
         float k = 1f - d / 240f;
-        g.fill(0, 0, gw, gh, UiTheme.withAlpha(0xFFEEF3FF, 0.16f * k * k));
+        g.fill(0, 0, gw, gh, UiTheme.withAlpha(0xFFEEF3FF, 0.16f * weight() * k * k));
     }
 
     /** 月光路：从岸线往近处一段段点亮，亮一下再落到四成，最后整条淡掉（画里本来那条光路留着） */
@@ -232,7 +245,7 @@ final class MoonriseIntro {
     }
 
     /**
-     * 大月：升起、盈满时的月晕外扩和光尘、收拢。收拢的锚点是月盒的下沿正中，
+     * 大月：升起、盈到位时的月晕外扩和光尘、收拢。收拢的锚点是月盒的下沿正中，
      * 所以大月和卷首月亮共用一条月心竖线，逐档换小就是「落进」月盒。
      *
      * @param cx          月心那一列（卷首月盒 / 湖上那轮的正中）
@@ -240,16 +253,15 @@ final class MoonriseIntro {
      * @param n           落位后的尺寸
      * @param big         升起时的尺寸，见 {@link #bigSize}
      * @param tint        月晕着色（选中附魔的分类色）
-     * @param gatherFrame 收拢时的月相帧：卷首正从满月亏回去，跟着它走
      * @param fade        没有地方落，收拢时一起淡掉
      */
-    void renderMoon(@Nonnull GuiGraphics g, long e, int cx, int hzy, int n, int big, int tint,
-                    int gatherFrame, boolean fade) {
+    void renderMoon(@Nonnull GuiGraphics g, long e, int cx, int hzy, int n, int big, int tint, boolean fade) {
         if (e < RISE_AT || e >= LAND_AT) {
             return;
         }
         int size = big;
-        int frame = MoonDisc.FRAMES - 1;
+        int frame = target;
+        boolean pre = false;
         float alpha = 1f;
         boolean clip = false;
         int y;
@@ -259,7 +271,11 @@ final class MoonriseIntro {
             int y0 = hzy - big / 2 + radius(big);
             int y1 = hzy - 5 - big;
             y = Math.round(y0 + (y1 - y0) * s);
-            frame = (int) Math.floor(wax(e) * (MoonDisc.FRAMES - 1));
+            // 朔、三帧细牙，再接卷首那套月相直到目标帧；最后一帧占最后一段，到顶前已经盈到位
+            int steps = PRE + target;
+            int k = Math.min(steps, (int) Math.floor(wax(e) * (steps + 1)));
+            pre = k < PRE;
+            frame = pre ? k : k - PRE;
             alpha = clamp((e - RISE_AT) / 260f);
             clip = true;
         } else if (e < GATHER_AT) {
@@ -283,7 +299,6 @@ final class MoonriseIntro {
                     }
                 }
             }
-            frame = gatherFrame;
             y = hzy - 5 - size;
             if (fade) {
                 alpha = 1f - q;
@@ -300,11 +315,16 @@ final class MoonriseIntro {
         if (clip) {
             g.enableScissor(cx - big, 0, cx + big, hzy);
         }
-        float glow = MoonDisc.glowCap(frame) * (e < FULL_AT ? 0.85f : 1f) * alpha;
+        float cap = pre ? MoonDisc.glowCap(0) * frame / PRE : MoonDisc.glowCap(frame);
+        float glow = cap * (e < FULL_AT ? 0.85f : 1f) * alpha;
         UiTheme.spriteTinted(g, glowTex(size), x, y, size, size, 0, 0, size, size, MoonDisc.glowTint(tint), glow);
         if (alpha > 0f) {
             RenderSystem.setShaderColor(1f, 1f, 1f, alpha);
-            UiTheme.sprite(g, moonTex(size), x, y, size, size, frame * size, 0, size, size, size * MoonDisc.FRAMES, size);
+            if (pre) {
+                UiTheme.sprite(g, "moonpre_" + size, x, y, size, size, frame * size, 0, size, size, size * PRE, size);
+            } else {
+                UiTheme.sprite(g, moonTex(size), x, y, size, size, frame * size, 0, size, size, size * MoonDisc.FRAMES, size);
+            }
             RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
         }
         if (clip) {
@@ -316,7 +336,7 @@ final class MoonriseIntro {
         g.pose().popPose();
     }
 
-    /** 盈满：月晕放大两倍、三倍涨开再退，两圈光环往外扩 */
+    /** 盈到位：月晕放大两倍、三倍涨开再退，两圈光环往外扩；月相越满越重，蛾眉的光环小一圈 */
     private void renderBloom(@Nonnull GuiGraphics g, long e, int cx, int cy, int big, int tint) {
         long d = e - FULL_AT;
         if (d >= 700) {
@@ -324,12 +344,13 @@ final class MoonriseIntro {
         }
         int glowRgb = MoonDisc.glowTint(tint);
         String tex = glowTex(big);
+        float w = weight();
         for (int k = 3; k >= 2; k--) {
             float q = d / (k == 2 ? 480f : 620f);
             if (q >= 1f) {
                 continue;
             }
-            float a = (k == 2 ? 0.55f : 0.28f) * (1f - q);
+            float a = (k == 2 ? 0.55f : 0.28f) * (1f - q) * (0.4f + 0.6f * w);
             g.pose().pushPose();
             g.pose().translate(cx - big * k / 2f, cy - big * k / 2f, 0f);
             g.pose().scale(k, k, 1f);
@@ -338,8 +359,9 @@ final class MoonriseIntro {
         }
         int r0 = radius(big) + 2;
         int ringRgb = UiTheme.mix(UiTheme.MOON, tint | 0xFF000000, 0.3f);
-        ring(g, cx, cy, r0, r0 + Math.round(big * 1.3f), d, 420, 0.9f, ringRgb, false);
-        ring(g, cx, cy, r0, r0 + big, d - 90, 460, 0.6f, ringRgb, true);
+        float reach = 0.15f + 0.85f * w;
+        ring(g, cx, cy, r0, r0 + Math.round(big * 1.3f * reach), d, 420, 0.9f, ringRgb, false);
+        ring(g, cx, cy, r0, r0 + Math.round(big * reach), d - 90, 460, 0.6f, ringRgb, true);
     }
 
     private static void ring(@Nonnull GuiGraphics g, int cx, int cy, int r0, int r1, long d, int dur,
@@ -398,7 +420,7 @@ final class MoonriseIntro {
                 continue;
             }
             double ang = i * 2.39996 + ((h >>> 8) & 0xF) * 0.03;
-            float dist = r + 2 + (16 + ((h >>> 12) & 0x3F)) * UiTheme.easeOutCubic(q);
+            float dist = r + 2 + (16 + ((h >>> 12) & 0x3F)) * (0.5f + 0.5f * weight()) * UiTheme.easeOutCubic(q);
             int px = cx + (int) Math.round(Math.cos(ang) * dist);
             int py = cy + (int) Math.round(Math.sin(ang) * dist - q * 8);
             float a = q < 0.55f ? 1f : (float) Math.floor((1f - q) / 0.45f * 4f) / 4f;
