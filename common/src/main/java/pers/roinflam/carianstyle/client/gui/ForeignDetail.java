@@ -437,8 +437,20 @@ public final class ForeignDetail {
         head.setLarge(large);
     }
 
-    public void playOpen(long start) {
-        head.playOpen(start);
+    public void playIntro(long handoff, long waneAt) {
+        head.playIntro(handoff, waneAt);
+    }
+
+    public void skipIntro() {
+        head.skipIntro();
+    }
+
+    public int introFrame(long t) {
+        return head.frameAt(t);
+    }
+
+    public int moonColor() {
+        return head.catColor();
     }
 
     public void playSelect() {

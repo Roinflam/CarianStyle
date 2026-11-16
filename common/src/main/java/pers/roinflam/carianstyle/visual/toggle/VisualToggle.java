@@ -264,6 +264,8 @@ public final class VisualToggle {
         root.addProperty("_time_reversal_zh", "时间逆转 — 时间逆转的回溯残影");
         root.addProperty("_stack_hud_en", "Stack HUD — On-screen stacks and cooldown timers");
         root.addProperty("_stack_hud_zh", "叠层 HUD — 屏幕上的叠层与冷却倒计时");
+        root.addProperty("_codex_intro_en", "Opening Animation — Moonrise sequence when the codex opens");
+        root.addProperty("_codex_intro_zh", "开场动画 — 打开百科时的月出演出");
 
 
         boolean[] snapshot = enabled;

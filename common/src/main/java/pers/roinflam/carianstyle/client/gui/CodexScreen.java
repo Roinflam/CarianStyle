@@ -101,7 +101,8 @@ public final class CodexScreen extends Screen {
     private boolean filterCompact;
     private boolean filterHovered;
 
-    private long openedAt;
+    private final MoonriseIntro intro = new MoonriseIntro();
+    private boolean opened;
     private long turnedAt;
     private long tabDroppedAt;
     private int droppedTab = -1;
@@ -114,10 +115,12 @@ public final class CodexScreen extends Screen {
     @Override
     protected void init() {
         VisualToggle.ensureLoaded();
-        boolean firstInit = openedAt == 0L;
+        boolean firstInit = !opened;
         if (firstInit) {
-            openedAt = UiTheme.now();
-            railAt = openedAt + 100;
+            opened = true;
+            long t = UiTheme.now();
+            intro.begin(t);
+            railAt = t + MoonriseIntro.UNFOLD_AT;
         }
         picker.close();
         detail.setFilter(filter);
@@ -179,8 +182,13 @@ public final class CodexScreen extends Screen {
             }
         }
         if (firstInit) {
-            detail.playOpen(openedAt);
-            foreignDetail.playOpen(openedAt);
+            long land = intro.start() + MoonriseIntro.LAND_AT;
+            long wane = intro.start() + MoonriseIntro.GATHER_AT;
+            detail.playIntro(land, wane);
+            foreignDetail.playIntro(land, wane);
+            if (!VisualToggle.isEnabled(VisualEffectType.CODEX_INTRO)) {
+                skipIntro();
+            }
         }
         updateWidgetVisibility();
     }
@@ -426,10 +434,12 @@ public final class CodexScreen extends Screen {
     @Override
     public void render(@Nonnull GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         long t = UiTheme.now();
-        long sinceOpen = t - openedAt;
+        long e = t - intro.start();
         boolean modal = picker.isOpen();
-        int underX = modal ? -1 : mouseX;
-        int underY = modal ? -1 : mouseY;
+        // 书还没照全时不响应悬停
+        boolean hidden = modal || e < MoonriseIntro.UNFOLD_AT + MoonriseIntro.UNFOLD_DUR;
+        int underX = hidden ? -1 : mouseX;
+        int underY = hidden ? -1 : mouseY;
 
         boolean codex = isCodexTab();
         int top = spreadTop;
@@ -438,24 +448,47 @@ public final class CodexScreen extends Screen {
         int hx1 = bx + bw - 10;
         int hy0 = by + BAND + 2;
         int hy1 = hy0 + 4 + moonSize + 5;
-        CodexScene.render(g, this.width, this.height, bgx, hzy, UiTheme.steps(sinceOpen, 300, 5), (x, y) -> {
+        CodexScene.Open open = (x, y) -> {
             if (codex && x >= hx0 && x < hx1 && y >= hy0 && y < hy1) {
                 return true;
             }
             return !(x >= bx && x < bx + bw && y >= top && y < bottom);
-        });
+        };
+        // 书从书缝往两边被照出来，没照到的地方书是看不见的
+        int seam = bx + lw + GUT / 2;
+        float reveal = intro.reveal(e);
+        int revL = seam - Math.round((seam - bx) * reveal);
+        int revR = seam + Math.round((bx + bw - seam) * reveal);
+        boolean veiled = reveal < 1f;
+        CodexScene.render(g, this.width, this.height, bgx, hzy, intro.night(e), intro.starLimit(e), open,
+                veiled ? (x, y) -> x < revL || x >= revR || open.test(x, y) : open);
+        int moonX = bgx + CodexScene.moonColumn();
+        intro.renderPath(g, e, moonX, hzy, this.height);
+        intro.renderWash(g, e, this.width, this.height);
         if (tab == Tab.EFFECTS && panoMoon > 0) {
             renderPanoMoon(g, t);
         }
 
         filterHovered = false;
+        if (veiled) {
+            g.enableScissor(revL, 0, revR, this.height);
+        }
         renderBand(g, underX, underY, t);
-        renderSpread(g, underX, underY, t, sinceOpen);
+        renderSpread(g, underX, underY, t, e);
 
         super.render(g, underX, underY, partialTick);
         if (searchBox != null && searchBox.visible && searchBox.getValue().isEmpty() && !searchBox.isFocused()) {
             UiTheme.trimmed(g, this.font, Component.translatable("carianstyle.codex.search"),
                     searchBox.getX(), searchBox.getY(), searchRect[2] - 21, UiTheme.OFF);
+        }
+        if (veiled) {
+            intro.renderShade(g, e, revL, by - 12, revR, bottom);
+            g.disableScissor();
+        }
+        intro.renderEdges(g, e, revL, revR, by, bottom);
+        intro.renderSeam(g, e, seam, by, bottom);
+        if (intro.running(t)) {
+            renderIntroMoon(g, t, e, moonX);
         }
 
         if (modal && this.minecraft != null && this.minecraft.player != null) {
@@ -471,15 +504,57 @@ public final class CodexScreen extends Screen {
         int n = panoMoon;
         int mx = bgx + CodexScene.moonColumn() - n / 2;
         int my = hzy - 5 - n;
-        long e = t - turnedAt - 100;
-        if (turnedAt == 0L) {
-            e = t - openedAt - 300;
+        int rise = 0;
+        float breath;
+        if (turnedAt != 0L) {
+            long e = t - turnedAt - 100;
+            rise = Math.round((1f - UiTheme.steps(e, 600, 14)) * n * 0.62f);
+            breath = UiTheme.breathe(Math.max(0, e - 600), 4800, 8, 0.4f);
+        } else {
+            // 打开时停在开关页：开场的大月落到这一轮上之前不画
+            long e = t - intro.start() - MoonriseIntro.LAND_AT;
+            if (e < 0) {
+                return;
+            }
+            breath = UiTheme.breathe(Math.max(0, e - 400), 4800, 8, 0.4f);
         }
-        int rise = Math.round((1f - UiTheme.steps(e, 600, 14)) * n * 0.62f);
-        float breath = UiTheme.breathe(Math.max(0, e - 600), 4800, 8, 0.4f);
         g.enableScissor(mx, my, mx + n, hzy);
         MoonDisc.drawMoon(g, mx, my + rise, n, MoonDisc.FRAMES - 1, CodexTheme.CARIAN_ROYALTY.getAccentColor(), breath);
         g.disableScissor();
+    }
+
+    /** 开场的大月最后落到哪：卷首月盒，开关页湖上那一轮，都没有就淡掉 */
+    private void renderIntroMoon(@Nonnull GuiGraphics g, long t, long e, int moonX) {
+        int n = moonSize;
+        int frame = MoonDisc.FRAMES - 1;
+        int color = CodexTheme.CARIAN_ROYALTY.getAccentColor();
+        boolean fade = false;
+        if (tab == Tab.CODEX) {
+            frame = detail.introFrame(t);
+            color = detail.moonColor();
+        } else if (tab == Tab.OTHERS) {
+            frame = foreignDetail.introFrame(t);
+            color = foreignDetail.moonColor();
+        } else if (panoMoon > 0) {
+            n = panoMoon;
+        } else {
+            fade = true;
+        }
+        intro.renderMoon(g, e, moonX, hzy, n, MoonriseIntro.bigSize(n, hzy), color, frame, fade);
+        if (intro.takeLanding(e) && !fade) {
+            UiTheme.burst(moonX, hzy - 5 - n / 2, 8);
+        }
+    }
+
+    /** 开场播到一半被点了或按了键：直接到播完的样子，这一下操作照常处理 */
+    private void skipIntro() {
+        long t = UiTheme.now();
+        intro.finish(t);
+        if (railAt > t - 700) {
+            railAt = t - 1000;
+        }
+        detail.skipIntro();
+        foreignDetail.skipIntro();
     }
 
     private void renderBand(@Nonnull GuiGraphics g, int mouseX, int mouseY, long t) {
@@ -568,7 +643,7 @@ public final class CodexScreen extends Screen {
             dur = 280;
             n = 7;
         } else {
-            e = t - openedAt - index * 60L;
+            e = t - intro.start() - MoonriseIntro.TABS_AT - index * 60L;
             dur = 300;
             n = 8;
             if (e >= dur) {
@@ -610,51 +685,49 @@ public final class CodexScreen extends Screen {
         return Component.literal(String.valueOf(value)).withStyle(s -> s.withColor(color & 0xFFFFFF));
     }
 
-    private void renderSpread(@Nonnull GuiGraphics g, int mouseX, int mouseY, long t, long sinceOpen) {
+    private void renderSpread(@Nonnull GuiGraphics g, int mouseX, int mouseY, long t, long e) {
         int top = spreadTop;
         int h = spreadH;
         boolean toggles = tab == Tab.EFFECTS;
 
-        // 两页从书缝往外展开：翻开 0.4 秒，切标签 0.26 秒
-        float unfold = UiTheme.steps(sinceOpen, 400, 12);
+        // 两页从书缝往外展开：开场跟着月光走，切标签 0.26 秒
+        float unfold = intro.reveal(e);
         if (turnedAt != 0L && t - turnedAt < 260) {
             unfold = Math.min(unfold, UiTheme.steps(t - turnedAt, 260, 8));
         }
         int lVisible = Math.round(lw * unfold);
         int rVisible = Math.round(rightW * unfold);
 
-        renderGutter(g, bx + lw, top, h, sinceOpen);
+        renderGutter(g, bx + lw, top, h, e - MoonriseIntro.UNFOLD_AT - 60);
 
-        if (lVisible > 0) {
-            g.enableScissor(bx + lw - lVisible, top, bx + lw, top + h);
-            UiTheme.page(g, bx, top, lw, h, true);
-            if (toggles) {
-                togglePage.renderLeft(g, this.font, mouseX, mouseY);
-            } else if (tab == Tab.CODEX) {
-                list.render(g, this.font, mouseX, mouseY);
-            } else {
-                foreignList.render(g, this.font, mouseX, mouseY);
-            }
-            UiTheme.pageCorners(g, bx, top, lw, h);
-            g.disableScissor();
+        // 没展开的页也照画（裁成零宽）：开关、等级牌的点击位置是画的时候记的，开场中途点下去也要点得中
+        g.enableScissor(bx + lw - lVisible, top, bx + lw, top + h);
+        UiTheme.page(g, bx, top, lw, h, true);
+        if (toggles) {
+            togglePage.renderLeft(g, this.font, mouseX, mouseY);
+        } else if (tab == Tab.CODEX) {
+            list.render(g, this.font, mouseX, mouseY);
+        } else {
+            foreignList.render(g, this.font, mouseX, mouseY);
         }
-        if (rVisible > 0) {
-            g.enableScissor(rightX, top, rightX + rVisible, top + h);
-            UiTheme.page(g, rightX, top, rightW, h, toggles);
-            if (toggles) {
-                togglePage.renderRight(g, this.font, mouseX, mouseY);
-            } else if (tab == Tab.CODEX) {
-                detail.render(g, this.font, mouseX, mouseY);
-            } else {
-                foreignDetail.render(g, this.font, mouseX, mouseY);
-            }
-            UiTheme.pageCorners(g, rightX, top, rightW, h);
-            g.disableScissor();
+        UiTheme.pageCorners(g, bx, top, lw, h);
+        g.disableScissor();
+
+        g.enableScissor(rightX, top, rightX + rVisible, top + h);
+        UiTheme.page(g, rightX, top, rightW, h, toggles);
+        if (toggles) {
+            togglePage.renderRight(g, this.font, mouseX, mouseY);
+        } else if (tab == Tab.CODEX) {
+            detail.render(g, this.font, mouseX, mouseY);
+        } else {
+            foreignDetail.render(g, this.font, mouseX, mouseY);
         }
+        UiTheme.pageCorners(g, rightX, top, rightW, h);
+        g.disableScissor();
     }
 
     /** 书缝：左右暗到中间，上面垂一条淡金书签带 */
-    private void renderGutter(@Nonnull GuiGraphics g, int x, int top, int h, long sinceOpen) {
+    private void renderGutter(@Nonnull GuiGraphics g, int x, int top, int h, long dropElapsed) {
         for (int i = 0; i < GUT; i++) {
             float p = (i + 0.5f) / GUT;
             float k = p < 0.45f ? p / 0.45f : p > 0.55f ? (1f - p) / 0.45f : 1f;
@@ -666,7 +739,7 @@ public final class CodexScreen extends Screen {
         int gh = large ? 26 : 18;
         int gx = x + 2;
         int gy = top - 3;
-        float drop = UiTheme.steps(sinceOpen - 100, 500, 10);
+        float drop = UiTheme.steps(dropElapsed, 500, 10);
         int visible = Math.round((gh + 3) * drop);
         if (visible <= 0) {
             return;
@@ -795,6 +868,9 @@ public final class CodexScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (intro.running(UiTheme.now())) {
+            skipIntro();
+        }
         if (keyCode == GLFW.GLFW_KEY_ESCAPE && picker.isOpen()) {
             picker.close();
             return true;
@@ -814,6 +890,9 @@ public final class CodexScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (intro.running(UiTheme.now())) {
+            skipIntro();
+        }
         if (picker.isOpen()) {
             if (this.minecraft == null || this.minecraft.player == null) {
                 picker.close();
@@ -907,6 +986,9 @@ public final class CodexScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (intro.running(UiTheme.now())) {
+            skipIntro();
+        }
         if (picker.isOpen()) {
             return true;
         }

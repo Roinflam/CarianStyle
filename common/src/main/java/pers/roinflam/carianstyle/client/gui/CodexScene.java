@@ -26,6 +26,8 @@ public final class CodexScene {
     public static final int H = 1000;
     private static final int MAX_STARS = 18;
     private static final int MAX_GLINTS = 8;
+    private static final int MAX_EXTRA_STARS = 24;
+    private static final int NIGHT = 0xFF02040D;
 
     private static boolean loaded;
     private static int horizon = 440;
@@ -85,17 +87,17 @@ public final class CodexScene {
     }
 
     /**
-     * @param bgx   画的左上角
-     * @param hzy   湖岸线落在哪一行（画的 y = hzy - 岸线）
-     * @param alpha 翻开时整体淡入
+     * @param bgx       画的左上角
+     * @param hzy       湖岸线落在哪一行（画的 y = hzy - 岸线）
+     * @param night     开场时压在画上的夜色，0 是不压
+     * @param starLimit 开场时星一颗颗亮起，只画前这么多颗
+     * @param open      播完后这一点露不露在外面
+     * @param uncovered 现在这一点有没有被书挡住（书还没照出来时，书后面的星也看得见）
      */
-    public static void render(@Nonnull GuiGraphics g, int gw, int gh, int bgx, int hzy, float alpha, @Nonnull Open open) {
+    public static void render(@Nonnull GuiGraphics g, int gw, int gh, int bgx, int hzy, float night, int starLimit,
+                              @Nonnull Open open, @Nonnull Open uncovered) {
         load();
-        if (alpha <= 0f) {
-            return;
-        }
         int bgy = hzy - horizon;
-        RenderSystem.setShaderColor(1f, 1f, 1f, Math.min(1f, alpha));
         String n = "night";
         int r = bgx + W;
         int b = bgy + H;
@@ -126,23 +128,37 @@ public final class CodexScene {
         }
 
         // 岸线上的薄雾倒过来贴，比卷首里那层淡
-        RenderSystem.setShaderColor(1f, 1f, 1f, 0.55f * Math.min(1f, alpha));
+        RenderSystem.setShaderColor(1f, 1f, 1f, 0.55f);
         int mist = mistOffset();
         for (int x = mist - 128; x < gw; x += 128) {
             UiTheme.sprite(g, "mist", x, hzy, 128, 14, 0, 14, 128, -14, 128, 14);
         }
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        if (night > 0f) {
+            g.fill(0, 0, gw, gh, UiTheme.withAlpha(NIGHT, night));
+        }
 
+        // 播完后露在外面的取前 18 颗；书挡住的那些只在书还没照出来时额外画
         long t = UiTheme.now();
         int shown = 0;
-        for (int i = 0; i < STARS.size() && shown < MAX_STARS; i++) {
+        int extra = 0;
+        for (int i = 0; i < STARS.size() && i < starLimit; i++) {
             int x = STARS.get(i)[0] + bgx;
             int y = STARS.get(i)[1] + bgy;
-            if (x < 1 || y < 1 || x >= gw - 1 || y >= gh - 1 || !open.test(x, y)) {
+            if (x < 1 || y < 1 || x >= gw - 1 || y >= gh - 1) {
                 continue;
             }
-            shown++;
-            float a = twinkle(t, 2400 + (i % 5) * 500, (i % 7) * 600, 4) * alpha;
+            if (open.test(x, y)) {
+                if (shown >= MAX_STARS) {
+                    continue;
+                }
+                shown++;
+            } else if (extra >= MAX_EXTRA_STARS || !uncovered.test(x, y)) {
+                continue;
+            } else {
+                extra++;
+            }
+            float a = Math.max(twinkle(t, 2400 + (i % 5) * 500, (i % 7) * 600, 4), night * 0.7f);
             if (i % 3 == 0) {
                 UiTheme.spriteAlpha(g, "spark", x - 1, y - 1, 3, 3, a);
             } else if (a > 0f) {
@@ -158,7 +174,7 @@ public final class CodexScene {
                 continue;
             }
             shown++;
-            float a = twinkle(t, 2200, (i % 5) * 500, 3) * alpha;
+            float a = twinkle(t, 2200, (i % 5) * 500, 3) * (1f - night);
             if (a > 0f) {
                 g.fill(x, y, x + p[2], y + 1, UiTheme.withAlpha(UiTheme.MOON, a));
             }

@@ -410,6 +410,8 @@
   "carianstyle.visual.time_reversal.desc": "Afterimages of the rewind",
   "carianstyle.visual.stack_hud": "Stack HUD",
   "carianstyle.visual.stack_hud.desc": "On-screen stacks and cooldown timers",
+  "carianstyle.visual.codex_intro": "Opening Animation",
+  "carianstyle.visual.codex_intro.desc": "Moonrise sequence when the codex opens",
   "carianstyle.codex.theme.carian_royalty": "Carian Royalty",
   "carianstyle.codex.theme.erdtree": "Erdtree",
   "carianstyle.codex.theme.beast": "Beast",

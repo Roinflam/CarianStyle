@@ -58,6 +58,7 @@ public final class DetailHead {
     private boolean levelsVisible;
     private int current = 1;
 
+    private long hiddenUntil = Long.MIN_VALUE / 4;
     private long riseStart = Long.MIN_VALUE / 4;
     private int riseDelay;
     private int riseDur = 500;
@@ -172,14 +173,38 @@ public final class DetailHead {
         current = level;
     }
 
-    /** 翻开书：月亮 .3 秒后升 .6 秒，环 .7 秒后淡入，指针 .8 秒后从公式走到当前级 */
-    public void playOpen(long start) {
-        rise(start, 300, 600, 14, 700);
-        breatheStart = start + 900;
+    /**
+     * 开场月出：大月在 handoff 时落进月盒，这之前月盒里不画月亮；月相从满月起，waneAt 起逐帧亏回本条目的月相，
+     * 环随后淡入，指针从公式走到当前级。
+     */
+    public void playIntro(long handoff, long waneAt) {
+        hiddenUntil = handoff;
+        rise(handoff, 0, 1, 1, 60);
+        breatheStart = handoff + 400;
+        frameFrom = MoonDisc.FRAMES - 1;
+        frameStart = waneAt;
         ptrFrom = 0;
-        ptrStart = start + 800;
+        ptrStart = handoff + 160;
         sparkPending = false;
+    }
+
+    /** 开场被跳过或关掉：直接是播完的样子 */
+    public void skipIntro() {
+        hiddenUntil = Long.MIN_VALUE / 4;
+        riseStart = Long.MIN_VALUE / 4;
         frameFrom = frameTo;
+        ptrStart = Long.MIN_VALUE / 4;
+        breatheStart = UiTheme.now();
+        sparkPending = false;
+    }
+
+    /** 开场收拢时大月跟着卷首一起亏 */
+    public int frameAt(long t) {
+        return frame(t);
+    }
+
+    public int catColor() {
+        return catColor;
     }
 
     /** 切回这一页：月亮重升，指针重走 */
@@ -286,7 +311,9 @@ public final class DetailHead {
 
         int mx = x + pl;
         int rise = Math.round((1f - UiTheme.steps(t - riseStart - riseDelay, riseDur, riseSteps)) * n * 0.62f);
-        MoonDisc.drawMoon(g, mx, top + rise, n, frame(t), catColor, glow(t));
+        if (t >= hiddenUntil) {
+            MoonDisc.drawMoon(g, mx, top + rise, n, frame(t), catColor, glow(t));
+        }
         int q = pointer(t);
         MoonDisc.drawRing(g, mx, top, n, catColor, q, UiTheme.steps(t - riseStart - ringDelay, 300, 4));
         if (sparkPending && t >= ptrStart && q == stepOf(current)) {

@@ -410,6 +410,8 @@
   "carianstyle.visual.time_reversal.desc": "回溯时的残影",
   "carianstyle.visual.stack_hud": "叠层 HUD",
   "carianstyle.visual.stack_hud.desc": "屏幕上的叠层与冷却倒计时",
+  "carianstyle.visual.codex_intro": "开场动画",
+  "carianstyle.visual.codex_intro.desc": "打开百科时的月出演出",
   "carianstyle.codex.theme.carian_royalty": "卡利亚王室",
   "carianstyle.codex.theme.erdtree": "黄金树",
   "carianstyle.codex.theme.beast": "野兽",
