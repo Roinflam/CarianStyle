@@ -321,7 +321,7 @@
   "carianstyle.codex.ui_theme": "Interface Theme",
   "carianstyle.codex.ui_theme.carian": "Carian Moonlight",
   "carianstyle.codex.ui_theme.classic": "Erdtree",
-  "carianstyle.codex.ui_theme.tip": "Switch the codex interface style. The setting is saved on this client.",
+  "carianstyle.codex.ui_theme.tip": "Changes the appearance of the codex. The choice is saved locally and used the next time the codex opens.",
   "carianstyle.codex.tab.codex": "Codex",
   "carianstyle.codex.tab.effects": "Visual Effects",
   "carianstyle.codex.search": "Search enchantments...",

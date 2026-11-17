@@ -321,7 +321,7 @@
   "carianstyle.codex.ui_theme": "界面主题",
   "carianstyle.codex.ui_theme.carian": "卡利亚月夜",
   "carianstyle.codex.ui_theme.classic": "黄金树",
-  "carianstyle.codex.ui_theme.tip": "切换百科界面的样式，设置保存在本机。",
+  "carianstyle.codex.ui_theme.tip": "切换百科的界面外观。选择保存在本机，下次打开时沿用。",
   "carianstyle.codex.tab.codex": "附魔百科",
   "carianstyle.codex.tab.effects": "特效开关",
   "carianstyle.codex.search": "搜索附魔…",
