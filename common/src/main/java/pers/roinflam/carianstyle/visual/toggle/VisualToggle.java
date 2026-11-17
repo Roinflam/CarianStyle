@@ -61,6 +61,12 @@ public final class VisualToggle {
      */
     private static volatile boolean[] enabled = defaults();
 
+    /** 百科界面主题的配置键；值是主题 id，认不出的 id 由界面按默认主题处理 */
+    private static final String THEME_KEY = "codex_ui_theme";
+    private static final String DEFAULT_THEME = "carian";
+
+    private static volatile String codexTheme = DEFAULT_THEME;
+
     /** 是否已从磁盘加载过 */
     private static boolean loaded = false;
 
@@ -133,6 +139,21 @@ public final class VisualToggle {
         return count;
     }
 
+    @Nonnull
+    public static String codexTheme() {
+        ensureLoaded();
+        return codexTheme;
+    }
+
+    public static void setCodexTheme(@Nonnull String id) {
+        ensureLoaded();
+        if (id.equals(codexTheme)) {
+            return;
+        }
+        codexTheme = id;
+        save();
+    }
+
     /**
      * 确保已从磁盘加载（惰性，首次打开界面或首次渲染时触发）。
      */
@@ -199,6 +220,11 @@ public final class VisualToggle {
                 }
             }
             enabled = result;
+            // 旧文件没有这个键，或者值不是字符串，都按默认主题，不算格式错误
+            JsonElement theme = object.get(THEME_KEY);
+            if (theme != null && theme.isJsonPrimitive() && theme.getAsJsonPrimitive().isString()) {
+                codexTheme = theme.getAsString();
+            }
         } catch (Exception e) {
             LogUtil.error("卡利亚式附魔 - 读取 " + FILE_NAME + " 失败，已回落到全部启用", e);
             enabled = defaults();
@@ -264,12 +290,17 @@ public final class VisualToggle {
         root.addProperty("_time_reversal_zh", "时间逆转 — 时间逆转的回溯残影");
         root.addProperty("_stack_hud_en", "Stack HUD — On-screen stacks and cooldown timers");
         root.addProperty("_stack_hud_zh", "叠层 HUD — 屏幕上的叠层与冷却倒计时");
+        root.addProperty("_codex_intro_en", "Opening Animation — Moonrise sequence when the codex opens");
+        root.addProperty("_codex_intro_zh", "开场动画 — 打开百科时的月出演出");
+        root.addProperty("_codex_ui_theme_en", "Interface Theme — Codex interface style: carian (Carian Moonlight) or classic (Erdtree)");
+        root.addProperty("_codex_ui_theme_zh", "界面主题 — 百科界面的样式：carian 为卡利亚月夜，classic 为黄金树");
 
 
         boolean[] snapshot = enabled;
         for (VisualEffectType type : VisualEffectType.values()) {
             root.addProperty(type.getKey(), snapshot[type.ordinal()]);
         }
+        root.addProperty(THEME_KEY, codexTheme);
 
         try (Writer writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
             new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(root, writer);

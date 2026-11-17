@@ -3,7 +3,7 @@ package pers.roinflam.carianstyle.client;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;
-import pers.roinflam.carianstyle.client.gui.CodexScreen;
+import pers.roinflam.carianstyle.client.gui.CodexTheme;
 import pers.roinflam.carianstyle.platform.ClientPlatform;
 import pers.roinflam.carianstyle.utils.Reference;
 
@@ -105,7 +105,7 @@ public final class CarianStyleKeys {
             }
 
             if (triggered) {
-                minecraft.setScreen(new CodexScreen());
+                CodexTheme.openCurrent();
             }
         }
     }

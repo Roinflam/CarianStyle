@@ -7,6 +7,7 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.TextColor;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -104,20 +105,20 @@ public final class DescriptionText {
     private static final Pattern NUMBER = Pattern.compile(
             "[+\\-]?[0-9]+(?:\\.[0-9]+)?(?:%|秒|格|级|层|倍|点|s(?![A-Za-z]))?");
 
-    /** 占位符与代入结果的高亮色（金色，与界面强调色一致） */
-    private static final TextColor COLOR_LEVEL = TextColor.fromRgb(0xD9B46A);
+    private static final TextColor COLOR_LEVEL = TextColor.fromRgb(0xF2E2A6);
 
-    /** 数值高亮色（浅青，在暗底上比白字更跳但不刺眼） */
-    private static final TextColor COLOR_NUMBER = TextColor.fromRgb(0x8FD0C8);
+    private static final TextColor COLOR_NUMBER = TextColor.fromRgb(0x7FE3FF);
 
-    /** 正文色 */
-    private static final TextColor COLOR_TEXT = TextColor.fromRgb(0xE8E2D4);
+    /** 带负号的数值：描述里写成负数的几乎都是减益（持续时间-75%、护甲-50%） */
+    private static final TextColor COLOR_NEGATIVE = TextColor.fromRgb(0xFF8F9A);
 
-    /** 触发条件色：比正文略亮，让「什么时候生效」先被看到 */
-    private static final TextColor COLOR_CONDITION = TextColor.fromRgb(0xFFF4E0);
+    private static final TextColor COLOR_TEXT = TextColor.fromRgb(0xD3DCF5);
 
-    /** 补充说明色：压暗，主干读完再看 */
-    private static final TextColor COLOR_ASIDE = TextColor.fromRgb(0x9C927E);
+    /** 触发条件比正文略亮，让「什么时候生效」先被看到 */
+    private static final TextColor COLOR_CONDITION = TextColor.fromRgb(0xEEF3FF);
+
+    /** 补充说明压暗，主干读完再看 */
+    private static final TextColor COLOR_ASIDE = TextColor.fromRgb(0x8E9AC0);
 
     private DescriptionText() {
     }
@@ -373,7 +374,8 @@ public final class DescriptionText {
             }
             Matcher num = NUMBER.matcher(text);
             if (num.find(i) && num.start() == i) {
-                spans.add(new Span(num.group(), aside ? color : COLOR_NUMBER, false));
+                spans.add(new Span(num.group(), aside ? color
+                        : num.group().startsWith("-") ? COLOR_NEGATIVE : COLOR_NUMBER, false));
                 i = num.end();
                 continue;
             }
@@ -497,6 +499,11 @@ public final class DescriptionText {
             s = s.substring(0, s.length() - 1);
         }
         return s;
+    }
+
+    /** 等级代入值和数值的颜色（切等级时这几种字要闪一下） */
+    public static boolean isValueColor(@Nullable TextColor color) {
+        return color != null && (color.equals(COLOR_LEVEL) || color.equals(COLOR_NUMBER) || color.equals(COLOR_NEGATIVE));
     }
 
     /**
