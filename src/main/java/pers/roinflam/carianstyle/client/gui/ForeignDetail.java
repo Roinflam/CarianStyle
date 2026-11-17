@@ -1,20 +1,23 @@
 package pers.roinflam.carianstyle.client.gui;
 
-import pers.roinflam.carianstyle.mc112.gui.Font;
-import pers.roinflam.carianstyle.mc112.gui.FormattedCharSequence;
-import pers.roinflam.carianstyle.mc112.gui.GuiGraphics;
-import pers.roinflam.carianstyle.mc112.gui.Component;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.enchantment.Enchantment;
+import pers.roinflam.carianstyle.mc112.gui.TextRun;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
+import pers.roinflam.carianstyle.mc112.gui.Font;
+import pers.roinflam.carianstyle.mc112.gui.GuiGraphics;
+import pers.roinflam.carianstyle.mc112.gui.Component;
+import pers.roinflam.carianstyle.mc112.gui.Style;
+import pers.roinflam.carianstyle.mc112.gui.TextColor;
+import pers.roinflam.carianstyle.mc112.gui.FormattedCharSequence;
+import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.enchantment.Enchantment;
 import pers.roinflam.carianstyle.codex.EnchantmentCodex;
-import pers.roinflam.carianstyle.codex.EnchantmentSlots;
-import pers.roinflam.carianstyle.codex.EnchantmentMeta;
 import pers.roinflam.carianstyle.codex.ForeignCodex;
-import pers.roinflam.carianstyle.codex.ItemCategoryNamer;
-import pers.roinflam.carianstyle.codex.ModNames;
 import pers.roinflam.carianstyle.codex.ForeignMeta;
+import pers.roinflam.carianstyle.codex.ModNames;
+import pers.roinflam.carianstyle.codex.EnchantmentMeta;
+import pers.roinflam.carianstyle.codex.EnchantmentSlots;
+import pers.roinflam.carianstyle.codex.ItemCategoryNamer;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -23,89 +26,55 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * 外部附魔（原版与其它模组）的详情面板。
- *
- * <h3>为什么单独写一个而不是复用 {@link CodexDetail}</h3>
+ * 外部附魔（原版和别的模组）的详情。版式和 {@link CodexDetail} 一样：透明卷首 + 卷首下沿往下铺玻璃的正文。
  * <p>
- * 两者能展示的信息差得太远：本模组的详情有题材主题、可调数值、宝藏归因、
- * 整类互斥折叠；外部附魔这些一概没有，硬塞进同一个面板就会到处是
- * {@code if (isForeign)}，两种形态互相牵制，改一个要担心另一个。
+ * 没和 CodexDetail 合成一个类：本模组的详情有可调数值、宝藏归因、整类互斥折叠，外部附魔一概没有，
+ * 合在一起到处是 isForeign 分支。共用的画法都在 {@link DetailHead}、{@link DetailSections} 里，这边只是调用。
  * </p>
  * <p>
- * 共用的部分已经抽到 {@link UiTheme}（区块标题、信息行、徽章）和
- * {@link DescriptionText}（描述排版）里，重复的只是几十行调用，值得。
+ * 冲突小牌里外部附魔在本页跳，本模组附魔会切回「附魔百科」页（靠键里有没有冒号区分）。
+ * 颜色和 CodexDetail 那边同一个意思：红牌留在本页，灰蓝牌会换页。
  * </p>
- *
- * <h3>跳转</h3>
- * <p>
- * 冲突列表里既有外部附魔也有本模组附魔，两者都可点击：
- * 前者在本标签页内跳转，后者会切回「附魔百科」标签页。
- * 界面靠键里有没有冒号来区分，见 {@code CodexEntry.getKey()}。
- * </p>
- *
- * @author RoinFlam
- * @version 1.0
  */
 @SideOnly(Side.CLIENT)
 public final class ForeignDetail {
 
-    /** 内容左右内边距 */
-    private static final int PADDING = 10;
+    private static final int SCROLLBAR = 7;
+    private static final int SCROLL_COLUMN = SCROLLBAR + 1;
+    private static final int WHEEL_STEP = 25;
+    private static final int BULLET_INDENT = 10;
 
-    /** 当前展示的附魔 */
+    private final DetailHead head = new DetailHead();
+
     private ForeignMeta meta;
 
-    /** 界面的放入物品筛选，见 {@link #setFilter} */
     @Nullable
     private ItemFilter filter;
 
-    /** 滚动偏移 */
     private int scroll;
-
-    /** 上一帧算出的内容总高度 */
     private int contentHeight;
+    private boolean large;
+    private boolean showLevels;
 
-    /** 本帧记录的可点击徽章 */
     private final List<HitBox> hits = new ArrayList<>();
 
-    /**
-     * 描述查看等级，跨附魔保持。
-     * <p>{@link Integer#MAX_VALUE} 表示「跟随各自的最高级」，与本模组那边同一套语义。</p>
-     */
+    /** 描述看哪一级，跨附魔保持；MAX_VALUE 是跟着各自的最高级。和本模组那页各存各的 */
     private static int viewLevel = Integer.MAX_VALUE;
 
-    /** 本帧记录的等级选择条命中区域，元素为 {x, y, w, h, level} */
-    private final List<int[]> levelHits = new ArrayList<>();
-
-    /** 描述排版缓存的键 */
     private String layoutKey;
-
-    /** 描述排版缓存 */
+    private final DetailSections.SectionCache sections = new DetailSections.SectionCache(6);
     private List<DescriptionText.Line> layoutCache = Collections.emptyList();
+    private long descLitAt = Long.MIN_VALUE / 4;
 
-    // 布局区域
     private int x;
     private int y;
     private int width;
     private int height;
 
-    /**
-     * 接上界面的放入物品筛选。启用时详情最上方多一张「对这件物品怎么样」的卡片。
-     *
-     * @param filter 筛选；null 表示不显示卡片
-     */
     public void setFilter(@Nullable ItemFilter filter) {
         this.filter = filter;
     }
 
-    /**
-     * 设置布局区域。
-     *
-     * @param x      左
-     * @param y      上
-     * @param width  宽
-     * @param height 高
-     */
     public void setBounds(int x, int y, int width, int height) {
         this.x = x;
         this.y = y;
@@ -113,223 +82,174 @@ public final class ForeignDetail {
         this.height = height;
     }
 
-    /**
-     * 切换展示的附魔。
-     *
-     * @param meta 元数据，可为 null（空态）
-     */
     public void setMeta(@Nullable ForeignMeta meta) {
         this.meta = meta;
         this.scroll = 0;
+        sections.reset();
+        if (meta == null) {
+            head.clear();
+            return;
+        }
+        int phase = UiTheme.phaseOf(meta);
+        int groupColor = 0xFF000000 | meta.getGroupColor();
+        Enchantment enchantment = meta.getEnchantment();
+        List<DetailHead.Tag> tags = new ArrayList<>(4);
+        tags.add(new DetailHead.Tag(meta.getGroupName(), groupColor));
+        tags.add(DetailHead.Tag.rarity(meta.getRarityName(), phase));
+        if (DetailSections.isTreasure(enchantment)) {
+            tags.add(new DetailHead.Tag(Component.translatable("carianstyle.codex.badge.treasure"), UiTheme.GOLD));
+        }
+        if (enchantment.isCurse()) {
+            tags.add(new DetailHead.Tag(Component.translatable("carianstyle.codex.badge.curse"), UiTheme.DANGER));
+        }
+        head.setEntry(meta.getKey(), meta.getDisplayName(), meta.getKey(), tags, phase, groupColor);
+        // 外部附魔没有「公式」档；描述里没有占位符时点等级什么都不变，不摆等级牌
+        showLevels = meta.hasFormatArgs() && meta.getMaxLevel() > 1;
+        head.setLevels(meta.getMaxLevel(), false, showLevels);
+        head.setLevel(shownLevel(), false);
     }
 
-    /**
-     * 绘制详情。
-     *
-     * @param g      绘制上下文
-     * @param font   字体
-     * @param mouseX 鼠标 X
-     * @param mouseY 鼠标 Y
-     */
+    /** 没有等级牌时指针停在最高级，不跟着别的附魔上选的那级走 */
+    private int shownLevel() {
+        if (!showLevels) {
+            return Math.max(1, meta.getMaxLevel());
+        }
+        return Math.max(1, Math.min(viewLevel, meta.getMaxLevel()));
+    }
+
     public void render(@Nonnull GuiGraphics g, @Nonnull Font font, int mouseX, int mouseY) {
-        UiTheme.panel(g, x, y, width, height, UiTheme.PANEL);
-        UiTheme.corners(g, x, y, width, height, 8, UiTheme.tint());
         hits.clear();
-        levelHits.clear();
+        int vpW = width - SCROLL_COLUMN;
+        g.fill(x + width - SCROLLBAR, y, x + width, y + height, 0xEB0A0F26);
 
         if (meta == null) {
+            UiTheme.glass(g, x, y, vpW, height);
             Component hint = Component.translatable("carianstyle.codex.detail.empty");
-            int textWidth = font.width(hint);
-            g.drawString(font, hint, x + (width - textWidth) / 2, y + height / 2 - 4,
-                    UiTheme.TEXT_DIM, false);
+            g.drawString(font, hint, x + (vpW - font.width(hint)) / 2, y + (height - 8) / 2, UiTheme.OFF, false);
             contentHeight = 0;
             return;
         }
 
-        int innerWidth = width - PADDING * 2 - 6;
-        g.enableScissor(x + 1, y + 1, x + width - 1, y + height - 1);
+        boolean inView = UiTheme.hit(mouseX, mouseY, x, y, vpW, height);
+        int hx = inView ? mouseX : Integer.MIN_VALUE;
+        int hy = inView ? mouseY : Integer.MIN_VALUE;
+        int padL = large ? 14 : 10;
+        int padR = large ? 14 : 8;
+        int left = x + padL;
+        int innerWidth = vpW - padL - padR;
+        int top = y - scroll;
 
-        int cursorY = y + PADDING - scroll;
-        cursorY = renderTitle(g, font, cursorY, innerWidth);
-        cursorY = DetailSections.fitCard(g, font, filter, meta.getEnchantment(),
-                x + PADDING, cursorY, innerWidth);
-        cursorY = renderDescription(g, font, cursorY, innerWidth);
-        cursorY = renderBasics(g, font, cursorY, innerWidth);
-        cursorY = renderItems(g, font, cursorY, innerWidth);
-        cursorY = renderAcquisition(g, font, cursorY, innerWidth);
-        cursorY = renderEnchantingData(g, font, cursorY, innerWidth);
-        cursorY = renderConflicts(g, font, cursorY, innerWidth, mouseX, mouseY);
+        g.enableScissor(x, y, x + vpW, y + height);
+
+        head.setLevel(shownLevel(), false);
+        int bodyTop = top + head.render(g, font, x, top, vpW, hx, hy, inView);
+
+        int glassBottom = Math.max(top + contentHeight, y + height);
+        UiTheme.glass(g, x, bodyTop, vpW, glassBottom - bodyTop);
+
+        int cursorY = DetailSections.fitCard(g, font, filter, meta.getEnchantment(), left, bodyTop, innerWidth);
+        sections.begin(meta.getKey() + '#' + shownLevel() + '#' + innerWidth);
+        int vt = y;
+        int vb = y + height;
+        cursorY = sections.draw(0, cursorY, vt, vb, c -> renderDescription(g, font, left, c, innerWidth));
+        cursorY = sections.draw(1, cursorY, vt, vb, c -> renderBasics(g, font, left, c, innerWidth));
+        cursorY = sections.draw(2, cursorY, vt, vb, c -> DetailSections.itemTypes(g, font,
+                ItemCategoryNamer.describe(meta.getApplicableItems()), meta.getApplicableItems(),
+                left, c + DetailSections.SECTION_GAP, innerWidth));
+        cursorY = sections.draw(3, cursorY, vt, vb, c -> renderAcquisition(g, font, left, c, innerWidth));
+        cursorY = sections.draw(4, cursorY, vt, vb, c -> renderEnchantingData(g, font, left, c, innerWidth));
+        cursorY = sections.draw(5, cursorY, vt, vb, c -> renderConflicts(g, font, left, c, innerWidth, hx, hy));
+        cursorY += large ? 12 : 10;
 
         g.disableScissor();
 
-        contentHeight = cursorY - (y + PADDING - scroll) + PADDING;
-        // 内容变矮时（放入物品的结论卡片消失、换成更短的卡片）把滚动收回来，
-        // 否则底部会空出一截，滚动条的滑块还会画到面板外面。只收不放：变高不会越界
-        int maxScroll = Math.max(0, contentHeight - height + PADDING);
+        contentHeight = cursorY - top;
+        int maxScroll = Math.max(0, contentHeight - height);
         if (scroll > maxScroll) {
             scroll = maxScroll;
         }
-        UiTheme.scrollbar(g, x + width - 4, y + 1, height - 2, contentHeight, scroll);
+        boolean barHot = UiTheme.hit(mouseX, mouseY, x + width - SCROLLBAR, y, SCROLLBAR, height);
+        UiTheme.scrollbar(g, x + width - SCROLLBAR, y, height, contentHeight, scroll, barHot);
     }
 
     /**
-     * 标题区：名称 + 注册名 + 分组与稀有度徽章。
-     *
-     * @param g          绘制上下文
-     * @param font       字体
-     * @param cursorY    当前纵坐标
-     * @param innerWidth 内容宽度
-     * @return 绘制后的纵坐标
+     * 描述和本模组走同一套排版（；分条、：分层、括号压暗、数值高亮），不少模组的写法和本模组一样。
+     * 作者没写描述时给两行灰字，留白会被当成百科没加载出来。
      */
-    private int renderTitle(@Nonnull GuiGraphics g, @Nonnull Font font, int cursorY, int innerWidth) {
-        int left = x + PADDING;
-
-        g.drawString(font, meta.getDisplayName(), left, cursorY, UiTheme.tint(), false);
-        DetailSections.idChip(g, font, meta.getKey(), left, cursorY, innerWidth,
-                left + font.width(meta.getDisplayName()) + 16);
-        cursorY += font.lineHeight + 8;
-
-        int badgeX = left;
-        badgeX += UiTheme.badge(g, font, meta.getGroupName(), badgeX, cursorY,
-                meta.getGroupColor(), false);
-        badgeX += UiTheme.badge(g, font, meta.getRarityName(), badgeX, cursorY,
-                meta.getRarityColor(), false);
-
-        Enchantment enchantment = meta.getEnchantment();
-        if (DetailSections.isTreasure(enchantment)) {
-            badgeX += UiTheme.badge(g, font, Component.translatable("carianstyle.codex.badge.treasure"),
-                    badgeX, cursorY, UiTheme.WARN, false);
-        }
-        if (enchantment.isCurse()) {
-            UiTheme.badge(g, font, Component.translatable("carianstyle.codex.badge.curse"),
-                    badgeX, cursorY, UiTheme.DANGER, false);
-        }
-        cursorY += font.lineHeight + 12;
-
-        UiTheme.divider(g, left, cursorY, innerWidth);
-        return cursorY + 9;
-    }
-
-    /**
-     * 描述区。
-     * <p>
-     * 与本模组的描述走同一套排版（{@code ；} 分条、{@code ：} 分层、括号压暗、数值高亮），
-     * 因为不少模组的描述写法和本模组一样。作者没写描述时显示一行灰字说明——
-     * 留白会让人以为是百科没加载出来。
-     * </p>
-     *
-     * @param g          绘制上下文
-     * @param font       字体
-     * @param cursorY    当前纵坐标
-     * @param innerWidth 内容宽度
-     * @return 绘制后的纵坐标
-     */
-    private int renderDescription(@Nonnull GuiGraphics g, @Nonnull Font font,
-                                  int cursorY, int innerWidth) {
-        int left = x + PADDING;
-        int bulletIndent = 9;
-
+    private int renderDescription(@Nonnull GuiGraphics g, @Nonnull Font font, int left, int cursorY, int innerWidth) {
+        cursorY += 7;
         if (!meta.hasDescription()) {
-            // 两行都要换行：提示里嵌了一条完整的语言键，很容易超出面板宽度。
-            // 原来直接 drawString，后半句被切在面板外，而且看不出是被截断了
-            cursorY = UiTheme.wrapped(g, font,
-                    Component.translatable("carianstyle.codex.foreign.no_description"),
-                    left, cursorY, innerWidth, UiTheme.OFF);
-            cursorY += 2;
-            cursorY = UiTheme.wrapped(g, font,
-                    Component.translatable("carianstyle.codex.foreign.desc_hint",
-                            meta.getPreferredDescKey()),
-                    left, cursorY, innerWidth, UiTheme.OFF);
-            return cursorY + 8;
+            // 第二行嵌了一整条语言键，很容易超宽，两行都要折
+            cursorY = DetailSections.note(g, font, Component.translatable("carianstyle.codex.foreign.no_description"),
+                    left, cursorY + 1, innerWidth, UiTheme.OFF);
+            return DetailSections.note(g, font, Component.translatable("carianstyle.codex.foreign.desc_hint",
+                    meta.getPreferredDescKey()), left, cursorY + 3, innerWidth, UiTheme.OFF) + 2;
         }
 
-        int level = clampViewLevel();
-
-        // 只有描述里真的带占位符时才显示等级条。
-        // 没有可变量的描述摆一排等级按钮，点了什么都不变，纯属噪音
-        if (meta.hasFormatArgs() && meta.getMaxLevel() > 1) {
-            int chipX = left;
-            int chipH = font.lineHeight + 4;
-            for (int lv = 1; lv <= meta.getMaxLevel(); lv++) {
-                Component label = Component.literal(UiTheme.roman(lv));
-                int chipW = font.width(label) + 8;
-                if (chipX + chipW > left + innerWidth) {
-                    chipX = left;
-                    cursorY += chipH + 3;
-                }
-                boolean active = lv == level;
-                g.fill(chipX, cursorY, chipX + chipW, cursorY + chipH,
-                        active ? UiTheme.ACCENT_FILL : UiTheme.PANEL_ALT);
-                UiTheme.border(g, chipX, cursorY, chipW, chipH,
-                        active ? UiTheme.ACCENT : UiTheme.BORDER);
-                g.drawString(font, label, chipX + 4, cursorY + 3,
-                        active ? UiTheme.ACCENT : UiTheme.TEXT_DIM, false);
-                levelHits.add(new int[]{chipX, cursorY, chipW, chipH, lv});
-                chipX += chipW + 3;
-            }
-            cursorY += chipH + 7;
-        }
-
+        int level = shownLevel();
         String key = meta.getKey() + '#' + level + '#' + innerWidth;
         if (!key.equals(layoutKey)) {
             layoutKey = key;
-            // 外部附魔没有 [附魔等级] 这套占位符约定，一律按公式档排版；
-            // 它们的 %1$s 已经在 getDescription(level) 里填好了
+            // 外部附魔没有 [附魔等级] 这套占位符，一律按公式档排；%1$s 已经在 getDescription(level) 里填好
             layoutCache = DescriptionText.layout(meta.getDescription(level).getString(),
-                    DescriptionText.FORMULA, font, innerWidth - bulletIndent, bulletIndent);
+                    DescriptionText.FORMULA, font, innerWidth - BULLET_INDENT, BULLET_INDENT);
         }
+        long lit = UiTheme.now() - descLitAt;
+        float p = lit >= 0 && lit < 400 ? UiTheme.steps(lit, 400, 6) : 1f;
+
         for (DescriptionText.Line line : layoutCache) {
-            int indent = bulletIndent + (line.getIndent() == 0 ? 0 : bulletIndent);
             if (line.isBlockStart()) {
-                g.fill(left + 1, cursorY + 3, left + 4, cursorY + 6, UiTheme.ACCENT);
+                UiTheme.sprite(g, "bul_star", left + 1, cursorY + 2, 5, 5);
             }
-            g.drawString(font, line.getText(), left + indent, cursorY, UiTheme.TEXT, false);
-            cursorY += font.lineHeight + 2;
+            int tx = left + BULLET_INDENT + (line.getIndent() == 0 ? 0 : BULLET_INDENT);
+            FormattedCharSequence seq = FormattedCharSequence.of(line.getText());
+            if (p < 1f) {
+                seq = litLine(g, font, seq, tx, cursorY + 1, p);
+            }
+            g.drawString(font, seq, tx, cursorY + 1, UiTheme.TEXT, false);
+            cursorY += DetailSections.LINE;
         }
 
+        // 原版附魔的描述是本模组补的，写明出处，不冒充人家自带的
         if (meta.isDescriptionSupplied()) {
-            cursorY += 2;
-            cursorY = UiTheme.wrapped(g, font,
-                    Component.translatable("carianstyle.codex.foreign.desc_by_us"),
-                    left + bulletIndent, cursorY, innerWidth - bulletIndent, UiTheme.OFF);
+            cursorY = DetailSections.note(g, font, Component.translatable("carianstyle.codex.foreign.desc_by_us"),
+                    left + BULLET_INDENT, cursorY + 3, innerWidth - BULLET_INDENT, UiTheme.OFF) + 2;
         }
-        return cursorY + 8;
+        return cursorY;
     }
 
-    /**
-     * 把查看等级收拢到当前附魔的合法范围。
-     *
-     * @return 收拢后的等级
-     */
-    private int clampViewLevel() {
-        return Math.max(1, Math.min(viewLevel, meta.getMaxLevel()));
+    /** 切等级时数值那几个字从白退回本色，底下一层青光跟着淡掉；和本模组详情同一个效果 */
+    @Nonnull
+    private static FormattedCharSequence litLine(@Nonnull GuiGraphics g, @Nonnull Font font,
+                                                 @Nonnull FormattedCharSequence seq, int x, int y, float p) {
+        int bg = UiTheme.withAlpha(0xFF7FE3FF, 0.35f * (1f - p));
+        int cursor = x;
+        List<TextRun> out = new ArrayList<>();
+        for (TextRun run : seq.runs()) {
+            int w = font.width(Collections.singletonList(run));
+            if (run.rgb != null && DescriptionText.isValueColor(TextColor.fromRgb(run.rgb))) {
+                g.fill(cursor, y, cursor + w, y + 8, bg);
+                out.add(new TextRun(run.text, UiTheme.mix(0xFFFFFFFF, 0xFF000000 | run.rgb, p) & 0xFFFFFF, run.flags));
+            } else {
+                out.add(run);
+            }
+            cursor += w;
+        }
+        return FormattedCharSequence.of(out);
     }
 
-    /**
-     * 基础信息区：等级范围、权重、可交易 / 可发现。
-     *
-     * @param g          绘制上下文
-     * @param font       字体
-     * @param cursorY    当前纵坐标
-     * @param innerWidth 内容宽度
-     * @return 绘制后的纵坐标
-     */
-    private int renderBasics(@Nonnull GuiGraphics g, @Nonnull Font font,
-                             int cursorY, int innerWidth) {
-        int left = x + PADDING;
-        cursorY = UiTheme.sectionHeader(g, font,
-                Component.translatable("carianstyle.codex.section.basics"), left, cursorY, innerWidth);
+    private int renderBasics(@Nonnull GuiGraphics g, @Nonnull Font font, int left, int cursorY, int innerWidth) {
+        cursorY = DetailSections.section(g, font, Component.translatable("carianstyle.codex.section.basics"),
+                left, cursorY, innerWidth);
 
-        // 「可交易」「可被发现」原来放在这里，但它们回答的是「怎么拿到」，
-        // 已经挪进「获取方式」区块——同一个问题的答案不该散在两处
+        // 「可交易」「可被发现」回答的是怎么拿到，放在获取方式里，不在这里重复
         String levels = meta.getMinLevel() == meta.getMaxLevel()
                 ? UiTheme.roman(meta.getMaxLevel())
                 : UiTheme.roman(meta.getMinLevel()) + " ~ " + UiTheme.roman(meta.getMaxLevel());
-        cursorY = UiTheme.keyValue(g, font,
-                Component.translatable("carianstyle.codex.field.max_level"),
-                levels + " (" + meta.getMaxLevel() + ")", left, cursorY, innerWidth, UiTheme.TEXT);
+        cursorY = DetailSections.kv(g, font, Component.translatable("carianstyle.codex.field.max_level"),
+                levels + " (" + meta.getMaxLevel() + ")", left, cursorY, innerWidth, UiTheme.MOON);
 
-        // 生效槽位靠反射读取，拿不到就整行略过——纯展示信息，缺了不影响任何玩法
+        // 槽位靠反射读，读不到就整行不画，纯展示信息
         List<EntityEquipmentSlot> slots = EnchantmentSlots.of(meta.getEnchantment());
         if (!slots.isEmpty()) {
             StringBuilder slotText = new StringBuilder();
@@ -337,182 +257,79 @@ public final class ForeignDetail {
                 if (i > 0) {
                     slotText.append("  ");
                 }
-                slotText.append(Component.translatable(
-                        "carianstyle.codex.slot." + slots.get(i).getName()).getString());
+                slotText.append(Component.translatable("carianstyle.codex.slot." + slots.get(i).getName()).getString());
             }
-            cursorY = UiTheme.keyValue(g, font,
-                    Component.translatable("carianstyle.codex.field.slots"),
-                    slotText.toString(), left, cursorY, innerWidth, UiTheme.TEXT);
+            cursorY = DetailSections.kv(g, font, Component.translatable("carianstyle.codex.field.slots"),
+                    slotText.toString(), left, cursorY, innerWidth, UiTheme.MOON);
         }
-
-        return cursorY + 8;
+        return cursorY;
     }
 
     /**
-     * 适用物品种类区。
-     * <p>
-     * 绘制交给 {@link DetailSections#itemTypes}，与「附魔百科」页共用同一段代码。
-     * 本方法只负责算出种类名——外部附魔没有注解，靠 {@link ItemCategoryNamer}
-     * 从实测结果反推。
-     * </p>
-     *
-     * @param g          绘制上下文
-     * @param font       字体
-     * @param cursorY    当前纵坐标
-     * @param innerWidth 内容宽度
-     * @return 绘制后的纵坐标
+     * 外部附魔没有本模组那套配置开关，获取途径只看原版附魔台和村民交易实际读的四个标志：
+     * isDiscoverable、isTreasureOnly、isTradeable、isCurse。
      */
-    private int renderItems(@Nonnull GuiGraphics g, @Nonnull Font font,
-                            int cursorY, int innerWidth) {
-        return DetailSections.itemTypes(g, font,
-                ItemCategoryNamer.describe(meta.getApplicableItems()),
-                meta.getApplicableItems(), x + PADDING, cursorY, innerWidth);
-    }
-
-    /**
-     * 获取方式区。
-     *
-     * <h3>能推出多少</h3>
-     * <p>
-     * 外部附魔没有本模组那套配置开关，但 {@code Enchantment} 本身就暴露了
-     * 四个决定获取途径的标志：{@code isTreasureOnly}（能否从附魔台抽到）、
-     * {@code isDiscoverable}（能否被随机抽中）、{@code isTradeable}（能否出现在交易里）、
-     * {@code isCurse}（是不是诅咒）。这四个组合起来足够说清「怎么拿到」。
-     * </p>
-     * <p>
-     * 这些都是原版附魔台与村民交易实际读取的字段，不是猜的。
-     * </p>
-     *
-     * @param g          绘制上下文
-     * @param font       字体
-     * @param cursorY    当前纵坐标
-     * @param innerWidth 内容宽度
-     * @return 绘制后的纵坐标
-     */
-    private int renderAcquisition(@Nonnull GuiGraphics g, @Nonnull Font font,
-                                  int cursorY, int innerWidth) {
-        int left = x + PADDING;
-        cursorY = UiTheme.sectionHeader(g, font,
-                Component.translatable("carianstyle.codex.section.acquisition"),
+    private int renderAcquisition(@Nonnull GuiGraphics g, @Nonnull Font font, int left, int cursorY, int innerWidth) {
+        cursorY = DetailSections.section(g, font, Component.translatable("carianstyle.codex.section.acquisition"),
                 left, cursorY, innerWidth);
 
         Enchantment enchantment = meta.getEnchantment();
-
         if (!DetailSections.isDiscoverable(enchantment)) {
-            // 这一条排最前：不可被发现意味着上面所有途径都无从谈起
-            cursorY = bullet(g, font,
-                    Component.translatable("carianstyle.codex.acquire.not_discoverable"),
+            // 排最前：抽不到的话下面的途径都无从谈起
+            cursorY = DetailSections.bullet(g, font, Component.translatable("carianstyle.codex.acquire.not_discoverable"),
                     left, cursorY, innerWidth, UiTheme.WARN);
         } else if (DetailSections.isTreasure(enchantment)) {
-            cursorY = bullet(g, font, Component.translatable("carianstyle.codex.acquire.treasure"),
+            cursorY = DetailSections.bullet(g, font, Component.translatable("carianstyle.codex.acquire.treasure"),
                     left, cursorY, innerWidth, UiTheme.WARN);
-            cursorY = bullet(g, font, Component.translatable("carianstyle.codex.acquire.loot"),
+            cursorY = DetailSections.bullet(g, font, Component.translatable("carianstyle.codex.acquire.loot"),
                     left, cursorY, innerWidth, UiTheme.TEXT);
         } else {
-            cursorY = bullet(g, font, Component.translatable("carianstyle.codex.acquire.table"),
+            cursorY = DetailSections.bullet(g, font, Component.translatable("carianstyle.codex.acquire.table"),
                     left, cursorY, innerWidth, UiTheme.ON);
-            cursorY = bullet(g, font, Component.translatable("carianstyle.codex.acquire.loot"),
+            cursorY = DetailSections.bullet(g, font, Component.translatable("carianstyle.codex.acquire.loot"),
                     left, cursorY, innerWidth, UiTheme.TEXT);
         }
 
-        cursorY = bullet(g, font, Component.translatable(DetailSections.isTradeable(enchantment)
+        boolean tradeable = DetailSections.isTradeable(enchantment);
+        cursorY = DetailSections.bullet(g, font, Component.translatable(tradeable
                         ? "carianstyle.codex.acquire.villager"
                         : "carianstyle.codex.acquire.no_villager"),
-                left, cursorY, innerWidth,
-                DetailSections.isTradeable(enchantment) ? UiTheme.TEXT : UiTheme.OFF);
+                left, cursorY, innerWidth, tradeable ? UiTheme.TEXT : UiTheme.OFF);
 
         if (enchantment.isCurse()) {
-            cursorY = bullet(g, font, Component.translatable("carianstyle.codex.acquire.curse"),
+            cursorY = DetailSections.bullet(g, font, Component.translatable("carianstyle.codex.acquire.curse"),
                     left, cursorY, innerWidth, UiTheme.DANGER);
         }
-
-        return cursorY + 8;
+        return cursorY;
     }
 
-    /**
-     * 附魔台数据区：权重与等级需求。
-     *
-     * @param g          绘制上下文
-     * @param font       字体
-     * @param cursorY    当前纵坐标
-     * @param innerWidth 内容宽度
-     * @return 绘制后的纵坐标
-     */
-    private int renderEnchantingData(@Nonnull GuiGraphics g, @Nonnull Font font,
-                                     int cursorY, int innerWidth) {
-        int left = x + PADDING;
-        cursorY = UiTheme.sectionHeader(g, font,
-                Component.translatable("carianstyle.codex.section.enchanting"),
+    private int renderEnchantingData(@Nonnull GuiGraphics g, @Nonnull Font font, int left, int cursorY, int innerWidth) {
+        cursorY = DetailSections.section(g, font, Component.translatable("carianstyle.codex.section.enchanting"),
                 left, cursorY, innerWidth);
-
-        cursorY = UiTheme.keyValue(g, font,
-                Component.translatable("carianstyle.codex.field.weight"),
-                String.valueOf(meta.getWeight()), left, cursorY, innerWidth, UiTheme.TEXT);
+        cursorY = DetailSections.kv(g, font, Component.translatable("carianstyle.codex.field.weight"),
+                String.valueOf(meta.getWeight()), left, cursorY, innerWidth, UiTheme.MOON);
 
         Enchantment enchantment = meta.getEnchantment();
         int minCost = DetailSections.minCost(enchantment, enchantment.getMinLevel());
         int maxCost = DetailSections.minCost(enchantment, enchantment.getMaxLevel());
-        cursorY = UiTheme.keyValue(g, font,
-                Component.translatable("carianstyle.codex.field.cost"),
+        return DetailSections.kv(g, font, Component.translatable("carianstyle.codex.field.cost"),
                 minCost == maxCost ? String.valueOf(minCost) : minCost + " ~ " + maxCost,
-                left, cursorY, innerWidth, UiTheme.TEXT);
-
-        return cursorY + 8;
+                left, cursorY, innerWidth, UiTheme.MOON);
     }
 
-    /**
-     * 画一行带项目符号的文字，超宽自动换行。
-     *
-     * @param g          绘制上下文
-     * @param font       字体
-     * @param text       文字
-     * @param left       左边界
-     * @param cursorY    当前纵坐标
-     * @param innerWidth 可用宽度
-     * @param color      颜色
-     * @return 绘制后的纵坐标
-     */
-    private int bullet(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component text,
-                       int left, int cursorY, int innerWidth, int color) {
-        g.drawString(font, "\u2022", left + 1, cursorY, color, false);
-        for (FormattedCharSequence line : font.splitSequences(text, innerWidth - 10)) {
-            g.drawString(font, line, left + 9, cursorY, color, false);
-            cursorY += font.lineHeight + 1;
-        }
-        return cursorY + 1;
-    }
-
-    /**
-     * 冲突区：外部附魔与本模组附魔都可点击跳转。
-     *
-     * @param g          绘制上下文
-     * @param font       字体
-     * @param cursorY    当前纵坐标
-     * @param innerWidth 内容宽度
-     * @param mouseX     鼠标 X
-     * @param mouseY     鼠标 Y
-     * @return 绘制后的纵坐标
-     */
-    private int renderConflicts(@Nonnull GuiGraphics g, @Nonnull Font font, int cursorY,
+    private int renderConflicts(@Nonnull GuiGraphics g, @Nonnull Font font, int left, int cursorY,
                                 int innerWidth, int mouseX, int mouseY) {
-        int left = x + PADDING;
-        cursorY = UiTheme.sectionHeader(g, font,
-                Component.translatable("carianstyle.codex.section.conflicts"),
+        cursorY = DetailSections.section(g, font, Component.translatable("carianstyle.codex.section.conflicts"),
                 left, cursorY, innerWidth);
 
         List<String> foreign = meta.getForeignConflicts();
         List<String> carian = meta.getCarianConflicts();
         if (foreign.isEmpty() && carian.isEmpty()) {
-            return UiTheme.wrapped(g, font,
-                    Component.translatable("carianstyle.codex.conflicts.none"),
-                    left, cursorY, innerWidth, UiTheme.TEXT_DIM) + 8;
+            return DetailSections.note(g, font, Component.translatable("carianstyle.codex.conflicts.none"),
+                    left, cursorY, innerWidth, UiTheme.OFF);
         }
 
-        int badgeX = left;
-        int badgeY = cursorY;
-        int badgeHeight = font.lineHeight + 4;
-
-        // 与「附魔百科」页同一条规则：原版最前，其余按模组显示名，同模组内按附魔名
+        // 和「附魔百科」页同一条规则：原版最前，其余按模组显示名，同模组内按附魔名
         List<String> sortedForeign = new ArrayList<>(foreign);
         sortedForeign.sort((a, b) -> {
             ForeignMeta ma = ForeignCodex.get(a);
@@ -520,26 +337,12 @@ public final class ForeignDetail {
             if (ma == null || mb == null) {
                 return 0;
             }
-            int byMod = ModNames.compare(ma.getRegistryName().getResourceDomain(),
-                    mb.getRegistryName().getResourceDomain());
+            int byMod = ModNames.compare(ma.getRegistryName().getResourceDomain(), mb.getRegistryName().getResourceDomain());
             if (byMod != 0) {
                 return byMod;
             }
             return ma.getDisplayName().getString().compareTo(mb.getDisplayName().getString());
         });
-
-        for (String other : sortedForeign) {
-            ForeignMeta target = ForeignCodex.get(other);
-            if (target == null) {
-                continue;
-            }
-            int[] pos = placeBadge(g, font, target.getDisplayName(), left, innerWidth,
-                    badgeX, badgeY, badgeHeight, UiTheme.DANGER, mouseX, mouseY, other);
-            badgeX = pos[0];
-            badgeY = pos[1];
-        }
-        // 本模组的附魔用金色边框，与上面的外部附魔区分开：
-        // 点它会切到另一个标签页，视觉上先给个提示
         List<String> sortedCarian = new ArrayList<>(carian);
         sortedCarian.sort((a, b) -> {
             EnchantmentMeta ma = EnchantmentCodex.get(a);
@@ -549,73 +352,56 @@ public final class ForeignDetail {
             }
             return ma.getDisplayName().getString().compareTo(mb.getDisplayName().getString());
         });
+
+        int[] pos = {left, cursorY};
+        boolean drewAny = false;
+        for (String other : sortedForeign) {
+            ForeignMeta target = ForeignCodex.get(other);
+            if (target != null) {
+                placeChip(g, font, target.getDisplayName(), other, false, pos, left, innerWidth, mouseX, mouseY);
+                drewAny = true;
+            }
+        }
         for (String id : sortedCarian) {
             EnchantmentMeta target = EnchantmentCodex.get(id);
-            if (target == null) {
-                continue;
+            if (target != null) {
+                placeChip(g, font, target.getDisplayName(), id, true, pos, left, innerWidth, mouseX, mouseY);
+                drewAny = true;
             }
-            int[] pos = placeBadge(g, font, target.getDisplayName(), left, innerWidth,
-                    badgeX, badgeY, badgeHeight, UiTheme.ACCENT, mouseX, mouseY, id);
-            badgeX = pos[0];
-            badgeY = pos[1];
         }
 
-        cursorY = badgeY + badgeHeight + 4;
-        cursorY = UiTheme.wrapped(g, font, Component.translatable("carianstyle.codex.conflicts.hint"),
-                left, cursorY, innerWidth, UiTheme.TEXT_DIM);
-        return cursorY + 8;
-    }
-
-    /**
-     * 画一个可点击徽章并登记命中区域，必要时换行。
-     *
-     * @param g           绘制上下文
-     * @param font        字体
-     * @param label       文字
-     * @param left        内容左边界
-     * @param innerWidth  可用宽度
-     * @param badgeX      当前横坐标
-     * @param badgeY      当前纵坐标
-     * @param badgeHeight 徽章高度
-     * @param color       颜色
-     * @param mouseX      鼠标 X
-     * @param mouseY      鼠标 Y
-     * @param targetKey   点击后要跳转到的键
-     * @return 更新后的 {@code {badgeX, badgeY}}
-     */
-    @Nonnull
-    private int[] placeBadge(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component label,
-                             int left, int innerWidth, int badgeX, int badgeY, int badgeHeight,
-                             int color, int mouseX, int mouseY, @Nonnull String targetKey) {
-        int badgeWidth = font.width(label) + 8;
-        if (badgeX + badgeWidth > left + innerWidth) {
-            badgeX = left;
-            badgeY += badgeHeight + 3;
+        if (!drewAny) {
+            return cursorY;
         }
-        boolean hovered = UiTheme.hit(mouseX, mouseY, badgeX, badgeY, badgeWidth, badgeHeight);
-        UiTheme.badge(g, font, label, badgeX, badgeY, color, hovered);
-        hits.add(new HitBox(badgeX, badgeY, badgeWidth, badgeHeight, targetKey));
-        return new int[]{badgeX + badgeWidth + 3, badgeY};
+        return DetailSections.note(g, font, Component.translatable("carianstyle.codex.conflicts.hint"),
+                left, pos[1] + DetailSections.CHIP_H + 5, innerWidth, UiTheme.OFF);
     }
 
-    /**
-     * 处理点击。
-     *
-     * @param mouseX 鼠标 X
-     * @param mouseY 鼠标 Y
-     * @return 被点中的目标键；未命中时返回 null
-     */
+    private void placeChip(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component label, @Nonnull String target,
+                           boolean otherPage, int[] pos, int left, int innerWidth, int mouseX, int mouseY) {
+        int w = DetailSections.chipWidth(font, label, innerWidth);
+        if (pos[0] > left && pos[0] + w > left + innerWidth) {
+            pos[0] = left;
+            pos[1] += DetailSections.CHIP_H + DetailSections.CHIP_GAP;
+        }
+        boolean hovered = UiTheme.hit(mouseX, mouseY, pos[0], pos[1], w, DetailSections.CHIP_H);
+        DetailSections.chip(g, font, label, pos[0], pos[1], w, hovered, otherPage);
+        hits.add(new HitBox(pos[0], pos[1], w, DetailSections.CHIP_H, target));
+        pos[0] += w + DetailSections.CHIP_GAP;
+    }
+
+    /** 点等级牌切描述等级（返回 null）；点冲突小牌返回要跳去的键 */
     @Nullable
     public String mouseClicked(double mouseX, double mouseY) {
-        if (!UiTheme.hit(mouseX, mouseY, x, y, width, height)) {
+        if (meta == null || !UiTheme.hit(mouseX, mouseY, x, y, width - SCROLL_COLUMN, height)) {
             return null;
         }
-        for (int[] chip : levelHits) {
-            if (UiTheme.hit(mouseX, mouseY, chip[0], chip[1], chip[2], chip[3])) {
-                viewLevel = chip[4];
-                layoutKey = null;
-                return null;
-            }
+        int level = head.mouseClicked(mouseX, mouseY);
+        if (level != DetailHead.NO_LEVEL) {
+            viewLevel = level;
+            head.setLevel(level, true);
+            descLitAt = UiTheme.now();
+            return null;
         }
         for (HitBox box : hits) {
             if (UiTheme.hit(mouseX, mouseY, box.x, box.y, box.width, box.height)) {
@@ -625,32 +411,16 @@ public final class ForeignDetail {
         return null;
     }
 
-    /**
-     * 处理滚轮。
-     *
-     * @param mouseX 鼠标 X
-     * @param mouseY 鼠标 Y
-     * @param delta  滚轮增量
-     * @return 是否消费了本次事件
-     */
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (!UiTheme.hit(mouseX, mouseY, x, y, width, height)) {
             return false;
         }
-        scroll -= (int) (delta * 16);
-        int max = Math.max(0, contentHeight - height + PADDING);
-        if (scroll > max) {
-            scroll = max;
-        }
-        if (scroll < 0) {
-            scroll = 0;
-        }
+        scroll -= (int) Math.round(delta * WHEEL_STEP);
+        int max = Math.max(0, contentHeight - height);
+        scroll = Math.max(0, Math.min(scroll, max));
         return true;
     }
 
-    /**
-     * 一个可点击区域。
-     */
     private static final class HitBox {
         private final int x;
         private final int y;
@@ -665,5 +435,34 @@ public final class ForeignDetail {
             this.height = height;
             this.targetKey = targetKey;
         }
+    }
+
+    public void setLarge(boolean large) {
+        this.large = large;
+        head.setLarge(large);
+    }
+
+    public void playIntro(long handoff) {
+        head.playIntro(handoff);
+    }
+
+    public void skipIntro() {
+        head.skipIntro();
+    }
+
+    public int introFrame(long t) {
+        return head.frameAt(t);
+    }
+
+    public int moonColor() {
+        return head.catColor();
+    }
+
+    public void playSelect() {
+        head.playSelect();
+    }
+
+    public void pulse() {
+        head.pulse();
     }
 }

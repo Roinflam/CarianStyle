@@ -10,7 +10,7 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import org.lwjgl.input.Keyboard;
-import pers.roinflam.carianstyle.client.gui.CodexScreen;
+import pers.roinflam.carianstyle.client.gui.CodexTheme;
 import pers.roinflam.carianstyle.utils.Reference;
 
 import javax.annotation.Nonnull;
@@ -105,7 +105,7 @@ public final class CarianStyleKeys {
             }
 
             if (triggered) {
-                minecraft.displayGuiScreen(new CodexScreen());
+                CodexTheme.openCurrent();
             }
         }
     }

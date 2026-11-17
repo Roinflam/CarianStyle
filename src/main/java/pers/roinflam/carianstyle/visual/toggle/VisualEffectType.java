@@ -101,7 +101,9 @@ public enum VisualEffectType {
     // ==================== 界面 ====================
 
     /** 叠层 HUD（StackHudOverlay） */
-    STACK_HUD("stack_hud", Category.HUD, true);
+    STACK_HUD("stack_hud", Category.HUD, true),
+    /** 百科开场的月出（CodexScreen） */
+    CODEX_INTRO("codex_intro", Category.HUD, false);
 
     /** 配置键与语言键的后缀 */
     private final String key;

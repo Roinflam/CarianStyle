@@ -67,7 +67,24 @@ public final class VisualToggle {
     /** 是否已从磁盘加载过 */
     private static boolean loaded = false;
 
+    private static final String CODEX_THEME_KEY = "codex_ui_theme";
+
+    // 只存 id，认不认得由界面那边决定，这里不依赖界面类
+    private static volatile String codexTheme = "";
+
     private VisualToggle() {
+    }
+
+    @Nonnull
+    public static String codexTheme() {
+        ensureLoaded();
+        return codexTheme;
+    }
+
+    public static void setCodexTheme(@Nonnull String id) {
+        ensureLoaded();
+        codexTheme = id;
+        save();
     }
 
     /**
@@ -202,6 +219,10 @@ public final class VisualToggle {
                 }
             }
             enabled = result;
+            JsonElement theme = object.get(CODEX_THEME_KEY);
+            if (theme != null && theme.isJsonPrimitive() && theme.getAsJsonPrimitive().isString()) {
+                codexTheme = theme.getAsString();
+            }
         } catch (Exception e) {
             LogUtil.error("卡利亚式附魔 - 读取 " + FILE_NAME + " 失败，已回落到全部启用", e);
             enabled = defaults();
@@ -267,11 +288,19 @@ public final class VisualToggle {
         root.addProperty("_time_reversal_zh", "时间逆转 — 时间逆转的回溯残影");
         root.addProperty("_stack_hud_en", "Stack HUD — On-screen stacks and cooldown timers");
         root.addProperty("_stack_hud_zh", "叠层 HUD — 屏幕上的叠层与冷却倒计时");
+        root.addProperty("_codex_intro_en", "Opening Animation — Moonrise sequence when the codex opens");
+        root.addProperty("_codex_intro_zh", "开场动画 — 打开百科时的月出演出");
+        root.addProperty("_codex_ui_theme_en", "Codex Interface Theme — carian (Carian Moonlight, default) or classic (Erdtree)");
+        root.addProperty("_codex_ui_theme_zh", "百科界面主题 — carian 为卡利亚月夜（默认），classic 为黄金树");
 
 
         boolean[] snapshot = enabled;
         for (VisualEffectType type : VisualEffectType.values()) {
             root.addProperty(type.getKey(), snapshot[type.ordinal()]);
+        }
+        String theme = codexTheme;
+        if (!theme.isEmpty()) {
+            root.addProperty(CODEX_THEME_KEY, theme);
         }
 
         try (Writer writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {

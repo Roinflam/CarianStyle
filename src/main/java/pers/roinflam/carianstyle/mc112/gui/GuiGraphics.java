@@ -11,6 +11,7 @@ import net.minecraft.client.renderer.WorldVertexBufferUploader;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.fml.client.config.GuiUtils;
 import org.lwjgl.opengl.GL11;
@@ -224,6 +225,7 @@ public final class GuiGraphics {
     }
 
     private static void vertex(@Nonnull BufferBuilder buffer, int x, int y, int color) {
+        color = RenderSystem.modulate(color);
         buffer.pos(x, y, 0.0D).color((color >> 16) & 255, (color >> 8) & 255, color & 255, (color >>> 24) & 255).endVertex();
     }
 
@@ -310,6 +312,44 @@ public final class GuiGraphics {
         task.run();
     }
 
+    // 贴图
+
+    /**
+     * 贴图（同 1.20.1 blit(ResourceLocation, x, y, w, h, u, v, uWidth, vHeight, texW, texH)），乘着色器颜色
+     * <p>
+     * vHeight 可以是负数，等于上下翻转。
+     */
+    public void blit(@Nonnull ResourceLocation texture, int x, int y, int width, int height, float u, float v,
+                     int uWidth, int vHeight, int textureWidth, int textureHeight) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        flush();
+        minecraft.getTextureManager().bindTexture(texture);
+        GlStateManager.enableTexture2D();
+        GlStateManager.enableBlend();
+        GlStateManager.tryBlendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
+                GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
+        // 1.20.1 的贴图着色器只丢掉全透明的像素，原版 0.1 的 alpha 测试会把淡光晕的边吃掉
+        GlStateManager.disableAlpha();
+        GlStateManager.color(RenderSystem.red, RenderSystem.green, RenderSystem.blue, RenderSystem.alpha);
+        float u0 = u / textureWidth;
+        float u1 = (u + uWidth) / textureWidth;
+        float v0 = v / textureHeight;
+        float v1 = (v + vHeight) / textureHeight;
+        Tessellator tessellator = Tessellator.getInstance();
+        BufferBuilder buffer = tessellator.getBuffer();
+        buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_TEX);
+        buffer.pos(x, y + height, 0.0D).tex(u0, v1).endVertex();
+        buffer.pos(x + width, y + height, 0.0D).tex(u1, v1).endVertex();
+        buffer.pos(x + width, y, 0.0D).tex(u1, v0).endVertex();
+        buffer.pos(x, y, 0.0D).tex(u0, v0).endVertex();
+        tessellator.draw();
+        GlStateManager.enableAlpha();
+        GlStateManager.disableBlend();
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+    }
+
     // 裁剪
 
     /**
@@ -380,6 +420,16 @@ public final class GuiGraphics {
     public int drawRuns(@Nonnull Font font, @Nonnull List<TextRun> runs, int x, int y, int color, boolean shadow) {
         if (runs.isEmpty()) {
             return x + (shadow ? 1 : 0);
+        }
+        if (!RenderSystem.isWhite()) {
+            // 1.20.1 先把透明度低于 4 的当不透明，再乘着色器颜色；乘完太淡就不画，否则 1.12.2 的字体会把它当成不透明
+            if ((color & 0xFC000000) == 0) {
+                color |= 0xFF000000;
+            }
+            color = RenderSystem.modulate(color);
+            if ((color & 0xFC000000) == 0) {
+                return x + font.width(runs) + (shadow ? 1 : 0);
+            }
         }
         flush();
         GlStateManager.enableBlend();

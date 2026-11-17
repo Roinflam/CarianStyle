@@ -1,112 +1,211 @@
 package pers.roinflam.carianstyle.client.gui;
 
+import pers.roinflam.carianstyle.mc112.gui.Ui;
+import pers.roinflam.carianstyle.mc112.gui.TextRun;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
-import pers.roinflam.carianstyle.mc112.gui.Component;
+import pers.roinflam.carianstyle.mc112.gui.RenderSystem;
+import net.minecraft.client.Minecraft;
 import pers.roinflam.carianstyle.mc112.gui.Font;
 import pers.roinflam.carianstyle.mc112.gui.GuiGraphics;
+import pers.roinflam.carianstyle.mc112.gui.Component;
+import pers.roinflam.carianstyle.mc112.gui.TextColor;
+import net.minecraft.util.ResourceLocation;
+import pers.roinflam.carianstyle.mc112.gui.FormattedCharSequence;
+import pers.roinflam.carianstyle.utils.Reference;
+import pers.roinflam.carianstyle.codex.CodexEntry;
+import pers.roinflam.carianstyle.codex.CodexTheme;
+import pers.roinflam.carianstyle.codex.EnchantmentMeta;
 
 import javax.annotation.Nonnull;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 /**
- * 百科界面的配色与基础绘制工具。
- *
- * <h3>为什么自己画而不用原版控件</h3>
- * <p>
- * 原版的控件体系（按钮九宫格贴图、{@code GuiSlot} 列表）
- * 样式固定、留白很大，在一屏要塞下「分类 + 列表 + 详情 + 冲突跳转」的信息密度下不够用。
- * 而 Forge 自带的配置界面是为「一列开关」设计的，做不了双栏跳转。
- * </p>
- * <p>
- * 这里全部用 {@link GuiGraphics#fill} 拼矩形，没有任何贴图资源依赖，
- * 也就不会出现资源包覆盖导致界面变形的问题。
- * </p>
- *
- * <h3>颜色约定</h3>
- * <p>
- * 全部为 ARGB（{@code 0xAARRGGBB}）。基调取自模组的艾尔登法环主题：
- * 暗褐底 + 金色强调。所有颜色集中在本类，改主题只改这里。
- * </p>
- *
- * <h3>1.12.2 版</h3>
- * <p>
- * 绘制走界面兼容层 {@code mc112.gui} 的 {@link GuiGraphics}：{@code fill} 先攒进缓冲、
- * 画字前统一刷出去，所以色块和文字的先后顺序与 1.20.1 一致，这里的写法不用改。
- * </p>
- *
- * @author RoinFlam
- * @version 1.0
+ * 百科界面的配色和基础画法：夜色深蓝底、银边玻璃页，装饰件都是 textures/gui/codex 下的像素贴图。
+ * 坐标一律是界面像素，动效全部按 {@link #now()} 的真实毫秒算，不跟帧数走。
  */
 @SideOnly(Side.CLIENT)
 public final class UiTheme {
 
-    /** 整屏遮罩 */
-    public static final int SCRIM = 0xE0090806;
+    public static final int TEXT = 0xFFD3DCF5;
+    public static final int MOON = 0xFFEEF3FF;
+    public static final int TEXT_DIM = 0xFF8E9AC0;
+    public static final int OFF = 0xFF5E6A94;
+    public static final int SILVER = 0xFFC9D6F2;
+    public static final int EDGE = 0xFF9FB0DE;
+    public static final int EDGE_HI = 0xFFDFE8FF;
+    public static final int LINE = 0xFF2B3869;
+    public static final int DOTS = 0xFF33437E;
+    public static final int BUFF = 0xFF7FE3FF;
+    public static final int DEBUFF = 0xFFFF8F9A;
+    public static final int EMPH = 0xFFF2E2A6;
+    public static final int GOLD = 0xFFE6CF8A;
+    public static final int ON = 0xFF8FE6A0;
+    public static final int DANGER = 0xFFFF7F8C;
+    public static final int WARN = 0xFFF4C264;
+    /** 辉石蓝：选中、聚焦、指针星 */
+    public static final int ACCENT = 0xFF7FB4FF;
+    public static final int SHADOW = 0xFF05081A;
+    public static final int INK_DARK = 0xFF101842;
+    public static final int NAVY = 0xFF0B1030;
 
-    /** 面板底色 */
-    public static final int PANEL = 0xFF17140F;
+    public static final int PANEL = 0xE0060A1A;
+    public static final int PANEL_ALT = 0xEB080D22;
+    public static final int PANEL_HOVER = 0xFF18214C;
+    public static final int BORDER = 0xFF4A5C96;
+    public static final int ACCENT_FILL = 0x577FB4FF;
+    public static final int GLASS_TOP = 0xE60F1736;
+    public static final int GLASS_BOTTOM = 0xF0080C1E;
 
-    /** 次级面板底色（列表行交替、详情分区） */
-    public static final int PANEL_ALT = 0xFF1F1B14;
+    /** 月相 1~4（蛾眉、上弦、盈凸、满月）的颜色，下标 0 不用 */
+    private static final int[] PHASE_COLOR = {0xFFA9B4CF, 0xFFA9B4CF, 0xFFB79CFF, 0xFFF08FC8, 0xFFFFB561};
 
-    /** 面板高亮底色（悬停） */
-    public static final int PANEL_HOVER = 0xFF2B251A;
+    /** const.png 里 25 个分类之后的格子 */
+    public static final int CONST_MOD = 25;
+    public static final int CONST_FIT_OK = 26;
+    public static final int CONST_FIT_EXPENSIVE = 27;
+    public static final int CONST_FIT_OWNED = 28;
+    public static final int CONST_FIT_BLOCKED = 29;
+    public static final int CONST_FX = 30;
+    private static final int CONST_CELLS = 35;
 
-    /** 边框 */
-    public static final int BORDER = 0xFF3A3226;
-
-    /** 金色强调 */
-    public static final int ACCENT = 0xFFD9B46A;
-
-    /** 金色强调（半透明，用于选中底） */
-    public static final int ACCENT_FILL = 0x55D9B46A;
-
-    /** 主文本 */
-    public static final int TEXT = 0xFFE8E2D4;
-
-    /** 次要文本 */
-    public static final int TEXT_DIM = 0xFF9C927E;
-
-    /** 警示文本（数值被改动、关闭信息类特效等） */
-    public static final int WARN = 0xFFE0A05A;
-
-    /** 危险 / 冲突 */
-    public static final int DANGER = 0xFFD97070;
-
-    /** 启用状态 */
-    public static final int ON = 0xFF8FD07A;
-
-    /** 禁用状态 */
-    public static final int OFF = 0xFF6A6255;
+    private static final Map<String, ResourceLocation> TEXTURES = new HashMap<>();
 
     private UiTheme() {
     }
 
-    /**
-     * 画一个带 1px 边框的面板。
-     *
-     * @param g      绘制上下文
-     * @param x      左
-     * @param y      上
-     * @param width  宽
-     * @param height 高
-     * @param fill   填充色
-     */
-    public static void panel(@Nonnull GuiGraphics g, int x, int y, int width, int height, int fill) {
-        g.fill(x, y, x + width, y + height, fill);
-        border(g, x, y, width, height, BORDER);
+    public static long now() {
+        return Ui.millis();
     }
 
-    /**
-     * 画一个 1px 边框（不填充）。
-     *
-     * @param g      绘制上下文
-     * @param x      左
-     * @param y      上
-     * @param width  宽
-     * @param height 高
-     * @param color  边框色
-     */
+    /** CSS 的 steps(n)：线性进度按 n 档取整，到头是 1 */
+    public static float steps(long elapsed, float duration, int n) {
+        if (elapsed <= 0) {
+            return 0f;
+        }
+        float p = Math.min(1f, elapsed / duration);
+        return p >= 1f ? 1f : (float) Math.floor(p * n) / n;
+    }
+
+    /** 来回呼吸：从 1 降到 lo 再回来，单程 periodMs，分 n 档 */
+    public static float breathe(long time, float periodMs, int n, float lo) {
+        float t = time / periodMs;
+        int cycle = (int) Math.floor(t);
+        float f = t - cycle;
+        if ((cycle & 1) == 1) {
+            f = 1f - f;
+        }
+        f = (float) Math.floor(f * n) / n;
+        return 1f - (1f - lo) * f;
+    }
+
+    public static float easeOutCubic(float t) {
+        t = Math.max(0f, Math.min(1f, t));
+        float inv = 1f - t;
+        return 1f - inv * inv * inv;
+    }
+
+    public static int withAlpha(int argb, float scale) {
+        int a = Math.round(((argb >>> 24) & 0xFF) * Math.max(0f, Math.min(1f, scale)));
+        return (a << 24) | (argb & 0xFFFFFF);
+    }
+
+    public static int mix(int a, int b, float t) {
+        int r = Math.round(((a >> 16) & 0xFF) + (((b >> 16) & 0xFF) - ((a >> 16) & 0xFF)) * t);
+        int gg = Math.round(((a >> 8) & 0xFF) + (((b >> 8) & 0xFF) - ((a >> 8) & 0xFF)) * t);
+        int bb = Math.round((a & 0xFF) + ((b & 0xFF) - (a & 0xFF)) * t);
+        return (a & 0xFF000000) | (r << 16) | (gg << 8) | bb;
+    }
+
+    /** 稀有度对应的月相：本模组三档对蛾眉 / 上弦 / 满月，原版四档一档一张 */
+    public static int phaseOf(@Nonnull CodexEntry entry) {
+        // 放入物品后列表里的条目包了一层，要按原条目认档
+        entry = ItemFilter.unwrap(entry);
+        int order = Math.max(0, entry.getRarityOrder());
+        if (entry instanceof EnchantmentMeta) {
+            return order >= 2 ? 4 : order + 1;
+        }
+        return Math.min(4, order + 1);
+    }
+
+    public static int phaseColor(int phase) {
+        return PHASE_COLOR[Math.max(1, Math.min(4, phase))];
+    }
+
+    public static int constIndex(@Nonnull CodexTheme theme) {
+        return theme.ordinal();
+    }
+
+    @Nonnull
+    public static ResourceLocation tex(@Nonnull String name) {
+        return TEXTURES.computeIfAbsent(name,
+                n -> new ResourceLocation(Reference.MOD_ID, "textures/gui/codex/" + n + ".png"));
+    }
+
+    public static void sprite(@Nonnull GuiGraphics g, @Nonnull String name, int x, int y, int w, int h) {
+        sprite(g, name, x, y, w, h, 0, 0, w, h, w, h);
+    }
+
+    /** 从贴图 (u, v) 取 uw×vh 画成 w×h；uw 取负数就左右翻转 */
+    public static void sprite(@Nonnull GuiGraphics g, @Nonnull String name, int x, int y, int w, int h,
+                              float u, float v, int uw, int vh, int texW, int texH) {
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        g.blit(tex(name), x, y, w, h, u, v, uw, vh, texW, texH);
+    }
+
+    public static void spriteAlpha(@Nonnull GuiGraphics g, @Nonnull String name, int x, int y, int w, int h,
+                                   float alpha) {
+        if (alpha <= 0f) {
+            return;
+        }
+        RenderSystem.setShaderColor(1f, 1f, 1f, Math.min(1f, alpha));
+        sprite(g, name, x, y, w, h);
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+    }
+
+    public static void spriteAlpha(@Nonnull GuiGraphics g, @Nonnull String name, int x, int y, int w, int h,
+                                   float u, float v, int uw, int vh, int texW, int texH, float alpha) {
+        if (alpha <= 0f) {
+            return;
+        }
+        RenderSystem.setShaderColor(1f, 1f, 1f, Math.min(1f, alpha));
+        sprite(g, name, x, y, w, h, u, v, uw, vh, texW, texH);
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+    }
+
+    /** 白图按颜色着色画（月晕、刻度环、星座） */
+    public static void spriteTinted(@Nonnull GuiGraphics g, @Nonnull String name, int x, int y, int w, int h,
+                                    float u, float v, int texW, int texH, int rgb, float alpha) {
+        if (alpha <= 0f) {
+            return;
+        }
+        RenderSystem.setShaderColor(((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f,
+                (rgb & 0xFF) / 255f, Math.min(1f, alpha));
+        sprite(g, name, x, y, w, h, u, v, w, h, texW, texH);
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+    }
+
+    /** 21×11 的小星座：上行着色，下行叠白（星点提亮、主星中心纯白） */
+    public static void constellation(@Nonnull GuiGraphics g, int index, int x, int y, int color) {
+        int u = Math.max(0, Math.min(CONST_CELLS - 1, index)) * 21;
+        spriteTinted(g, "const", x, y, 21, 11, u, 0, CONST_CELLS * 21, 22, color, 1f);
+        sprite(g, "const", x, y, 21, 11, u, 11, 21, 11, CONST_CELLS * 21, 22);
+    }
+
+    /** 9×9 稀有度月相；满月另画一圈 15×15 淡月晕，haloAlpha 为 0 就不画 */
+    public static void phase(@Nonnull GuiGraphics g, int phase, int x, int y, float alpha, float haloAlpha) {
+        int p = Math.max(1, Math.min(4, phase));
+        if (p == 4 && haloAlpha > 0f) {
+            spriteAlpha(g, "phase_halo", x - 3, y - 3, 15, 15, haloAlpha);
+        }
+        spriteAlpha(g, "phase_" + p, x, y, 9, 9, alpha);
+    }
+
     public static void border(@Nonnull GuiGraphics g, int x, int y, int width, int height, int color) {
         g.fill(x, y, x + width, y + 1, color);
         g.fill(x, y + height - 1, x + width, y + height, color);
@@ -114,254 +213,268 @@ public final class UiTheme {
         g.fill(x + width - 1, y + 1, x + width, y + height - 1, color);
     }
 
-    /**
-     * 画一条水平分隔线。
-     *
-     * @param g     绘制上下文
-     * @param x     左
-     * @param y     纵坐标
-     * @param width 宽
-     */
-    public static void divider(@Nonnull GuiGraphics g, int x, int y, int width) {
-        g.fill(x, y, x + width, y + 1, BORDER);
+    public static void panel(@Nonnull GuiGraphics g, int x, int y, int width, int height, int fill) {
+        g.fill(x, y, x + width, y + height, fill);
+        border(g, x, y, width, height, BORDER);
     }
 
-    /**
-     * 画一个左侧竖条强调的小标签。
-     *
-     * @param g     绘制上下文
-     * @param font  字体
-     * @param text  文字
-     * @param x     左
-     * @param y     上
-     * @param color 竖条与文字颜色
-     */
-    public static void tag(@Nonnull GuiGraphics g, @Nonnull Font font,
-                           @Nonnull Component text, int x, int y, int color) {
-        g.fill(x, y, x + 2, y + font.lineHeight, color);
-        g.drawString(font, text, x + 5, y, color, false);
+    public static void glass(@Nonnull GuiGraphics g, int x, int y, int width, int height) {
+        glass(g, x, y, width, height, 1f);
     }
 
-    /**
-     * 画一个胶囊状小徽章，返回它占用的宽度。
-     *
-     * @param g       绘制上下文
-     * @param font    字体
-     * @param text    文字
-     * @param x       左
-     * @param y       上
-     * @param color   文字与边框色
-     * @param hovered 是否悬停（悬停时填充更亮）
-     * @return 徽章总宽度（含右侧 3px 间距）
-     */
+    public static void glass(@Nonnull GuiGraphics g, int x, int y, int width, int height, float thickness) {
+        if (width > 0 && height > 0) {
+            g.fillGradient(x, y, x + width, y + height, withAlpha(GLASS_TOP, thickness), withAlpha(GLASS_BOTTOM, thickness));
+        }
+    }
+
+    /** 书页：外圈一道暗边，里面一道银边；glass 为 true 时铺玻璃底。四角另由 {@link #pageCorners} 压在内容上面 */
+    public static void page(@Nonnull GuiGraphics g, int x, int y, int width, int height, boolean glass) {
+        page(g, x, y, width, height, glass ? 1f : 0f);
+    }
+
+    public static void page(@Nonnull GuiGraphics g, int x, int y, int width, int height, float glass) {
+        if (glass > 0f) {
+            glass(g, x, y, width, height, glass);
+        }
+        border(g, x, y, width, height, 0xD905081A);
+        border(g, x + 1, y + 1, width - 2, height - 2, EDGE);
+    }
+
+    public static void pageCorners(@Nonnull GuiGraphics g, int x, int y, int width, int height) {
+        int r = x + width - 8;
+        int b = y + height - 8;
+        sprite(g, "pcorner", x, y, 8, 8, 0, 0, 8, 8, 8, 8);
+        sprite(g, "pcorner", r, y, 8, 8, 8, 0, -8, 8, 8, 8);
+        sprite(g, "pcorner", x, b, 8, 8, 0, 8, 8, -8, 8, 8);
+        sprite(g, "pcorner", r, b, 8, 8, 8, 8, -8, -8, 8, 8);
+    }
+
+    /** 1 像素内描边的小牌（id 牌、标签、等级牌、冲突牌都是它） */
+    public static void plate(@Nonnull GuiGraphics g, int x, int y, int width, int height, int fill, int edge) {
+        g.fill(x, y, x + width, y + height, fill);
+        border(g, x, y, width, height, edge);
+    }
+
+    /** 分类 / 宝藏这类彩色标签，13 高，返回宽度 */
+    public static int tag(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component text,
+                          int x, int y, int color) {
+        int w = font.width(text) + 10;
+        plate(g, x, y, w, 13, mix(0xFF0B1030, color, 0.14f), color);
+        g.drawString(font, text.getString(), x + 5, y + 3, color, false);
+        return w;
+    }
+
+    /** 冲突小牌（红），返回宽度（不含间距） */
+    public static int chip(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component text,
+                           int x, int y, boolean hovered) {
+        int w = font.width(text) + 10;
+        plate(g, x, y, w, 13, hovered ? 0x3DFF5A6E : 0x14FF5A6E, hovered ? DANGER : 0xFF8F3F52);
+        g.drawString(font, text.getString(), x + 5, y + 3, hovered ? 0xFFFFFFFF : 0xFFFF9AA6, false);
+        return w;
+    }
+
     public static int badge(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component text,
                             int x, int y, int color, boolean hovered) {
-        int textWidth = font.width(text);
-        int width = textWidth + 8;
-        int height = font.lineHeight + 4;
-        g.fill(x, y, x + width, y + height, hovered ? PANEL_HOVER : PANEL_ALT);
-        border(g, x, y, width, height, color);
-        g.drawString(font, text, x + 4, y + 3, color, false);
-        return width + 3;
+        int w = font.width(text) + 10;
+        plate(g, x, y, w, 13, hovered ? mix(0xFF0B1030, color, 0.28f) : mix(0xFF0B1030, color, 0.14f),
+                hovered ? 0xFFFFFFFF : color);
+        g.drawString(font, text.getString(), x + 5, y + 3, hovered ? 0xFFFFFFFF : color, false);
+        return w + 3;
+    }
+
+    public static void divider(@Nonnull GuiGraphics g, int x, int y, int width) {
+        g.fill(x, y, x + width, y + 1, LINE);
     }
 
     /**
-     * 画一个竖向滚动条。
-     * <p>内容不超出可视区时不绘制。</p>
-     *
-     * @param g             绘制上下文
-     * @param x             轨道左边缘
-     * @param y             轨道上边缘
-     * @param height        轨道高度
-     * @param contentHeight 内容总高度
-     * @param scroll        当前滚动偏移
-     */
-    public static void scrollbar(@Nonnull GuiGraphics g, int x, int y, int height,
-                                 int contentHeight, int scroll) {
-        if (contentHeight <= height) {
-            return;
-        }
-        g.fill(x, y, x + 3, y + height, PANEL_ALT);
-
-        int thumbHeight = Math.max(16, height * height / contentHeight);
-        int maxScroll = contentHeight - height;
-        int travel = height - thumbHeight;
-        int thumbY = y + (maxScroll <= 0 ? 0 : (int) ((long) scroll * travel / maxScroll));
-
-        g.fill(x, thumbY, x + 3, thumbY + thumbHeight, ACCENT);
-    }
-
-    /**
-     * 绘制自动换行的多行文本，返回绘制后应继续的纵坐标。
-     *
-     * <h3>为什么要有这个</h3>
-     * <p>
-     * 详情面板里那些说明性短句原本都是直接 {@code drawString} 画的，
-     * 短的时候看不出问题；一旦文字变长——比如提示里嵌了一条完整的语言键
-     * {@code enchantment.lrtactical.backstab.desc}——就会一路画出面板右边界，
-     * 后半句直接看不到，而且没有任何迹象表明它被截断了。
-     * </p>
-     * <p>
-     * {@link #trimmed} 至少会给个省略号，但那是为「一行内必须放下」的场景准备的
-     * （比如列表行）。说明文字应该换行而不是被砍掉。
-     * </p>
-     *
-     * @param g          绘制上下文
-     * @param font       字体
-     * @param text       文字
-     * @param x          左
-     * @param y          上
-     * @param maxWidth   可用宽度
-     * @param color      颜色
-     * @return 绘制后应继续的纵坐标
-     */
-    public static int wrapped(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component text,
-                              int x, int y, int maxWidth, int color) {
-        for (Component line : font.split(text, Math.max(1, maxWidth))) {
-            g.drawString(font, line, x, y, color, false);
-            y += font.lineHeight + 1;
-        }
-        return y;
-    }
-
-    /**
-     * 绘制被宽度截断的文本，超出部分以省略号结尾。
-     *
-     * @param g        绘制上下文
-     * @param font     字体
-     * @param text     文字
-     * @param x        左
-     * @param y        上
-     * @param maxWidth 最大宽度
-     * @param color    颜色
-     */
-    public static void trimmed(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component text,
-                               int x, int y, int maxWidth, int color) {
-        String raw = text.getString();
-        if (font.width(raw) <= maxWidth) {
-            g.drawString(font, raw, x, y, color, false);
-            return;
-        }
-        String clipped = font.plainSubstrByWidth(raw, maxWidth - font.width("...")) + "...";
-        g.drawString(font, clipped, x, y, color, false);
-    }
-
-    /**
-     * 画一个与本界面风格一致的按钮，并返回是否处于悬停状态。
-     *
-     * <h3>为什么不用原版 {@code Button}</h3>
-     * <p>
-     * 原版按钮是九宫格贴图，灰色石质、悬停变蓝——它是为原版 GUI 的
-     * 石头质感设计的。放进本界面的暗褐 + 金色配色里非常突兀，而且它的贴图会跟随资源包变化，
-     * 换一个材质包按钮就变了样，旁边自绘的部分却不会跟着变，割裂感更明显。
-     * </p>
-     * <p>
-     * 这里改成和面板、徽章同一套绘制原语（{@link #fill} + 1px 边框），
-     * 整个界面只有一种视觉语言。
-     * </p>
-     *
-     * @param g       绘制上下文
-     * @param font    字体
-     * @param label   按钮文字
-     * @param x       左
-     * @param y       上
-     * @param width   宽
-     * @param height  高
-     * @param enabled 是否可用；不可用时文字与边框转为灰色且不响应悬停
-     * @param mouseX  鼠标 X
-     * @param mouseY  鼠标 Y
-     * @return 是否悬停（不可用时恒为 false）
+     * 银边按钮，高 14：上下各一道亮边和暗边，按下时字往下沉 1 像素。
+     * 宽度由调用方给（一般是字宽 + 14）。返回是否悬停。
      */
     public static boolean button(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component label,
                                  int x, int y, int width, int height,
                                  boolean enabled, int mouseX, int mouseY) {
         boolean hovered = enabled && hit(mouseX, mouseY, x, y, width, height);
-
-        int fill = !enabled ? PANEL : (hovered ? ACCENT_FILL : PANEL_ALT);
-        int edge = !enabled ? BORDER : (hovered ? ACCENT : TEXT_DIM);
-        int text = !enabled ? OFF : (hovered ? ACCENT : TEXT);
-
-        g.fill(x, y, x + width, y + height, fill);
-        border(g, x, y, width, height, edge);
-
-        int textWidth = font.width(label);
-        g.drawString(font, label, x + (width - textWidth) / 2,
-                y + (height - font.lineHeight) / 2 + 1, text, false);
+        boolean pressed = hovered && Ui.isLeftPressed();
+        int rim = pressed ? 0xFF8FA2D6 : hovered ? EDGE_HI : 0xFF7F93C8;
+        int hi = pressed ? 0xFF0B1030 : hovered ? 0xFF5367BD : 0xFF33468C;
+        int bd = pressed ? 0xFF0F1638 : hovered ? 0xFF27367C : 0xFF1C2759;
+        int lo = hovered ? 0xFF1A2458 : 0xFF121A40;
+        if (!enabled) {
+            rim = BORDER;
+        }
+        g.fill(x, y, x + width, y + height, bd);
+        g.fill(x, y, x + width, y + 1, rim);
+        g.fill(x, y + 1, x + width, y + 2, hi);
+        g.fill(x, y + height - 2, x + width, y + height - 1, lo);
+        g.fill(x, y + height - 1, x + width, y + height, rim);
+        g.fill(x, y, x + 1, y + height, rim);
+        g.fill(x + width - 1, y, x + width, y + height, rim);
+        int color = !enabled ? OFF : hovered ? 0xFFFFFFFF : SILVER;
+        int tx = x + (width - font.width(label)) / 2;
+        text(g, font, label, tx, y + 3 + (pressed ? 1 : 0), color);
         return hovered;
     }
 
-    /**
-     * 画一个区块标题：左侧竖条 + 标题文字 + 右侧贯穿到底的细分隔线。
-     * <p>
-     * 比单独一行文字更容易在长详情页里扫到，也免去了在每个区块末尾再画一条分隔线——
-     * 分隔线跟着标题走，区块的起止一眼可辨。
-     * </p>
-     *
-     * @param g          绘制上下文
-     * @param font       字体
-     * @param title      标题
-     * @param x          左
-     * @param y          上
-     * @param innerWidth 可用宽度
-     * @return 绘制后应继续的纵坐标
-     */
-    public static int sectionHeader(@Nonnull GuiGraphics g, @Nonnull Font font,
-                                    @Nonnull Component title, int x, int y, int innerWidth) {
-        g.fill(x, y, x + 2, y + font.lineHeight, tint);
-        g.drawString(font, title, x + 6, y, tint, false);
-
-        int lineLeft = x + 6 + font.width(title) + 6;
-        int lineY = y + font.lineHeight / 2;
-        if (lineLeft < x + innerWidth) {
-            g.fill(lineLeft, lineY, x + innerWidth, lineY + 1, BORDER);
-            // 区块分隔线的流光比顶栏那道更弱、相位错开，
-            // 免得整屏的高光同步扫动像跑马灯
-            sweep(g, lineLeft, lineY, x + innerWidth - lineLeft, time(), 0.35f);
-        }
-        return y + font.lineHeight + 5;
+    public static int buttonWidth(@Nonnull Font font, @Nonnull Component label) {
+        return font.width(label) + 14;
     }
 
-    /**
-     * 画一行「标签 —— 值」，标签左对齐、值右对齐。
-     *
-     * @param g          绘制上下文
-     * @param font       字体
-     * @param label      左侧标签
-     * @param value      右侧值
-     * @param x          左
-     * @param y          上
-     * @param innerWidth 可用宽度
-     * @param valueColor 值的颜色
-     * @return 绘制后应继续的纵坐标
-     */
+    /** 节头：分节星 + 银字 + 一道线 + 收尾小菱，高 10，返回下一行的 y（已含下面 3 像素） */
+    public static int sectionHeader(@Nonnull GuiGraphics g, @Nonnull Font font,
+                                    @Nonnull Component title, int x, int y, int innerWidth) {
+        sprite(g, "orn", x, y + 1, 7, 7);
+        int tx = x + 12;
+        int endX = x + innerWidth - 5;
+        int titleW = font.width(title);
+        if (titleW <= endX - 5 - tx) {
+            text(g, font, title, tx, y + 1, SILVER);
+        } else {
+            String cut = trim(font, title.getString(), endX - 5 - tx);
+            text(g, font, cut, tx, y + 1, SILVER);
+            titleW = font.width(cut);
+        }
+        int lineLeft = tx + titleW + 5;
+        if (lineLeft < endX - 5) {
+            g.fill(lineLeft, y + 4, endX - 5, y + 5, LINE);
+        }
+        sprite(g, "orn_end", endX, y + 2, 5, 5);
+        return y + 13;
+    }
+
+    /** 标签 …… 值，值靠右；行高 11 */
     public static int keyValue(@Nonnull GuiGraphics g, @Nonnull Font font,
                                @Nonnull Component label, @Nonnull String value,
                                int x, int y, int innerWidth, int valueColor) {
-        g.drawString(font, label, x, y, TEXT_DIM, false);
-        int valueWidth = font.width(value);
-        g.drawString(font, value, x + innerWidth - valueWidth, y, valueColor, false);
-        return y + font.lineHeight + 3;
+        int labelW = font.width(label);
+        int valueW = font.width(value);
+        g.drawString(font, label.getString(), x, y + 1, TEXT_DIM, false);
+        int vx = x + innerWidth - valueW;
+        g.drawString(font, value, vx, y + 1, valueColor, false);
+        dots(g, x + labelW + 4, vx - 4, y + 7);
+        return y + 11;
     }
 
-    /**
-     * 画一个实心小圆点（用 3 段矩形近似，避免引入贴图）。
-     *
-     * @param g     绘制上下文
-     * @param cx    圆心 X
-     * @param cy    圆心 Y
-     * @param color 颜色
-     */
-    public static void dot(@Nonnull GuiGraphics g, int cx, int cy, int color) {
-        g.fill(cx - 1, cy - 2, cx + 2, cy + 3, color);
-        g.fill(cx - 2, cy - 1, cx + 3, cy + 2, color);
+    public static void dots(@Nonnull GuiGraphics g, int x0, int x1, int y) {
+        if (x0 >= x1) {
+            return;
+        }
+        // fill 不在 drawManaged 里时一次一提交，一行点线合成一批
+        g.drawManaged(() -> {
+            for (int x = x0; x < x1; x += 3) {
+                g.fill(x, y, x + 1, y + 1, DOTS);
+            }
+        });
     }
 
-    /**
-     * 把 1~10 转成罗马数字，与游戏内附魔等级的显示方式一致。
-     *
-     * @param level 等级
-     * @return 罗马数字；超出 1~10 时返回原数字的十进制文本
-     */
+    /** 刻度尺滚动条，宽 7：每 20 一长刻、每 4 一短刻、中轴一道，游标框里穿一颗月珠。内容放得下时什么都不画 */
+    public static void scrollbar(@Nonnull GuiGraphics g, int x, int y, int height,
+                                 int contentHeight, int scroll, boolean hot) {
+        if (contentHeight <= height || height <= 0) {
+            return;
+        }
+        int th = thumbHeight(height, contentHeight);
+        int max = contentHeight - height;
+        int ty = y + (max <= 0 ? 0 : Math.round((float) (height - th) * Math.min(scroll, max) / max));
+        // 刻度和游标框合成一批提交；月珠是贴图，得等这批画完再盖上去
+        g.drawManaged(() -> {
+            g.fill(x + 3, y, x + 4, y + height, 0xFF232F5C);
+            for (int i = 0; i < height; i += 4) {
+                g.fill(x + 2, y + i, x + 5, y + i + 1, 0xFF3D4F8A);
+            }
+            for (int i = 0; i < height; i += 20) {
+                g.fill(x + 1, y + i, x + 6, y + i + 1, 0xFF6C7FB8);
+            }
+            g.fill(x + 1, ty, x + 6, ty + th, hot ? 0xF528387A : 0xF5101839);
+            border(g, x + 1, ty, 5, th, hot ? 0xFFFFFFFF : EDGE);
+        });
+        sprite(g, "bead", x + 1, ty + th / 2 - 2, 5, 5);
+    }
+
+    public static void scrollbar(@Nonnull GuiGraphics g, int x, int y, int height,
+                                 int contentHeight, int scroll) {
+        scrollbar(g, x, y, height, contentHeight, scroll, false);
+    }
+
+    /** 游标高度取奇数，月珠才落在正中 */
+    public static int thumbHeight(int height, int contentHeight) {
+        int h = Math.max(13, Math.round((float) height * height / Math.max(1, contentHeight)));
+        h = (h & 1) == 0 ? h + 1 : h;
+        return Math.max(1, Math.min(height, h));
+    }
+
+    /** 带投影的字：投影是右下 1 像素的深蓝，不走原版那种按字色压暗的投影 */
+    public static void text(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component text,
+                            int x, int y, int color) {
+        text(g, font, FormattedCharSequence.of(text), x, y, color);
+    }
+
+    public static void text(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull String text,
+                            int x, int y, int color) {
+        g.drawString(font, text, x + 1, y + 1, SHADOW, false);
+        g.drawString(font, text, x, y, color, false);
+    }
+
+    public static void text(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull FormattedCharSequence text,
+                            int x, int y, int color) {
+        g.drawString(font, recolor(text, SHADOW), x + 1, y + 1, SHADOW, false);
+        g.drawString(font, text, x, y, color, false);
+    }
+
+    @Nonnull
+    public static FormattedCharSequence recolor(@Nonnull FormattedCharSequence seq, int color) {
+        List<TextRun> out = new ArrayList<>(seq.runs().size());
+        for (TextRun run : seq.runs()) {
+            out.add(new TextRun(run.text, color & 0xFFFFFF, run.flags));
+        }
+        return FormattedCharSequence.of(out);
+    }
+
+    /** 自动换行，返回下一行的 y；每行占 lineHeight + 1 */
+    public static int wrapped(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component text,
+                              int x, int y, int maxWidth, int color) {
+        return wrapped(g, font, text, x, y, maxWidth, color, font.lineHeight + 1, false);
+    }
+
+    public static int wrapped(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component text,
+                              int x, int y, int maxWidth, int color, int lineStep, boolean shadow) {
+        for (FormattedCharSequence line : font.splitSequences(text, Math.max(1, maxWidth))) {
+            if (shadow) {
+                text(g, font, line, x, y, color);
+            } else {
+                g.drawString(font, line, x, y, color, false);
+            }
+            y += lineStep;
+        }
+        return y;
+    }
+
+    public static void trimmed(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component text,
+                               int x, int y, int maxWidth, int color) {
+        trimmed(g, font, text, x, y, maxWidth, color, false);
+    }
+
+    public static void trimmed(@Nonnull GuiGraphics g, @Nonnull Font font, @Nonnull Component text,
+                               int x, int y, int maxWidth, int color, boolean shadow) {
+        String s = trim(font, text.getString(), maxWidth);
+        if (shadow) {
+            text(g, font, s, x, y, color);
+        } else {
+            g.drawString(font, s, x, y, color, false);
+        }
+    }
+
+    @Nonnull
+    public static String trim(@Nonnull Font font, @Nonnull String raw, int maxWidth) {
+        if (font.width(raw) <= maxWidth) {
+            return raw;
+        }
+        if (maxWidth <= font.width("…")) {
+            return "";
+        }
+        return font.plainSubstrByWidth(raw, maxWidth - font.width("…")) + "…";
+    }
+
     @Nonnull
     public static String roman(int level) {
         switch (level) {
@@ -379,404 +492,40 @@ public final class UiTheme {
         }
     }
 
-    // ==================== 动画与光效 ====================
-
-    /** 流光的分段数，见 {@link #sweep} 的性能说明 */
-    private static final int SWEEP_SEGMENTS = 24;
-
-    /**
-     * 当前界面的强调色调。
-     *
-     * <h3>为什么用一个可变的全局值</h3>
-     * <p>
-     * 分隔线流光、区块标题、面板角标这些装饰件散布在好几个类里，
-     * 而它们应该<b>一起</b>随当前选中附魔的稀有度变色。
-     * 逐个方法加一个颜色参数意味着从最外层一路往下传，
-     * 中间那些根本不关心颜色的方法也得跟着改签名。
-     * </p>
-     * <p>
-     * 装饰色是「本帧的绘制上下文」，不是某个方法的输入——每帧开头由
-     * {@code CodexScreen} 设一次，之后所有装饰件自动同步。
-     * </p>
-     */
-    private static int tint = ACCENT;
-
-    /**
-     * 本帧的「显现进度」0~1，供角标等装饰件做开场生长。
-     *
-     * <h3>为什么用它替掉原来那道光带</h3>
-     * <p>
-     * 原来开场时有一道金色光带自上而下扫过整屏。问题是它<b>与界面无关</b>——
-     * 一道横线从世界背景上刷过去，既不是面板的一部分，也没说明任何事，
-     * 看起来像渲染出了岔子。
-     * </p>
-     * <p>
-     * 改成让面板四角的金饰从零「长」出来：动的是界面自己的构件，
-     * 观感是这块面板正在被勾勒成形，而不是有个东西从旁边飞过。
-     * </p>
-     */
-    private static float reveal = 1f;
-
-    /**
-     * 供各绘制方法共用的时间源（秒）。
-     * <p>
-     * 取模 600 秒是为了让浮点数不会随着游戏开着越久而精度越差——
-     * 十分钟一个循环，所有动画都是周期性的，接缝处看不出来。
-     * </p>
-     *
-     * @return 当前时间（秒）
-     */
-    /**
-     * 设置本帧的装饰色调。
-     *
-     * @param color ARGB 颜色
-     */
-    public static void setTint(int color) {
-        tint = color;
-    }
-
-    /**
-     * 设置本帧的显现进度。
-     *
-     * @param value 0~1
-     */
-    public static void setReveal(float value) {
-        reveal = Math.min(1f, Math.max(0f, value));
-    }
-
-    /**
-     * @return 本帧的装饰色调
-     */
-    public static int tint() {
-        return tint;
-    }
-
-    public static float time() {
-        return (System.currentTimeMillis() % 600000L) / 1000f;
-    }
-
-    /**
-     * 缓出三次曲线：开头快、结尾慢。
-     * <p>
-     * 界面出现用缓出而不是线性，是因为线性动画在末尾会「啪」地停住，
-     * 看起来像卡了一下；缓出让它滑进最终位置，短到 0.2 秒也能感觉到差别。
-     * </p>
-     *
-     * @param t 归一化进度 0~1
-     * @return 缓动后的进度
-     */
-    public static float easeOutCubic(float t) {
-        float clamped = Math.min(1f, Math.max(0f, t));
-        float inv = 1f - clamped;
-        return 1f - inv * inv * inv;
-    }
-
-    /**
-     * 缓入三次曲线：开头慢、结尾快。
-     * <p>
-     * 与 {@link #easeOutCubic} 配对使用：出现用缓出（滑进来后稳稳停住），
-     * 消失用缓入（先几乎不动，再加速离场）。
-     * </p>
-     * <p>
-     * 反过来用是最常见的错误：消失若用缓出，画面会在按下的一瞬间猛地弹开一大截，
-     * 然后慢吞吞地磨完剩下一点——观感就是「一顿」。
-     * </p>
-     *
-     * @param t 归一化进度 0~1
-     * @return 缓动后的进度
-     */
-    public static float easeInCubic(float t) {
-        float clamped = Math.min(1f, Math.max(0f, t));
-        return clamped * clamped * clamped;
-    }
-
-    /**
-     * 把颜色的 alpha 乘上一个系数。
-     *
-     * @param argb  原色
-     * @param scale 系数 0~1
-     * @return 调整后的颜色
-     */
-    public static int withAlpha(int argb, float scale) {
-        int alpha = (int) (((argb >>> 24) & 0xFF) * Math.min(1f, Math.max(0f, scale)));
-        return (alpha << 24) | (argb & 0x00FFFFFF);
-    }
-
-    /**
-     * 在一条水平线上画一段缓慢往复的流光。
-     *
-     * <h3>性能：为什么改成分段画</h3>
-     * <p>
-     * 原实现是<b>逐像素</b>的：光带半宽取 {@code width/8}，一条 1000px 宽的分隔线
-     * 就要 251 次 {@code fill}。详情页有 7 个区块标题加顶栏分隔线，
-     * 单这一项每帧约 2000 次绘制调用，60fps 下十二万次——这就是掉帧的来源。
-     * </p>
-     * <p>
-     * 改成固定 {@value #SWEEP_SEGMENTS} 段，每段一个矩形、整段同一 alpha。
-     * 段数够多，在暗底上的渐变看不出是台阶；调用次数从 251 降到 24。
-     * </p>
-     *
-     * @param g     绘制上下文
-     * @param x     左
-     * @param y     纵坐标
-     * @param width 宽
-     * @param time  当前时间（秒）
-     * @param phase 相位偏移，让不同分隔线的高光错开
-     * @param color 流光颜色，可按稀有度着色
-     */
-    public static void sweep(@Nonnull GuiGraphics g, int x, int y, int width,
-                             float time, float phase, int color) {
-        if (width <= 0) {
-            return;
-        }
-        // 用三角波而不是取模：取模会在回到起点时瞬移，三角波是来回扫
-        float t = ((time / 12f) + phase) % 1f;
-        float tri = t < 0.5f ? t * 2f : (1f - t) * 2f;
-
-        int center = x + (int) (tri * width);
-        int half = Math.max(16, width / 8);
-        int step = Math.max(1, half * 2 / SWEEP_SEGMENTS);
-
-        for (int i = 0; i < SWEEP_SEGMENTS; i++) {
-            int sx = center - half + i * step;
-            int ex = Math.min(sx + step, x + width);
-            if (ex <= x || sx >= x + width) {
-                continue;
-            }
-            // 段中心到光带中心的距离决定亮度
-            float mid = (sx + ex) * 0.5f - center;
-            float falloff = 1f - Math.min(1f, Math.abs(mid) / half);
-            int alpha = (int) (110 * falloff * falloff);
-            if (alpha <= 2) {
-                continue;
-            }
-            g.fill(Math.max(x, sx), y, ex, y + 1, (alpha << 24) | (color & 0x00FFFFFF));
-        }
-    }
-
-    /**
-     * 用默认强调色画流光。
-     *
-     * @param g     绘制上下文
-     * @param x     左
-     * @param y     纵坐标
-     * @param width 宽
-     * @param time  当前时间（秒）
-     * @param phase 相位偏移
-     */
-    public static void sweep(@Nonnull GuiGraphics g, int x, int y, int width,
-                             float time, float phase) {
-        sweep(g, x, y, width, time, phase, tint);
-    }
-
-    /**
-     * 在给定区域内画缓缓上升的金色光尘。
-     *
-     * <h3>确定性而非随机</h3>
-     * <p>
-     * 每个光点的横坐标由下标经一次整数散列得出，纵坐标由时间线性推进后取模——
-     * 全程没有 {@code Random}，因此不需要保存粒子状态，也不会因为帧率波动而抖动。
-     * 界面重开时光点位置连续，不会「重新撒一把」。
-     * </p>
-     *
-     * @param g      绘制上下文
-     * @param x      左
-     * @param y      上
-     * @param width  宽
-     * @param height 高
-     * @param time   当前时间（秒）
-     * @param count  光点数量
-     * @param alpha  整体透明度系数 0~1
-     */
-    public static void motes(@Nonnull GuiGraphics g, int x, int y, int width, int height,
-                             float time, int count, float alpha) {
-        motes(g, x, y, width, height, time, count, alpha, 1f);
-    }
-
-    /**
-     * 画缓缓上升的光尘，可指定速度倍率。
-     *
-     * @param g      绘制上下文
-     * @param x      左
-     * @param y      上
-     * @param width  宽
-     * @param height 高
-     * @param time   当前时间（秒）
-     * @param count  光点数量
-     * @param alpha  整体透明度系数 0~1
-     * @param speedScale 速度倍率，稀有度越高越快
-     */
-    public static void motes(@Nonnull GuiGraphics g, int x, int y, int width, int height,
-                             float time, int count, float alpha, float speedScale) {
-        if (width <= 0 || height <= 0 || alpha <= 0f) {
-            return;
-        }
-        for (int i = 0; i < count; i++) {
-            int hash = i * 1103515245 + 12345;
-            int px = x + Math.floorMod(hash >> 8, Math.max(1, width));
-            float speed = (6f + Math.floorMod(hash >> 3, 9)) * speedScale;
-            float offset = Math.floorMod(hash >> 16, 1000) / 1000f;
-
-            // 自下而上：进度 1 在底部、0 在顶部
-            float progress = 1f - (((time * speed / height) + offset) % 1f);
-            int py = y + (int) (progress * height);
-
-            // 轻微横向漂移：完全垂直上升像雨滴倒放，加一点摆动才像悬浮的尘埃。
-            // 用光点自身的散列值做相位，各飘各的，不会整片同步摆
-            px += (int) (Math.sin(time * 0.6 + (hash >> 5)) * 3.0);
-            if (px < x || px >= x + width) {
-                continue;
-            }
-
-            // 两端淡出，避免光点在边缘凭空出现或消失
-            float fade = Math.min(1f, Math.min(progress, 1f - progress) * 6f);
-            int a = (int) (70 * fade * alpha);
-            if (a <= 2) {
-                continue;
-            }
-            int color = (a << 24) | (tint & 0x00FFFFFF);
-            // 四分之一的光点画成 2x2，避免整片看起来像噪点。
-            // 原来是额外补两个十字矩形，一颗光点要三次 fill；改成一次画大一点，
-            // 视觉差别看不出来，调用次数少三分之二
-            int size = (hash & 3) == 0 ? 2 : 1;
-            g.fill(px, py, px + size, py + size, color);
-        }
-    }
-
-    /**
-     * 四角压暗的暗角效果。
-     *
-     * <h3>它解决什么</h3>
-     * <p>
-     * 遮罩是一层均匀的半透明黑，屏幕四周和中央一样亮，金色面板放上去后
-     * 视线没有着落点。暗角把边缘再压暗一档，中央相对更亮，
-     * 面板就自然「浮」出来了——这是最省力的聚焦手段，不需要任何贴图。
-     * </p>
-     * <p>
-     * 用同心矩形逼近而不是真的算径向渐变：一层层往里画 12 圈，
-     * 每圈 alpha 递减，在暗底上看不出是矩形。
-     * </p>
-     *
-     * @param g      绘制上下文
-     * @param width  屏幕宽
-     * @param height 屏幕高
-     * @param scale  整体强度系数 0~1
-     */
-    public static void vignette(@Nonnull GuiGraphics g, int width, int height, float scale) {
-        if (scale <= 0f) {
-            return;
-        }
-        // 6 圈足够，暗底上看不出台阶；12 圈只是把 fill 次数翻倍
-        int rings = 6;
-        int stepX = Math.max(1, width / (rings * 4));
-        int stepY = Math.max(1, height / (rings * 4));
-        for (int i = 0; i < rings; i++) {
-            int inset = i;
-            int alpha = (int) (26 * scale);
-            if (alpha <= 0) {
-                break;
-            }
-            int color = (alpha << 24);
-            int left = inset * stepX;
-            int top = inset * stepY;
-            g.fill(0, top, left + stepX, height - top, color);
-            g.fill(width - left - stepX, top, width, height - top, color);
-            g.fill(0, top, width, top + stepY, color);
-            g.fill(0, height - top - stepY, width, height, color);
-        }
-    }
-
-
-    /**
-     * 呼吸系数：在 {@code min} 与 1 之间以 {@code period} 秒为周期平滑往复。
-     *
-     * @param time   当前时间（秒）
-     * @param period 周期（秒）
-     * @param min    最低值
-     * @return 系数
-     */
-    public static float breathe(float time, float period, float min) {
-        float wave = (float) ((Math.sin(time / period * Math.PI * 2.0) + 1.0) * 0.5);
-        return min + (1f - min) * wave;
-    }
-
-    /**
-     * 在面板四角画金色转角装饰。
-     * <p>
-     * 黄金树的视觉语言里，金饰总是出现在边界与转角而不是铺满平面。
-     * 四个 L 形短角比一整圈亮边框克制得多，却足以让面板从背景里「立」出来。
-     * </p>
-     *
-     * @param g      绘制上下文
-     * @param x      左
-     * @param y      上
-     * @param width  宽
-     * @param height 高
-     * @param length 每条角边的长度
-     * @param color  颜色
-     */
-    public static void corners(@Nonnull GuiGraphics g, int x, int y, int width, int height,
-                               int length, int color) {
-        // 开场时从零长到满长，四角像被逐渐勾勒出来
-        length = Math.max(1, (int) (length * reveal));
-        int right = x + width;
-        int bottom = y + height;
-
-        g.fill(x, y, x + length, y + 1, color);
-        g.fill(x, y, x + 1, y + length, color);
-
-        g.fill(right - length, y, right, y + 1, color);
-        g.fill(right - 1, y, right, y + length, color);
-
-        g.fill(x, bottom - 1, x + length, bottom, color);
-        g.fill(x, bottom - length, x + 1, bottom, color);
-
-        g.fill(right - length, bottom - 1, right, bottom, color);
-        g.fill(right - 1, bottom - length, right, bottom, color);
-    }
-
-    /**
-     * 画一条水平方向由浓到淡的渐变条。
-     * <p>用于悬停行：纯色块会把整行「盖住」，渐变则像光扫过去，不抢文字。</p>
-     *
-     * @param g      绘制上下文
-     * @param x      左
-     * @param y      上
-     * @param width  宽
-     * @param height 高
-     * @param color  起始颜色（右端淡出到全透明）
-     */
-    public static void gradientRow(@Nonnull GuiGraphics g, int x, int y, int width, int height,
-                                   int color) {
-        if (width <= 0) {
-            return;
-        }
-        // 分 16 段近似，足够平滑又不至于画出上百个矩形
-        int steps = 16;
-        int step = Math.max(1, width / steps);
-        for (int i = 0; i < steps; i++) {
-            int sx = x + i * step;
-            int ex = Math.min(x + width, sx + step);
-            if (sx >= ex) {
-                break;
-            }
-            float k = 1f - (i / (float) steps);
-            g.fill(sx, y, ex, y + height, withAlpha(color, k * k));
-        }
-    }
-
-    /**
-     * 判断坐标是否落在矩形内。
-     *
-     * @param mouseX 鼠标 X
-     * @param mouseY 鼠标 Y
-     * @param x      左
-     * @param y      上
-     * @param width  宽
-     * @param height 高
-     * @return 是否命中
-     */
     public static boolean hit(double mouseX, double mouseY, int x, int y, int width, int height) {
         return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+    }
+
+    private static final int[][] DIRS = {{1, 0}, {1, -1}, {0, -1}, {-1, -1}, {-1, 0}, {-1, 1}, {0, 1}, {1, 1}};
+    private static final List<long[]> SPARKS = new ArrayList<>();
+
+    /** 从 (cx, cy) 往八个方向迸出 n 颗 3×3 星点，每 45 毫秒走一步，六步灭 */
+    public static void burst(int cx, int cy, int n) {
+        long t = now();
+        for (int i = 0; i < n && SPARKS.size() < 64; i++) {
+            SPARKS.add(new long[]{t, cx - 1, cy - 1, (i * 3 + 1) % 8, 2 + (i % 3)});
+        }
+    }
+
+    public static void renderSparks(@Nonnull GuiGraphics g) {
+        if (SPARKS.isEmpty()) {
+            return;
+        }
+        long t = now();
+        g.pose().pushPose();
+        g.pose().translate(0f, 0f, 300f);
+        Iterator<long[]> it = SPARKS.iterator();
+        while (it.hasNext()) {
+            long[] s = it.next();
+            int step = (int) ((t - s[0]) / 45L);
+            if (step > 5) {
+                it.remove();
+                continue;
+            }
+            int[] d = DIRS[(int) s[3]];
+            int dist = 4 + step * (int) s[4];
+            spriteAlpha(g, "spark", (int) s[1] + d[0] * dist, (int) s[2] + d[1] * dist, 3, 3, step > 3 ? 0.4f : 1f);
+        }
+        g.pose().popPose();
     }
 }

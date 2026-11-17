@@ -74,6 +74,13 @@ public final class Ui {
     }
 
     /**
+     * 鼠标左键是否按着（同 1.20.1 mouseHandler.isLeftPressed）
+     */
+    public static boolean isLeftPressed() {
+        return org.lwjgl.input.Mouse.isButtonDown(0);
+    }
+
+    /**
      * 读剪贴板文本
      *
      * @return 文本；读不到时为空串
