@@ -293,11 +293,12 @@ public final class CodexScreen extends Screen {
         }
         total += 4;
         // 主题按钮压在标题栏最右，和丝带同一行；标签挤不下时也先截标题，按钮和标签不让
-        themeMenu.layout(this.font, bx + bw - 2, by + 4, 14, 6, 14, 3, this.width, this.height);
+        // 右沿和下面的重载按钮、顶上的横线对齐
+        themeMenu.layout(this.font, bx + bw, by + 4, 14, 6, 14, 3, this.width, this.height);
         int themeW = themeMenu.button()[2] + 6;
         int titleX = bx + 21;
         titleW = this.font.width(this.title);
-        int maxTitle = bx + bw - 2 - themeW - total - 8 - titleX;
+        int maxTitle = bx + bw - themeW - total - 8 - titleX;
         titleW = Math.max(0, Math.min(titleW, maxTitle));
         int x = titleX + titleW + 8;
         for (Tab value : Tab.values()) {
