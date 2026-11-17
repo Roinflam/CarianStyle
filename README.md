@@ -248,19 +248,19 @@ Press `K` in game (rebindable in Controls) to open the codex (the screenshots ar
 - **Other enchantments:** vanilla and other mods' enchantments can be looked up here too.
 - **Effect toggles:** particles, circles and on-screen indicators can be turned off per enchantment; this only changes your own screen.
 
-![Detail page: click a level to turn the formulas into actual numbers](https://cdn.modrinth.com/data/cached_images/6d1e818ca91eecef22d8c37e83c2ca8b91c13477_0.webp)
+![Detail page: click a level to turn the formulas into actual numbers](https://cdn.modrinth.com/data/cached_images/8d92cab827420ebfb3ac92ea2dd9213caa6bb035.png)
 *Detail page: click a level to turn the formulas into actual numbers*
 
-![Conflicts link to each other; tunable values list their defaults and allowed ranges](https://cdn.modrinth.com/data/cached_images/dfe4def21d2005b9973f6efe8ff8d6bf64a402f8.png)
+![Conflicts link to each other; tunable values list their defaults and allowed ranges](https://cdn.modrinth.com/data/cached_images/49a35b78f3bdf33d93cc3b5517f285fe694240cc.png)
 *Conflicts link to each other; tunable values list their defaults and allowed ranges*
 
-![Insert an item: the list is grouped by what it can still take, and each entry says whether you need the enchanting table or an anvil](https://cdn.modrinth.com/data/cached_images/f8d770bdea7b3a3cb7898f7a88d0c2e6775967cf.png)
+![Insert an item: the list is grouped by what it can still take, and each entry says whether you need the enchanting table or an anvil](https://cdn.modrinth.com/data/cached_images/741a5cce934bdc40d2d5ab1c1ddfc0c463817f7b.png)
 *Insert an item: the list is grouped by what it can still take, and each entry says whether you need the enchanting table or an anvil*
 
-![Other enchantments: vanilla and other mods' enchantments, with the same item check](https://cdn.modrinth.com/data/cached_images/9955f9092f3666a75e4c99309ff0637ca0597ed7_0.webp)
+![Other enchantments: vanilla and other mods' enchantments, with the same item check](https://cdn.modrinth.com/data/cached_images/ef3fd28b19a892fbe7300922ce17ef411121bc6a_0.webp)
 *Other enchantments: vanilla and other mods' enchantments, with the same item check*
 
-![Effect toggles: switch particles, circles and on-screen indicators off one by one; only your own screen changes](https://cdn.modrinth.com/data/cached_images/34b95c9680e8d35d939c3771acbc6eed223caeec_0.webp)
+![Effect toggles: switch particles, circles and on-screen indicators off one by one; only your own screen changes](https://cdn.modrinth.com/data/cached_images/1c092c675522d4241c5a2aa711006cd3c38be6a7_0.webp)
 *Effect toggles: switch particles, circles and on-screen indicators off one by one; only your own screen changes*
 
 
@@ -535,19 +535,19 @@ Yes, no need to ask. Please credit the author; commercial use is not allowed (se
 - **其他附魔**：原版和其他模组的附魔也能在这里查；
 - **特效开关**：粒子、光圈、屏幕提示可以按附魔逐个关闭，只影响自己的画面。
 
-![附魔详情：点等级可以把公式换算成具体数值，下面是基础信息和适用物品](https://media.forgecdn.net/attachments/description/615940/description_cea0e1b3-6448-4f32-897f-0ae3f3108a6f.png)
+![附魔详情：点等级可以把公式换算成具体数值，下面是基础信息和适用物品](https://media.forgecdn.net/attachments/description/615940/description_b50d8a35-2090-4cd4-a87b-f2fa4c3900cf.png)
 *附魔详情：点等级可以把公式换算成具体数值，下面是基础信息和适用物品*
 
-![冲突附魔可以点击跳转；可调数值列出默认值和允许范围](https://media.forgecdn.net/attachments/description/615940/description_3e16cbd6-8a7f-455a-abf6-d67bc9a54a47.png)
+![冲突附魔可以点击跳转；可调数值列出默认值和允许范围](https://media.forgecdn.net/attachments/description/615940/description_ae33c508-741e-4277-8af3-1608b411a6ce.png)
 *冲突附魔可以点击跳转；可调数值列出默认值和允许范围*
 
-![放入物品：列表按「能附上 / 已经有了 / 被挡住」分组，并说明该用附魔台还是铁砧](https://media.forgecdn.net/attachments/description/615940/description_a46aa6de-c820-4f8f-a132-99a0876fc0c0.png)
+![放入物品：列表按「能附上 / 已经有了 / 被挡住」分组，并说明该用附魔台还是铁砧](https://media.forgecdn.net/attachments/description/615940/description_c64a07dd-8dda-4c2f-b537-c339aba0d4c9.png)
 *放入物品：列表按「能附上 / 已经有了 / 被挡住」分组，并说明该用附魔台还是铁砧*
 
-![其他附魔：原版和其他模组的附魔也能查，同样能放入物品](https://media.forgecdn.net/attachments/description/615940/description_c1be80a7-8e5e-435b-8057-333a16d41c21.png)
+![其他附魔：原版和其他模组的附魔也能查，同样能放入物品](https://media.forgecdn.net/attachments/description/615940/description_fe6c884f-878f-45ae-a3bd-b43319e80cea.png)
 *其他附魔：原版和其他模组的附魔也能查，同样能放入物品*
 
-![特效开关：粒子、法阵、屏幕提示可以逐个关闭，只影响自己的画面](https://media.forgecdn.net/attachments/description/615940/description_e537f639-ff2c-487a-9211-edf732227c35.png)
+![特效开关：粒子、法阵、屏幕提示可以逐个关闭，只影响自己的画面](https://media.forgecdn.net/attachments/description/615940/description_766bc10e-ac39-4086-ba40-59c391cd7a8f.png)
 *特效开关：粒子、法阵、屏幕提示可以逐个关闭，只影响自己的画面*
 
 
