@@ -293,9 +293,10 @@ public final class CodexScreen extends Screen {
         int titleX = bx + 21;
         // 主题按钮靠右，标签放不下时按钮先缩到只剩箭头
         int themeFull = ThemeMenu.labelWidth(this.font) + ThemeMenu.ARROW_GAP + ThemeMenu.ARROW_W + 14;
-        int themeRoom = bx + bw - 2 - (titleX + total + 8 + 6);
+        // 右沿和下面的重载按钮、顶上的横线对齐
+        int themeRoom = bx + bw - (titleX + total + 8 + 6);
         int themeW = Math.max(ThemeMenu.ARROW_W + 14, Math.min(themeFull, themeRoom));
-        int themeX = bx + bw - 2 - themeW;
+        int themeX = bx + bw - themeW;
         themeMenu.place(themeX, by + 4, themeW, 14, 14,
                 ThemeMenu.labelWidth(this.font) + 9 + 5 + 12, this.width, this.height);
         titleW = this.font.width(this.title);
