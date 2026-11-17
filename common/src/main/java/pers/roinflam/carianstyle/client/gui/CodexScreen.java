@@ -114,8 +114,36 @@ public final class CodexScreen extends Screen {
     private float seeTo;
     private long seeAt;
 
+    private final ThemeMenu themeMenu = new ThemeMenu();
+    private final boolean noIntro;
+
     public CodexScreen() {
+        this(false);
+    }
+
+    /** @param noIntro 从别的主题切过来时为 true，直接显示开场结束的画面 */
+    public CodexScreen(boolean noIntro) {
         super(Component.translatable("carianstyle.codex.title"));
+        this.noIntro = noIntro;
+    }
+
+    /** 打开前指定停在哪个标签页、选中哪一项；-1 / null 沿用上次的 */
+    public static void restore(int tabIndex, @Nullable String enchantId, @Nullable String foreignKey) {
+        if (tabIndex >= 0 && tabIndex < Tab.values().length) {
+            lastTab = Tab.values()[tabIndex];
+        }
+        if (enchantId != null) {
+            lastSelectedId = enchantId;
+        }
+        if (foreignKey != null) {
+            lastForeignKey = foreignKey;
+        }
+    }
+
+    private void switchTheme(int index) {
+        pers.roinflam.carianstyle.client.gui.CodexTheme.switchTo(
+                pers.roinflam.carianstyle.client.gui.CodexTheme.values()[index],
+                tab.ordinal(), lastSelectedId, lastForeignKey);
     }
 
     @Override
@@ -133,6 +161,7 @@ public final class CodexScreen extends Screen {
             seeAt = intro.start() + MoonriseIntro.END;
         }
         picker.close();
+        themeMenu.close();
         CodexScene.reload();
         detail.setFilter(filter);
         foreignDetail.setFilter(filter);
@@ -196,8 +225,11 @@ public final class CodexScreen extends Screen {
             long land = intro.start() + MoonriseIntro.LAND_AT;
             detail.playIntro(land);
             foreignDetail.playIntro(land);
-            if (!VisualToggle.isEnabled(VisualEffectType.CODEX_INTRO)) {
+            if (noIntro || !VisualToggle.isEnabled(VisualEffectType.CODEX_INTRO)) {
                 skipIntro();
+            }
+            if (noIntro) {
+                seeFrom = seeTo;
             }
         }
         updateWidgetVisibility();
@@ -260,9 +292,12 @@ public final class CodexScreen extends Screen {
             total += widths[value.ordinal()];
         }
         total += 4;
+        // 主题按钮压在标题栏最右，和丝带同一行；标签挤不下时也先截标题，按钮和标签不让
+        themeMenu.layout(this.font, bx + bw - 2, by + 4, 14, 6, 14, 3, this.width, this.height);
+        int themeW = themeMenu.button()[2] + 6;
         int titleX = bx + 21;
         titleW = this.font.width(this.title);
-        int maxTitle = bx + bw - 2 - total - 8 - titleX;
+        int maxTitle = bx + bw - 2 - themeW - total - 8 - titleX;
         titleW = Math.max(0, Math.min(titleW, maxTitle));
         int x = titleX + titleW + 8;
         for (Tab value : Tab.values()) {
@@ -446,7 +481,7 @@ public final class CodexScreen extends Screen {
         long e = t - intro.start();
         boolean modal = picker.isOpen();
         // 书还没照全时不响应悬停
-        boolean hidden = modal || e < MoonriseIntro.UNFOLD_AT + MoonriseIntro.UNFOLD_DUR;
+        boolean hidden = modal || themeMenu.isOpen() || e < MoonriseIntro.UNFOLD_AT + MoonriseIntro.UNFOLD_DUR;
         int underX = hidden ? -1 : mouseX;
         int underY = hidden ? -1 : mouseY;
 
@@ -508,6 +543,11 @@ public final class CodexScreen extends Screen {
             picker.render(g, this.font, this.minecraft.player.getInventory(), mouseX, mouseY, filter.getSourceSlot());
         } else if (filterHovered) {
             renderFilterTooltip(g, mouseX, mouseY);
+        }
+        if (themeMenu.isOpen()) {
+            renderThemeMenu(g, mouseX, mouseY);
+        } else if (!hidden && themeMenu.overButton(mouseX, mouseY)) {
+            g.renderTooltip(this.font, Component.translatable("carianstyle.codex.ui_theme.tip"), mouseX, mouseY);
         }
         UiTheme.renderSparks(g);
     }
@@ -626,10 +666,11 @@ public final class CodexScreen extends Screen {
 
         Component stat = statLine();
         int statW = this.font.width(stat);
-        int statX = bx + bw - 2 - statW;
+        int statX = themeMenu.button()[0] - 8 - statW;
         if (statX >= tabsEnd + 8) {
             UiTheme.text(g, this.font, stat, statX, by + 7, UiTheme.TEXT_DIM);
         }
+        renderThemeButton(g, mouseX, mouseY);
 
         if (!isCodexTab()) {
             return;
@@ -652,6 +693,46 @@ public final class CodexScreen extends Screen {
             UiTheme.button(g, this.font, Component.translatable("carianstyle.codex.reload"),
                     reloadRect[0], reloadRect[1], reloadRect[2], 14, true, mouseX, mouseY);
         }
+    }
+
+    private void renderThemeButton(@Nonnull GuiGraphics g, int mouseX, int mouseY) {
+        int[] r = themeMenu.button();
+        boolean open = themeMenu.isOpen();
+        boolean hovered = UiTheme.button(g, this.font, Component.empty(), r[0], r[1], r[2], r[3], true,
+                open ? r[0] : mouseX, open ? r[1] : mouseY);
+        boolean pressed = hovered && this.minecraft != null && this.minecraft.mouseHandler.isLeftPressed();
+        int color = hovered ? 0xFFFFFFFF : UiTheme.SILVER;
+        int dy = pressed ? 1 : 0;
+        int tx = r[0] + themeMenu.padX();
+        UiTheme.text(g, this.font, pers.roinflam.carianstyle.client.gui.CodexTheme.current().title(), tx, r[1] + 3 + dy, color);
+        ThemeMenu.arrow(g, r[0] + r[2] - themeMenu.padX() - ThemeMenu.ARROW_W, r[1] + (r[3] - 3) / 2 + dy, open, color);
+    }
+
+    private void renderThemeMenu(@Nonnull GuiGraphics g, int mouseX, int mouseY) {
+        int[] p = themeMenu.panel();
+        g.pose().pushPose();
+        g.pose().translate(0f, 0f, 400f);
+        g.fill(p[0] + 2, p[1] + 2, p[0] + p[2] + 2, p[1] + p[3] + 2, 0x8005081A);
+        g.fillGradient(p[0], p[1], p[0] + p[2], p[1] + p[3], 0xF50F1736, 0xF8080C1E);
+        UiTheme.border(g, p[0], p[1], p[2], p[3], UiTheme.EDGE);
+        g.fill(p[0] + 1, p[1] + 1, p[0] + p[2] - 1, p[1] + 2, 0xFF33468C);
+        pers.roinflam.carianstyle.client.gui.CodexTheme current = pers.roinflam.carianstyle.client.gui.CodexTheme.current();
+        int hover = themeMenu.rowAt(mouseX, mouseY);
+        int rowH = themeMenu.rowH();
+        for (int i = 0; i < pers.roinflam.carianstyle.client.gui.CodexTheme.values().length; i++) {
+            int y = themeMenu.rowY(i);
+            boolean on = pers.roinflam.carianstyle.client.gui.CodexTheme.values()[i] == current;
+            if (i == hover) {
+                g.fill(p[0] + 1, y, p[0] + p[2] - 1, y + rowH, UiTheme.PANEL_HOVER);
+            }
+            int ty = y + (rowH - 8) / 2;
+            if (on) {
+                ThemeMenu.diamond(g, themeMenu.textX() - ThemeMenu.MARK_W, y + (rowH - 5) / 2, UiTheme.ACCENT);
+            }
+            int color = on ? UiTheme.MOON : i == hover ? 0xFFFFFFFF : UiTheme.TEXT;
+            UiTheme.text(g, this.font, ThemeMenu.name(i), themeMenu.textX(), ty, color);
+        }
+        g.pose().popPose();
     }
 
     /** 返回按钮的实际位置：附魔百科页在重载数值左边，其他附魔页没有重载数值，靠右 */
@@ -904,6 +985,10 @@ public final class CodexScreen extends Screen {
             picker.close();
             return true;
         }
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE && themeMenu.isOpen()) {
+            themeMenu.close();
+            return true;
+        }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
@@ -936,6 +1021,14 @@ public final class CodexScreen extends Screen {
                 picker.close();
                 clearItem();
             }
+            return true;
+        }
+        int themeClick = themeMenu.click(mouseX, mouseY);
+        if (themeClick >= 0) {
+            switchTheme(themeClick);
+            return true;
+        }
+        if (themeClick == ThemeMenu.CONSUMED) {
             return true;
         }
 
@@ -1018,7 +1111,7 @@ public final class CodexScreen extends Screen {
         if (intro.running(UiTheme.now())) {
             skipIntro();
         }
-        if (picker.isOpen()) {
+        if (picker.isOpen() || themeMenu.isOpen()) {
             return true;
         }
         if (tab == Tab.CODEX) {
